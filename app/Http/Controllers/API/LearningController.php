@@ -234,6 +234,41 @@ class LearningController extends Controller
                 'trainer_profile'                   =>  optional($trainerData)->profile,
             ];
 
+            // Current employee's own feedback/evaluation form state for this
+            // session — drives the app's button (Feedback Form/Evaluation
+            // Form when pending vs. View Feedback Form/View Evaluation Form
+            // once submitted). training_participants.train_*_form_id is set
+            // when the L&D Manager assigns a form; the response tables key
+            // off participant_id = employees.id (not training_participants.id
+            // despite the relation name), matching feedbackStore()/
+            // evaluationStore()'s own lookup.
+            $myEmployeeId = optional($this->user->GetEmployee)->id;
+            $myParticipant = $sessions->participants->firstWhere('employee_id', $myEmployeeId);
+
+            $feedbackResponse = null;
+            $evaluationResponse = null;
+            if ($myEmployeeId) {
+                $feedbackResponse = TrainingFeedbackResponse::where('training_id', $sessions->id)
+                    ->where('participant_id', $myEmployeeId)
+                    ->first();
+                $evaluationResponse = EvaluationFormResponse::where('training_id', $sessions->id)
+                    ->where('participant_id', $myEmployeeId)
+                    ->first();
+            }
+
+            $data['feedback_form'] = [
+                'assigned'      => (bool) optional($myParticipant)->train_feedback_form_id,
+                'form_id'       => optional($myParticipant)->train_feedback_form_id,
+                'submitted'     => (bool) $feedbackResponse,
+                'form_res_id'   => optional($feedbackResponse)->id,
+            ];
+            $data['evaluation_form'] = [
+                'assigned'      => (bool) optional($myParticipant)->train_evaluation_form_id,
+                'form_id'       => optional($myParticipant)->train_evaluation_form_id,
+                'submitted'     => (bool) $evaluationResponse,
+                'form_res_id'   => optional($evaluationResponse)->id,
+            ];
+
             $data['participants'] = [];
             foreach ($sessions->participants as $participant) {
 
@@ -407,6 +442,7 @@ class LearningController extends Controller
 
             }
          
+            $absentEmployeeIds = [];
             foreach ($request->employees as $employeeData) {
                 TrainingAttendance::updateOrCreate(
                     [
@@ -417,8 +453,13 @@ class LearningController extends Controller
                     [
                         'status'                    =>  $employeeData['status'],
                     ]
-                );      
+                );
+                if ($employeeData['status'] === 'Absent') {
+                    $absentEmployeeIds[] = $employeeData['employee_id'];
+                }
             }
+
+            $this->notifyTrainingAbsence($resort_id, $trainingSchedule->id, $absentEmployeeIds);
 
             return response()->json([
                 'success'                           =>  true,
@@ -1003,6 +1044,96 @@ class LearningController extends Controller
         }
     }
 
+    /**
+     * Employee-facing counterpart to feedbackFormResView()/evaluationFormResView()
+     * — those two sit behind check.rank:EXCOM / ld.manager (built for the L&D
+     * Manager's review screen) and take no owner, by design, since a manager
+     * must be able to open any participant's response. An employee opening
+     * their OWN submitted form from Training Details has neither rank, so it
+     * 403'd with "Forbidden: Insufficient rank" (reported on evaluation-from-
+     * res-view; feedback-from-res-view has the identical gap). Scoped to
+     * participant_id = the caller's own employee id so this can sit on an
+     * unrestricted route without letting an employee view someone else's
+     * submitted form by guessing the id.
+     */
+    public function employeeFeedbackFormResView($formResId)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employeeId = optional($this->user->GetEmployee)->id;
+        if (!$employeeId) {
+            return response()->json(['success' => false, 'message' => 'Forbidden: No employee record linked'], 403);
+        }
+
+        try {
+            $trainingFeedbackResponse                   =   TrainingFeedbackResponse::join('training_feedback_form as tff','tff.id','training_feedback_responses.form_id')
+                                                                ->where('training_feedback_responses.id', $formResId)
+                                                                ->where('training_feedback_responses.participant_id', $employeeId)
+                                                                ->select(
+                                                                   'training_feedback_responses.*',
+                                                                   'tff.form_name',
+                                                                   'tff.form_structure',
+                                                                )->first();
+
+            if (!$trainingFeedbackResponse) {
+                return response()->json(['success' => false, 'message' => 'Feedback form not found'], 404);
+            }
+
+            return response()->json([
+                'success'                           =>  true,
+                'message'                           =>  'Feedback data retrieved successfully',
+                'feedback_form_res_view'            =>  $trainingFeedbackResponse
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    public function employeeEvaluationFormResView($formResId)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employeeId = optional($this->user->GetEmployee)->id;
+        if (!$employeeId) {
+            return response()->json(['success' => false, 'message' => 'Forbidden: No employee record linked'], 403);
+        }
+
+        try {
+            $evaluationResponse                         =   EvaluationFormResponse::join('evaluation_form as ef','ef.id','evaluation_form_responses.form_id')
+                                                                ->where('evaluation_form_responses.id', $formResId)
+                                                                ->where('evaluation_form_responses.participant_id', $employeeId)
+                                                                ->select(
+                                                                    'evaluation_form_responses.*',
+                                                                   'ef.form_name',
+                                                                   'ef.form_structure',
+                                                                )->first();
+
+            if (!$evaluationResponse) {
+                return response()->json(['success' => false, 'message' => 'Evaluation form not found'], 404);
+            }
+
+            return response()->json([
+                'success'                           =>  true,
+                'message'                           =>  'Evaluation data retrieved successfully',
+                'evaluation_form_res_view'          =>  $evaluationResponse
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function evaluationFormResView($formResId)
     {
         if (!$this->user) {
@@ -1070,6 +1201,49 @@ class LearningController extends Controller
             null,
             false,
             "training-{$formType}-form-submitted"
+        );
+    }
+
+    /**
+     * Alerts HR (Common::getResortHrEmployeeIds) and L&D Manager
+     * (Common::getResortLdManagerEmployeeIds) whenever an employee is marked
+     * Absent from a training session — same recipient-resolution as
+     * notifyFormSubmitted() above. Shared by both markAttendance()
+     * (trainer-facing) and ldManagerMarkAttendanceStore() (L&D-manager-facing).
+     */
+    private function notifyTrainingAbsence($resortId, $trainingScheduleId, array $absentEmployeeIds)
+    {
+        if (empty($absentEmployeeIds)) {
+            return;
+        }
+
+        $notifyIds = array_values(array_unique(array_merge(
+            Common::getResortHrEmployeeIds($resortId),
+            Common::getResortLdManagerEmployeeIds($resortId)
+        )));
+
+        if (empty($notifyIds)) {
+            return;
+        }
+
+        $trainingName = optional(optional(TrainingSchedule::with('learningProgram')->where('resort_id', $resortId)->find($trainingScheduleId))->learningProgram)->name;
+
+        $absentNames = Employee::with('resortAdmin')->whereIn('id', $absentEmployeeIds)->where('resort_id', $resortId)->get()
+            ->map(fn($e) => optional($e->resortAdmin) ? trim($e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name) : null)
+            ->filter()->implode(', ');
+
+        Common::sendMobileNotification(
+            $resortId,
+            2,
+            null,
+            $trainingScheduleId,
+            'Training Absence',
+            ($absentNames ?: 'An employee') . ' marked Absent' . ($trainingName ? " for {$trainingName}" : '') . '.',
+            'Learning',
+            $notifyIds,
+            null,
+            false,
+            'training-attendance-absence'
         );
     }
 
@@ -1454,6 +1628,7 @@ class LearningController extends Controller
             DB::beginTransaction();
 
             $today = Carbon::today()->format('Y-m-d');
+            $absentEmployeeIds = [];
             foreach ($request->employees as $row) {
                 TrainingAttendance::updateOrCreate(
                     [
@@ -1465,7 +1640,12 @@ class LearningController extends Controller
                         'status' => $row['status'],
                     ]
                 );
+                if ($row['status'] === 'Absent') {
+                    $absentEmployeeIds[] = $row['employee_id'];
+                }
             }
+
+            $this->notifyTrainingAbsence($resort_id, $request->training_schedule_id, $absentEmployeeIds);
 
             DB::commit();
 

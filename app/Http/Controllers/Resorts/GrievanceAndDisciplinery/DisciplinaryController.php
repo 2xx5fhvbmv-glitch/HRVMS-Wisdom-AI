@@ -285,6 +285,19 @@ class DisciplinaryController extends Controller
 
     public function StoreDisciplinary(Request $request)
     {
+        // No file validation existed on this endpoint at all — any file
+        // type (including .php) was accepted and, per the write-side fix
+        // below, used to land directly in the public webroot. Restrict to
+        // the document/image types a disciplinary case attachment or
+        // signed document actually needs.
+        $fileValidator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'attachment.*'            => 'nullable|file|mimes:jpeg,png,jpg,heic,heif,pdf,doc,docx|max:10240',
+            'upload_signed_document'  => 'nullable|file|mimes:jpeg,png,jpg,heic,heif,pdf,doc,docx|max:10240',
+        ]);
+        if ($fileValidator->fails()) {
+            return response()->json(['success' => false, 'errors' => $fileValidator->errors()], 422);
+        }
+
         $Employee_id = base64_decode($request->Employee_id);
         // Was written into disciplinarySubmit below before the (only)
         // resort-scoped lookup of this same id even ran, and that lookup's
@@ -376,22 +389,26 @@ class DisciplinaryController extends Controller
             foreach ($request->file('attachment') as $file) {
                 // Keep original filename
                 $filename = $file->getClientOriginalName();
-                
-                // Move the file to the destination path
-                $file->move($Path, $filename);
+
+                // Was $file->move($Path, $filename) — a raw filesystem write
+                // into the public webroot (resolves against public/ as cwd),
+                // with no validation above this until just now. Route
+                // through StorageHelper so it's disk-agnostic (Wasabi in
+                // prod) and no longer a public, unauthenticated path.
+                \App\Helpers\StorageHelper::put($Path . '/' . $filename, file_get_contents($file->getRealPath()));
                 $collection[] = $filename;
             }
-            
+
             disciplinarySubmit::where('Disciplinary_id', $disciplinarySubmit->Disciplinary_id)
                 ->update(['Attachements' => implode(",", $collection)]);
         }
-        
+
         if ($request->hasFile('upload_signed_document')) {
             $upload_signed_document = $request->file('upload_signed_document');
             $filename = $upload_signed_document->getClientOriginalName();
-            
-            $upload_signed_document->move($Path, $filename);
-            
+
+            \App\Helpers\StorageHelper::put($Path . '/' . $filename, file_get_contents($upload_signed_document->getRealPath()));
+
             disciplinarySubmit::where('Disciplinary_id', $disciplinarySubmit->Disciplinary_id)
                 ->update(['upload_signed_document' => $filename]);
         }
@@ -606,7 +623,15 @@ class DisciplinaryController extends Controller
 
     public function InvestigationReportStore(Request $request)
     {
-       
+            // No file validation existed on this endpoint at all — see the
+            // same fix in StoreDisciplinary() above.
+            $fileValidator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+                'investigation_file.*' => 'nullable|file|mimes:jpeg,png,jpg,heic,heif,pdf,doc,docx|max:10240',
+            ]);
+            if ($fileValidator->fails()) {
+                return response()->json(['success' => false, 'errors' => $fileValidator->errors()], 422);
+            }
+
             $id  = $request->Disciplinary_form_id;
             $committee_member_id  = $request->committee_member_id;
             $invesigation_date = $request->invesigation_date;
@@ -632,7 +657,9 @@ class DisciplinaryController extends Controller
                     .'/'.$this->resort->resort->resort_id
                     .'/'.$request->Disciplinary_form_id;
                 foreach($file as $f) {
-                    $f->move(public_path($FilePath), $f->getClientOriginalName());
+                    // Was $f->move(public_path($FilePath), ...) — same raw
+                    // public-webroot write fixed in StoreDisciplinary() above.
+                    \App\Helpers\StorageHelper::put($FilePath . '/' . $f->getClientOriginalName(), file_get_contents($f->getRealPath()));
                     $Files[] = $f->getClientOriginalName();
                 }
             }
@@ -668,6 +695,24 @@ class DisciplinaryController extends Controller
                 disciplinarySubmit::where("resort_id", $this->resort->resort_id)
                     ->where("Disciplinary_id", $id)
                     ->update(["status" => "resolved"]);
+
+                try {
+                    $accusedEmpId = disciplinarySubmit::where('resort_id', $this->resort->resort_id)
+                        ->where('Disciplinary_id', $id)
+                        ->value('Employee_id');
+                    if ($accusedEmpId) {
+                        Common::notifyEmployees(
+                            $this->resort->resort_id,
+                            [$accusedEmpId],
+                            'Disciplinary Case Resolved',
+                            'Your disciplinary case has been resolved.',
+                            'Disciplinary',
+                            $id
+                        );
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('Disciplinary resolved notification failed: ' . $e->getMessage());
+                }
             }
             
             // Make sure the parent ID exists before creating child records

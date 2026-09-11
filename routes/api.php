@@ -225,6 +225,15 @@ use Illuminate\Support\Facades\Route;
 			Route::post('accommodation/hr-maintenance-req-action', [App\Http\Controllers\API\AccommodationController::class, 'handleMaintananceAction']);
 			Route::post('accommodation/hr-maintenance-req-sendto-staff-emp', [App\Http\Controllers\API\AccommodationController::class, 'completeTaskHRSendToStaffAccEmp']);
 
+			// Housekeeping Requests (Trello Card 4) — predefined services
+			// catalog per Benefit Grid grade, distinct from the housekeeping-*
+			// cleaning-schedule routes above.
+			Route::get('accommodation/housekeeping-requests/services-by-grade/{emp_id}', [App\Http\Controllers\API\HousekeepingRequestController::class, 'servicesByGrade']);
+			Route::post('accommodation/housekeeping-requests/create', [App\Http\Controllers\API\HousekeepingRequestController::class, 'createRequest']);
+			Route::get('accommodation/housekeeping-requests/list', [App\Http\Controllers\API\HousekeepingRequestController::class, 'requestList']);
+			Route::get('accommodation/housekeeping-requests/view/{id}', [App\Http\Controllers\API\HousekeepingRequestController::class, 'requestView']);
+			Route::post('accommodation/housekeeping-requests/update-status', [App\Http\Controllers\API\HousekeepingRequestController::class, 'updateStatus']);
+
 			//Employee Managament
 			Route::post('employee-management/hr-employee-overview', [App\Http\Controllers\API\EmployeeManagementController::class, 'hrEmployeeOverview']);
 			Route::get('employee-management/hr-organization-overview', [App\Http\Controllers\API\EmployeeManagementController::class, 'hrOrganizationOverview']);
@@ -234,17 +243,23 @@ use Illuminate\Support\Facades\Route;
 			Route::get('boarding/boarding-hr-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'boardingHRDashboard']);
 		});
 
-		//MGR Middleware for SecurityManager
-		Route::middleware(['auth:api', 'check.rank:MGR'])->group(function () {
+		// Was check.rank:MGR ("MGR Middleware for SecurityManager") — no
+		// real Security Manager record in this DB has rank MGR (the real
+		// one is rank HOD, position_title "Security Manager"), same gap
+		// already found and fixed for the SOS module's equivalent gate.
+		// Reuses that exact same middleware (position-title based, not
+		// rank) instead of duplicating the check.
+		Route::middleware(['auth:api', 'security.manager'])->group(function () {
 			Route::get('boarding/boarding-sm-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'boardingSecurityManagerDashboard']);
 			Route::get('boarding/so-employee-list', [App\Http\Controllers\API\BoardingPassController::class, 'SOEmployeeList']);
 			Route::post('boarding/so-pass-assign', [App\Http\Controllers\API\BoardingPassController::class, 'SOPassAssign']);
 		});
 
-		// Route::middleware(['auth:api', 'check.rank:SO'])->group(function () {
-			Route::post('boarding/so-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'SODashboard']);
+		Route::post('boarding/so-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'SODashboard']);
+
+		Route::middleware(['auth:api', 'check.rank:SO'])->group(function () {
 			Route::post('boarding/so-confirm-arrival-dept', [App\Http\Controllers\API\BoardingPassController::class, 'SOConfirmArrivalDept']);
-		// });
+		});
 
 		// Mobile-audit P2: alias (GET, filter as query param) + new detail endpoint
 		Route::get('boarding/security-officer-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'SODashboard']);
@@ -297,14 +312,14 @@ use Illuminate\Support\Facades\Route;
 		Route::post('accommodation/edit-maintenance-requests', [App\Http\Controllers\API\StaffAccommodationController::class, 'editMaintenanceRequests']);
 
 		//Engineering Department HOD
-		// Route::middleware(['auth:api', 'check.rank:EDHOD'])->group(function () {
+		Route::middleware(['auth:api', 'check.rank:EDHOD'])->group(function () {
 			Route::get('accommodation/engi-department-hod-main-req-dashboard', [App\Http\Controllers\API\AccommodationController::class, 'engDepartmentHODMaintenanceReqDashboard']);
 			Route::get('accommodation/engi-department-hod-main-req-list', [App\Http\Controllers\API\AccommodationController::class, 'engDepartmentHODMaintenanceReqList']);
 			Route::get('accommodation/engi-department-hod-under-emp', [App\Http\Controllers\API\AccommodationController::class, 'getEmployeesUnderEngHOD']);
 			Route::post('accommodation/engi-department-hod-assign-emp', [App\Http\Controllers\API\AccommodationController::class, 'engHODAssignEmployees']);
 			Route::get('accommodation/engi-department-hod-assign-req-list', [App\Http\Controllers\API\AccommodationController::class, 'engDepartmentHODMaintenanceReqAssignList']);
 			Route::post('accommodation/engi-department-hod-complete-sendto-hr', [App\Http\Controllers\API\AccommodationController::class, 'engHODCompleteSendToHR']);
-		// });
+		});
 
 		//Engineering Department Staff
 		Route::get('accommodation/engi-department-staff-main-req-dashboard', [App\Http\Controllers\API\AccommodationController::class, 'engDepartmentStaffMaintenanceReqDashboard']);
@@ -356,6 +371,13 @@ use Illuminate\Support\Facades\Route;
 		Route::get('learning/evaluation-from-list', [App\Http\Controllers\API\LearningController::class, 'evaluationformListing']);
 		Route::post('learning/evaluation-data-store', [App\Http\Controllers\API\LearningController::class, 'evaluationStore']);
 
+		// Employee "View Feedback/Evaluation Form" (own submitted response only)
+		// — the EXCOM/ld-manager res-view routes above 403 any employee without
+		// that rank, which is what an employee viewing their own Training
+		// Details form hits. These are owner-scoped inside the controller.
+		Route::get('learning/employee-feedback-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'employeeFeedbackFormResView']);
+		Route::get('learning/employee-evaluation-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'employeeEvaluationFormResView']);
+
 		//L&D Manager module + HR onboarding dashboard (position/department gated, not rank)
 		Route::middleware(['ld.manager'])->group(function () {
 			Route::get('ld-manager/dashboard', [App\Http\Controllers\API\LearningController::class, 'ldManagerDashboard']);
@@ -374,6 +396,16 @@ use Illuminate\Support\Facades\Route;
 			Route::get('ld-manager/feedback-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'feedbackFormResView']);
 			Route::post('ld-manager/participant-evaluation-from-list', [App\Http\Controllers\API\LearningController::class, 'participantEvaluationFromList']);
 			Route::get('ld-manager/evaluation-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'evaluationFormResView']);
+
+			// Same gap as the 4 routes above: learning/manager-training-calendar
+			// (POST, start_date/end_date body — the "Core Training Calendar"
+			// screen) sits above under check.rank:EXCOM only. An L&D Manager
+			// who isn't also EXCOM rank 403'd — ldManagerTrainingCalendar() is
+			// a different implementation (day/week/month view, not a date
+			// range) and not a compatible replacement for what the app
+			// already calls, so this reaches the SAME method the app expects
+			// instead of redirecting it to a different contract.
+			Route::post('ld-manager/manager-training-calendar', [App\Http\Controllers\API\LearningController::class, 'managerTrainingCalendar']);
 		});
 
 		// HR onboarding dashboard — self-gated on HR department inside the controller.
@@ -440,6 +472,8 @@ use Illuminate\Support\Facades\Route;
 		Route::get('disciplinary/disciplinary-dashboard', [App\Http\Controllers\API\DisciplinaryController::class, 'disciplinaryDashboard']);
 		Route::get('disciplinary/disciplinary-details/{disciplinary_id}', [App\Http\Controllers\API\DisciplinaryController::class, 'disciplinaryDetails']);
 		Route::post('disciplinary/acknowledgment-submit', [App\Http\Controllers\API\DisciplinaryController::class, 'AcknowledgmentSubmit']);
+		Route::post('disciplinary/appeal-submit', [App\Http\Controllers\API\DisciplinaryController::class, 'AppealSubmit']);
+		Route::get('disciplinary/appeal-list', [App\Http\Controllers\API\DisciplinaryController::class, 'AppealList']);
 
 		//Clinic
 		Route::middleware(['auth:api', 'check.rank:CLINIC_STAFF'])->group(function () {
@@ -507,6 +541,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('sos/fire-team-members', [App\Http\Controllers\API\SOSController::class, 'fireTeamMembers']);
 		Route::get('sos/chat-logs/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'sosChatLogs']);
 		Route::post('sos/send-chat-message', [App\Http\Controllers\API\SOSController::class, 'sosSendChatMessage']);
+		Route::get('sos/mass-instructions/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'sosMassInstructions']);
 
 		// SOS — Security Manager only (approve/reject/dispatch/complete an
 		// incident). Previously reachable by any authenticated employee.

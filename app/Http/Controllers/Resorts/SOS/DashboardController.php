@@ -21,7 +21,6 @@ use App\Models\SosHistoryEmployeeStatus;
 use App\Models\ResortDepartment;
 use App\Models\SOSRolesAndPermission;
 use App\Models\ResortGeoLocation;
-use Google\Service\CloudControlsPartnerService\Console;
 use Illuminate\Support\Facades\Validator;
 
 class DashboardController extends Controller
@@ -112,15 +111,24 @@ class DashboardController extends Controller
                 return '<div class="user-ovImg">' . $employeesImage . '</div>';
             })
             ->addColumn('status', function ($row) {
+                // sos_history.status drifted across migrations (Drill-active
+                // renamed Drill-Active; Real-Active/In-Progress/Drill-Rejected/
+                // Drill-Completed added later) and this switch was never
+                // updated past the earliest version of that list — every
+                // status added since fell through to "Pending", which is
+                // wrong for an already-resolved or already-dispatched incident.
                 switch($row->status) {
                     case 'Completed':
-                        return '<span class="badge badge-themeSuccess">Completed</span>';
-                    case 'Drill-active':
-                        return '<span class="badge badge-infoBorder">Drill-active</span>';
+                    case 'Drill-Completed':
+                        return '<span class="badge badge-themeSuccess">'.$row->status.'</span>';
                     case 'Active':
-                        return '<span class="badge badge-infoBorder">Active</span>';
+                    case 'Drill-Active':
+                    case 'Real-Active':
+                    case 'In-Progress':
+                        return '<span class="badge badge-infoBorder">'.$row->status.'</span>';
                     case 'Rejected':
-                        return '<span class="badge badge-themeDangerNew">Rejected</span>';
+                    case 'Drill-Rejected':
+                        return '<span class="badge badge-themeDangerNew">'.$row->status.'</span>';
                     default:
                         return '<span class="badge badge-themeDanger">Pending</span>';
                 }
@@ -153,9 +161,17 @@ class DashboardController extends Controller
             ->make(true);
         }
 
-        $hasPendingSOS = SOSHistoryModel::where('status', 'Pending')->exists();
+        // Was missing resort_id — a Pending SOS in ANY resort made this true
+        // for every resort's dashboard, a live cross-tenant leak.
+        $hasPendingSOS = SOSHistoryModel::where('status', 'Pending')->where('resort_id', $this->resort->resort_id)->exists();
 
-        return view('resorts.SOS.dashboard.index', compact('page_title', 'SOSHistory','hasPendingSOS'));
+        // Rendered server-side from the same status list used everywhere
+        // else so the filter dropdown can't drift out of sync with the real
+        // enum again — it previously offered a fictional "Drilled" value
+        // that matched zero rows and was missing 5 of the 9 real statuses.
+        $sosStatusList = array_merge(['Pending'], Common::sosOpenStatuses(), Common::sosClosedStatuses());
+
+        return view('resorts.SOS.dashboard.index', compact('page_title', 'SOSHistory','hasPendingSOS','sosStatusList'));
         
     }
 
@@ -206,6 +222,25 @@ class DashboardController extends Controller
             $status = $request->type === 'Drilled' ? 'Drill-Active' : 'Real-Active';
             $sos->status = $status;
             $sos->save();
+
+            if ($status === 'Real-Active') {
+                try {
+                    $recipientIds = array_merge(
+                        Common::getResortSecurityEmployeeIds($this->resort->resort_id),
+                        Common::getResortGmEmployeeIds($this->resort->resort_id)
+                    );
+                    Common::notifyEmployees(
+                        $this->resort->resort_id,
+                        $recipientIds,
+                        'SOS Alert Escalated',
+                        'An SOS alert has been escalated to Real-Active status and requires immediate attention.',
+                        'SOS',
+                        $sos->id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('SOS escalation notification failed: ' . $e->getMessage());
+                }
+            }
 
             return response()->json([
                 'success' => true,
@@ -321,12 +356,20 @@ class DashboardController extends Controller
         $employeesStatusList = $employeeListQuery->paginate(10);
 
         $onlySafeEmpCount = SosHistoryEmployeeStatus::where('status','Safe')->where('sos_history_id', $id)->count();
-        $onlyUnsafeEmpCount = SosHistoryEmployeeStatus::where('status','Unknown')->where('sos_history_id', $id)->count();
+        // Was misleadingly named "onlyUnsafeEmpCount" but queried
+        // status='Unknown' — the Blade label was correctly "Unknown
+        // Status" so this was never user-facing wrong, just a wrong
+        // variable name. Real "Unsafe" count never existed anywhere on
+        // this screen — the single most operationally important number
+        // (who explicitly reported being unsafe) was invisible, folded
+        // into "everyone who isn't Safe."
+        $onlyUnknownEmpCount = SosHistoryEmployeeStatus::where('status','Unknown')->where('sos_history_id', $id)->count();
+        $onlyUnsafeEmpCount = SosHistoryEmployeeStatus::where('status','Unsafe')->where('sos_history_id', $id)->count();
         $totalEmployeesCount = SosHistoryEmployeeStatus::where('sos_history_id', $id)->count();
 
         $getAllDepartments = ResortDepartment::where('resort_id',  $resort_id)->get();
 
-        return view('resorts.SOS.dashboard.ViewEmployeeSafetyStatus',compact('page_title','sosDetails','employeesStatusList','totalEmployeesCount','onlySafeEmpCount','onlyUnsafeEmpCount','id','getAllDepartments'));
+        return view('resorts.SOS.dashboard.ViewEmployeeSafetyStatus',compact('page_title','sosDetails','employeesStatusList','totalEmployeesCount','onlySafeEmpCount','onlyUnknownEmpCount','onlyUnsafeEmpCount','id','getAllDepartments'));
         
     }
 
@@ -370,21 +413,56 @@ class DashboardController extends Controller
             'mass_instruction' => 'required|string|max:255',
         ]);
 
-        $update = SOSHistoryModel::where('id', $request->sos_history_id)
-            ->where('resort_id', $this->resort->resort_id)
-            ->update(['mass_instructions' => $request->mass_instruction]);
+        // Was overwriting sos_history.mass_instructions (a single string
+        // column) — every send wiped out the previous message with no way
+        // to see what was sent before. Insert a new history row instead;
+        // the old column is left alone (untouched) rather than migrated,
+        // per the decision to stop writing to it going forward.
+        \App\Models\SosMassInstruction::create([
+            'resort_id' => $this->resort->resort_id,
+            'sos_history_id' => $request->sos_history_id,
+            'message' => $request->mass_instruction,
+            'created_by' => $this->resort->id,
+        ]);
 
-        if ($update) {
-            $allEmpDeviceId                         =   Employee::where('resort_id',$this->resort->resort_id)
-                                                            ->where('status', 'Active')                 
-                                                            ->where('device_token', '!=', null)
-                                                            ->where('device_token', '!=', '')
-                                                            ->pluck('device_token');
-            $title                                  =   "SOS Mass Instruction";
-            $moduleName                             =   'SOS';
-            $allEmpPushNotification             =   Common::sendPushNotificationForMobile($allEmpDeviceId->toArray(), $title, $request->mass_instruction, $moduleName, NULL, NULL,NULL,'mass');
-        }
+        $allEmpDeviceId                         =   Employee::where('resort_id',$this->resort->resort_id)
+                                                        ->where('status', 'Active')
+                                                        ->where('device_token', '!=', null)
+                                                        ->where('device_token', '!=', '')
+                                                        ->pluck('device_token');
+        $title                                  =   "SOS Mass Instruction";
+        $moduleName                             =   'SOS';
+        $allEmpPushNotification             =   Common::sendPushNotificationForMobile($allEmpDeviceId->toArray(), $title, $request->mass_instruction, $moduleName, NULL, NULL,NULL,'mass');
+
         return response()->json(['success' => true, 'message' => 'Mass instruction updated successfully.']);
+    }
+
+    /**
+     * History panel for ViewEmployeeSafetyStatus.blade.php, newest first —
+     * the corresponding mobile GET is sos/mass-instructions/{sos_id} in
+     * API\SOSController.
+     */
+    public function massInstructionHistory($id)
+    {
+        if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
+            return abort(403, 'Unauthorized action.');
+        }
+        // Raw numeric id, not base64 — matches the sibling AJAX filter
+        // methods (filterEmployeeSafetyDetails/filterTeamActivityDetails)
+        // this is called alongside, both of which take $id as-is.
+        $sosExists = SOSHistoryModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists();
+        if (!$sosExists) {
+            return response()->json(['success' => false, 'message' => 'SOS record not found.'], 404);
+        }
+
+        $history = \App\Models\SosMassInstruction::with('sender')
+            ->where('sos_history_id', $id)
+            ->orderByDesc('created_at')
+            ->get();
+
+        $html = view('resorts.renderfiles.SosMassInstructionHistory', compact('history'))->render();
+
+        return response()->json(['success' => true, 'html' => $html]);
     }
 
     public function showMap($id)
@@ -489,6 +567,10 @@ class DashboardController extends Controller
                 'status' => $status->status,
                 'image' => Common::getResortUserPicture($status->employee->admin_parent_id ?? null),
                 'role' => $availableRank,
+                // Wanted on the info window so a manager can contact
+                // someone directly during a live incident, not just see
+                // their dot on the map.
+                'phone' => optional($status->employee->resortAdmin)->personal_phone,
             ];
         })->filter()->values();;
 

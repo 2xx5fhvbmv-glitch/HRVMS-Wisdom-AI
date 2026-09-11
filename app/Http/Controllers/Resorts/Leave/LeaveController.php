@@ -2135,8 +2135,8 @@ class LeaveController extends Controller
             try {
                 $applicantAdmin = ResortAdmin::find($applicantEmployee->Admin_Parent_id ?? 0);
                 $applicantName = $applicantAdmin ? trim($applicantAdmin->first_name . ' ' . $applicantAdmin->last_name) : 'An employee';
-                $leaveFromFormatted = Carbon::parse($fromDate)->format('d M Y');
-                $leaveToFormatted = Carbon::parse($toDate)->format('d M Y');
+                $leaveFromFormatted = Common::formatDate($fromDate);
+                $leaveToFormatted = Common::formatDate($toDate);
 
                 // Notify each approver in the chain
                 foreach ($approvalFlow as $approver) {

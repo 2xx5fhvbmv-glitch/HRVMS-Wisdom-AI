@@ -1599,10 +1599,34 @@ class EmployeeController extends Controller
         if (!$employee) {
             return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
         }
+        $oldStatus = $employee->status;
         ResortAdmin::where('id', $employee->Admin_Parent_id)
             ->update(['status' => $request->status]);
         $employee->status = $request->status;
         $employee->save();
+
+        // Employment-status changes (activate/deactivate/terminate) had no
+        // notification anywhere — HR and the employee's own HOD found out
+        // only by noticing it in the list.
+        if ($oldStatus !== $request->status) {
+            try {
+                $recipients = Common::getResortHrEmployeeIds($this->resort->resort_id);
+                $hod = Common::FindResortHODDepartment($this->resort->resort_id, $employee->Dept_id);
+                if ($hod) {
+                    $recipients[] = $hod->id;
+                }
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    $recipients,
+                    'Employee Status Changed',
+                    "Status for {$employee->Emp_id} changed from {$oldStatus} to {$request->status}.",
+                    'People Management',
+                    $employee->id
+                );
+            } catch (\Exception $e) {
+                \Log::warning('Employee status change notification failed: ' . $e->getMessage());
+            }
+        }
 
         return response()->json(['success' => true]);
     }
@@ -1778,6 +1802,24 @@ class EmployeeController extends Controller
             ? 'Probationary'
             : 'Active';
         $employee->save();
+
+        try {
+            $recipients = Common::getResortHrEmployeeIds($this->resort->resort_id);
+            $hod = Common::FindResortHODDepartment($this->resort->resort_id, $employee->Dept_id);
+            if ($hod) {
+                $recipients[] = $hod->id;
+            }
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                $recipients,
+                'Employee Activated',
+                "{$employee->Emp_id} was activated and moved to {$employee->status} status.",
+                'People Management',
+                $employee->id
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Employee activation notification failed: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
@@ -2174,6 +2216,8 @@ class EmployeeController extends Controller
 
             // Update employee
             $employee = Employee::where('resort_id', $this->resort->resort_id)->findOrFail($employeeId);
+            $oldBasicSalary = $employee->basic_salary;
+            $oldBasicSalaryCurrency = $employee->basic_salary_currency;
             $employee->basic_salary = $basicSalary;
             $employee->basic_salary_currency = $basicSalaryCurrency;
             $employee->payment_mode = $request->input('payment_mode');
@@ -2184,14 +2228,6 @@ class EmployeeController extends Controller
             $employee->entitled_public_holiday = $request->input('entitle_public_holiday') ? 'yes' : 'no';
             $employee->ewt_status = $request->input('ewt_status') ? 'yes' : 'no';
             $employee->save();
-
-
-            // Raw rank=3 (with a resort-wide, department-blind rank=2
-            // fallback) excluded this resort's real HR employee.
-            $notify_person = Employee::whereIn('id', Common::getResortHrEmployeeIds($this->resort->resort_id))->first();
-
-
-
 
             // Save/update allowances
             foreach ($allowances as $allowance) {
@@ -2219,6 +2255,23 @@ class EmployeeController extends Controller
             }
 
             DB::commit();
+
+            // Direct salary edit bypasses the SalaryIncrement approval chain
+            // entirely, so HR would otherwise have no record this happened.
+            if ((float) $oldBasicSalary !== (float) $basicSalary || $oldBasicSalaryCurrency !== $basicSalaryCurrency) {
+                try {
+                    Common::notifyEmployees(
+                        $this->resort->resort_id,
+                        Common::getResortHrEmployeeIds($this->resort->resort_id),
+                        'Employee Salary Updated',
+                        "Basic salary for {$employee->Emp_id} changed from {$oldBasicSalaryCurrency} {$oldBasicSalary} to {$basicSalaryCurrency} {$basicSalary}.",
+                        'People Management',
+                        $employee->id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('Employee salary update notification failed: ' . $e->getMessage());
+                }
+            }
 
             return response()->json([
                 'success' => true,
@@ -2260,6 +2313,26 @@ class EmployeeController extends Controller
 
         $bank_details->save();
 
+        // Fraud vector: bank detail changes had zero HR/Finance alert. Keep
+        // the account number/IBAN/etc out of the message — never put
+        // sensitive financial data in a notification row/push.
+        try {
+            $empIdentifier = optional($bank_details->employee)->Emp_id ?? $bank_details->employee_id;
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                array_merge(
+                    Common::getResortHrEmployeeIds($this->resort->resort_id),
+                    Common::getResortFinanceEmployeeIds($this->resort->resort_id)
+                ),
+                'Employee Bank Details Updated',
+                "Bank details were updated for employee {$empIdentifier}.",
+                'People Management',
+                $bank_details->employee_id
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Bank details update notification failed: ' . $e->getMessage());
+        }
+
         // Return a success JSON response
         return response()->json([
             'status' => true,
@@ -2294,6 +2367,23 @@ class EmployeeController extends Controller
         $bank_details->IBAN = $request->IBAN;
 
         $bank_details->save();
+
+        try {
+            $empIdentifier = optional($bank_details->employee)->Emp_id ?? $bank_details->employee_id;
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                array_merge(
+                    Common::getResortHrEmployeeIds($this->resort->resort_id),
+                    Common::getResortFinanceEmployeeIds($this->resort->resort_id)
+                ),
+                'Employee Bank Details Added',
+                "Bank details were added for employee {$empIdentifier}.",
+                'People Management',
+                $bank_details->employee_id
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Bank details add notification failed: ' . $e->getMessage());
+        }
 
         return response()->json([
             'status' => true,

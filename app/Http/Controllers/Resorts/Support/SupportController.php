@@ -337,6 +337,23 @@ class SupportController extends Controller
             
             Mail::to($supportEmail)->send(new SupportEmail($ticket, $resort));
         }
+
+        // No dedicated "Support" department exists in this codebase (grepped
+        // ResortDepartment aliases) — fall back to HR as the reasonable
+        // handler of record so a non-Email-preference ticket isn't silent.
+        try {
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                Common::getResortHrEmployeeIds($this->resort->resort_id),
+                'New Support Ticket',
+                'A new support ticket (' . $ticket->ticketID . ') has been submitted: ' . $ticket->subject,
+                'Support',
+                $ticket->id
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Support ticket notification failed: ' . $e->getMessage());
+        }
+
         return response()->json(['success' => true, 'message' => 'Ticket submitted successfully!', 'data' => $ticket]);
     }
 

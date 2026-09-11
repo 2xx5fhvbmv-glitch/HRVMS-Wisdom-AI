@@ -363,6 +363,19 @@ class AssignAccommodationController extends Controller
 
                     DB::commit();
 
+                    try {
+                        Common::notifyEmployees(
+                            $this->resort->resort_id,
+                            [(int) $emp_id],
+                            'Accommodation Assigned',
+                            'You have been assigned to bed ' . ($bed->BedNo ?? '') . '.',
+                            'Accommodation',
+                            $bed->id
+                        );
+                    } catch (\Exception $ne) {
+                        \Log::warning('Accommodation assign notification failed: ' . $ne->getMessage());
+                    }
+
                 return response()->json(['success' =>true,'message'=>'Assigned successfully','data' =>$data], 200);
         }
         catch (\Exception $e)
@@ -562,8 +575,22 @@ class AssignAccommodationController extends Controller
                 $newBed->update(['emp_id'=>$emp_id,"effected_date"=>date('Y-m-d')]);
 
                 DB::commit();
+
+                try {
+                    Common::notifyEmployees(
+                        $this->resort->resort_id,
+                        [(int) $emp_id],
+                        'Accommodation Moved',
+                        'You have been moved to bed ' . ($newBed->BedNo ?? '') . '.',
+                        'Accommodation',
+                        $newBed->id
+                    );
+                } catch (\Exception $ne) {
+                    \Log::warning('Accommodation move notification failed: ' . $ne->getMessage());
+                }
+
                 return response()->json(['success' =>true,'message'=>'Bed assigned successfully','data' =>$data], 200);
-    
+
 
             }
             catch (\Exception $e)

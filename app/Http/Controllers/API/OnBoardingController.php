@@ -575,6 +575,23 @@ class OnBoardingController extends Controller
             $itinerary->{$statusColumn} = $statusMap[$request->action];
             $itinerary->save();
 
+            // employee_id on the itinerary is the new hire this task is
+            // *for* — the actor here is the assigned pickup/medical-escort
+            // staff, a different person, so notify the new hire whose
+            // pickup/medical arrangement this outcome affects.
+            if ((int) $itinerary->employee_id !== (int) $employee->id) {
+                $taskLabel = $request->task_type === 'pickup' ? 'Airport Pickup' : 'Medical Escort';
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    [$itinerary->employee_id],
+                    $taskLabel . ' ' . $statusMap[$request->action],
+                    'Your ' . strtolower($taskLabel) . ' arrangement has been ' . strtolower($statusMap[$request->action]) . '.',
+                    'Onboarding',
+                    $itinerary->id,
+                    'onboarding-task-' . $request->task_type
+                );
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Task updated successfully.',
@@ -723,6 +740,22 @@ class OnBoardingController extends Controller
                 
                 $storeSelfie->selfie_image = $filePath;
                 $storeSelfie->save();
+
+                // Identity-verification content — HR needs to know it's
+                // ready to review, not just the employee who uploaded it.
+                $hrEmpIds = Common::getResortHrEmployeeIds($this->resort_id);
+                if (!empty($hrEmpIds)) {
+                    $empName = trim(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')) ?: 'An employee';
+                    Common::notifyEmployees(
+                        $this->resort_id,
+                        $hrEmpIds,
+                        'Onboarding Selfie Uploaded',
+                        $empName . ' uploaded their onboarding selfie for identity verification.',
+                        'Onboarding',
+                        $employee->id,
+                        'onboarding-selfie'
+                    );
+                }
             }
 
             return response()->json([
@@ -788,6 +821,25 @@ class OnBoardingController extends Controller
             $message                                    =   'Acknowledgements stored successfully.';
             if (!empty($duplicates)) {
                 $message                                .=  ' Already stored: ' . implode(', ', $duplicates);
+            }
+
+            // Let HR know the new hire acknowledged onboarding document(s)
+            // (handbook, contract, benefit grid, disciplinary process).
+            if (!empty($saved)) {
+                $hrEmpIds = Common::getResortHrEmployeeIds($this->resort_id);
+                if (!empty($hrEmpIds)) {
+                    $empName = trim(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')) ?: 'An employee';
+                    $types   = implode(', ', array_unique(array_column($saved, 'acknowledgement_type')));
+                    Common::notifyEmployees(
+                        $this->resort_id,
+                        $hrEmpIds,
+                        'Onboarding Acknowledgement Received',
+                        $empName . ' acknowledged: ' . $types . '.',
+                        'Onboarding',
+                        $employee->id,
+                        'onboarding-acknowledgement'
+                    );
+                }
             }
 
             return response()->json([

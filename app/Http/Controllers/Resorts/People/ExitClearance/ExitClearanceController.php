@@ -63,6 +63,39 @@ class ExitClearanceController extends Controller
         }
     }
 
+    /**
+     * Resolve stored relative paths for "file"-type form fields to signed
+     * StorageHelper URLs before handing $responses to the view. The blade's
+     * JS used to build a raw public URL client-side (url('/') + path),
+     * which only worked because uploads landed directly in the public
+     * webroot — now that uploads route through StorageHelper (disk-agnostic,
+     * Wasabi in prod), the URL has to be generated server-side.
+     */
+    private function resolveFileFieldUrls(?array $formStructure, array $responses): array
+    {
+        if (empty($responses) || empty($formStructure)) {
+            return $responses;
+        }
+        $fileFieldNames = collect($formStructure)
+            ->filter(fn ($f) => ($f['type'] ?? null) === 'file')
+            ->pluck('name')
+            ->filter()
+            ->all();
+
+        foreach ($fileFieldNames as $fieldName) {
+            if (empty($responses[$fieldName])) {
+                continue;
+            }
+            $paths = is_array($responses[$fieldName]) ? $responses[$fieldName] : [$responses[$fieldName]];
+            $responses[$fieldName] = array_values(array_filter(array_map(
+                fn ($p) => $p ? \App\Helpers\StorageHelper::temporaryUrl($p) : null,
+                $paths
+            )));
+        }
+
+        return $responses;
+    }
+
     public function index(Request $request)
     {
         
@@ -596,7 +629,22 @@ class ExitClearanceController extends Controller
             return response()->json(['success' => false, 'message' => 'Nothing to update.'], 422);
         }
 
+        $oldDeadline = $assignment->deadline_date;
         $assignment->update($payload);
+
+        // Only the recipient assigned to complete the form needs to know —
+        // and only when the deadline itself actually moved, not a
+        // reminder-frequency-only edit.
+        if (array_key_exists('deadline_date', $payload) && $payload['deadline_date'] !== $oldDeadline && $assignment->assigned_to_id) {
+            $assignment->loadMissing('employeeResignation.employee.resortAdmin');
+            $empName = optional(optional(optional($assignment->employeeResignation)->employee)->resortAdmin)->full_name ?: 'employee';
+            $this->notifyExit(
+                $assignment->assigned_to_id,
+                'Exit Clearance Deadline Changed',
+                "📋 The deadline for your exit clearance form for {$empName} has changed."
+                . " New deadline: " . Carbon::parse($assignment->deadline_date)->format('d M Y') . "."
+            );
+        }
 
         return response()->json([
             'success' => true,
@@ -720,7 +768,8 @@ class ExitClearanceController extends Controller
         }else {
             $responses = json_decode($exitClearanceFormAssignment->form_structure, true);
         }
-       
+        $responses = $this->resolveFileFieldUrls($formStructure, $responses ?: []);
+
         return view('resorts.people.exit-clearance.exit-clearance-form-view', compact(
             'page_title',
             'exitClearanceFormAssignment',
@@ -813,8 +862,8 @@ class ExitClearanceController extends Controller
         $responses = $exitClearanceFormResponse
             ? (json_decode($exitClearanceFormResponse->response_data, true) ?: [])
             : [];
+        $responses = $this->resolveFileFieldUrls($formStructure, $responses);
 
-        
         return view('resorts.people.exit-clearance.exit-clearance-form-view', compact(
             'page_title',
             'exitClearanceFormAssignment',
@@ -855,28 +904,33 @@ class ExitClearanceController extends Controller
             // Handle file upload
             if ($fieldType === 'file' && $request->hasFile($fieldName)) {
                 $uploadedFiles = $request->file($fieldName);
+                $rows = is_array($uploadedFiles) ? $uploadedFiles : [$uploadedFiles];
+
+                // No file validation existed on this dynamic form-builder
+                // upload at all — any file type (including .php) was
+                // accepted and, per the write-side fix below, previously
+                // landed directly in the public webroot via mkdir(0777)+move().
+                $fileValidator = \Illuminate\Support\Facades\Validator::make(
+                    [$fieldName => $rows],
+                    [$fieldName . '.*' => 'file|mimes:jpeg,png,jpg,heic,heif,pdf,doc,docx|max:10240']
+                );
+                if ($fileValidator->fails()) {
+                    return response()->json(['success' => false, 'errors' => $fileValidator->errors()], 422);
+                }
+
                 $path = config('settings.ExitClearanceAttachments');
                 $filePaths = [];
 
-                if (is_array($uploadedFiles)) {
-                    foreach ($uploadedFiles as $uploadedFile) {
-                        $fileName = time() . '_' . $uploadedFile->getClientOriginalName();
-                        $destinationPath = $path . '/' . $exitClearanceFormAssignment->id . '/' . $fieldName;
-                        $fullDestinationPath = public_path($destinationPath);
-                        if (!file_exists($fullDestinationPath)) {
-                            mkdir($fullDestinationPath, 0777, true);
-                        }
-                        $uploadedFile->move($fullDestinationPath, $fileName);
-                        $filePaths[] = $destinationPath . '/' . $fileName;
-                    }
-                } elseif ($uploadedFiles) {
-                    $fileName = time() . '_' . $uploadedFiles->getClientOriginalName();
+                foreach ($rows as $uploadedFile) {
+                    if (!$uploadedFile) continue;
+                    $fileName = time() . '_' . $uploadedFile->getClientOriginalName();
                     $destinationPath = $path . '/' . $exitClearanceFormAssignment->id . '/' . $fieldName;
-                    $fullDestinationPath = public_path($destinationPath);
-                    if (!file_exists($fullDestinationPath)) {
-                        mkdir($fullDestinationPath, 0777, true);
-                    }
-                    $uploadedFiles->move($fullDestinationPath, $fileName);
+                    // Was public_path($destinationPath) + mkdir(0777) +
+                    // move() — a raw, world-writable filesystem write into
+                    // the public webroot. Route through StorageHelper so
+                    // it's disk-agnostic (Wasabi in prod) and no longer a
+                    // public, unauthenticated path.
+                    \App\Helpers\StorageHelper::put($destinationPath . '/' . $fileName, file_get_contents($uploadedFile->getRealPath()));
                     $filePaths[] = $destinationPath . '/' . $fileName;
                 }
 
@@ -1014,18 +1068,26 @@ class ExitClearanceController extends Controller
 
             if ($fieldType === 'file' && $request->hasFile($fieldName)) {
                 $uploadedFiles = $request->file($fieldName);
+                $rows = is_array($uploadedFiles) ? $uploadedFiles : [$uploadedFiles];
+
+                // Same fix as departmentFormResponseStore() above — no file
+                // validation existed, and the write landed in the public
+                // webroot via mkdir(0777)+move().
+                $fileValidator = \Illuminate\Support\Facades\Validator::make(
+                    [$fieldName => $rows],
+                    [$fieldName . '.*' => 'file|mimes:jpeg,png,jpg,heic,heif,pdf,doc,docx|max:10240']
+                );
+                if ($fileValidator->fails()) {
+                    return response()->json(['success' => false, 'errors' => $fileValidator->errors()], 422);
+                }
+
                 $path = config('settings.ExitClearanceAttachments');
                 $filePaths = [];
-                $rows = is_array($uploadedFiles) ? $uploadedFiles : [$uploadedFiles];
                 foreach ($rows as $uploadedFile) {
                     if (!$uploadedFile) continue;
                     $fileName = time() . '_' . $uploadedFile->getClientOriginalName();
                     $destinationPath = $path . '/' . $exitClearanceFormAssignment->id . '/' . $fieldName;
-                    $fullDestinationPath = public_path($destinationPath);
-                    if (!file_exists($fullDestinationPath)) {
-                        mkdir($fullDestinationPath, 0777, true);
-                    }
-                    $uploadedFile->move($fullDestinationPath, $fileName);
+                    \App\Helpers\StorageHelper::put($destinationPath . '/' . $fileName, file_get_contents($uploadedFile->getRealPath()));
                     $filePaths[] = $destinationPath . '/' . $fileName;
                 }
                 $responseData[$fieldName] = $filePaths;

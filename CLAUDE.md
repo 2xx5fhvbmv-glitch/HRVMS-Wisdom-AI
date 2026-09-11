@@ -42,6 +42,28 @@ HR / Workforce Management system for Maldives resorts, multi-tenant (one resort 
 3. Verify against real data (`php -l`, then `php artisan tinker` against real records; wrap any DB mutation in a transaction and roll it back) — don't report a fix as done on code-inspection alone.
 4. Confirm you didn't edit any file outside the scope of the request. If you found an unrelated bug while working, report it, don't fix it in the same pass unless asked.
 
+## Before adding a notification feature
+
+`Common::sendMobileNotification()`/`notifyEmployees()` guard against a wrong id-domain now
+(logs + drops instead of silently failing — see `docs/notification-guardrails.md`), but the
+guard only catches *that one* failure mode. Ask these six before shipping any new
+"this should notify" feature — every one is a bug pattern that's actually happened here:
+
+1. **Is `$sendto` actually `employees.id`?** Not `resort_admins.id` (the web-portal login
+   identity — easy to reach for by accident since that's usually "the current user" in
+   web-portal code), not a shopkeeper id, not anything else.
+2. **Are you using `Common::notifyEmployees()`?** The one function that gets both channels
+   (in-app + push) right with one call and no duplicate rows. Reach for it by default.
+3. **Did you set `$requestId` and `$pageId`?** Without them the notification can't deep-link
+   to the record it's about.
+4. **Is the call wrapped in try/catch?** A notification failure should never roll back the
+   business transaction it's attached to.
+5. **If this is one side of an approval/request flow, does the other side notify too?** "The
+   request pings someone, the decision doesn't" is the most common gap found in this codebase.
+6. **If this is a create action, what happens on edit/cancel/delete?** Creation notifying
+   while edit/cancel/delete don't is the second most common gap — a conscious decision, not
+   an oversight.
+
 ## Business-model notes worth knowing before touching a module
 
 - **Leave approval**: rank-based chain (Line Worker/Supervisor → reporting manager → HOD/EXCOM → GM), with HR/GM able to shortcut-approve. Clinic-staff (rank 12) stage can comment but never flips the leave to Rejected. No rank-override/skip-ahead exists anywhere.

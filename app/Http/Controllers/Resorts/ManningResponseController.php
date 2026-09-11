@@ -207,7 +207,27 @@ class ManningResponseController extends Controller
 
             $Year = $validated['year'];
 
-// event(new ResortNotificationEvent(Common::nofitication($validated['resort_id'], $type[3], $request['message_id'])));
+            // HR raised the manning request; this department's response
+            // needs to reach them so they're not left waiting/chasing it up
+            // manually. Was commented out — Common::notifyEmployees() is the
+            // current recommended helper (one DB row + one push per
+            // recipient), matching the pattern already used elsewhere in
+            // this module for the reminder path.
+            try {
+                $deptName = ResortDepartment::where('id', $validated['dept_id'])->value('name');
+                $hrEmployeeIds = Common::getResortHrEmployeeIds($validated['resort_id']);
+
+                Common::notifyEmployees(
+                    $validated['resort_id'],
+                    $hrEmployeeIds,
+                    'Manning Response Submitted',
+                    ($deptName ?: 'A department') . ' has submitted its manning response for ' . $Year . '.',
+                    'WorkForce Planning',
+                    $manningResponse->id
+                );
+            } catch (\Exception $notifErr) {
+                \Log::warning('Manning response notification to HR failed: ' . $notifErr->getMessage());
+            }
 
             BudgetStatus::create(
                 // ['resort_id' => $manningResponse->resort_id, 'message_id' => $request['message_id']],

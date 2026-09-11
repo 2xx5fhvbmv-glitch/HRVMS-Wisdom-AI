@@ -362,8 +362,32 @@ class ResortAllNotificationController extends Controller
                         'resort_id'=>$resort_id,
                         'comments'=>$typeofCommet,
                     ]);
-                    // event( new ResortNotificationEvent(  Common::nofitication($resort_id, $this->type[4],$Message_id,$budget->id)));
-                   
+
+                    // Was commented out — the old call only ever hit
+                    // nofitication()'s broadcast-only branches (types 5/6/9,
+                    // no ResortNotification row, no push), so even
+                    // uncommented as-is it would never reach mobile or
+                    // survive a page reload. Notify whoever the budget was
+                    // just routed to, via the current recommended helper.
+                    $recipientIds = match ($budgetProcessStatus ?? null) {
+                        'Finance' => Common::getResortFinanceEmployeeIds($resort_id),
+                        'GM' => Common::getResortGmEmployeeIds($resort_id),
+                        default => [],
+                    };
+                    if (!empty($recipientIds)) {
+                        try {
+                            Common::notifyEmployees(
+                                $resort_id,
+                                $recipientIds,
+                                'Budget Review Update',
+                                'A department budget has been forwarded to ' . $budgetProcessStatus . ' for review.',
+                                'WorkForce Planning',
+                                $budget->id
+                            );
+                        } catch (\Exception $notifErr) {
+                            \Log::warning('SendToFinance notification failed for budget ' . $budget->id . ': ' . $notifErr->getMessage());
+                        }
+                    }
                 }
                 DB::commit();
                 $response['success'] = true;
@@ -434,7 +458,28 @@ class ResortAllNotificationController extends Controller
                     'status'=>'Rejected',
                 ]);
             }
-            // event( new ResortNotificationEvent(  Common::nofitication($resort_id, $this->type[5],$Message_id,$Budget_id)));
+
+            // Was commented out — budget sent back for revision, the
+            // department head who actually needs to act on it was never
+            // told. Unlike SendToFinance (forwards to the next role), this
+            // sends the budget back DOWN to whoever owns $Department_id —
+            // same HOD/EXCOM lookup convention used elsewhere (org chart,
+            // manning dispatch).
+            try {
+                $deptHead = Common::FindResortHODDepartment($resort_id, $Department_id);
+
+                Common::notifyEmployees(
+                    $resort_id,
+                    $deptHead ? [$deptHead->id] : [],
+                    'Budget Sent Back for Revision',
+                    'Your department budget has been sent back for revision' . ($revise_Comment ? (': ' . $revise_Comment) : '.'),
+                    'WorkForce Planning',
+                    $Budget_id
+                );
+            } catch (\Exception $notifErr) {
+                \Log::warning('ReviseBudget notification failed for department ' . $Department_id . ': ' . $notifErr->getMessage());
+            }
+
             DB::commit();
             $response['success'] = true;
             $response['html']= '' ;

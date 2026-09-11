@@ -125,18 +125,32 @@ class PaymentConsentController extends Controller
         $notificationMessage = "Payment conscent confirmed/approved by $names !";
         // dd($notificationMessage );
 
-        // Notify all employees about the birthdays
+        // config('settings.Notifications') is a 0-indexed array of the string
+        // type codes '1'..'11' — index 9 is '10' (the generic employee
+        // notification type, which does ResortNotification::create(['user_id'
+        // => $sendto, ...]) and a device-token push; $sendto is never passed
+        // here, so that branch silently wrote nothing and pushed nothing).
+        // Index 10 ('11') is the type this call's own argument shape already
+        // matches — nofitication()'s type==11 branch reinterprets
+        // ($resortid,$Msgid,$Budget_id) as ($shopkeeper_id,$content,$payment)
+        // specifically for this shopkeeper consent-approval notification.
         $type = config('settings.Notifications');
-        // dd($type);
-        $event = event(new ResortNotificationEvent(Common::nofitication($shopkeeperId, $type[9], $notificationMessage,  $payment)));
+        // event() returns listener response values, not a broadcast delivery
+        // receipt — for a ShouldBroadcast event with no registered Listener
+        // class (this one), it's always an empty array regardless of whether
+        // the broadcast actually goes out. Gating the success response on it
+        // meant this endpoint never returned success, even though the payment
+        // status update above already completed — the caller's AJAX request
+        // always looked like it failed.
+        try {
+            event(new ResortNotificationEvent(Common::nofitication($shopkeeperId, $type[10], $notificationMessage,  $payment)));
+        } catch (\Exception $e) {
+            \Log::warning('Payment consent notification failed: ' . $e->getMessage());
+        }
 
-        if($event)
-        {
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Payment Conscented successfully',
-            ]);
-        }   
-
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Payment Conscented successfully',
+        ]);
     }
 }

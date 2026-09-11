@@ -102,7 +102,13 @@ class IncidentController extends Controller
                 $query->where('incident_date', $request->date);
             }
 
-            $incidents = $query->get();
+            // The client's DataTable requests order by the hidden created_at
+            // column (order:[[10,'desc']]) but that request never actually
+            // reached the query — rows came back in whatever order the DB
+            // happened to return them, unsorted. Most-recently-reported-first
+            // as the query's own default fixes it regardless of what the
+            // client sends.
+            $incidents = $query->orderBy('created_at', 'desc')->get();
 
             $edit_class  = '';
             $delete_class  = '';
@@ -218,7 +224,9 @@ class IncidentController extends Controller
             }
     
             // ✅ Fetch data only after filtering
-            $incidents = $query->get();
+            // Same missing-order bug as list() above — most-recently-reported
+            // first as the query's own default.
+            $incidents = $query->orderBy('created_at', 'desc')->get();
                
             $delete_class  = '';
             if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.delete')) == false){
@@ -779,17 +787,41 @@ class IncidentController extends Controller
 
         $incident->save();
 
+        try {
+            $recipientIds = collect();
+            if ($incident->reporter_id) {
+                $recipientIds->push($incident->reporter_id);
+            }
+            if (!empty($incident->involved_employees)) {
+                $recipientIds = $recipientIds->merge(explode(',', $incident->involved_employees));
+            }
+            $recipientIds = $recipientIds->filter()->unique()->values()->all();
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                $recipientIds,
+                'Incident ' . $incident->status,
+                'Incident "' . $incident->incident_name . '" has been ' . strtolower($incident->status) . ' by the GM.',
+                'Incident',
+                $incident->id
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Incident approve/reject notification failed: ' . $e->getMessage());
+        }
+
         return response()->json(['success' => true]);
     }
 
     public function destroy(Request $request)
     {
+        if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.delete')) == false){
+            return abort(403, 'Unauthorized access');
+        }
         $id = base64_decode($request->id);
 
         try {
             DB::beginTransaction();
 
-            $incident = Incidents::findOrFail($id);
+            $incident = Incidents::where('resort_id', $this->resort->resort_id)->findOrFail($id);
 
             // Delete related child records
             $incident->witness()->delete();
@@ -838,15 +870,16 @@ class IncidentController extends Controller
             if (!$admin || !filter_var($admin->email ?? '', FILTER_VALIDATE_EMAIL)) return;
             $recipientName = trim(($admin->first_name ?? '') . ' ' . ($admin->last_name ?? '')) ?: 'there';
 
-            Mail::send('emails.incident-notification', [
-                'recipientName' => $recipientName,
-                'body'          => $body,
-                'details'       => $details,
-                'ctaUrl'        => $ctaUrl,
-                'ctaLabel'      => $ctaLabel ?: 'View in HRVMS',
-            ], function ($m) use ($admin, $recipientName, $subject) {
-                $m->to($admin->email, $recipientName)->subject($subject);
-            });
+            // Was Mail::send() — a blocking SMTP round-trip per recipient,
+            // called in a loop from assign()/statement-request (one send per
+            // committee member / involved employee / witness). QUEUE_CONNECTION
+            // is 'database' here (a real worker, not sync); Mailer::queue()
+            // only accepts Mailable instances (not the raw view+closure form
+            // Mail::send() takes), hence the small IncidentNotificationMail
+            // class instead of a one-line send->queue rename.
+            Mail::to($admin->email, $recipientName)->queue(
+                new \App\Mail\IncidentNotificationMail($recipientName, $subject, $body, $details, $ctaUrl, $ctaLabel, $this->resort->resort_id)
+            );
         } catch (\Throwable $e) {
             \Log::warning('Incident email failed for employee ' . $employeeId . ': ' . $e->getMessage());
         }

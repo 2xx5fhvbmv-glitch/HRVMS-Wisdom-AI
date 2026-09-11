@@ -512,8 +512,23 @@ class InventoryController extends Controller
             $bed = AssingAccommodation::where('id', $assignId)->where('resort_id', $resort_id)->where('emp_id', '!=', 0)->first();
 
             if ($bed) {
+                $unassignedEmpId = $bed->emp_id;
                 $decrementInventory($bed->available_a_id);
                 $bed->update(['emp_id' => 0, 'effected_date' => null]);
+
+                try {
+                    Common::notifyEmployees(
+                        $resort_id,
+                        [(int) $unassignedEmpId],
+                        'Accommodation Unassigned',
+                        'You have been unassigned from bed ' . ($bed->BedNo ?? '') . '.',
+                        'Accommodation',
+                        $bed->id
+                    );
+                } catch (\Exception $ne) {
+                    \Log::warning('Accommodation unassign notification failed: ' . $ne->getMessage());
+                }
+
                 return response()->json(['success' => true, 'message' => 'Employee unassigned successfully'], 200);
             }
             return response()->json(['success' => false, 'message' => 'No assigned employee found'], 404);
@@ -525,7 +540,7 @@ class InventoryController extends Controller
             ->where('assing_accommodations.emp_id', '!=', 0)
             ->join('employees as e', 'e.id', '=', 'assing_accommodations.emp_id')
             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-            ->select('assing_accommodations.id as assign_id', 'assing_accommodations.available_a_id', 'assing_accommodations.BedNo', 'e.Emp_id', 'ra.first_name', 'ra.last_name')
+            ->select('assing_accommodations.id as assign_id', 'assing_accommodations.available_a_id', 'assing_accommodations.BedNo', 'assing_accommodations.emp_id as numeric_emp_id', 'e.Emp_id', 'ra.first_name', 'ra.last_name')
             ->get();
 
         if ($assignedBeds->isEmpty()) {
@@ -537,6 +552,20 @@ class InventoryController extends Controller
             $decrementInventory($assignedBeds->first()->available_a_id);
             AssingAccommodation::where('id', $assignedBeds->first()->assign_id)
                 ->update(['emp_id' => 0, 'effected_date' => null]);
+
+            try {
+                Common::notifyEmployees(
+                    $resort_id,
+                    [(int) $assignedBeds->first()->numeric_emp_id],
+                    'Accommodation Unassigned',
+                    'You have been unassigned from bed ' . ($assignedBeds->first()->BedNo ?? '') . '.',
+                    'Accommodation',
+                    $assignedBeds->first()->assign_id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Accommodation unassign notification failed: ' . $ne->getMessage());
+            }
+
             return response()->json(['success' => true, 'message' => 'Employee unassigned successfully'], 200);
         }
 

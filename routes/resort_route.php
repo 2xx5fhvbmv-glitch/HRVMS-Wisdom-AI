@@ -118,8 +118,6 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
          Route::get('performance/admin-dashboard', 'Performance\PerformanceDashboardController@Admin_dashboard')->name('Performance.admindashboard');
 
 
-            Route::get('grievance-and-disciplinary/admin-dashboard', 'GrievanceAndDisciplinery\DashboardController@Admin_Dashobard')->name('GrievanceAndDisciplinery.Admindashboard');
-
          //Learning Module
          Route::get('learning/hr-dashboard', 'Learning\DashboardController@HR_Dashobard')->name('learning.hr.dashboard');
          Route::get('learning/hod-dashboard', 'Learning\DashboardController@hod_dashboard')->name('learning.hod.dashboard');
@@ -132,7 +130,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
         //  GrievanceAndDisciplinery
 
          Route::get('grievance-and-disciplinary/hr-dashboard', 'GrievanceAndDisciplinery\DashboardController@HR_Dashobard')->name('GrievanceAndDisciplinery.Hrdashboard');
-         Route::get('grievance-and-disciplinary/admin-dashboard', 'GrievanceAndDisciplinery\DashboardController@Admin_Dashobard')->name('GrievanceAndDisciplinery.Admindashboard');
+         Route::get('grievance-and-disciplinary/admin-dashboard', 'GrievanceAndDisciplinery\DashboardController@Admin_dashboard')->name('GrievanceAndDisciplinery.Admindashboard');
 
         //  Survey
          Route::get('survey/hr-dashboard', 'Survey\DashboardController@HR_Dashobard')->name('Survey.hr.dashboard');
@@ -444,6 +442,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/talent-acquisition/job-advertisement/list', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','getList'])->name('resort.ta.jobadvertisment.getList');
     Route::post('/talent-acquisition/job-advertisement/upload', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','StoreJobAvd'])->name('resort.ta.jobadvertisment.upload');
     Route::delete('/talent-acquisition/job-advertisement/destroy/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','destroy'])->name('resort.ta.jobadvertisment.destroy');
+    Route::get('/talent-acquisition/job-advertisement/download/{vacancyId}', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','downloadComposedAd'])->name('resort.ta.jobadvertisment.download');
 
     Route::Post('/talent-acquisition/hold-vcancies', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','TaHoldVcanciesNotification'])->name('resort.ta.HiringNotification');
 
@@ -474,6 +473,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/revert-back', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','RevertBack'])->name('resort.ta.RevertBack');
     Route::post('/talent-acquisition/applicant-file-download', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetAwsFiles'])->name('resort.ta.DownloadFile');
     Route::post('/talent-acquisition/applicant-file-download-all', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetAllAwsFiles'])->name('resort.ta.DownloadAllFiles');
+    Route::get('/talent-acquisition/applicant-file-download-all-zip/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','DownloadAllFilesZip'])->name('resort.ta.DownloadAllFilesZip');
 
 
     Route::post('/talent-acquisition/get-applicant-wise-grid-wise', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','getApplicantWiseGridWise'])->name('resort.ta.getApplicantWiseGridWise');
@@ -679,7 +679,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/leaves/boarding-pass-detail', 'Leave\BoardingPassController@getBoardingPassDetail')->name('resort.boardingpass.detail');
     Route::get('/leaves/boarding-pass-application', 'Leave\BoardingPassController@apply')->name('resort.boardingpass.apply');
     Route::post('/leaves/boarding-pass-submit', 'Leave\BoardingPassController@store')->name('resort.boardingpass.store');
-    Route::post('/leaves/handle-pass-action', 'Leave\BoardingPassController@handlePassAction')->name('pass.handleAction');
+    Route::post('/leaves/handle-pass-action', 'Leave\BoardingPassController@BoardingPassStatusUpdate')->name('pass.handleAction');
     Route::get('/leaves/boarding-pass/filter/grid', 'Leave\BoardingPassController@filterPassGridRequests')->name('pass.filter.grid');
     Route::get('/leaves/boarding-pass', 'Leave\BoardingPassController@index')->name('resort.boarding-pass');
     Route::post('/leaves/boarding/status-update', 'Leave\BoardingPassController@BoardingPassStatusUpdate')->name('resort.BoardingStatusUpdate');
@@ -1975,6 +1975,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('sos/view-employee-safety-status/{id}', 'SOS\DashboardController@viewEmployeeSafetyDetails')->name('sos.viewEmployeeSafetyDetails');
     Route::post('sos/filter-employee-status/{id}', 'SOS\DashboardController@filterEmployeeSafetyDetails')->name('sos.filterEmployeeSafetyDetails');
     Route::post('sos/update-mass-instruction', 'SOS\DashboardController@updateMassInstruction')->name('sos.updateMassInstruction');
+    Route::get('sos/mass-instruction-history/{id}', 'SOS\DashboardController@massInstructionHistory')->name('sos.massInstructionHistory');
     // Employee live location
     Route::get('sos/employees-live-location/{id}', 'SOS\DashboardController@showMap')->name('sos.showMap');
     Route::post('sos/filter-map-employee-list/{id}', 'SOS\DashboardController@filterMapEmployeeList')->name('sos.filterMapEmployeeList');

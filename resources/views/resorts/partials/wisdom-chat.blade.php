@@ -457,11 +457,39 @@
 .uc-info-action.uc-danger { color: var(--error); border-color: var(--error-bg); }
 .uc-info-name-edit { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 14px; margin-bottom: 10px; }
 
-/* Photo-first avatars with initials fallback — list rows, picker, thread
-   header and member rows all funnel through the same ucAvatarInner() JS
-   helper into this markup. */
-.crow .av img, .uc-picker-avatar img, #uc-thread-avatar img, .uc-member-row .uc-conv-avatar img {
-    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+/* ---- Colleague chat (#uc-panel) — teal redesign -----------------------
+   Scoped entirely under #uc-panel so the Wisdom AI assistant panel above
+   (which shares several base classes: .wai-header, .wai-row, .wai-bubble,
+   .wai-input, .wai-mini-avatar) keeps its own existing look untouched.
+   No presence dots — the only "presence" field the API returns
+   (last_seen) is a ResortAdmin row's updated_at, not real activity
+   tracking, so a dot/"Active now" text driven by it would just be wrong. */
+#uc-panel .wai-header { background: var(--teal); }
+#uc-panel .uc-back,
+#uc-panel .wai-header-actions button { background: rgba(255,255,255,.14); }
+#uc-panel .uc-back:hover,
+#uc-panel .wai-header-actions button:hover { background: rgba(255,255,255,.26); }
+
+/* Search */
+#uc-panel .uc-search-box { display: flex; align-items: center; gap: 8px; background: var(--line-2); border: 1px solid var(--line); border-radius: 11px; padding: 8px 12px; }
+#uc-panel .uc-search-box i { color: var(--faint); font-size: 12.5px; flex: none; }
+#uc-panel .uc-search-box input { border: none; background: none; outline: none; font-family: inherit; font-size: 13.5px; color: var(--ink); width: 100%; padding: 0; }
+#uc-panel .uc-search-box input::placeholder { color: var(--faint); }
+
+/* Photo-first avatars with initials fallback (list rows via .crow .av,
+   picker, thread header, member rows, and message-bubble sender avatars
+   all funnel through the same ucAvatarInner() JS helper into this markup). */
+#uc-panel .uc-conv-avatar, #uc-panel .uc-picker-avatar, #uc-panel #uc-thread-avatar, #uc-panel .wai-mini-avatar.uc-msg-avatar {
+    position: relative; background: var(--neutral-bg);
+}
+/* z-index keeps the fallback initials (below) from painting over a
+   successfully loaded photo — onerror only removes the <img> on a 404, so
+   without this the fallback (inserted alongside the img regardless) sat on
+   top of it in normal DOM stacking order. .crow .av wasn't in this list
+   before — the conversation LIST rows were still exposed to the same
+   overlap bug already fixed here for picker/thread/member/bubble avatars. */
+.crow .av img, #uc-panel .uc-conv-avatar img, #uc-panel .uc-picker-avatar img, #uc-panel #uc-thread-avatar img, #uc-panel .wai-mini-avatar.uc-msg-avatar img, .uc-member-row .uc-conv-avatar img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;
 }
 .uc-picker-avatar {
     width: 42px; height: 42px; border-radius: 50%; flex: 0 0 42px; overflow: hidden; position: relative;
@@ -469,7 +497,7 @@
 }
 .uc-av-fallback {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    color: #fff; font-weight: 600; font-size: inherit;
+    color: #fff; font-weight: 600; font-size: inherit; z-index: 0;
 }
 
 #uc-messages { background: #fff; }

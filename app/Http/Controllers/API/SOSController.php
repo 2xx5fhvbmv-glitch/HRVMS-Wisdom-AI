@@ -136,6 +136,24 @@ class SOSController extends Controller
                 'emergency_description'                 =>  $request->emergency_description,
             ]);
 
+            // Web dashboard had no way to know a new SOS came in except
+            // manually refreshing — see routes/channels.php's
+            // resort.{resort_id}.sos authorizer.
+            try {
+                $emergencyName = SOSEmergencyTypesModel::where('id', $request->emergency_id)->value('name');
+                event(new \App\Events\SosTriggered(
+                    $this->resort_id,
+                    $SOSHistoryAdd->id,
+                    $SOSHistoryAdd->status,
+                    $emergencyName,
+                    $SOSHistoryAdd->location,
+                    trim($this->user->first_name . ' ' . $this->user->last_name),
+                    Common::getResortUserPicture($this->user->id)
+                ));
+            } catch (\Throwable $e) {
+                \Log::warning('SosTriggered broadcast failed on SOSStore: ' . $e->getMessage());
+            }
+
             // rank==4 (MGR) used to be required here too, but no Security
             // Manager record in the DB actually carries rank 4 — the real
             // seeded example is rank 2/HOD — so that condition never
@@ -143,13 +161,7 @@ class SOSController extends Controller
             // anyone. Title alone is the real signal (matches
             // EnsureSOSSecurityManagerAccess, which gates the
             // approve/dispatch endpoints this employee is routed to).
-            $smEmployeeModel                            =   Employee::join('resort_positions as rp', 'employees.Position_id', '=', 'rp.id')
-                                                                ->where('employees.resort_id', $this->resort_id)
-                                                                ->where('employees.status', 'Active')
-                                                                ->where('rp.position_title', 'Security Manager')
-                                                                ->select('employees.id','employees.Admin_Parent_id','employees.Emp_id','employees.Position_id','employees.device_token')
-                                                                ->first();
-            $smEmployee                                 =   $smEmployeeModel ? $smEmployeeModel->toArray() : null;
+            $smEmployee                                  =   Common::findActiveSecurityManager($this->resort_id);
 
             // No active Security Manager configured for this resort — the SOS
             // record itself is still saved; just skip the push/notification
@@ -158,8 +170,8 @@ class SOSController extends Controller
                 $title                                      =   "SOS Alert";
                 $body                                       =   "SOS Alert!\n"
                                                                 . "Name: " . $this->user->first_name . ' ' . $this->user->last_name . "\n"
-                                                                . "Date: " . Carbon::now()->format('d M Y') . "\n"
-                                                                . "Time: " . Carbon::now()->format('h:i A') . "\n"
+                                                                . "Date: " . Common::formatDate(Carbon::now()) . "\n"
+                                                                . "Time: " . Common::formatDisplayTime(Carbon::now()) . "\n"
                                                                 . "Location: " . $request->location . "\n"
                                                                 . "Please respond immediately!";
 
@@ -250,7 +262,26 @@ class SOSController extends Controller
             $sosHistory->team_message                   =   $request->team_message ?? null;
             $sosHistory->rejected_message               =   $request->rejected_message ?? null;
             $sosHistory->save();
-            
+
+            // Web dashboard real-time alert — same event as SOSStore(), now
+            // reflecting the Approved/Rejected/Dispatched transition.
+            try {
+                $sosInitiatorName = Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                    ->where('employees.id', $sosHistory->emp_initiated_by)
+                    ->select('ra.first_name', 'ra.last_name')
+                    ->first();
+                event(new \App\Events\SosTriggered(
+                    $this->resort_id,
+                    $sosHistory->id,
+                    $sosHistory->status,
+                    SOSEmergencyTypesModel::where('id', $sosHistory->emergency_id)->value('name'),
+                    $sosHistory->location,
+                    $sosInitiatorName ? trim($sosInitiatorName->first_name . ' ' . $sosInitiatorName->last_name) : null
+                ));
+            } catch (\Throwable $e) {
+                \Log::warning('SosTriggered broadcast failed on handleSOSActionWithTeam: ' . $e->getMessage());
+            }
+
             // Get initiator details
             $empInitiatedDeviceToken                    =   Employee::where('resort_id', $this->resort_id)
                                                                 ->where('status', 'Active')
@@ -459,6 +490,20 @@ class SOSController extends Controller
             $sosHistoryEmployeeStatus->longitude        =   $request->longitude;
             $sosHistoryEmployeeStatus->save();
 
+            // An "Unsafe" self-report during an active SOS previously raised
+            // nothing — the single most urgent inbound signal in the app.
+            // Mirror the panic-button trigger's own SM notification.
+            if ($request->status === 'Unsafe') {
+                $smEmployee                             =   Common::findActiveSecurityManager($this->resort_id);
+                if ($smEmployee) {
+                    $title                               =   'SOS Alert';
+                    $body                                =   ($this->user->first_name ?? '') . ' ' . ($this->user->last_name ?? '')
+                                                                . " reported Unsafe during an active SOS.\nLocation: " . $request->address;
+                    Common::sendPushNotificationForMobile([$smEmployee['device_token']], $title, $body, 'SOS', 'Pending', 'siren_sound', 'custom_sound_channel', NULL);
+                    Common::sendMobileNotification($this->resort_id, 2, null, null, $title, $body, 'SOS', [$smEmployee['id']], $sosHistoryEmployeeStatus->sos_history_id, false, 'sos-unsafe-status');
+                }
+            }
+
             return response()->json([
                 'success'                               =>  true,
                 'message'                               =>  "You are marked as {$request->status}. SOS alert successfully updated",
@@ -576,7 +621,7 @@ class SOSController extends Controller
                                                                 // position for exactly the emergencies where it matters
                                                                 // most, returning a misleading "No employee location
                                                                 // found" instead.
-                                                                ->whereIn('sos_history.status',['Active','Drill-Active','Real-Active','In-Progress'])
+                                                                ->whereIn('sos_history.status', Common::sosOpenStatuses())
                                                                 ->first();
 
 
@@ -675,7 +720,7 @@ class SOSController extends Controller
                                                                 // position for exactly the emergencies where it matters
                                                                 // most, returning a misleading "No employee location
                                                                 // found" instead.
-                                                                ->whereIn('sos_history.status',['Active','Drill-Active','Real-Active','In-Progress'])
+                                                                ->whereIn('sos_history.status', Common::sosOpenStatuses())
                                                                 ->select('sos_history.*','stma.status as team_member_status', 'stma.address as team_member_address', 'stma.latitude as team_member_latitude', 'stma.longitude as team_member_longitude','stma.id as team_member_id','stma.emp_id as team_member_emp_id','set.name as emergency_name')
                                                                 ->first();
             if (!$sosData) {
@@ -715,6 +760,17 @@ class SOSController extends Controller
             $sosData->initiator_name                    =   $initiator ? trim($initiator->first_name . ' ' . $initiator->last_name) : null;
             $sosData->initiator_emp_id                  =   $initiator->Emp_id ?? null;
             $sosData->initiator_photo                   =   $initiator ? Common::getResortUserPicture($initiator->admin_id) : null;
+
+            // Configured on the web Configuration page (Emergency Types'
+            // default team) but never reached the manager's dispatch/detail
+            // screen before — the manager had no server-suggested default
+            // and had to already know/remember what was configured. Same
+            // sos_child_emergency_types lookup getAnySOSEmergency() already
+            // uses for the initiator's own status check.
+            $sosData->default_teams                     =   SOSChildEmergencyType::join('sos_teams as st', 'st.id', '=', 'sos_child_emergency_types.team_id')
+                                                                ->where('sos_child_emergency_types.emergency_id', $sosData->emergency_id)
+                                                                ->select('st.id as team_id', 'st.name as team_name')
+                                                                ->get();
 
             $teamMemberStats                            =   SosTeamMemberActivity::where('sos_history_id', $sosId)
                                                                 ->selectRaw("
@@ -780,6 +836,19 @@ class SOSController extends Controller
                                                             ->where('status', 'Unacknowledged')
                                                             ->first();
             if (!$sosAcknowledged) {
+                // Was a silent no-op — if the app sends a stale/mismatched
+                // team_member_id (e.g. a cached row id from an earlier
+                // fetch that no longer matches the current
+                // sos_team_member_activity.id on the server), this branch
+                // returns success:false with nothing ever written, and the
+                // web dashboard's "Not Acknowledged" is accurately reporting
+                // the DB truth. Log so this is distinguishable from a
+                // genuine double-submit from server logs alone.
+                \Log::warning('SOSAcknowledge: no matching Unacknowledged row', [
+                    'sos_history_id' => $request->sos_history_id,
+                    'team_member_id' => $request->team_member_id,
+                    'emp_id' => $this->user->id,
+                ]);
                 return response()->json(['success' => false, 'message' => 'SOS Already Acknowledged'], 200);
             }
 
@@ -795,6 +864,23 @@ class SOSController extends Controller
             ]);
 
             SOSHistoryModel::where('id', $request->sos_history_id)->update(['status' => 'In-Progress']);
+
+            // The person who raised the SOS had no way to know a team member
+            // acknowledged and is responding.
+            $sosHistoryForInitiator                     =   SOSHistoryModel::where('id', $request->sos_history_id)
+                                                                ->where('resort_id', $this->resort_id)
+                                                                ->first();
+            if ($sosHistoryForInitiator && $sosHistoryForInitiator->emp_initiated_by) {
+                $initiatorEmployee                      =   Employee::where('id', $sosHistoryForInitiator->emp_initiated_by)
+                                                                ->where('resort_id', $this->resort_id)
+                                                                ->first();
+                if ($initiatorEmployee) {
+                    $ackName                            =   trim(($this->user->first_name ?? '') . ' ' . ($this->user->last_name ?? ''));
+                    $ackBody                            =   ($ackName !== '' ? $ackName : 'A team member') . ' acknowledged the SOS and is responding.';
+                    Common::sendPushNotificationForMobile([$initiatorEmployee->device_token], 'SOS Alert', $ackBody, 'SOS', 'In-Progress', 'siren_sound', 'custom_sound_channel', NULL);
+                    Common::sendMobileNotification($this->resort_id, 2, null, null, 'SOS Alert', $ackBody, 'SOS', [$initiatorEmployee->id], $sosHistoryForInitiator->id, false, 'sos-status-update');
+                }
+            }
 
             return response()->json([
                 'success'                               =>  true,
@@ -941,6 +1027,16 @@ class SOSController extends Controller
 
 
             $displayedStatuses                          = ['data' => []];
+            // Was checking in_array($m->sos_status, $displayedStatuses) —
+            // $displayedStatuses is ['data' => [...]], an associative array
+            // whose only "value" is that inner array, so the status string
+            // could never actually be found in it and this never
+            // deduplicated anything. Track seen statuses in a flat list
+            // instead. Real impact: an incident with 2+ acknowledging team
+            // members duplicated the "acknowledgements received" timeline
+            // step once per member (ChildSOSHistoryStatus gets a new row
+            // per acknowledgement, no dedupe on the write side either).
+            $seenStatuses                                = [];
 
             foreach($sosHistory as $m)
             {
@@ -948,8 +1044,9 @@ class SOSController extends Controller
                 $date                                   =   $dateTime->format('Y-m-d');
                 $time                                   =   $dateTime->format('H:i:s');
 
-                if(!in_array($m->sos_status, $displayedStatuses))
+                if(!in_array($m->sos_status, $seenStatuses, true))
                 {
+                    $seenStatuses[]                     =   $m->sos_status;
                     $displayedStatuses['data'][]        =   [
                         'sos_status'                    =>  $m->sos_status,
                         'date'                          =>  $date,
@@ -1174,6 +1271,20 @@ class SOSController extends Controller
             $sosHistory->status                         =   $request->action;
             $sosHistory->save();
 
+            // The initiating employee had no way to know whether their alert
+            // was classified as a drill or a real emergency — no team is
+            // assigned yet at this point (that happens in
+            // handleSOSActionWithTeam), so they're the only recipient who
+            // needs to know right now.
+            $initiatorEmployee                          =   Employee::where('id', $sosHistory->emp_initiated_by)
+                                                                ->where('resort_id', $this->resort_id)
+                                                                ->first();
+            if ($initiatorEmployee) {
+                $classification                          =   $request->action === 'Real-Active' ? 'a REAL emergency' : 'a drill';
+                Common::sendPushNotificationForMobile([$initiatorEmployee->device_token], 'SOS Alert', "Your SOS alert has been classified as {$classification}.", 'SOS', $request->action, 'siren_sound', 'custom_sound_channel', NULL);
+                Common::sendMobileNotification($this->resort_id, 2, null, null, 'SOS Alert', "Your SOS alert has been classified as {$classification}.", 'SOS', [$initiatorEmployee->id], $sosHistory->id, false, 'sos-status-update');
+            }
+
             return response()->json([
                 'success'                               =>  true,
                 'message'                               =>  "SOS {$request->action} successfully.",
@@ -1210,7 +1321,7 @@ class SOSController extends Controller
                                                                 // same class of bug fixed for employee-team-location/
                                                                 // SOSDetails: a live SOS could never be marked Completed
                                                                 // by the security manager, only a drill could.
-                                                                ->whereIn('status',['Active', 'Drill-Active', 'Real-Active', 'In-Progress'])
+                                                                ->whereIn('status', Common::sosOpenStatuses())
                                                                 ->first();
             if (!$sosHistory) {
                 return response()->json(['success' => false, 'message' => 'SOS Not Found'], 200);
@@ -1233,9 +1344,16 @@ class SOSController extends Controller
             $body                                   =   "SOS Alert: Incident was reported and is now under control. For your safety, please remain calm and proceed to the nearest designated assembly point.";
             $moduleName                             =   'SOS';
             
-            //Send push notification to the employee same resort
-            $allEmpDeviceId                         =   Employee::where('resort_id',$this->resort_id)->where('status','Active')->where('id','!=',$this->user->GetEmployee->id)->pluck('device_token');
-            $allEmpPushNotification                 =   Common::sendPushNotificationForMobile($allEmpDeviceId->toArray(), $title, $body, $moduleName,'Completed',NULL,NULL,NULL);
+            // Broadcast to every other active employee in the resort. This used
+            // to push only (sendPushNotificationForMobile against raw device
+            // tokens) — unlike every other SOS transition, it left no
+            // resort_notifications row, so anyone who missed the push had no
+            // record the all-clear ever happened. notifyEmployees() writes the
+            // row and pushes exactly once per employee (no separate push call
+            // needed here — pairing both would double-push, see Common.php's
+            // own doc comment on notifyEmployees).
+            $allEmpIds                               =   Employee::where('resort_id', $this->resort_id)->where('status', 'Active')->where('id', '!=', $this->user->GetEmployee->id)->pluck('id')->toArray();
+            Common::notifyEmployees($this->resort_id, $allEmpIds, $title, $body, $moduleName, $sosHistory->id, 'sos-all-clear');
 
             // DB::commit();
             return response()->json([
@@ -1443,6 +1561,47 @@ class SOSController extends Controller
     }
 
     /**
+     * Ordered history (newest first) of mass instructions sent for an
+     * incident — the web side writes to sos_mass_instructions (a real
+     * history table) instead of overwriting sos_history.mass_instructions
+     * as it used to. Any authenticated employee can see what was sent, not
+     * just whoever had the app open at send time, same access posture as
+     * sosChatLogs() above.
+     */
+    public function sosMassInstructions($sosId)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $sosId                                          =   base64_decode($sosId);
+        try {
+            $instructions                               =   \App\Models\SosMassInstruction::join('resort_admins as ra', 'sos_mass_instructions.created_by', '=', 'ra.id')
+                                                                ->where('sos_mass_instructions.resort_id', $this->resort_id)
+                                                                ->where('sos_mass_instructions.sos_history_id', $sosId)
+                                                                ->orderBy('sos_mass_instructions.created_at', 'desc')
+                                                                ->select(
+                                                                    'sos_mass_instructions.*',
+                                                                    'ra.first_name',
+                                                                    'ra.last_name'
+                                                                )
+                                                                ->get();
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  "Mass instructions fetched successfully.",
+                'data'                                  =>  $instructions,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
      * Post a chat message during an active SOS. Not explicitly in the
      * mobile spec (which only listed the GET log), but a log screen with
      * no way to populate it isn't testable — thin, isolated addition.
@@ -1482,12 +1641,26 @@ class SOSController extends Controller
             // to poll it — nothing told them a new instruction arrived, so
             // it never showed "in real time". Push it immediately, same as
             // every other SOS status change.
-            $recipient                                   =   Employee::where('resort_id', $this->resort_id)
+            //
+            // Recipient used to be hardcoded to emp_initiated_by, so a reply
+            // FROM the initiating employee (to the SM) always resolved back
+            // to themself — the guard below then silently skipped sending,
+            // and the Security Manager never learned of the reply. Resolve
+            // whoever ISN'T the sender instead: the initiator texts the SM,
+            // the SM (or any other responder) texts the initiator back.
+            $senderEmpId                                 =   $this->user->GetEmployee->id ?? null;
+            if ($senderEmpId && (int) $senderEmpId === (int) $sosHistory->emp_initiated_by) {
+                $recipient                               =   Common::findActiveSecurityManager($this->resort_id);
+            } else {
+                $initiator                               =   Employee::where('resort_id', $this->resort_id)
                                                                 ->where('id', $sosHistory->emp_initiated_by)
                                                                 ->first(['id', 'device_token']);
-            if ($recipient && $recipient->id != ($this->user->GetEmployee->id ?? null)) {
-                Common::sendPushNotificationForMobile([$recipient->device_token], 'Security Instructions', $request->message, 'SOS', 'Active', 'siren_sound', 'custom_sound_channel', NULL);
-                Common::sendMobileNotification($this->resort_id, 2, null, null, 'Security Instructions', $request->message, 'SOS', [$recipient->id], $sosHistory->id, false, 'sos-chat-message');
+                $recipient                               =   $initiator ? $initiator->toArray() : null;
+            }
+
+            if ($recipient) {
+                Common::sendPushNotificationForMobile([$recipient['device_token']], 'Security Instructions', $request->message, 'SOS', 'Active', 'siren_sound', 'custom_sound_channel', NULL);
+                Common::sendMobileNotification($this->resort_id, 2, null, null, 'Security Instructions', $request->message, 'SOS', [$recipient['id']], $sosHistory->id, false, 'sos-chat-message');
             }
 
             return response()->json([

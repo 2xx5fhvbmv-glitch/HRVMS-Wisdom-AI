@@ -28,22 +28,27 @@
             </div>
             <div class="card ">
                 <div class="row g-lg-4 g-3 sosteamActivity-header mb-md-4 mb-3">
-                    <div class="col-lg-3 col-sm-6">
+                    <div class="col-lg-2 col-sm-6">
                         <div class="d-flex bg-themeGrayLight">
                             <h6>Total Members</h6><strong>{{ $totalEmployeesCount }}</strong>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-sm-6">
+                    <div class="col-lg-2 col-sm-6">
                         <div class="d-flex bg-themeGrayLight">
                             <h6>Marked Safe</h6><strong>{{ $onlySafeEmpCount }}</strong>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-sm-6">
+                    <div class="col-lg-2 col-sm-6">
                         <div class="d-flex bg-themeGrayLight">
-                            <h6>Unknown Status</h6><strong>{{ $onlyUnsafeEmpCount }}</strong>
+                            <h6>Marked Unsafe</h6><strong>{{ $onlyUnsafeEmpCount }}</strong>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-sm-6 text-end">
+                    <div class="col-lg-2 col-sm-6">
+                        <div class="d-flex bg-themeGrayLight">
+                            <h6>Unknown Status</h6><strong>{{ $onlyUnknownEmpCount }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-sm-12 text-end">
                         <span class="badge badge-dangerNew mb-2">SOS Active : {{$sosDetails->getSos->name}}</span>
                         <p><i class="fa-regular fa-location-dot"></i> {{$sosDetails->location}}</p>
                     </div>
@@ -105,6 +110,13 @@
                     </div>
                 </form>
 
+                <div class="sosEmpSafetyStatus-form bg-themeGrayLight mb-md-4 mb-3">
+                    <div class="card-title">
+                        <h3>Instruction History</h3>
+                    </div>
+                    <div id="massInstructionHistorySection"></div>
+                </div>
+
                 <div id="employeStatusSection">
                     @include('resorts.renderfiles.SosEmployeesStatusList', ['employeesStatusList' => $employeesStatusList])
                 </div>
@@ -164,6 +176,19 @@
             });
         });
 
+        function loadMassInstructionHistory() {
+            $.ajax({
+                url: "{{ route('sos.massInstructionHistory', '') }}/" + $('#sos_history_id').val(),
+                method: "GET",
+                success: function(response) {
+                    if (response.success) {
+                        $('#massInstructionHistorySection').html(response.html);
+                    }
+                }
+            });
+        }
+        loadMassInstructionHistory();
+
         $('#massInstructionForm').submit(function(e) {
             e.preventDefault();
 
@@ -174,10 +199,11 @@
                 success: function(response) {
                     if (response.success) {
                         toastr.success(response.message, "Success", {
-                            positionClass: 'toast-bottom-right' 
+                            positionClass: 'toast-bottom-right'
                         });
                         $('#massInstructionForm')[0].reset();
                         $('#massInstructionForm').parsley().reset();
+                        loadMassInstructionHistory();
                     } else {
                         toastr.error(response.message, "Error", {
                             positionClass: 'toast-bottom-right'

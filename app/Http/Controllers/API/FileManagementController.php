@@ -557,6 +557,22 @@ class FileManagementController extends Controller
                 'TypeofAction' => 'Delete',
                 'file_path'    => $file->File_Path,
             ]);
+
+            // Delete on an HR-visible document was silent — upload notifies
+            // HR (above, in store()), delete never did.
+            $hrEmployeeIds = array_values(array_diff(Common::getResortHrEmployeeIds($resortId), [$emp->id]));
+            if (!empty($hrEmployeeIds)) {
+                Common::notifyEmployees(
+                    $resortId,
+                    $hrEmployeeIds,
+                    'File Deleted',
+                    ($emp->resortAdmin->full_name ?? $emp->Emp_id) . ' deleted a file: ' . $file->File_Name,
+                    'File Management',
+                    $file->id,
+                    'file-management-delete'
+                );
+            }
+
             $file->delete();
             return response()->json(['success' => true, 'message' => 'File deleted successfully.'], 200);
         } catch (\Throwable $e) {

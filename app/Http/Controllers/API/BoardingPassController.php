@@ -340,7 +340,7 @@ class BoardingPassController extends Controller
                 }
 
                 // Add the same approval flow for Exit Pass as well
-                $passApprovalFlow->each(function($approver) use ($boardingPass, $employee) {
+                $passApprovalFlow->each(function($approver) use ($boardingPass) {
                     EmployeeTravelPassStatus::create([
                         'travel_pass_id'                =>  $boardingPass->id,
                         'approver_id'                   =>  $approver->id,
@@ -348,44 +348,26 @@ class BoardingPassController extends Controller
                         'approver_role'                 =>  $approver->approver_role,
                         'status'                        =>  'Pending',
                     ]);
-
-                    // Was commented out — approvers (SM/HR/HOD) never got a
-                    // mobile push when a new boarding pass request was
-                    // submitted, so nobody knew to open the app and act on
-                    // it. Since the web list at /leaves/boarding-pass-requests
-                    // only shows a pass once the HOD's approval row is
-                    // already Approved, a silent HOD (never notified, never
-                    // opened the app) meant the request could never progress
-                    // far enough to appear on the web page either.
-                    //
-                    // When this step is the department HOD, also cc the
-                    // department's EXCOM — informational only, not a new
-                    // formal approval step (no extra EmployeeTravelPassStatus
-                    // row, Island Pass's fixed HOD→HR→SM step count
-                    // unchanged), per "XCOM should mirror HOD" notification
-                    // visibility requirement.
-                    $sendto = [$approver->id];
-                    if ($approver->approver_role === 'HOD') {
-                        $sendto = array_unique(array_merge(
-                            $sendto,
-                            Common::getDepartmentApproverIds($this->resort_id, $employee->Dept_id)
-                        ));
-                    }
-
-                    Common::sendMobileNotification(
-                        $this->resort_id,
-                        2,
-                        null,
-                        null,
-                        'Boarding Pass Request',
-                        'A boarding pass request has been submitted by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
-                        'Boarding Pass',
-                        $sendto,
-                        $boardingPass->id,
-                        false,
-                        'boarding-pass-request'
-                    );
                 });
+
+                // Was commented out — approvers (SM/HR/HOD) never got a
+                // mobile push when a new boarding pass request was
+                // submitted, so nobody knew to open the app and act on
+                // it. Since the web list at /leaves/boarding-pass-requests
+                // only shows a pass once the HOD's approval row is
+                // already Approved, a silent HOD (never notified, never
+                // opened the app) meant the request could never progress
+                // far enough to appear on the web page either. Shared with
+                // LeaveController::leaveAdd(), which builds the identical
+                // $passApprovalFlow for a pass created alongside a leave
+                // request but never notified anyone.
+                Common::notifyBoardingPassApprovalFlow(
+                    $this->resort_id,
+                    $passApprovalFlow,
+                    $boardingPass,
+                    $employee,
+                    $this->user->first_name . ' ' . $this->user->last_name
+                );
 
                 DB::commit();
 
@@ -810,8 +792,17 @@ class BoardingPassController extends Controller
                                                             'ArrivalResortTransportation:id,resort_id,transportation_option',
                                                             ])
                                                             ->where('status', 'Pending')
+                                                            // Was approver_rank only — HOD, HR's own rep, and Security
+                                                            // Manager can all be assigned as rank 2 (approver_rank
+                                                            // reflects the real rank of whoever holds each role, not a
+                                                            // fixed per-stage code), so this matched ANY pending
+                                                            // rank-2 stage, not specifically the stage routed to THIS
+                                                            // HR employee. Same fix as boardingHODDashboard() above
+                                                            // (already correct) and boardingSecurityManagerDashboard()
+                                                            // below.
                                                             ->whereHas('employeeTravelPassStatusData', function($q) use ($currentRank) {
-                                                                    $q->where('approver_rank', $currentRank)
+                                                                    $q->where('approver_id', $this->user->GetEmployee->id)
+                                                                    ->where('approver_rank', $currentRank)
                                                                     ->where('status', 'Pending');
                                                                 })
                                                             ->where('resort_id', $this->resort_id)
@@ -941,8 +932,16 @@ class BoardingPassController extends Controller
                                                             ])
                                                             ->where('status', 'Pending')
                                                             ->where('resort_id', $this->resort_id)
+                                                            // Was approver_rank only — the Security Manager's own real
+                                                            // rank (HOD, per this resort's data) is shared with the
+                                                            // actual HOD/HR approvers on the same pass, so this matched
+                                                            // ANY pending rank-2 stage — the reported bug ("Show only
+                                                            // requests that are actually pending Security Manager
+                                                            // approval. Do not display requests pending HOD/HR
+                                                            // approval"). Same fix as boardingHRDashboard() above.
                                                             ->whereHas('employeeTravelPassStatusData', function($q) use ($currentRank) {
-                                                                    $q->where('approver_rank', $currentRank)
+                                                                    $q->where('approver_id', $this->user->GetEmployee->id)
+                                                                    ->where('approver_rank', $currentRank)
                                                                     ->where('status', 'Pending');
                                                                 })
                                                             ->orderBy('created_at', 'desc')
@@ -1640,6 +1639,22 @@ class BoardingPassController extends Controller
             'visitors.*'                        => 'string',
         ]);
 
+        // Nothing stopped a manifest being saved with every employee_ids[]
+        // slot blank and no visitors either — a completely empty manifest,
+        // which is exactly what happened for two manifests reported as
+        // "No travel pass found for this manifest" (nobody was ever
+        // actually on them to have a pass). Blocking on employee_ids alone
+        // would break the legitimate visitors-only manifest case (see
+        // comment above), so this only rejects the case where BOTH are
+        // empty.
+        $validator->after(function ($validator) use ($request) {
+            $hasEmployees = collect((array) $request->employee_ids)->filter(fn ($id) => $id !== null && $id !== '')->isNotEmpty();
+            $hasVisitors = collect((array) $request->visitors)->filter(fn ($v) => $v !== null && trim((string) $v) !== '')->isNotEmpty();
+            if (!$hasEmployees && !$hasVisitors) {
+                $validator->errors()->add('employee_ids', 'Add at least one employee or visitor before saving the manifest.');
+            }
+        });
+
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
@@ -1746,7 +1761,7 @@ class BoardingPassController extends Controller
                     null,
                     null,
                     $request->transportation_mode . ' ' . $request->manifest_type,
-                    $request->transportation_mode . ' '  . $request->date . ' at ' . $request->time . ' has been ' . $request->manifest_type . '.',
+                    $request->transportation_mode . ' '  . Common::formatDate($request->date) . ' at ' . Common::formatDisplayTime($request->time) . ' has been ' . $request->manifest_type . '.',
                     'Boarding Pass',
                     $validEmployeeIds,
                     null,
@@ -1772,7 +1787,7 @@ class BoardingPassController extends Controller
                     null,
                     null,
                     'Manifest ' . ucfirst($request->manifest_type) . ' Created',
-                    ucfirst($request->manifest_type) . ' manifest for ' . $request->transportation_mode . ' (' . $request->transportation_name . ') on ' . $request->date . ' at ' . $request->time . ' created with ' . count($validEmployeeIds) . ' employee(s).',
+                    ucfirst($request->manifest_type) . ' manifest for ' . $request->transportation_mode . ' (' . $request->transportation_name . ') on ' . Common::formatDate($request->date) . ' at ' . Common::formatDisplayTime($request->time) . ' created with ' . count($validEmployeeIds) . ' employee(s).',
                     'Boarding Pass',
                     $staffNotifyIds,
                     null,
@@ -1887,6 +1902,17 @@ class BoardingPassController extends Controller
             }
 
             $pass->save();
+
+            // Employee whose travel time this is had no way to find out HR/SM
+            // moved it under them.
+            Common::notifyEmployees(
+                $this->resort_id,
+                [$pass->employee_id],
+                'Boarding Pass Time Updated',
+                'Your boarding pass travel time was updated by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                'Boarding Pass',
+                $pass->id
+            );
 
             DB::commit();
             return response()->json([
@@ -2060,7 +2086,9 @@ class BoardingPassController extends Controller
         try {
              $passId                                =   $request->pass_id;
 
-                $employeeTravelPass                 =   EmployeeTravelPass::find($passId);
+                $employeeTravelPass                 =   EmployeeTravelPass::where('id', $passId)
+                                                            ->where('resort_id', $this->resort_id)
+                                                            ->first();
                 if (!$employeeTravelPass) {
                     return response()->json([
                         'success'                   =>  false,
@@ -2074,6 +2102,29 @@ class BoardingPassController extends Controller
                 }
 
                 $employeeTravelPass->save();
+
+            // Neither the traveller nor HR previously learned that Security
+            // had confirmed their departure/arrival.
+            $travellerAdmin                         =   optional($employeeTravelPass->employee)->resortAdmin;
+            $travellerName                          =   $travellerAdmin ? trim(($travellerAdmin->first_name ?? '') . ' ' . ($travellerAdmin->last_name ?? '')) : '';
+
+            Common::notifyEmployees(
+                $employeeTravelPass->resort_id,
+                [$employeeTravelPass->employee_id],
+                'Boarding Pass ' . ucfirst($request->status),
+                'Your boarding pass has been marked as ' . $request->status . ' by Security.',
+                'Boarding Pass',
+                $employeeTravelPass->id
+            );
+
+            Common::notifyEmployees(
+                $employeeTravelPass->resort_id,
+                Common::getResortHrEmployeeIds($employeeTravelPass->resort_id),
+                'Employee ' . ucfirst($request->status),
+                ($travellerName !== '' ? $travellerName : 'An employee') . ' has been marked as ' . $request->status . ' by Security.',
+                'Boarding Pass',
+                $employeeTravelPass->id
+            );
 
             return response()->json([
                 'success'                           =>  true,
@@ -2133,7 +2184,10 @@ class BoardingPassController extends Controller
             // emergency-cancelled while still fully Pending (no stage ever
             // reached Approved) had nothing here blocking it from still being
             // modified.
-            $travelPass                             =   EmployeeTravelPass::find($data['pass_id']);
+            $travelPass                             =   EmployeeTravelPass::where('id', $data['pass_id'])
+                                                            ->where('resort_id', $this->resort_id)
+                                                            ->where('employee_id', $employee->id)
+                                                            ->first();
             if (!$travelPass) {
                 DB::rollBack();
                 return response()->json(['status' => false, 'message' => 'Travel pass not found.'], 200);
@@ -2165,7 +2219,22 @@ class BoardingPassController extends Controller
                 'departure_reason'                  =>  $data['dept_reason'] ?? null,
             ];
 
-            EmployeeTravelPass::where('id', $data['pass_id'])->update($boardingData);
+            $travelPass->update($boardingData);
+
+            // Approvers still holding a Pending stage on this pass were
+            // never told the details they're about to act on just changed.
+            $pendingApproverIds                     =   $EmployeeTravelPassStatus->where('status', 'Pending')->pluck('approver_id')->unique()->values()->all();
+            if (!empty($pendingApproverIds)) {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    $pendingApproverIds,
+                    'Boarding Pass Updated',
+                    $user->first_name . ' ' . $user->last_name . ' updated a pending boarding pass request awaiting your review.',
+                    'Boarding Pass',
+                    $travelPass->id
+                );
+            }
+
             DB::commit();
 
             return response()->json([
@@ -2201,7 +2270,10 @@ class BoardingPassController extends Controller
 
         try {
             // Check if the pass is already cancelled
-            $travelPass                             =   EmployeeTravelPass::where('id', $passId)->first();
+            $travelPass                             =   EmployeeTravelPass::where('id', $passId)
+                                                            ->where('resort_id', $this->resort_id)
+                                                            ->where('employee_id', $this->reporting_to)
+                                                            ->first();
 
             if (!$travelPass) {
                 return response()->json([
@@ -2232,9 +2304,29 @@ class BoardingPassController extends Controller
                 ], 200);
             }
 
+            // Approvers still holding a Pending stage need to know before
+            // their status rows are overwritten below.
+            $pendingApproverIds                         =   EmployeeTravelPassStatus::where('travel_pass_id', $passId)
+                                                                ->where('status', 'Pending')
+                                                                ->pluck('approver_id')
+                                                                ->unique()
+                                                                ->values()
+                                                                ->all();
+
             // Cancel the travel pass and all its approver statuses
             $travelPass->update(['status' => 'Cancel']);
             EmployeeTravelPassStatus::where('travel_pass_id',$passId)->update(['status' => 'Cancel']);
+
+            if (!empty($pendingApproverIds)) {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    $pendingApproverIds,
+                    'Boarding Pass Cancelled',
+                    $this->user->first_name . ' ' . $this->user->last_name . ' withdrew a boarding pass request awaiting your review.',
+                    'Boarding Pass',
+                    $travelPass->id
+                );
+            }
 
             DB::commit();
 

@@ -212,7 +212,10 @@
             event.preventDefault(); // Prevent default action
             var $row = $(this).closest("tr");
             var Main_id = $(this).attr('data-cat-id');
-            var buildingId= $(this).attr('data-buildingId');
+            // Was reading the stale data-buildingId attribute (stamped once
+            // at row-edit-open time from the row's original building) —
+            // changing the dropdown had no effect on what got submitted.
+            var buildingId = $row.find('select[name="building_id"]').val();
             var FloorNo = $row.find("input").eq(0).val();
             var RoomNo = $row.find("input").eq(1).val();
 

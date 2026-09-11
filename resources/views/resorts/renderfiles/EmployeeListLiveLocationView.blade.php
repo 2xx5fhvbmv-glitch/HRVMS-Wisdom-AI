@@ -11,18 +11,25 @@
                 @endif
                 </div>
                 <div>
-                    <h6>{{ $employeeStatus->employee->resortAdmin->full_name }} <span class="badge badge-themeNew">
-                        {{ $employeeStatus->employee->Emp_id }} 
+                    <h6>{{ optional($employeeStatus->employee->resortAdmin)->full_name }} <span class="badge badge-themeNew">
+                        {{ $employeeStatus->employee->Emp_id }}
                     </span> </h6>
-                    <p>{{ $employeeStatus->employee->position->short_title }} • {{ $employeeStatus->employee->department->name }}</p>
+                    <p>{{ optional(optional($employeeStatus->employee)->position)->short_title ?? 'N/A' }} • {{ optional(optional($employeeStatus->employee)->department)->name ?? 'N/A' }}</p>
                 </div>
                 <div>
+                    {{-- 3-way status (Safe/Unsafe/Unknown) — was 2-way, Unsafe and
+                         Unknown shared the same red badge, making "hasn't responded
+                         yet" visually identical to "in danger". --}}
                     @if($employeeStatus->status == 'Safe')
                     <span class="badge badge-themeSuccess">
                         {{ $employeeStatus->status }}
                     </span>
-                    @else
+                    @elseif($employeeStatus->status == 'Unsafe')
                     <span class="badge badge-themeDanger">
+                        {{ $employeeStatus->status }}
+                    </span>
+                    @else
+                    <span class="badge badge-themeWarning">
                         {{ $employeeStatus->status }}
                     </span>
                     @endif

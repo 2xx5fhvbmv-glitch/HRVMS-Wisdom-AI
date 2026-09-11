@@ -138,7 +138,13 @@
                                 <div class="r"><span class="l">Employee ID</span><span class="v">{{ $incident->reporter->Emp_id ?? '-' }}</span></div>
                                 <div class="r"><span class="l">Department</span><span class="v">{{ $incident->reporter->department->name ?? 'N/A' }}</span></div>
                                 <div class="r"><span class="l">Section</span><span class="v">{{ $incident->reporter->section->name ?? 'N/A' }}</span></div>
-                                <div class="r"><span class="l">Reported</span><span class="v">{{ \Carbon\Carbon::parse($incident->getRawOriginal('created_at'))->format('d M Y') }}</span></div>
+                                {{-- Same fix as incident/view.blade.php's "Reported by" card —
+                                     incident_date/incident_time is when the incident actually
+                                     happened; created_at is when the report was filed. Both
+                                     showed created_at here before, with no distinct "Submitted". --}}
+                                <div class="r"><span class="l">Reported</span><span class="v">{{ \Carbon\Carbon::parse($incident->incident_date)->format('d M Y') }}</span></div>
+                                <div class="r"><span class="l">Time</span><span class="v">{{ \Carbon\Carbon::parse($incident->incident_time)->format('h:i A') }}</span></div>
+                                <div class="r"><span class="l">Submitted</span><span class="v">{{ \Carbon\Carbon::parse($incident->getRawOriginal('created_at'))->format('d M Y, h:i A') }}</span></div>
                             </div>
                         </div>
                     </div>

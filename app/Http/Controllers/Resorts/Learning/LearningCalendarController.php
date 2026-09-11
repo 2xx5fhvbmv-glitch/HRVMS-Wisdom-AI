@@ -70,7 +70,7 @@ class LearningCalendarController extends Controller
         $formatted_date = Carbon::parse($request->session_date)->format('Y-m-d');
         // dd($formatted_date);
 
-        LearningCalendarSession::create([
+        $session = LearningCalendarSession::create([
             'resort_id'=>$resort_id,
             'learning_program_id' => $request->title,
             'session_date' => $formatted_date,
@@ -78,6 +78,37 @@ class LearningCalendarController extends Controller
             'venue' => $request->venue,
             'frequency' => $request->session_frequency_hidden,
         ]);
+
+        // Sessions carry no participant list of their own — participants are
+        // the employees whose learning request for this same program was
+        // Approved (LearningController@updateStatus notifies them of the
+        // assignment the same way).
+        try {
+            $participantIds = LearningRequestEmployee::join('learning_requests', 'learning_requests.id', '=', 'learning_requests_employees.learning_request_id')
+                ->where('learning_requests.resort_id', $resort_id)
+                ->where('learning_requests.learning_id', $request->title)
+                ->where('learning_requests.status', 'Approved')
+                ->pluck('learning_requests_employees.employee_id')
+                ->unique()
+                ->all();
+
+            if (!empty($participantIds)) {
+                $learningProgram = LearningProgram::find($request->title);
+                $programName = $learningProgram ? $learningProgram->name : 'Learning Program';
+                Common::notifyEmployees(
+                    $resort_id,
+                    $participantIds,
+                    'New Learning Session Scheduled',
+                    "A session for '{$programName}' has been scheduled on " . Common::formatDate($formatted_date)
+                        . ($request->session_time ? " at " . Common::formatDisplayTime($request->session_time) : "")
+                        . ($request->venue ? ". Venue: {$request->venue}." : "."),
+                    'Learning',
+                    $session->id
+                );
+            }
+        } catch (\Exception $ne) {
+            \Log::warning('Learning calendar session notification failed: ' . $ne->getMessage());
+        }
 
         return response()->json(
             [

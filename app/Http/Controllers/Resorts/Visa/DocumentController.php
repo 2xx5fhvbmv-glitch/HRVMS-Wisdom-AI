@@ -286,6 +286,21 @@ class DocumentController extends Controller
 
             $empName = optional($employee->resortAdmin)->full_name ?: $employee->Emp_id;
 
+            // Was silent — the employee had no visibility that new visa/passport
+            // documents were just filed to their File Management folder.
+            try {
+                Common::notifyEmployees(
+                    $resortId,
+                    [$employee->id],
+                    'Visa Documents Uploaded',
+                    count($saved) . ' document(s) have been added to your profile: ' . implode(', ', $saved) . '.',
+                    'Visa',
+                    $employee->id
+                );
+            } catch (\Exception $e) {
+                \Log::warning('Visa document upload notification failed: ' . $e->getMessage());
+            }
+
             return response()->json([
                 'success'  => true,
                 'status'   => 'success',

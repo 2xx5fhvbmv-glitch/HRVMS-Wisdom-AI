@@ -76,7 +76,8 @@ class IncidentMeetingReminder extends Command
                 foreach ($participants as $employeeId) {
                     $employee = Employee::find($employeeId);
                     if ($employee) {
-                        $msg = "📝 Meeting: {$meeting->meeting_subject}\n📅 Date: {$meeting->meeting_date}\n⏰ Time: {$meeting->meeting_time}\n📍 Location: {$meeting->location}";
+                        $msg = "📝 Meeting: {$meeting->meeting_subject}\n📅 Date: " . Common::formatDate($meeting->meeting_date)
+                            . "\n⏰ Time: " . Common::formatDisplayTime($meeting->meeting_time) . "\n📍 Location: {$meeting->location}";
 
                         event(new ResortNotificationEvent(Common::nofitication(
                             $meeting->resort_id, // Make sure `resort_id` exists on the `meetings` table

@@ -46,7 +46,7 @@
                     <a href="{{route('resort.ta.Applicants',base64_encode( $v->vacancy_id)) }}" class="btn btn-sm ta-btn-secondary me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicants"><i class="fa-solid fa-eye"></i></a>
                     @if($canSeeAction)
                     <a href="javascript:void(0)" data-id="{{ $v->vacancy_id }}" data-ExpiryDate="{{ $v->link_Expiry_date }}" data-ApplicationId="{{ $v->application_id }}" class="btn btn-sm ta-btn-attention ExtendJobLink" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend the Job Ad Link"><i class="fa-solid fa-calendar-plus"></i></a>
-                    <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary viewJobAd ms-1" data-position="{{ $v->positionTitle }}" data-joblink="{{ $v->jobAdLink ?? '' }}" data-alljobimages='{{ json_encode($v->allJobAdImages) }}' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-rectangle-ad"></i></a>
+                    <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary viewJobAd ms-1" data-vacancy-id="{{ $v->vacancy_id }}" data-position="{{ $v->positionTitle }}" data-joblink="{{ $v->jobAdLink ?? '' }}" data-alljobimages='{{ json_encode($v->allJobAdImages) }}' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-rectangle-ad"></i></a>
                     @endif
                 </div>
             </div>

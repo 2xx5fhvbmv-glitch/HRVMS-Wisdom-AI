@@ -36,6 +36,16 @@ class FundTransferController extends Controller
 
     public function VisaWalletToWalletTransfer(Request $request)
     {
+        // No file validation existed on this endpoint at all — any file
+        // type (including .php) was accepted and, per the write-side fix
+        // below, previously landed directly in the public webroot.
+        $fileValidator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'transectionFile' => 'nullable|file|mimes:jpeg,png,jpg,heic,heif,pdf|max:10240',
+        ]);
+        if ($fileValidator->fails()) {
+            return response()->json(['success' => false, 'errors' => $fileValidator->errors()], 422);
+        }
+
         $from_wallet = base64_decode($request->from_wallet);
         $to_wallet = base64_decode($request->to_wallet);
         // The visa module is MVR end-to-end: the AMOUNT field is entered in MVR
@@ -43,15 +53,19 @@ class FundTransferController extends Controller
         // math (balance check, debit, credit, transaction record).
         $Amt      =  (float) $request->Amt;
         $comments = $request->comments;
-    
-        
+
+
         $collection='';
         $path_path = config('settings.FundTransfer') . '/' . Auth::guard('resort-admin')->user()->resort->resort_id;
-        if ($request->hasFile('transectionFile')) 
+        if ($request->hasFile('transectionFile'))
         {
             $imageFile = $request->file('transectionFile');
             $imageName =  $imageFile->getClientOriginalName();
-            $imageFile->move($path_path, $imageName);
+            // Was $imageFile->move($path_path, $imageName) — a raw
+            // filesystem write into the public webroot. Route through
+            // StorageHelper so it's disk-agnostic (Wasabi in prod) and no
+            // longer a public, unauthenticated path.
+            \App\Helpers\StorageHelper::put($path_path . '/' . $imageName, file_get_contents($imageFile->getRealPath()));
             $collection = $imageName;
         }
 
@@ -133,7 +147,7 @@ class FundTransferController extends Controller
 
                 $attachment = '—';
                 if (!empty($t->file)) {
-                    $fileUrl = url($fundTransferBase . '/' . $resortFolder . '/' . $t->file);
+                    $fileUrl = \App\Helpers\StorageHelper::temporaryUrl($fundTransferBase . '/' . $resortFolder . '/' . $t->file);
                     $attachment = '<a href="' . e($fileUrl) . '" target="_blank" rel="noopener">View</a>';
                 }
 

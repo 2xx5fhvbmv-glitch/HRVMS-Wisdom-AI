@@ -70,5 +70,23 @@
     <div class="row d-flex justify-content-center" style="width:100%;box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);border:1px solid #2121246b;padding:10px;">
       <div class=" col-lg-6 col-md-8 myappoint-contain " style="background-color:white">
         <div class="find-logo" style="text-align: center;" >
-          <img src="{{ URL::asset('assets/images/header_logo.png') }}" style="max-width: 185px;"/>
+          @php
+            // Resort-scoped logo, not Wisdom's — resolved from whichever
+            // caller passed $resortLogo explicitly (queued mailables, which
+            // render in a worker process with no Auth session), else from
+            // the currently-authenticated resort-admin/mobile session (the
+            // common case: these emails render inline during the request).
+            // No resort context at all (super-admin-panel registration,
+            // password reset — both fire before/outside a resort session)
+            // falls through to Wisdom's own logo, which is correct for
+            // those two flows.
+            $__resortLogo = $resortLogo ?? null;
+            if (empty($__resortLogo)) {
+                $__resortUser = auth('resort-admin')->user() ?? auth('api')->user() ?? null;
+                if ($__resortUser && !empty($__resortUser->resort_id)) {
+                    $__resortLogo = \App\Helpers\Common::GetResortLogo($__resortUser->resort_id);
+                }
+            }
+          @endphp
+          <img src="{{ $__resortLogo ?: URL::asset('assets/images/header_logo.png') }}" style="max-width: 185px;"/>
         </div>

@@ -1309,7 +1309,7 @@ $(document).ready(function()
                                         <select class="form-select dd-native-select buildingAvailable" id="building_${AvailableCount}"
                                         data-id= "${AvailableCount}" name="BuildingName[${AvailableCount}]"
                                          placeholder=" Select Building" required data-parsley-type="digits"
-                                          data-parsley-required-message="Building name is required." data-parsley-errors-container="#type_accom_b_error_{{$k}}">
+                                          data-parsley-required-message="Building name is required." data-parsley-errors-container="#type_accom_b_error_${AvailableCount}">
                                             <option> </option>
                                             @if($BuildingData->isNotEmpty())
                                                     @foreach ($BuildingData as $a)
@@ -1335,7 +1335,7 @@ $(document).ready(function()
                                             </div>
                                         </div>
 
-                                        <div id="type_accom_b_error_{{$k}}"></div>
+                                        <div id="type_accom_b_error_${AvailableCount}"></div>
                                     </div>
 
 
@@ -1344,7 +1344,7 @@ $(document).ready(function()
                                         <select class="form-select dd-native-select AvailableFloor"
                                          data-flag="A" id="AvailableFloor_${AvailableCount}"data-id= "${AvailableCount}"
                                          name="Floor[${AvailableCount}]" placeholder=" Select Building" required   required
-                                          data-parsley-errors-container="#type_accom_f_error_{{$k}}"
+                                          data-parsley-errors-container="#type_accom_f_error_${AvailableCount}"
                                             data-parsley-trigger="keyup" data-parsley-required-message="Please select floor.">
 
                                         </select>
@@ -1358,7 +1358,7 @@ $(document).ready(function()
                                                 <div class="dd-scroll"></div>
                                             </div>
                                         </div>
-                                        <div id="type_accom_f_error_{{$k}}"></div>
+                                        <div id="type_accom_f_error_${AvailableCount}"></div>
 
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
@@ -1366,7 +1366,7 @@ $(document).ready(function()
                                         <select class="form-select dd-native-select RoomNo"data-id= "${AvailableCount}" id="RoomNo_${AvailableCount}"
                                          name="RoomNo[${AvailableCount}]"  required
                                           data-parsley-type="digits" data-parsley-trigger="keyup"
-                                        data-parsley-errors-container="#type_accom_r_error_{{$k}}"
+                                        data-parsley-errors-container="#type_accom_r_error_${AvailableCount}"
                                         data-parsley-required-message="Please select floor.">
 
                                         </select>
@@ -1380,7 +1380,7 @@ $(document).ready(function()
                                                 <div class="dd-scroll"></div>
                                             </div>
                                         </div>
-                                        <div id="type_accom_r_error_{{$k}}"></div>
+                                        <div id="type_accom_r_error_${AvailableCount}"></div>
 
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
@@ -1388,7 +1388,7 @@ $(document).ready(function()
                                         <select class="form-select dd-native-select" id="TypeAccommodation_${AvailableCount}"
                                          name="Accommodation_type_id[${AvailableCount}]" required data-parsley-trigger="change"
                                          data-parsley-required-message="Please select accommodation type."
-                                        data-parsley-errors-container="#type_accom_type_accom_r_error_{{$k}}">
+                                        data-parsley-errors-container="#type_accom_type_accom_r_error_${AvailableCount}">
                                         <option value=""></option>
                                         @if($AccommodationType->isNotEmpty())
                                                 @foreach ($AccommodationType as $a)
@@ -1413,7 +1413,7 @@ $(document).ready(function()
                                                 </div>
                                             </div>
                                         </div>
-                                        <div id="type_accom_type_accom_r_error_{{$k}}"></div>
+                                        <div id="type_accom_type_accom_r_error_${AvailableCount}"></div>
 
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
@@ -1422,7 +1422,7 @@ $(document).ready(function()
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
                                         <label for="roomType" class="form-label">ROOM TYPE</label>
-                                        <select class="form-select dd-native-select" id="RoomType_${AvailableCount}" name="RoomType[${AvailableCount}]" required data-parsley-trigger="change" data-parsley-errors-container="#type_accom_type_accom_r_type_error_{{$k}}" data-parsley-required-message="Room type is required.">
+                                        <select class="form-select dd-native-select" id="RoomType_${AvailableCount}" name="RoomType[${AvailableCount}]" required data-parsley-trigger="change" data-parsley-errors-container="#type_accom_type_accom_r_type_error_${AvailableCount}" data-parsley-required-message="Room type is required.">
                                             <?php
                                                 $ROOM = config('settings.eligibilty');
                                             ?>
@@ -1448,7 +1448,7 @@ $(document).ready(function()
                                                 </div>
                                             </div>
                                         </div>
-                                        <div id="type_accom_type_accom_r_type_error_{{$k}}"></div>
+                                        <div id="type_accom_type_accom_r_type_error_${AvailableCount}"></div>
 
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
@@ -1477,7 +1477,7 @@ $(document).ready(function()
                                     <div class="col-lg-3 col-md-4 col-sm-6">
 
                                         <label for="roomStatus" class="form-label">CLEANING SCHEDULE</label>
-                                            <select class="form-select dd-native-select" id="CleaningSchedule_${AvailableCount}" data-parsley-errors-container="#type_accom_type_accom_cleaningschedule_error_{{$k}}" name="CleaningSchedule[${AvailableCount}]" aria-label="Default select example" required data-parsley-required-message="Please select an option.">
+                                            <select class="form-select dd-native-select" id="CleaningSchedule_${AvailableCount}" data-parsley-errors-container="#type_accom_type_accom_cleaningschedule_error_${AvailableCount}" name="CleaningSchedule[${AvailableCount}]" aria-label="Default select example" required data-parsley-required-message="Please select an option.">
                                                 <?php
                                                     $CleaningSchedule = config('settings.CleaningSchedule');
                                                 ?>
@@ -1502,7 +1502,7 @@ $(document).ready(function()
                                                 </div>
                                             </div>
                                         </div>
-                                        <div id="type_accom_type_accom_cleaningschedule_error_{{$k}}"></div>
+                                        <div id="type_accom_type_accom_cleaningschedule_error_${AvailableCount}"></div>
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
                                         <label for="occupThres" class="form-label">OCCUPANCY THRESHOLDS</label>

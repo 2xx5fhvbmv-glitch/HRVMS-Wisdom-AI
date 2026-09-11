@@ -11,7 +11,12 @@ use App\Models\Conversation;
 use Carbon\Carbon;
 use App\Models\GroupChat;
 
-
+/**
+ * Dead code — not routed anywhere. Both routes/resort_route.php (web
+ * portal, chat/*) and routes/api.php (mobile) point at
+ * App\Http\Controllers\API\ChatBoat\ChatController, not this class.
+ * Edit that one instead.
+ */
 class ChatController extends Controller
 {
      public $resort;

@@ -256,6 +256,17 @@ class GrievanceAppealController extends Controller
         if ($request->status === 'Completed') $patch['completed_at'] = now();
         $hearing->update($patch);
 
+        // Same recipients as storeHearing()'s "Hearing Scheduled" notice —
+        // every participant on this hearing — just for the cancel/reschedule
+        // statuses, which never notified anyone before.
+        if (in_array($request->status, ['Cancelled', 'Rescheduled'], true)) {
+            $msg = 'Hearing #' . $hearing->sequence_no . ' of appeal ' . $appeal->appeal_no
+                . ' has been ' . strtolower($request->status) . '.';
+            foreach ($hearing->participants ?? [] as $empId) {
+                $this->fireBellNotification($empId, 'Hearing ' . $request->status, $msg, $appeal->id);
+            }
+        }
+
         return response()->json(['success' => true, 'message' => 'Hearing updated.']);
     }
 

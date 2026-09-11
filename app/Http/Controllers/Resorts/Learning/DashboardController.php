@@ -590,7 +590,7 @@ class DashboardController extends Controller
                 $msg = $kind === 'overdue'
                     ? 'Your compulsory probation training "' . $p->program_name . '" is overdue. Please complete it as soon as possible.'
                     : 'Reminder: please complete your probation training "' . $p->program_name . '"'
-                        . ($p->due_on ? ' by ' . \Carbon\Carbon::parse($p->due_on)->format('d M Y') : '') . '.';
+                        . ($p->due_on ? ' by ' . Common::formatDate($p->due_on) : '') . '.';
 
                 $recipients = [(int) $emp->id];
                 if ($kind === 'overdue' && $emp->reporting_to) {

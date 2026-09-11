@@ -858,10 +858,13 @@ class TalentAcquisitionDashboardController extends Controller
             // variable to the view since only $showAllDepts was ever set.
             $canSeeAllDepts = $showAllDepts;
 
-            // Fetch draft vacancies for the Drafts section
+            // Fetch not-yet-submitted vacancies (Draft + Inactive — both are
+            // resumable through the same edit/resubmit flow, and had no
+            // list of their own until now for Inactive specifically) for
+            // the Drafts section.
             $drafts = Vacancies::with(['Getdepartment', 'Getposition'])
                 ->where('Resort_id', $resort_id)
-                ->where('status', 'Draft')
+                ->whereIn('status', ['Draft', 'Inactive'])
                 ->when(!$showAllDepts, function ($query) use ($Dept_id) {
                     $query->where('department', $Dept_id);
                 })

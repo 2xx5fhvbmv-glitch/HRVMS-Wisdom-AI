@@ -549,6 +549,30 @@ class CycleController extends Controller
         PerformaChildCycle::where('Parent_cycle_id', $cycle->id)
             ->update(['template_id' => $templateId]);
 
+        // Participants were blocked on "No template was assigned" until now — let them know it's available.
+        try {
+            $resortId = $this->resort->resort_id;
+            $participantIds = PerformaChildCycle::where('Parent_cycle_id', $cycle->id)
+                ->get()
+                ->map(fn($child) => $this->resolveEmployee($child->Emp_main_id, $resortId))
+                ->filter()
+                ->map(fn($emp) => (int) $emp->id)
+                ->unique()
+                ->values()
+                ->all();
+            Common::notifyEmployees(
+                $resortId,
+                $participantIds,
+                'Performance Review Template Available',
+                'The review template for the "' . ($cycle->Cycle_Name ?? '') . '" cycle is now available. You can start your self review.',
+                'Performance',
+                $cycle->id,
+                'appraisal-template-attached'
+            );
+        } catch (\Exception $ne) {
+            \Log::warning('attachTemplate notification failed: ' . $ne->getMessage());
+        }
+
         return response()->json(['success' => true, 'message' => 'Template attached. Reviewers can now open the form.']);
     }
 
@@ -837,11 +861,48 @@ class CycleController extends Controller
             ], 404);
         }
 
+        // Gather participants + managers before the children rows are
+        // deleted below — same recipient shape as CycleStore's create
+        // notification (participants + their reporting managers).
+        $resortId = $this->resort->resort_id;
+        $children = PerformaChildCycle::where('Parent_cycle_id', $id)->get();
+        $participantIds = [];
+        $managerIds = [];
+        foreach ($children as $child) {
+            $emp = $this->resolveEmployee($child->Emp_main_id, $resortId);
+            if ($emp) $participantIds[] = (int) $emp->id;
+            if ($child->Manager_id) $managerIds[] = (int) $child->Manager_id;
+        }
+        $cycleName = $cycle->Cycle_Name ?? '';
+
         DB::beginTransaction();
         try {
             PerformaChildCycle::where('Parent_cycle_id', $id)->delete();
             $cycle->delete();
             DB::commit();
+
+            try {
+                Common::notifyEmployees(
+                    $resortId,
+                    $participantIds,
+                    'Performance Review Cycle Cancelled',
+                    'The "' . $cycleName . '" performance review cycle has been cancelled.',
+                    'Performance',
+                    $id,
+                    'appraisal-cycle-cancelled'
+                );
+                Common::notifyEmployees(
+                    $resortId,
+                    $managerIds,
+                    'Performance Review Cycle Cancelled',
+                    'The "' . $cycleName . '" performance review cycle has been cancelled.',
+                    'Performance',
+                    $id,
+                    'appraisal-cycle-cancelled'
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Cycle delete notifications failed: ' . $ne->getMessage());
+            }
 
             return response()->json([
                 'success' => true,

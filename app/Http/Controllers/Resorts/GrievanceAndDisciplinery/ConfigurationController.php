@@ -1344,6 +1344,9 @@ class ConfigurationController extends Controller
                                     'Parent_committee_id' => $newCommittee->id,
                                     'MemberId' => $member,
                                 ]);
+
+                                $msg = 'You have been assigned to the "'.$committee[0].'" disciplinary committee.';
+                                event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10, 'Disciplinary Committee', $msg, 0, $member, 'Disciplinary')));
                             }
 
 
@@ -1487,6 +1490,10 @@ class ConfigurationController extends Controller
 
                 if( count($assign_members)> 0)
                 {
+                    // Only notify members newly assigned by this edit —
+                    // mirrors GrivanceCommitteeinlineUpdate()'s same guard so
+                    // existing members don't get re-notified every save.
+                    $previousMemberIds = DisciplineryCommitteeMembers::where('Parent_committee_id',$id)->pluck('MemberId')->toArray();
 
                     DisciplineryCommitteeMembers::where("Parent_committee_id",$id)->delete();
 
@@ -1495,6 +1502,12 @@ class ConfigurationController extends Controller
                         'Parent_committee_id' =>  $id,
                         'MemberId' => $m,
                     ]);
+
+                    foreach(array_diff($assign_members, $previousMemberIds) as $m)
+                    {
+                        $msg = 'You have been assigned to the "'.$CommitteeName.'" disciplinary committee.';
+                        event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10, 'Disciplinary Committee', $msg, 0, $m, 'Disciplinary')));
+                    }
                 }
             DB::commit();
                 return response()->json([
@@ -2665,7 +2678,7 @@ class ConfigurationController extends Controller
                 ->make(true);
         }
         $GrievanceCategory = GrievanceCategory::where("resort_id",$this->resort->resort_id)->get();
-        return view('resorts.GrievanceAndDisciplinery.configurationGIndexGrievanceDelegationRule',compact('GrievanceCategory','page_title'));
+        return view('resorts.GrievanceAndDisciplinery.configuration.Grievance.IndexGrievanceDelegationRule',compact('GrievanceCategory','page_title'));
     }
     public function GrievanceDelegeationRuleinlineUpdate(Request $request)
     {
