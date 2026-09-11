@@ -85,6 +85,7 @@ class VacancyController extends Controller
             $manningresponse = ManningResponse::where('resort_id', $resort_id)
                 ->where('dept_id', $Dept_id)
                 ->where('year', $currentYear)
+                ->where('budget_process_status', 'Approved')
                 ->first();
             if ($manningresponse) {
                 $budgetedPositionIds = PositionMonthlyData::where('manning_response_id', $manningresponse->id)
@@ -249,7 +250,19 @@ class VacancyController extends Controller
             $manningresponse = ManningResponse::where('resort_id', $resort_id)
                 ->where('year', $currentYear)
                 ->where('dept_id', $dept_id)
+                ->where('budget_process_status', 'Approved')
                 ->first();
+
+            // A Draft/Inactive save is allowed through with no approved budget
+            // yet (same "not final" treatment the duplicate-check above
+            // already gives drafts) — only a real submission needs an
+            // Approved manning budget to exist for this dept/year at all.
+            if (!$isDraft && !$manningresponse) {
+                return response()->json([
+                    'success' => false,
+                    'msg' => 'Manning budget for this department has not been approved yet for this year. A vacancy cannot be created until the budget is approved.',
+                ]);
+            }
 
             $budgeted_salary = 0;
             $proposed_salary = 0;
@@ -553,6 +566,7 @@ class VacancyController extends Controller
             $manningresponse = ManningResponse::where('resort_id', $resort_id)
                 ->where('dept_id', $Dept_id)
                 ->where('year', $currentYear)
+                ->where('budget_process_status', 'Approved')
                 ->first();
             if ($manningresponse) {
                 $budgetedPositionIds = PositionMonthlyData::where('manning_response_id', $manningresponse->id)
@@ -695,7 +709,17 @@ class VacancyController extends Controller
         $manningresponse = ManningResponse::where('resort_id', $resort_id)
             ->where('year', $currentYear)
             ->where('dept_id', $dept_id)
+            ->where('budget_process_status', 'Approved')
             ->first();
+
+        // Same gate as store() — a Draft/Inactive resume doesn't need an
+        // approved budget yet, only actually submitting does.
+        if (!$isDraft && !$manningresponse) {
+            return response()->json([
+                'success' => false,
+                'msg' => 'Manning budget for this department has not been approved yet for this year. A vacancy cannot be created until the budget is approved.',
+            ]);
+        }
 
         $budgeted_salary = 0;
         $proposed_salary = 0;
@@ -1591,6 +1615,7 @@ class VacancyController extends Controller
 
         $manningresponse = ManningResponse::where('resort_id', $resort_id)
             ->where('year', $currentYear)
+            ->where('budget_process_status', 'Approved')
             ->when($dept_id, function($q) use ($dept_id) {
                 $q->where('dept_id', $dept_id);
             })
