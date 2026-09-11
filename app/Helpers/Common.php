@@ -95,6 +95,48 @@ class Common
      * rows so a freed number is never reused (avoids Emp_id collisions), and
      * uses the resort's own prefix.
      */
+    /**
+     * Collapses employees.employment_type down to the 3 manning-budget
+     * categories (Permanent/Casual/Intern). Not a stored column — derive
+     * this everywhere the manning/budget/attendance code needs to know
+     * which bucket an employee belongs to, so a later employment_type
+     * change (e.g. Casual converted to Full-Time) moves them buckets
+     * automatically instead of needing a second field kept in sync.
+     */
+    public static function manningCategory(string $employmentType): string
+    {
+        return match ($employmentType) {
+            'Casual'     => 'Casual',
+            'Internship' => 'Intern',
+            default      => 'Permanent', // Full-Time, Part-Time, Contract, Probationary, Temporary
+        };
+    }
+
+    /**
+     * Same 3-bucket mapping as manningCategory(), but for the separate,
+     * differently-spelled enum on vacancies.employee_type /
+     * offline_interviews.employee_type — NOT the employees.employment_type
+     * value. Used to pick which manning_responses (Permanent/Casual/Intern)
+     * row a vacancy's requested headcount should validate against.
+     */
+    public static function manningCategoryForVacancy(string $vacancyEmployeeType): string
+    {
+        $type = strtolower($vacancyEmployeeType);
+
+        if (str_contains($type, 'intern') || str_contains($type, 'trainee')) {
+            return 'Intern';
+        }
+        if (str_contains($type, 'casual') || str_contains($type, 'temporary')) {
+            // 'Casual/Agency' and 'Temporary / Project' both draw from the
+            // Casual manning pool — confirmed decision for the latter, it
+            // doesn't cleanly fit the 3-bucket model otherwise.
+            return 'Casual';
+        }
+        // 'Permanant' and 'Replacement' (backfilling a named permanent
+        // employee) both draw from the Permanent pool.
+        return 'Permanent';
+    }
+
     public static function nextEmployeeId($resortId): string
     {
         $prefix   = optional(Resort::find($resortId))->resort_prefix ?: 'DR';
