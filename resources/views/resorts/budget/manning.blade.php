@@ -116,8 +116,22 @@
             })->values();
         @endphp
 
+        @php
+            // Viewing is 3-tab (Permanent / Casual / Intern) — independent
+            // of submission, which stays a separate per-category form per
+            // HOD. Reuses this same page/grid, just feeding it whichever
+            // category's manning_responses row the controller resolves.
+            $vmCategory = $employmentType ?? 'Permanent';
+        @endphp
+        <div class="vm-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
+            @foreach (['Permanent' => 'Permanent', 'Casual' => 'Casual', 'Intern' => 'Intern'] as $catValue => $catLabel)
+                <a href="{{ route('resort.budget.manning', ['year' => $year, 'employment_type' => $catValue]) }}"
+                   class="btn btn-sm {{ $vmCategory === $catValue ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}">{{ $catLabel }}</a>
+            @endforeach
+        </div>
         <div class="vm-tools">
             <form method="GET" action="{{ route('resort.budget.manning') }}" id="yearFilterForm">
+                <input type="hidden" name="employment_type" value="{{ $vmCategory }}">
                 <select class="form-select dd-native-select" id="yearFilter" name="year"
                     onchange="document.getElementById('yearFilterForm').submit();">
                     @php
