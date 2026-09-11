@@ -248,45 +248,56 @@ class ConversationController extends Controller
 
       
 
-        broadcast(new \App\Events\MessageSent($conversation))->toOthers();
+        // Broadcast (Pusher, ShouldBroadcastNow) and the FCM push fan-out
+        // below are both synchronous outbound HTTP calls the caller never
+        // needs to wait on — the response body doesn't depend on either.
+        // sendMobileNotification() alone costs a full uncached Google OAuth
+        // round trip PLUS one FCM POST per registered device token, every
+        // single message; combined with Pusher this was adding several
+        // seconds to every chat/send response. Deferred to run right after
+        // the HTTP response is flushed to the client (still same request,
+        // no queue worker dependency) instead of before it.
+        dispatch(function () use ($resort, $conversation) {
+            broadcast(new \App\Events\MessageSent($conversation))->toOthers();
 
-        if ($conversation->type == 'group') {
-            $group = GroupChat::where('id', $conversation->type_id)
-                ->where('resort_id', $resort->resort_id)
-                ->first();
+            if ($conversation->type == 'group') {
+                $group = GroupChat::where('id', $conversation->type_id)
+                    ->where('resort_id', $resort->resort_id)
+                    ->first();
 
-            $recipientAdminIds = $group
-                ? array_diff($group->groupMembers()->pluck('user_id')->toArray(), [$conversation->sender_id])
-                : [];
-        } else {
-            $recipientAdminIds = [$conversation->type_id];
-        }
-
-        if (!empty($recipientAdminIds)) {
-            // sender_id/type_id/chat_group_member.user_id are all
-            // resort_admins.id (the api-guard "current user" here is a
-            // ResortAdmin) — sendMobileNotification/notifyEmployees expect
-            // employees.id everywhere (device-token lookup,
-            // resort_notifications.user_id FK). Passing resort_admins ids
-            // straight through silently sent the push/row to whichever
-            // unrelated employee happened to share that numeric id, or to
-            // nobody at all.
-            $recipientEmpIds = \App\Models\Employee::whereIn('Admin_Parent_id', $recipientAdminIds)
-                ->where('resort_id', $resort->resort_id)
-                ->pluck('id')
-                ->toArray();
-
-            if (!empty($recipientEmpIds)) {
-                Common::notifyEmployees(
-                    $resort->resort_id,
-                    $recipientEmpIds,
-                    $resort->full_name,
-                    $conversation->message ?: 'Sent an attachment',
-                    'Chat',
-                    $conversation->id
-                );
+                $recipientAdminIds = $group
+                    ? array_diff($group->groupMembers()->pluck('user_id')->toArray(), [$conversation->sender_id])
+                    : [];
+            } else {
+                $recipientAdminIds = [$conversation->type_id];
             }
-        }
+
+            if (!empty($recipientAdminIds)) {
+                // sender_id/type_id/chat_group_member.user_id are all
+                // resort_admins.id (the api-guard "current user" here is a
+                // ResortAdmin) — sendMobileNotification/notifyEmployees expect
+                // employees.id everywhere (device-token lookup,
+                // resort_notifications.user_id FK). Passing resort_admins ids
+                // straight through silently sent the push/row to whichever
+                // unrelated employee happened to share that numeric id, or to
+                // nobody at all.
+                $recipientEmpIds = \App\Models\Employee::whereIn('Admin_Parent_id', $recipientAdminIds)
+                    ->where('resort_id', $resort->resort_id)
+                    ->pluck('id')
+                    ->toArray();
+
+                if (!empty($recipientEmpIds)) {
+                    Common::notifyEmployees(
+                        $resort->resort_id,
+                        $recipientEmpIds,
+                        $resort->full_name,
+                        $conversation->message ?: 'Sent an attachment',
+                        'Chat',
+                        $conversation->id
+                    );
+                }
+            }
+        })->afterResponse();
 
         $chat_history = $this->messageThread($resort, $request->type, $request->type_id);
 
