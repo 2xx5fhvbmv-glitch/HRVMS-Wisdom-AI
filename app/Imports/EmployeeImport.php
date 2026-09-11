@@ -332,7 +332,11 @@ class EmployeeImport implements ToModel, WithHeadingRow
                 $this->updated++;
             }
 
-            if (!$existingResortAdmin) {
+            // Same mobile-access gate as EmployeeController::sendCredentials()
+            // — Casual/Intern staff get no mobile app access, so this bulk
+            // path must skip the credential email too, not just the manual
+            // single-employee one.
+            if (!$existingResortAdmin && Common::manningCategory($employeeData['employment_type'] ?? 'Full-Time') === 'Permanent') {
                 $profile['resortAdmin']->sendResortemployee($this->resort->resort, $profile['resortAdmin'], $password);
             }
         });
