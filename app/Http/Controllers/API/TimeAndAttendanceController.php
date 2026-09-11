@@ -3028,10 +3028,18 @@ class TimeAndAttendanceController extends Controller
 
         $validator                                          =   Validator::make($request->all(), [
             'hod_location'                                  =>  'required|string',
+            // Was Present-only. Casual/Intern staff have no mobile app of
+            // their own — their manager marks the full daily status on
+            // their behalf, same set the bulk Excel importer already
+            // accepts (ImportAttandance.php/AttendanceTemplateExport.php).
+            // Defaults to 'Present' so existing app builds that don't send
+            // this yet keep working exactly as before.
+            'status'                                        =>  'nullable|in:Present,Absent,Sick,DayOff,ShortLeave,HalfDayLeave,FullDayLeave',
         ]);
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
+        $status                                              =   $request->input('status', 'Present');
 
         if (empty($empIds) && empty($attendaceIds)) {
             return response()->json(['success' => false, 'message' => 'Send either emp_id (array) or attendance_id (array).'], 400);
@@ -3075,7 +3083,7 @@ class TimeAndAttendanceController extends Controller
                     if ($shiftData) {
                         $parentAttendance->CheckingTime     =   $shiftData->StartTime;
                         $parentAttendance->CheckingOutTime  =   $shiftData->EndTime;
-                        $parentAttendance->Status           =   'Present';
+                        $parentAttendance->Status           =   $status;
                         $parentAttendance->CheckInCheckOut_Type = 'Manual';
                         $parentAttendance->save();
 
@@ -3133,12 +3141,62 @@ class TimeAndAttendanceController extends Controller
                         ->whereDate('date', $currentDate)
                         ->first();
                     if (!$rosterEntry) {
-                        $markResultByEmpId[$empId]          =   [
-                            'emp_id'                        =>  $empId,
-                            'marked'                        =>  false,
-                            'message'                       =>  'No duty roster for this date. Ensure roster exists for ' . $currentDate . '.',
-                        ];
-                        continue;
+                        // Casual/Intern never go through the normal
+                        // onboarding->roster-setup flow a permanent employee
+                        // does, so they'd otherwise never clear this
+                        // prerequisite at all. Auto-create a minimal roster
+                        // (no geofence zone needed) using the resort's first
+                        // configured shift, instead of forking the whole
+                        // attendance pipeline by category.
+                        $targetEmployee                     =   Employee::find($empId);
+                        $isNonPermanent                      =   $targetEmployee
+                            && Common::manningCategory($targetEmployee->employment_type) !== 'Permanent';
+
+                        if ($isNonPermanent) {
+                            $defaultShift                    =   ShiftSettings::where('resort_id', $resort_id)->first();
+                            if (!$defaultShift) {
+                                $markResultByEmpId[$empId]  =   [
+                                    'emp_id'                =>  $empId,
+                                    'marked'                =>  false,
+                                    'message'               =>  'No shift configured for this resort — cannot auto-create a roster for this Casual/Intern employee.',
+                                ];
+                                continue;
+                            }
+
+                            // Raw inserts, not DutyRoster::create()/DutyRosterEntry::create()
+                            // — DutyRoster's model boot() hook unconditionally
+                            // reads Auth::guard('resort-admin')->user()->id for
+                            // created_by, which is null in this mobile (api
+                            // guard) context and would fatal on ->id.
+                            $rosterParentId                  =   DB::table('duty_rosters')->insertGetId([
+                                'resort_id'                 =>  $resort_id,
+                                'Shift_id'                  =>  $defaultShift->id,
+                                'Emp_id'                    =>  $empId,
+                                'ShiftDate'                 =>  $currentDate . ' - ' . $currentDate,
+                                'Year'                      =>  Carbon::parse($currentDate)->format('Y'),
+                                'created_by'                =>  $user->id,
+                                'modified_by'               =>  $user->id,
+                                'created_at'                =>  now(),
+                                'updated_at'                =>  now(),
+                            ]);
+                            $rosterEntry                     =   DutyRosterEntry::create([
+                                'roster_id'                 =>  $rosterParentId,
+                                'resort_id'                 =>  $resort_id,
+                                'Shift_id'                  =>  $defaultShift->id,
+                                'Emp_id'                    =>  $empId,
+                                'date'                      =>  $currentDate,
+                                'Status'                    =>  'Present',
+                                'CheckingTime'              =>  $defaultShift->StartTime,
+                                'CheckingOutTime'           =>  $defaultShift->EndTime,
+                            ]);
+                        } else {
+                            $markResultByEmpId[$empId]      =   [
+                                'emp_id'                    =>  $empId,
+                                'marked'                    =>  false,
+                                'message'                   =>  'No duty roster for this date. Ensure roster exists for ' . $currentDate . '.',
+                            ];
+                            continue;
+                        }
                     }
                     $rosterResortId                         =   (int) $rosterEntry->resort_id;
                     $shiftData                              =   ShiftSettings::where('resort_id', $rosterResortId)->where('id', $rosterEntry->Shift_id)->first();
@@ -3153,7 +3211,7 @@ class TimeAndAttendanceController extends Controller
                         'CheckingTime'                      =>  $startTime,
                         'CheckingOutTime'                   =>  $endTime,
                         'DayWiseTotalHours'                 =>  $rosterEntry->DayWiseTotalHours ?? '00:00',
-                        'Status'                            =>  'Present',
+                        'Status'                            =>  $status,
                         'CheckInCheckOut_Type'              =>  'Manual',
                     ]);
                     ChildAttendace::create([
@@ -3190,7 +3248,7 @@ class TimeAndAttendanceController extends Controller
                 $endTime                                    =   $shiftData ? $shiftData->EndTime : ($parentAttendance->CheckingOutTime ?? '00:00');
                 $parentAttendance->CheckingTime             =   $startTime;
                 $parentAttendance->CheckingOutTime          =   $endTime;
-                $parentAttendance->Status                   =   'Present';
+                $parentAttendance->Status                   =   $status;
                 $parentAttendance->CheckInCheckOut_Type     =   'Manual';
                 $parentAttendance->save();
 
