@@ -470,11 +470,23 @@
             </div>
         </div>
 
+        @php
+            // Same 3-way viewing tabs as View Manning — reuses this page's
+            // existing grid unchanged, just feeding it a different category.
+            $vbCategory = $employmentType ?? 'Permanent';
+        @endphp
+        <div class="vb-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
+            @foreach (['Permanent' => 'Permanent', 'Casual' => 'Casual', 'Intern' => 'Intern'] as $catValue => $catLabel)
+                <a href="{{ route('resort.budget.viewbudget', ['year' => request()->get('year', date('Y')), 'employment_type' => $catValue]) }}"
+                   class="btn btn-sm {{ $vbCategory === $catValue ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}">{{ $catLabel }}</a>
+            @endforeach
+        </div>
         <div class="card">
             <div class="card-header">
                 <div class="row g-md-3 g-2 align-items-center justify-content-between">
                     <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                         <form method="GET" action="{{ route('resort.budget.viewbudget') }}" id="yearFilterForm">
+                            <input type="hidden" name="employment_type" value="{{ $vbCategory }}">
                             <select class="form-select" name="year" id="yearFilter" onchange="document.getElementById('yearFilterForm').submit();">
                                 @php
                                     $currentYear = date('Y');

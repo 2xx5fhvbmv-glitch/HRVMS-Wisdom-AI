@@ -1268,7 +1268,8 @@ class BudgetController extends Controller
             'manningResponses',
             'departments',
             'resortCosts',
-            'approvedBudgetIdsLookup'
+            'approvedBudgetIdsLookup',
+            'employmentType'
         ));
     }
 
