@@ -144,6 +144,12 @@
                 </div>
             </div>
         </div>
+        <div class="cb-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
+            @foreach (['Permanent' => 'Permanent', 'Casual' => 'Casual', 'Intern' => 'Intern'] as $catValue => $catLabel)
+                <button type="button" class="btn btn-sm cb-category-btn {{ $catValue === 'Permanent' ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}"
+                        data-category="{{ $catValue }}" onclick="cbSwitchCategory('{{ $catValue }}', this)">{{ $catLabel }}</button>
+            @endforeach
+        </div>
         <div class="card">
             <div class="card-header">
                 <div class="row g-md-3 g-2 align-items-center justify-content-between">
@@ -235,6 +241,19 @@
         }
     }
 
+    // Same 3-way viewing tabs as View Manning/View Budget — cbCategory
+    // tracks which is active; fetchConsolidatedBudget() below sends it
+    // alongside the year on every (re)load.
+    let cbCategory = 'Permanent';
+    function cbSwitchCategory(category, btn) {
+        cbCategory = category;
+        document.querySelectorAll('.cb-category-btn').forEach(b => b.classList.remove('wfp-btn-primary'));
+        document.querySelectorAll('.cb-category-btn').forEach(b => b.classList.add('wfp-btn-secondary'));
+        btn.classList.remove('wfp-btn-secondary');
+        btn.classList.add('wfp-btn-primary');
+        fetchConsolidatedBudget(document.getElementById('year').value);
+    }
+
     function fetchConsolidatedBudget(selectedYear) {
 
         document.getElementById('SendToFinanceYear').value = selectedYear;
@@ -245,7 +264,7 @@
             $.ajax({
                 url: url, // Use the generated URL
                 type: 'GET',
-                data: { year: selectedYear },
+                data: { year: selectedYear, employment_type: cbCategory },
                 success: function(response) {
                     $('#accordionViewBudget').html(response.html); // Update this to match your HTML structure
                     $('#cbSearchInput').val('');
