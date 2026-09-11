@@ -1651,6 +1651,20 @@ class EmployeeController extends Controller
                 ]);
             }
 
+            // Casual/Intern staff get no mobile app access at all — their
+            // reporting manager marks attendance/leave on their behalf.
+            // Derived from employment_type rather than a stored flag so a
+            // later conversion (e.g. Casual -> Full-Time) grants access
+            // automatically. The ResortAdmin record itself still exists
+            // (name/photo/email resolution throughout the app depends on
+            // it) — only the credential dispatch is skipped.
+            if (Common::manningCategory($employee->employment_type) !== 'Permanent') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Mobile app credentials are not issued for Casual/Intern employees.'
+                ]);
+            }
+
             $plainPassword = Common::generateUniquePassword(8);
             $hashedPassword = Hash::make($plainPassword);
 

@@ -50,6 +50,18 @@ class Logincontroller extends Controller
                 ],200);
             }
 
+            // Casual/Intern staff get no mobile app access at all — their
+            // reporting manager marks attendance/leave on their behalf
+            // (Common::sendResortemployee() already skips issuing them
+            // credentials, but this is checked again here too in case a
+            // password was set some other way — e.g. a manual reset).
+            if (Common::manningCategory($employee->employment_type) !== 'Permanent') {
+                return response()->json([
+                    'success'                       =>  false,
+                    'message'                       =>  'Mobile app access is not available for this account type'
+                ],200);
+            }
+
             // Find the ResortAdmin by Admin_Parent_id
             $resortAdmin                            =   ResortAdmin::where('id', $employee->Admin_Parent_id)->first();
 
