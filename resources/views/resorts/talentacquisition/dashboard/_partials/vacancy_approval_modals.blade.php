@@ -12,45 +12,47 @@
     contains only the modals + the JS that wires their buttons.
 --}}
 
-<div class="modal fade" id="FreshRespond-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-small">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Respond data</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="respond-main"></div>
-            </div>
-            <div class="modal-footer justify-content-center">
-                <a href="#respond-HoldModel" id="holdResponseModel" data-bs-toggle="modal"  data-bs-dismiss="modal" class="btn ta-btn-attention">On Hold</a>
-                <a href="#respond-rejectModal" id="RejectResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn ta-btn-attention">Reject</a>
-                <a href="javascript:void(0)" id="ApprovedResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn ta-btn-positive">Approved</a>
+<div class="modal fade" id="FreshRespond-modal" tabindex="-1" aria-labelledby="respondModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered rsp-dialog">
+        <div class="modal-content rsp-glass">
+            <button type="button" class="rsp-x" data-bs-dismiss="modal" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <h5 class="rsp-title" id="respondModalLabel">Respond to request</h5>
+            <div class="rsp-sub">Approve, hold, or reject this hire request.</div>
+            <div class="respond-main"></div>
+            <div class="rsp-actions">
+                <a href="#respond-HoldModel" id="holdResponseModel" data-bs-toggle="modal"  data-bs-dismiss="modal" class="rsp-btn rsp-hold">On hold</a>
+                <a href="#respond-rejectModal" id="RejectResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="rsp-btn rsp-reject">Reject</a>
+                <a href="javascript:void(0)" id="ApprovedResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="rsp-btn rsp-approve">Approve</a>
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="respond-HoldModel" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-small">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Respond</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
+<div class="modal fade" id="respond-HoldModel" tabindex="-1" aria-labelledby="holdModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered rsp-dialog">
+        <div class="modal-content rsp-glass">
+            <button type="button" class="rsp-x" data-bs-dismiss="modal" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <h5 class="rsp-title" id="holdModalLabel">Put request on hold</h5>
+            <div class="rsp-sub">Pick a date to revisit this hire request.</div>
             <form id="HoldNewVacanciyForm">
                 @csrf
-                <div class="modal-body">
-                    <label class="form-label mb-8">Select date</label>
-                    <div class="modalCalendar-block">
-                        <div id="calendarModal"></div>
-                        <input type="date" style="display:none" id="HoldDate" name="HoldDate">
-                        <input type="hidden" id="Calender_ta_id" name="ta_id">
+                <div class="hd-lbl">Hold until</div>
+                <div class="wcal-card">
+                    <div class="wcal-head">
+                        <span class="wcal-m" id="holdCalMonth"></span>
+                        <div class="wcal-nav">
+                            <button type="button" id="holdCalPrev" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+                            <button type="button" id="holdCalNext" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+                        </div>
                     </div>
+                    <div class="wcal-grid" id="holdCalGrid"></div>
                 </div>
-                <div class="modal-footer justify-content-center">
-                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
-                    <button type="submit" class="btn ta-btn-primary">Submit</button>
+                <div class="hd-selnote" id="holdSelNote">Select a date to hold this request.</div>
+                <input type="date" style="display:none" id="HoldDate" name="HoldDate">
+                <input type="hidden" id="Calender_ta_id" name="ta_id">
+                <div class="rsp-actions">
+                    <a href="#" data-bs-dismiss="modal" class="hd-btn hd-cancel">Cancel</a>
+                    <button type="submit" class="hd-btn hd-submit">Submit</button>
                 </div>
             </form>
         </div>
@@ -115,6 +117,17 @@ $(document).ready(function() {
     // Open the Respond modal and copy the row's data attributes onto
     // the three action buttons so the subsequent Hold/Reject/Approve
     // handlers know which vacancy + child notification they're acting on.
+    var rspDefaultPhoto = "{{ url(config('settings.default_picture')) }}";
+    function rspEsc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function rspInitials(name) {
+        var parts = String(name || '').trim().split(/\s+/).slice(0, 2);
+        var out = parts.map(function (p) { return p.charAt(0).toUpperCase(); }).join('');
+        return out || '?';
+    }
     $(document).on("click", ".respondOfFreshmodal", function () {
         $('#FreshRespond-modal').modal('show');
         var image       = $(this).attr("data-images");
@@ -134,17 +147,41 @@ $(document).ready(function() {
         $("#holdResponseModel").attr("data-Child_ta_id", Child_ta_id);
         $("#RejectResponseModel").attr("data-Child_ta_id", Child_ta_id);
 
-        var hm = '<div class="respond-block">' +
-                    '<div class="img-circle">' +
-                        '<img src="' + image + '" alt="image">' +
-                    '</div>' +
-                    '<div>' +
-                        '<h6>' + department + ' (' + rank + ')</h6>' +
-                        '<p><strong>' + createdBy + ' (' + creatorRank + ')</strong> Requested to Hire ' + NoOfVacnacy + ' ' + position + '</p>' +
+        // Photo-first avatar, initials fallback: skip the <img> entirely
+        // when it's just the app's default silhouette (not a real photo),
+        // and still guard with onerror in case a real photo URL is broken.
+        var hasPhoto = image && image !== rspDefaultPhoto;
+        var initials = rspInitials(createdBy);
+        var avatarInner = hasPhoto
+            ? '<img src="' + rspEsc(image) + '" alt="' + rspEsc(createdBy) + '" onerror="this.parentNode.textContent=\'' + rspEsc(initials) + '\'">'
+            : rspEsc(initials);
+
+        var hm = '<div class="rsp-req">' +
+                    '<span class="rsp-av">' + avatarInner + '</span>' +
+                    '<div class="rsp-rbody">' +
+                        '<div class="rsp-rtop"><span class="rsp-rname">' + rspEsc(createdBy) + '</span><span class="rsp-tag">' + rspEsc(department) + ' &middot; ' + rspEsc(creatorRank) + '</span></div>' +
+                        '<div class="rsp-rsub"><span class="rsp-lbl">Requested to hire</span><span class="rsp-rolepill"><span class="rsp-qty">' + rspEsc(NoOfVacnacy) + '</span>' + rspEsc(position) + '</span></div>' +
                     '</div>' +
                  '</div>';
         $(".respond-main").html(hm);
     });
+
+    // Liquid Glass shell: dark blurred scrim (scoped to <body> only while
+    // this modal is open — see _respond_modal_styles.blade.php) + the
+    // pointer-tracking specular highlight, skipped under
+    // prefers-reduced-motion same as the reference.
+    $('#FreshRespond-modal').on('show.bs.modal', function () {
+        $('body').addClass('rsp-modal-open');
+    }).on('hidden.bs.modal', function () {
+        $('body').removeClass('rsp-modal-open');
+    });
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.getElementById('FreshRespond-modal').querySelector('.rsp-glass').addEventListener('pointermove', function (e) {
+            var r = this.getBoundingClientRect();
+            this.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+            this.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+        });
+    }
 
     // Hold flow — store the child id on the hidden field so the form
     // POST carries the right reference.
@@ -152,6 +189,45 @@ $(document).ready(function() {
         var Child_ta_id = $(this).attr('data-Child_ta_id');
         $("#Calender_ta_id").val(Child_ta_id);
     });
+
+    // "Put request on hold" — canonical calendar (resorts._datepicker_calendar_script)
+    // + the same Liquid Glass scrim/specular as the Respond modal.
+    var isDateSelected = false;
+    var HOLD_MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    function fmtHoldDate(dateObj) {
+        return dateObj.getDate() + ' ' + HOLD_MONTHS_SHORT[dateObj.getMonth()] + ' ' + dateObj.getFullYear();
+    }
+    var holdCalendar = null;
+    $('#respond-HoldModel').on('show.bs.modal', function () {
+        $('body').addClass('rsp-modal-open');
+        if (!holdCalendar) {
+            holdCalendar = window.wisdomDatepicker.create({
+                monthEl: document.getElementById('holdCalMonth'),
+                gridEl: document.getElementById('holdCalGrid'),
+                prevEl: document.getElementById('holdCalPrev'),
+                nextEl: document.getElementById('holdCalNext'),
+                onSelect: function (isoDate, dateObj) {
+                    $('#HoldDate').val(isoDate);
+                    isDateSelected = true;
+                    $('#holdSelNote').html('Holding until <b>' + fmtHoldDate(dateObj) + '</b>');
+                }
+            });
+        } else {
+            holdCalendar.reset();
+        }
+        isDateSelected = false;
+        $('#HoldDate').val('');
+        $('#holdSelNote').text('Select a date to hold this request.');
+    }).on('hidden.bs.modal', function () {
+        $('body').removeClass('rsp-modal-open');
+    });
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.getElementById('respond-HoldModel').querySelector('.rsp-glass').addEventListener('pointermove', function (e) {
+            var r = this.getBoundingClientRect();
+            this.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+            this.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+        });
+    }
 
     $('#HoldNewVacanciyForm').validate({
         rules:    { HoldDate: { required: true } },

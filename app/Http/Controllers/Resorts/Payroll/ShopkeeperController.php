@@ -102,24 +102,24 @@ class ShopkeeperController extends Controller
             }
 
             return datatables()->of($tableData)
-            ->addColumn('view_more', function ($row) {
-                $url = route('resort.shopkeeper.payments', ['id' => $row->id]);
-                return '<a href="' . e($url) . '" class="btn payroll-btn-secondary btn-sm">View more</a>';
+            // One combined Action column (View / Edit / Delete icon buttons)
+            // instead of the old separate "view_more" text-button column —
+            // presentation only, same $row->id driving every link/attribute.
+            ->addColumn('action', function ($row) use ($edit_class, $delete_class) {
+                $id = htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8');
+                $viewUrl = e(route('resort.shopkeeper.payments', ['id' => $row->id]));
+                $viewBtn = '<a href="' . $viewUrl . '" class="sk-ico view" title="View"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></a>';
+                $editBtn = $edit_class === 'd-none' ? '' : '<button type="button" class="sk-ico edit edit-row-btn" title="Edit" data-shopkeeper-id="' . $id . '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>';
+                $delBtn = $delete_class === 'd-none' ? '' : '<button type="button" class="sk-ico del delete-row-btn" title="Delete" data-shopkeeper-id="' . $id . '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>';
+                return '<div class="sk-acts">' . $viewBtn . $editBtn . $delBtn . '</div>';
             })
-            ->addColumn('action', function ($row) use ($edit_class,$delete_class) {
-                return '
-                    <div class="d-flex align-items-center">
-                        <a href="#" class="btn-lg-icon icon-bg-green me-1 edit-row-btn '.$edit_class.'"
-                        data-shopkeeper-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '">
-                            <img src="' . asset('resorts_assets/images/edit.svg') . '" alt="" class="img-fluid" />
-                        </a>
-                        <a href="#" class="btn-lg-icon icon-bg-red delete-row-btn '.$delete_class.'"
-                        data-shopkeeper-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '">
-                            <img src="' . asset('resorts_assets/images/trash-red.svg') . '" alt="" class="img-fluid" />
-                        </a>
-                    </div>';
-            })
-            ->escapeColumns(['action'])
+            // escapeColumns(['action']) previously meant "escape (break)
+            // the action column's HTML" — yajra's default is '*' (escape
+            // everything), and listing a column here adds it to the
+            // escape set rather than exempting it. escapeColumns([])
+            // is the "allow HTML" pattern already used correctly
+            // elsewhere in this codebase (e.g. Admin\AdminController).
+            ->escapeColumns([])
             ->make(true);
         }
     }
@@ -322,7 +322,7 @@ class ShopkeeperController extends Controller
                 if (!$canCheck) {
                     return '—';
                 }
-                return '<input type="checkbox" class="payment-row-checkbox form-check-input" data-payment-id="' . (int) $row->id . '" aria-label="Select row">';
+                return '<input type="checkbox" class="sk-chk payment-row-checkbox" data-payment-id="' . (int) $row->id . '" aria-label="Select row">';
             })
             ->addColumn('currency_type', function ($row) {
                 $ct = $row->product_currency_type ?? 'USD';
@@ -332,16 +332,22 @@ class ShopkeeperController extends Controller
                 // getResortUserPicture() looks up by resort_admins.id, not a
                 // raw profile_picture filename — that lookup always failed,
                 // falling back to the default picture for every employee.
-                $profile_pic = Common::getResortUserPicture($row->Admin_Parent_id);
-                if ($row->first_name && $row->last_name) {
-                    return '<div class="tableUser-block">
-                        <div class="img-circle">
-                            <img src="' . $profile_pic . '" alt="user">
-                        </div>
-                        <span>' . $row->first_name . ' ' . $row->last_name . '</span>
-                    </div>';
+                // Always resolves to at least the app's generic silhouette
+                // default, so only treat it as a real photo when it differs
+                // from that default — otherwise fall back to initials
+                // rather than showing the generic placeholder.
+                if (!($row->first_name && $row->last_name)) {
+                    return '—';
                 }
-                return '—';
+                $fullName = trim($row->first_name . ' ' . $row->last_name);
+                $parts = preg_split('/\s+/', $fullName);
+                $initials = strtoupper(($parts[0][0] ?? '') . (isset($parts[1]) ? $parts[1][0] : '')) ?: '?';
+                $photo = Common::getResortUserPicture($row->Admin_Parent_id);
+                if ($photo === url(config('settings.default_picture'))) {
+                    $photo = null;
+                }
+                $img = $photo ? '<img src="' . e($photo) . '" alt="' . e($fullName) . '" onerror="this.remove()">' : '';
+                return '<div class="sk-nm"><span class="sk-av"><span class="sk-av-fallback">' . e($initials) . '</span>' . $img . '</span><span class="sk-t">' . e($fullName) . '</span></div>';
             })
             ->addColumn('product', function ($row) {
                 return $row->product_name;
@@ -350,16 +356,17 @@ class ShopkeeperController extends Controller
                 return $row->purchased_date ? \Carbon\Carbon::parse($row->purchased_date)->format('d M Y') : '—';
             })
             ->addColumn('status', function ($row) {
-                $statusClasses = [
-                    'Paid' => 'badge-success',
-                    'Partial Paid' => 'badge-info',
-                    'Pending Consent' => 'badge-warning',
-                    'Consented' => 'badge-themeSkyblue',
-                    'Paid to shopkeeper' => 'badge-themeSuccess',
-                    'Paid by resort' => 'badge-themeSuccess',
+                // Only Consented/Paid/Partial Paid ever reach this table
+                // (the query above already filters to those three), but
+                // keep a neutral fallback for any unexpected value rather
+                // than assuming the list can never widen.
+                $pills = [
+                    'Paid' => 'paid',
+                    'Consented' => 'consented',
+                    'Partial Paid' => 'partial',
                 ];
-                $class = $statusClasses[$row->status] ?? 'badge-secondary';
-                return '<span class="badge ' . $class . '">' . e($row->status) . '</span>';
+                $pillClass = $pills[$row->status] ?? 'neutral';
+                return '<span class="sk-pill ' . $pillClass . '"><span class="sk-dot"></span>' . e($row->status) . '</span>';
             })
             ->escapeColumns([])
             ->make(true);

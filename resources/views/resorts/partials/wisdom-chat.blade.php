@@ -792,8 +792,12 @@
         return s || '?';
     }
     function ucAvatarInner(profile, name) {
-        return (profile ? '<img src="' + profile + '" alt="" onerror="this.remove()">' : '') +
-            '<span class="uc-av-fallback" style="background:' + ucAvatarColor(name) + '">' + escapeHtml(ucInitials(name)) + '</span>';
+        // Fallback must be painted BEFORE the photo: both are position:absolute
+        // inset:0 with no z-index, so whichever is later in the DOM paints on
+        // top. With the photo last, a successful load naturally covers the
+        // fallback; onerror removes the <img>, revealing the fallback beneath.
+        return '<span class="uc-av-fallback" style="background:' + ucAvatarColor(name) + '">' + escapeHtml(ucInitials(name)) + '</span>' +
+            (profile ? '<img src="' + profile + '" alt="" onerror="this.remove()">' : '');
     }
     function ucDayLabel(dateStr) {
         if (!dateStr) return '';

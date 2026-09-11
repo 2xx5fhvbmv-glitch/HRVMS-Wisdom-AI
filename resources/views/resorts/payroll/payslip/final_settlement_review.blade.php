@@ -22,78 +22,80 @@
             </div>
 
             <form id="final-review-form" method="POST">
-                <div class="card card-fianlSettlement">
-                    @csrf
-                    <input type="hidden" name="payment_mode" id="paymentModeInput" value="{{$finalSettlement->payment_mode}}">
+                @csrf
+                <input type="hidden" name="payment_mode" id="paymentModeInput" value="{{$finalSettlement->payment_mode}}">
 
-                    <div class="row g-2">
-                        <div class="col-xxl-5 col-xl-5 col-lg-6">
-                            <div class="paySlip-user">
-                                <div class="img-obj cover">
-                                    <img src="{{ Common::getResortUserPicture($finalSettlement->employee->Admin_Parent_id)}}" alt="image">
-                                </div>
-                                <div>
-                                    {{-- Employee ID was reading $finalSettlement->Emp_id, which
-                                         doesn't exist on the final_settlements table — the value
-                                         lives on the related employee row. --}}
-                                    <h4>{{$finalSettlement->employee->resortAdmin->full_name}} <span class="badge badge-themeLight">{{$finalSettlement->employee->Emp_id}}</span></h4>
-                                    <div class="table-responsive">
-                                        <table class="paySlip-table">
-                                            <tr><th>Position:</th><td>{{$finalSettlement->employee->position->position_title}}</td></tr>
-                                            <tr><th>Department:</th><td>{{$finalSettlement->employee->department->name}}</td></tr>
-                                            <tr><th>Division:</th><td>{{$finalSettlement->employee->division->name}}</td></tr>
-                                            {{-- Basic Salary currency was hardcoded MVR even though
-                                                 employees on USD payroll have their basic stored in
-                                                 USD on the employee row. Show the employee's actual
-                                                 stored basic + their basic_salary_currency. --}}
-                                            <tr><th>Basic Salary:</th><td>{{ number_format((float) ($finalSettlement->employee->basic_salary ?? 0), 2) }} {{ $finalSettlement->employee->basic_salary_currency ?? 'MVR' }}</td></tr>
-                                            <tr><th>Payroll Start Date:</th><td>{{$calculated['payroll_start']}}</td></tr>
-                                            <tr><th>Remarks:</th><td></td></tr>
-                                        </table>
-                                    </div>
+                <div class="fsr-wrap">
+
+                    {{-- ─────────── Settlement document (left) + Employee (right) ─────────── --}}
+                    <div class="fsr-card fsr-combo fsr-span2">
+                        <div class="fsr-cl">
+                            <div class="fsr-sec-top">
+                                <h2>Settlement document</h2>
+                                <div class="fsr-doc-actions">
+                                    <a href="#" class="fsr-ghostbtn" id="printFinalSettlement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>Print</a>
+                                    <a href="#" class="fsr-ghostbtn" id="downloadPdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download</a>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="col-xxl-4 col-xl-4 col-lg-6 col-sm">
-                            <div class="bg-themeGrayLight h-100">
-                                <div class="table-responsive">
-                                    <table class="paySlip-table">
-                                        <tr><th>Doc Date:</th><td>{{ \Carbon\Carbon::parse($today)->format('d M Y') }}</td></tr>
-                                        <tr><th>Reference No.</th><td>{{$finalSettlement->reference_no}}</td></tr>
-                                        <tr><th>Pay Mode:</th><td>{{$finalSettlement->employee->payment_mode}}</td></tr>
-                                        <tr><th>Hire Date:</th><td>{{ \Carbon\Carbon::parse($finalSettlement->employee->joining_date)->format('d M Y') }}</td></tr>
-                                        {{-- final_settlements.last_working_date is nullable and
-                                             reaches the page as NULL when the F&F store didn't
-                                             receive a parseable value (Carbon::parse(null) then
-                                             renders as "30 Nov -0001"). Fall back to the
-                                             employee's resignation last_working_day, which is
-                                             always present at this point in the lifecycle. --}}
-                                        @php
-                                            $lwd = $finalSettlement->last_working_date
-                                                ?: optional($finalSettlement->employee->resignation)->last_working_day;
-                                        @endphp
-                                        <tr><th>Last Working Date:</th><td>{{ $lwd ? \Carbon\Carbon::parse($lwd)->format('d M Y') : '—' }}</td></tr>
-                                        {{-- Payroll Month was the month the payroll WINDOW starts
-                                             (Apr for a 25-Apr → 24-May cycle). HR reads "Payroll
-                                             Month" as the month of the last working day (when the
-                                             employee actually left), which matches the payslip
-                                             convention. Fall back to payroll_start if no LWD. --}}
-                                        <tr><th>Payroll Month:</th><td>{{ $lwd ? \Carbon\Carbon::parse($lwd)->format('F') : \Carbon\Carbon::parse($calculated['payroll_start'])->format('F') }}</td></tr>
-                                        <tr><th>Reason:</th><td>{{$finalSettlement->employee->resignation->reason_title->reason}}</td></tr>
-                                    </table>
-                                </div>
+                            <div class="fsr-meta2">
+                                <div class="fsr-m"><div class="fsr-l">Reference No.</div><div class="fsr-v">{{$finalSettlement->reference_no}}</div></div>
+                                <div class="fsr-m"><div class="fsr-l">Doc Date</div><div class="fsr-v">{{ \Carbon\Carbon::parse($today)->format('d M Y') }}</div></div>
+                                @php
+                                    // final_settlements.last_working_date is nullable and
+                                    // reaches the page as NULL when the F&F store didn't
+                                    // receive a parseable value (Carbon::parse(null) then
+                                    // renders as "30 Nov -0001"). Fall back to the
+                                    // employee's resignation last_working_day, which is
+                                    // always present at this point in the lifecycle.
+                                    $lwd = $finalSettlement->last_working_date
+                                        ?: optional($finalSettlement->employee->resignation)->last_working_day;
+                                @endphp
+                                {{-- Payroll Month was the month the payroll WINDOW starts
+                                     (Apr for a 25-Apr → 24-May cycle). HR reads "Payroll
+                                     Month" as the month of the last working day (when the
+                                     employee actually left), which matches the payslip
+                                     convention. Fall back to payroll_start if no LWD. --}}
+                                <div class="fsr-m"><div class="fsr-l">Payroll Month</div><div class="fsr-v">{{ $lwd ? \Carbon\Carbon::parse($lwd)->format('F') : \Carbon\Carbon::parse($calculated['payroll_start'])->format('F') }}</div></div>
+                                <div class="fsr-m"><div class="fsr-l">Pay Mode</div><div class="fsr-v">{{$finalSettlement->employee->payment_mode}}</div></div>
+                                <div class="fsr-m"><div class="fsr-l">Hire Date</div><div class="fsr-v">{{ \Carbon\Carbon::parse($finalSettlement->employee->joining_date)->format('d M Y') }}</div></div>
+                                <div class="fsr-m"><div class="fsr-l">Last Working Date</div><div class="fsr-v">{{ $lwd ? \Carbon\Carbon::parse($lwd)->format('d M Y') : '—' }}</div></div>
+                                <div class="fsr-m"><div class="fsr-l">Reason</div><div class="fsr-v"><span class="fsr-rpill">{{$finalSettlement->employee->resignation->reason_title->reason}}</span></div></div>
                             </div>
                         </div>
-
-                        <div class="col-auto ms-auto">
-                            <a href="#" class="btn payroll-btn-secondary btn-sm" id="printFinalSettlement">Print</a>
-                        </div>
-                        <div class="col-auto">
-                            <a href="#" class="btn payroll-btn-secondary btn-sm" id="downloadPdf">Download</a>
+                        <div class="fsr-cr fsr-pcard">
+                            <div class="fsr-ct"><h2>Employee</h2></div>
+                            @php
+                                // Photo-first avatar with an initials fallback —
+                                // Common::getResortUserPicture() always resolves to at
+                                // least the app's generic silhouette default, so only
+                                // treat it as a real photo when it differs from that
+                                // default; otherwise fall back to initials rather than
+                                // showing the generic placeholder.
+                                $fsrFullName = $finalSettlement->employee->resortAdmin->full_name ?? '';
+                                $fsrParts = preg_split('/\s+/', trim($fsrFullName));
+                                $fsrInitials = strtoupper(($fsrParts[0][0] ?? '') . (isset($fsrParts[1]) ? $fsrParts[1][0] : '')) ?: '?';
+                                $fsrPhoto = Common::getResortUserPicture($finalSettlement->employee->Admin_Parent_id);
+                                if ($fsrPhoto === url(config('settings.default_picture'))) { $fsrPhoto = null; }
+                            @endphp
+                            <div class="fsr-pc-head">
+                                <span class="fsr-pa">
+                                    <span class="fsr-pa-fallback">{{ $fsrInitials }}</span>
+                                    @if($fsrPhoto)<img src="{{ $fsrPhoto }}" alt="{{ $fsrFullName }}" onerror="this.remove()">@endif
+                                </span>
+                                <div class="fsr-pn">{{ $fsrFullName }} <span class="fsr-id-chip">{{$finalSettlement->employee->Emp_id}}</span></div>
+                            </div>
+                            <div class="fsr-prow"><span class="fsr-k">Position</span><span class="fsr-v">{{$finalSettlement->employee->position->position_title}}</span></div>
+                            <div class="fsr-prow"><span class="fsr-k">Department</span><span class="fsr-v">{{$finalSettlement->employee->department->name}}</span></div>
+                            <div class="fsr-prow"><span class="fsr-k">Division</span><span class="fsr-v">{{$finalSettlement->employee->division->name}}</span></div>
+                            {{-- Basic Salary currency was hardcoded MVR even though
+                                 employees on USD payroll have their basic stored in
+                                 USD on the employee row. Show the employee's actual
+                                 stored basic + their basic_salary_currency. --}}
+                            <div class="fsr-prow"><span class="fsr-k">Basic Salary</span><span class="fsr-v">{{ number_format((float) ($finalSettlement->employee->basic_salary ?? 0), 2) }} {{ $finalSettlement->employee->basic_salary_currency ?? 'MVR' }}</span></div>
+                            <div class="fsr-prow"><span class="fsr-k">Payroll Start Date</span><span class="fsr-v">{{$calculated['payroll_start']}}</span></div>
+                            <div class="fsr-prow"><span class="fsr-k">Remarks</span><span class="fsr-v fsr-muted">—</span></div>
                         </div>
                     </div>
-                    <hr>
 
                     {{-- ════════════════════════════════════════════════════════════
                          Figma layout: two cards side by side.
@@ -232,14 +234,10 @@
                         $noticeCharge = $toDisplay($calculated['notice_period_charge_mvr'] ?? 0);
                     @endphp
 
-                    <div class="row g-md-4 g-3 mb-3">
-                        {{-- ─────────── EARNINGS card (left) ─────────── --}}
-                        <div class="col-md-6">
-                            <div class="paySlip-block p-0">
-                                <div class="paySlip-header">Earnings</div>
-                                <div class="paySlip-body">
-                                    <div class="table-responsive">
-                                        <table class="paySlipBorder-table">
+                    {{-- ─────────── Earnings (left) + Deductions (right) ─────────── --}}
+                    <div class="fsr-card fsr-eq">
+                        <div class="fsr-ct"><span class="fsr-ic fsr-up"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><h2>Earnings</h2></div>
+                                    <table class="fsr-tbl">
                                             <thead>
                                                 <tr>
                                                     <th>Particulars</th>
@@ -307,22 +305,16 @@
                                                     <th class="text-end">{!! Common::formatCurrency($totalEarnings, $payCurrency) !!}</th>
                                                 </tr>
                                             </tfoot>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        </table>
+                    </div>
 
-                        {{-- ─────────── DEDUCTIONS card (right) ───────────
-                             Strictly the actual deductions HR posted (EWHT, MRPS,
-                             Loan, Notice, custom). Basic / Service / Allowance
-                             now live in the Earnings card where they belong. --}}
-                        <div class="col-md-6">
-                            <div class="paySlip-block p-0">
-                                <div class="paySlip-header">Deductions</div>
-                                <div class="paySlip-body">
-                                    <div class="table-responsive">
-                                        <table class="paySlipBorder-table">
+                    {{-- ─────────── Deductions ───────────
+                         Strictly the actual deductions HR posted (EWHT, MRPS,
+                         Loan, Notice, custom). Basic / Service / Allowance
+                         now live in the Earnings card where they belong. --}}
+                    <div class="fsr-card fsr-eq">
+                        <div class="fsr-ct"><span class="fsr-ic fsr-dn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><h2>Deductions</h2></div>
+                                    <table class="fsr-tbl">
                                             <thead>
                                                 <tr>
                                                     <th>Particulars</th>
@@ -383,42 +375,7 @@
                                                     <th class="text-end" id="totalDeductions">{!! Common::formatCurrency($totalDeductions, $payCurrency) !!}</th>
                                                 </tr>
                                             </tfoot>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="paySlip-block h-auto mb-3">
-                        <div class="table-responsive">
-                            <table class="paySlipBorder-table">
-                                <thead>
-                                    <tr><th>Net Pay</th><th class="text-end">Amount</th></tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>Gross Earnings</td>
-                                        <td class="fw-600 text-end" id="grossEarnings">{!! Common::formatCurrency($totalEarnings, $payCurrency) !!}</td>
-                                        <input type="hidden" name="total_earnings" id="totalEarningsInput" value="{{ number_format($totalEarnings, 2, '.', '') }}">
-                                        <input type="hidden" name="worked_days" id="workedDaysInput" value="{{ $workedDays }}">
-                                    </tr>
-                                    <tr>
-                                        <td>Total Deductions</td>
-                                        <td class="fw-600 text-end" id="totalDeductions1">(-) {!! Common::formatCurrency($totalDeductions, $payCurrency) !!}</td>
-                                        <input type="hidden" name="total_deductions" id="totalDeductionsInput" value="{{ number_format($totalDeductions, 2, '.', '') }}">
-                                    </tr>
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <th>Total Net Payable</th>
-                                        <th class="text-end" id="netPayable">{!! Common::formatCurrency($totalEarnings - $totalDeductions, $payCurrency) !!}</th>
-                                        <input type="hidden" name="net_pay" id="netPayInput" value="{{ number_format($totalEarnings - $totalDeductions, 2, '.', '') }}">
-                                        <input type="hidden" name="final_settlement_id" id="final_settlement_id" value="{{ $finalSettlement->id }}">
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
+                        </table>
                     </div>
 
                     @php
@@ -449,59 +406,65 @@
                         }
                     @endphp
 
-                    <div class="bg-themeGrayLight mb-2">
-                        <span class="fw-600">Total Net Payable: </span>&nbsp;
-                        <span id="netPayWords">{{ $payCurrency }} {{ convertToWords($totalEarnings - $totalDeductions) }} Only</span>
-                    </div>
-                    {{-- Bank Name + Account Number come from the employee's
-                         bank_details record (most recent first). Was previously
-                         hardcoded to "Bank Of Maldives / 154210145545" so every
-                         settlement reviewer saw the same placeholder regardless
-                         of the actual payee. Hides when the employee has no
-                         bank record OR is paid in Cash. --}}
-                    @if($finalSettlement->employee->payment_mode == 'Bank')
-                        @php
-                            $bank = optional($finalSettlement->employee->bankDetails)->sortByDesc('id')->first();
-                        @endphp
-                        @if($bank)
-                            <div class="bg-themeGrayLight d-flex mb-md-4 mb-3">
-                                <div class="me-4"><span class="fw-600">Bank Name:</span> {{ $bank->bank_name ?? '—' }}</div>
-                                <div><span class="fw-600">Account Number:</span> {{ $bank->account_number ?? '—' }}</div>
+                    {{-- ─────────── Net pay (breakdown + words, left) + hero/status (right) ─────────── --}}
+                    <div class="fsr-card fsr-span2 fsr-netcard">
+                        <div class="fsr-net-left">
+                            <div class="fsr-ct"><h2>Net pay</h2></div>
+                            <div class="fsr-nline">
+                                <div class="fsr-nrow"><span class="fsr-lbl">Gross Earnings</span><span class="fsr-amt" id="grossEarnings">{!! Common::formatCurrency($totalEarnings, $payCurrency) !!}</span></div>
+                                <div class="fsr-nrow"><span class="fsr-lbl">Total Deductions</span><span class="fsr-amt fsr-red" id="totalDeductions1">− {!! Common::formatCurrency($totalDeductions, $payCurrency) !!}</span></div>
                             </div>
-                        @else
-                            <div class="bg-themeGrayLight d-flex mb-md-4 mb-3 text-warning">
-                                <i class="fa-solid fa-circle-info me-2"></i>
-                                Bank payment selected but no bank account is on file for this employee.
-                            </div>
-                        @endif
-                    @endif
-
-                    {{-- Lock banner once the settlement is finalized. Replaces the
-                         Submit button with a read-only badge, prevents accidental
-                         re-finalize (the controller also rejects POST in that case,
-                         but the UI guard avoids the round-trip). --}}
-                    @if($finalSettlement->status === 'finalized')
-                        <div class="card-footer">
-                            <div class="alert alert-success mb-0 py-2 px-3 d-flex align-items-center" role="alert" style="font-size:13px;">
-                                <i class="fa-solid fa-lock me-2"></i>
-                                <div class="flex-grow-1">
-                                    <strong>Settlement Finalized.</strong>
-                                    Locked from further edits.
-                                    @if(!empty($finalSettlement->finalized_at))
-                                        Finalized on
-                                        <strong>{{ \Carbon\Carbon::parse($finalSettlement->finalized_at)->format('d M Y H:i') }}</strong>.
-                                    @endif
+                            <div class="fsr-words"><b>In words:</b> <span id="netPayWords">{{ $payCurrency }} {{ convertToWords($totalEarnings - $totalDeductions) }} Only</span></div>
+                            {{-- Bank Name + Account Number come from the employee's
+                                 bank_details record (most recent first). Was previously
+                                 hardcoded to "Bank Of Maldives / 154210145545" so every
+                                 settlement reviewer saw the same placeholder regardless
+                                 of the actual payee. Hides when the employee has no
+                                 bank record OR is paid in Cash. --}}
+                            @if($finalSettlement->employee->payment_mode == 'Bank')
+                                @php
+                                    $bank = optional($finalSettlement->employee->bankDetails)->sortByDesc('id')->first();
+                                @endphp
+                                @if($bank)
+                                    <div class="fsr-words fsr-bankbox">
+                                        <div><b>Bank Name:</b> {{ $bank->bank_name ?? '—' }}</div>
+                                        <div><b>Account Number:</b> {{ $bank->account_number ?? '—' }}</div>
+                                    </div>
+                                @else
+                                    <div class="fsr-words fsr-bankbox fsr-warnbox">
+                                        <i class="fa-solid fa-circle-info me-1"></i>
+                                        Bank payment selected but no bank account is on file for this employee.
+                                    </div>
+                                @endif
+                            @endif
+                            <input type="hidden" name="total_earnings" id="totalEarningsInput" value="{{ number_format($totalEarnings, 2, '.', '') }}">
+                            <input type="hidden" name="worked_days" id="workedDaysInput" value="{{ $workedDays }}">
+                            <input type="hidden" name="total_deductions" id="totalDeductionsInput" value="{{ number_format($totalDeductions, 2, '.', '') }}">
+                            <input type="hidden" name="net_pay" id="netPayInput" value="{{ number_format($totalEarnings - $totalDeductions, 2, '.', '') }}">
+                            <input type="hidden" name="final_settlement_id" id="final_settlement_id" value="{{ $finalSettlement->id }}">
+                        </div>
+                        <div class="fsr-net-hero">
+                            <div class="fsr-nh-lab">Total Net Payable</div>
+                            <div class="fsr-nh-big" id="netPayable">{!! Common::formatCurrency($totalEarnings - $totalDeductions, $payCurrency) !!}</div>
+                            {{-- Lock banner once the settlement is finalized — replaces
+                                 the Submit button with a read-only status, preventing
+                                 accidental re-finalize (the controller also rejects a
+                                 second POST, but the UI guard avoids the round-trip). --}}
+                            @if($finalSettlement->status === 'finalized')
+                                <div class="fsr-nh-fin">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                    <span>Settlement finalized · locked from edits.
+                                        @if(!empty($finalSettlement->finalized_at))
+                                            Finalized on {{ \Carbon\Carbon::parse($finalSettlement->finalized_at)->format('d M Y H:i') }}.
+                                        @endif
+                                    </span>
                                 </div>
-                                <a href="{{ route('final.settlement.list') }}" class="btn btn-sm payroll-btn-secondary">
-                                    Back to list
-                                </a>
-                            </div>
+                                <a href="{{ route('final.settlement.list') }}" class="fsr-nh-back">Back to list <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                            @else
+                                <button type="submit" class="fsr-nh-submit">Submit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                            @endif
                         </div>
-                    @else
-                        <div class="card-footer text-end">
-                            <button type="submit" class="btn payroll-btn-critical">Submit</button>
-                        </div>
-                    @endif
+                    </div>
                 </div>
             </form>
 
@@ -528,10 +491,107 @@
         width: 100%;
     }
 
-    .btn, .card-footer, .navbar, .sidebar {
+    .btn, .card-footer, .navbar, .sidebar,
+    .fsr-ghostbtn, .fsr-nh-back, .fsr-nh-submit {
         display: none !important;
     }
 }
+</style>
+<style>
+/* ════════════════════════════════════════════════════════════════
+   Review Final Settlement — frontend-only restyle. Scoped fsr-
+   prefixed classes; nothing here touches the shared .paySlip-,
+   .img-obj, .bg-themeGrayLight classes other pages still use. */
+.fsr-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.fsr-span2 { grid-column: 1 / -1; }
+@media (max-width: 900px) { .fsr-wrap { grid-template-columns: 1fr; } }
+
+.fsr-card { background: #fff; border-radius: 18px; box-shadow: 0 1px 2px rgba(1,70,83,.05), 0 16px 40px rgba(1,70,83,.10); padding: 24px 26px; }
+.fsr-eq { height: 100%; }
+
+/* header: settlement-document (left) + employee card (right) */
+.fsr-card.fsr-combo { padding: 0; display: grid; grid-template-columns: 1.5fr 1fr; }
+.fsr-combo .fsr-cl { padding: 24px 30px 24px 26px; min-width: 0; }
+.fsr-combo .fsr-cr { padding: 24px 26px 24px 30px; border-left: 1px solid var(--line, #EEF2F2); min-width: 0; }
+@media (max-width: 900px) { .fsr-card.fsr-combo { grid-template-columns: 1fr; } .fsr-combo .fsr-cr { border-left: none; border-top: 1px solid var(--line, #EEF2F2); } }
+
+.fsr-sec-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.fsr-sec-top h2 { font-size: 18px; font-weight: 600; color: var(--ink); }
+.fsr-doc-actions { display: flex; gap: 10px; flex: none; }
+.fsr-ghostbtn { background: #fff; color: #3A4145; border: 1px solid var(--line, #EEF2F2); border-radius: 11px; padding: 9px 15px; font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; transition: border-color .14s, color .14s; }
+.fsr-ghostbtn:hover { border-color: #C7CDCF; color: var(--teal); }
+.fsr-ghostbtn svg { width: 15px; height: 15px; }
+@media (prefers-reduced-motion: reduce) { .fsr-ghostbtn, .fsr-nh-back, .fsr-nh-submit { transition: none; } }
+
+.fsr-meta2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 26px; }
+@media (max-width: 560px) { .fsr-meta2 { grid-template-columns: 1fr; } }
+.fsr-meta2 .fsr-m .fsr-l { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: #99A1A5; margin-bottom: 6px; }
+.fsr-meta2 .fsr-m .fsr-v { font-size: 14px; font-weight: 500; color: var(--ink); line-height: 1.45; }
+.fsr-rpill { display: inline-block; background: #fbeceb; color: #B4462F; font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: 8px; }
+
+/* employee card — Incident "Reported by" style */
+.fsr-pcard .fsr-ct { border-bottom: 1px solid var(--line, #EEF2F2); padding-bottom: 14px; margin-bottom: 16px; }
+.fsr-pc-head { display: flex; align-items: center; gap: 14px; padding-bottom: 16px; border-bottom: 1px solid var(--line, #EEF2F2); }
+.fsr-pa { position: relative; width: 54px; height: 54px; flex: none; border-radius: 50%; background: var(--teal-soft, #f1f7f7); overflow: hidden; }
+.fsr-pa-fallback { position: absolute; inset: 0; display: grid; place-items: center; color: var(--teal); font-size: 17px; font-weight: 600; }
+.fsr-pa img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.fsr-pn { font-size: 17px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.fsr-id-chip { background: #F7F8F8; color: #3A4145; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 7px; }
+.fsr-prow { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid #F3F6F6; font-size: 14px; }
+.fsr-prow:last-child { border-bottom: none; }
+.fsr-prow .fsr-k { color: #6B7378; }
+.fsr-prow .fsr-v { font-weight: 600; text-align: right; color: var(--ink); }
+.fsr-prow .fsr-v.fsr-muted { color: #99A1A5; font-weight: 400; }
+
+/* section header (Earnings / Deductions / Net pay) */
+.fsr-ct { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; }
+.fsr-ct .fsr-ic { width: 30px; height: 30px; flex: none; border-radius: 9px; display: grid; place-items: center; }
+.fsr-ct .fsr-ic.fsr-up { background: var(--teal-soft, #f1f7f7); color: var(--teal); }
+.fsr-ct .fsr-ic.fsr-dn { background: #fbeceb; color: #B4462F; }
+.fsr-ct h2 { font-size: 18px; font-weight: 600; color: var(--ink); }
+
+/* tables — .fsr-tbl doubled on th/td/tfoot rules: the app's own
+   default.css ships ".table thead th{padding:0 10px 12px !important}"
+   and ".table tbody td{padding:16px 10px !important}" plus a
+   ":first-child{padding-left:0 !important}" reset (all !important,
+   meant for other DataTables-style tables app-wide) — matching
+   !important here is the only way to win against that, scoped to
+   just these two tables so no other .table on the site is touched. */
+.fsr-tbl { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--line, #EEF2F2); border-radius: 14px; overflow: hidden; margin: 0; }
+.fsr-tbl.fsr-tbl th { background: var(--teal-soft, #f1f7f7); text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: #6B7378; padding: 12px 15px !important; border-bottom: 1px solid var(--line, #EEF2F2); }
+.fsr-tbl.fsr-tbl td { padding: 13px 15px !important; border-bottom: 1px solid #F3F6F6; font-size: 14px; color: #3A4145; vertical-align: middle; }
+.fsr-tbl.fsr-tbl th:first-child,
+.fsr-tbl.fsr-tbl td:first-child { padding-left: 15px !important; }
+.fsr-tbl.fsr-tbl tr:last-child td { border-bottom: none; }
+.fsr-tbl .text-end { text-align: right; font-variant-numeric: tabular-nums; }
+.fsr-tbl.fsr-tbl tfoot tr td,
+.fsr-tbl.fsr-tbl tfoot tr th { font-weight: 600; background: #fcfdfd; font-size: 14px; color: var(--ink); padding: 13px 15px !important; }
+.fsr-tbl.fsr-tbl tfoot tr td:first-child,
+.fsr-tbl.fsr-tbl tfoot tr th:first-child { padding-left: 15px !important; }
+
+/* net pay + finalized status combined into one card */
+.fsr-netcard { display: grid; grid-template-columns: 1.4fr 1fr; padding: 0; overflow: hidden; }
+@media (max-width: 900px) { .fsr-netcard { grid-template-columns: 1fr; } }
+.fsr-net-left { padding: 24px 26px; }
+.fsr-nline { border: 1px solid var(--line, #EEF2F2); border-radius: 14px; overflow: hidden; }
+.fsr-nrow { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 15px 18px; border-bottom: 1px solid #F3F6F6; font-size: 14px; }
+.fsr-nrow:last-child { border-bottom: none; }
+.fsr-nrow .fsr-lbl { color: #3A4145; }
+.fsr-nrow .fsr-amt { font-variant-numeric: tabular-nums; font-weight: 500; white-space: nowrap; }
+.fsr-nrow .fsr-amt.fsr-red { color: #B4462F; }
+.fsr-words { font-size: 12.5px; color: #3A4145; margin-top: 14px; line-height: 1.55; background: var(--teal-soft, #f1f7f7); border: 1px solid var(--line, #EEF2F2); border-radius: 12px; padding: 13px 16px; }
+.fsr-words b { color: var(--ink); font-weight: 600; }
+.fsr-bankbox { display: flex; flex-direction: column; gap: 4px; }
+.fsr-bankbox.fsr-warnbox { color: #B4462F; background: #fbeceb; }
+.fsr-net-hero { background: var(--teal-soft, #f1f7f7); padding: 28px; display: flex; flex-direction: column; justify-content: center; border-left: 1px solid var(--line, #EEF2F2); }
+@media (max-width: 900px) { .fsr-net-hero { border-left: none; border-top: 1px solid var(--line, #EEF2F2); } }
+.fsr-nh-lab { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: #6B7378; }
+.fsr-nh-big { font-size: 36px; font-weight: 600; line-height: 1; margin-top: 9px; color: var(--teal); font-variant-numeric: tabular-nums; }
+.fsr-nh-fin { display: flex; align-items: center; gap: 9px; font-size: 13px; color: #1F7A54; font-weight: 500; margin-top: 24px; padding-top: 18px; border-top: 1px solid rgba(1,70,83,.1); }
+.fsr-nh-fin svg { width: 15px; height: 15px; flex: none; }
+.fsr-nh-back, .fsr-nh-submit { margin-top: 18px; align-self: flex-start; background: #fff; color: #3A4145; border: 1px solid var(--line, #EEF2F2); border-radius: 11px; padding: 11px 18px; font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; transition: border-color .14s, color .14s; }
+.fsr-nh-back:hover, .fsr-nh-submit:hover { border-color: #C7CDCF; color: var(--teal); }
+.fsr-nh-back svg, .fsr-nh-submit svg { width: 15px; height: 15px; }
 </style>
 @endsection
 
