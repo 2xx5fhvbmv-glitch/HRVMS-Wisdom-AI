@@ -253,6 +253,11 @@ use Illuminate\Support\Facades\Route;
 			Route::get('boarding/boarding-sm-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'boardingSecurityManagerDashboard']);
 			Route::get('boarding/so-employee-list', [App\Http\Controllers\API\BoardingPassController::class, 'SOEmployeeList']);
 			Route::post('boarding/so-pass-assign', [App\Http\Controllers\API\BoardingPassController::class, 'SOPassAssign']);
+
+			// Mobile calls this endpoint as 'security-officer-employee-list' (assignSecurityOfficerScreen),
+			// which never existed as a route — a plain 404, not a rank/permission gap. Alias, same pattern
+			// as the security-officer-dashboard/-details aliases below.
+			Route::get('boarding/security-officer-employee-list', [App\Http\Controllers\API\BoardingPassController::class, 'SOEmployeeList']);
 		});
 
 		Route::post('boarding/so-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'SODashboard']);
