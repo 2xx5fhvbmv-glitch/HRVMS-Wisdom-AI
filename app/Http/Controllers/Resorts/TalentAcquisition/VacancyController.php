@@ -272,10 +272,15 @@ class VacancyController extends Controller
             $currentYear = Carbon::now()->year;
             $dept_id = $validatedData['dept_id'];
             $positionId = $validatedData['position'];
+            // Which manning budget pool this vacancy draws from — a Casual/
+            // Agency or Trainee/Intern vacancy must validate against that
+            // category's own manning_responses row, not always Permanent's.
+            $manningCategory = Common::manningCategoryForVacancy($validatedData['employee_type'] ?? 'Permanant');
 
             $manningresponse = ManningResponse::where('resort_id', $resort_id)
                 ->where('year', $currentYear)
                 ->where('dept_id', $dept_id)
+                ->where('employment_type', $manningCategory)
                 ->where('budget_process_status', 'Approved')
                 ->first();
 
@@ -773,10 +778,13 @@ class VacancyController extends Controller
         $currentYear = Carbon::now()->year;
         $dept_id = $validatedData['dept_id'];
         $positionId = $validatedData['position'];
+        // Same category resolution as store() — see there for rationale.
+        $manningCategory = Common::manningCategoryForVacancy($validatedData['employee_type'] ?? 'Permanant');
 
         $manningresponse = ManningResponse::where('resort_id', $resort_id)
             ->where('year', $currentYear)
             ->where('dept_id', $dept_id)
+            ->where('employment_type', $manningCategory)
             ->where('budget_process_status', 'Approved')
             ->first();
 
@@ -1716,9 +1724,14 @@ class VacancyController extends Controller
         // Get the department of the selected position
         $position = ResortPosition::find($positionId);
         $dept_id = $position ? $position->dept_id : null;
+        // Which pool the live "Budgeted"/"Out of Budget" verdict reads —
+        // the Add Vacancy form must send the employee_type it currently has
+        // selected, same resolution as store()/update().
+        $manningCategory = Common::manningCategoryForVacancy($request->employee_type ?? 'Permanant');
 
         $manningresponse = ManningResponse::where('resort_id', $resort_id)
             ->where('year', $currentYear)
+            ->where('employment_type', $manningCategory)
             ->where('budget_process_status', 'Approved')
             ->when($dept_id, function($q) use ($dept_id) {
                 $q->where('dept_id', $dept_id);
