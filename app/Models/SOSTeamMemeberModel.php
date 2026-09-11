@@ -37,10 +37,6 @@ class SOSTeamMemeberModel extends Model
         });
     }
 
-    public function employee(){
-        return $this->belongsTo(Employee::class, 'emp_id', 'id');
-    }
-
     public function team(){
         return $this->belongsTo(SOSTeamManagementModel::class, 'team_id', 'id');
     }

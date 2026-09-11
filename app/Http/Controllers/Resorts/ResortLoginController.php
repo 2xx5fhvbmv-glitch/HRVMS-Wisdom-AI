@@ -250,7 +250,7 @@ class ResortLoginController extends Controller
         $path_profile_image = config('settings.ResortProfile_folder');
         $path_signature_image = config('settings.Resortsignature_folder');
        
-            $resortAdmin =ResortAdmin::find($request->id);
+            $resortAdmin = Auth::guard('resort-admin')->user();
             $resortAdmin->first_name = $request->first_name;
             $resortAdmin->middle_name = $request->middle_name;
             $resortAdmin->last_name = $request->last_name;

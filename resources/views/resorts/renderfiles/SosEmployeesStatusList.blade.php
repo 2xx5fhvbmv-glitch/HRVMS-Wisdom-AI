@@ -28,7 +28,18 @@
                     </div>
                     <div>
                         <ul>
-                            <li><i class="fa-regular fa-location-dot"></i>{{ $employeeStatus->address }}</li>
+                            <li><i class="fa-regular fa-location-dot"></i>
+                                @if(!empty($employeeStatus->address))
+                                    {{ $employeeStatus->address }}
+                                @elseif($employeeStatus->latitude && $employeeStatus->longitude)
+                                    {{-- address is only ever populated if the employee's own device called
+                                         sos/location-update with one — most rows never get it. Lat/lng is
+                                         always seeded at dispatch time though, so this is never truly blank. --}}
+                                    <a href="https://www.google.com/maps?q={{ $employeeStatus->latitude }},{{ $employeeStatus->longitude }}" target="_blank">View on map</a>
+                                @else
+                                    N/A
+                                @endif
+                            </li>
                             
                             @if($employeeStatus->status == 'Safe')
                             <li class="text-themeSuccess">

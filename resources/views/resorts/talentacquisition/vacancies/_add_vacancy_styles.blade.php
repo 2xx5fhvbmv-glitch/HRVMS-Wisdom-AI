@@ -103,6 +103,12 @@
 .av-seg-input:checked + label { background: var(--teal, #014653); color: #fff; }
 .av-seg-input:focus-visible + label { outline: 2px solid var(--teal, #014653); outline-offset: 2px; }
 
+/* explains what Active/Inactive actually does on submit — content owned by
+   the backend gap doc (docs/vacancy-active-inactive-status-workflow.md),
+   just restyled to fit this form instead of a raw Bootstrap .form-text. */
+.av-hint { font-size: 12px; line-height: 1.6; color: #6B7378; margin: 10px 0 0; }
+.av-hint strong { color: #3A4145; font-weight: 600; }
+
 /* conditional service-provider panel */
 .av-sppanel { background: var(--teal-soft, #F5F8F8); border: 1px solid #dcebeb; border-radius: 14px; padding: 18px 20px; margin-top: 18px; }
 .av-sph { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: var(--teal, #014653); margin-bottom: 16px; }

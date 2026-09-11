@@ -134,7 +134,14 @@ class InfoUpdateController extends Controller
                     ], 404);
                }
 
-               $payload = $employeeinfoUpdateRequest->info_payload;
+               // Defense in depth: the creation side (ProfileController::
+               // profilePersonalUpdate) now allow-lists info_payload to
+               // these same keys, but this intersects again so a payload
+               // stored before that fix (or by any future creation path)
+               // still can't smuggle an arbitrary Employee-fillable column
+               // (rank, Dept_id, basic_salary, status, ...) through here.
+               $allowedPersonalInfoFields = ['first_name', 'middle_name', 'last_name', 'personal_phone', 'dob', 'address_line_1', 'address_line_2'];
+               $payload = array_intersect_key((array) $employeeinfoUpdateRequest->info_payload, array_flip($allowedPersonalInfoFields));
                $employees = Employee::where('id',$employeeinfoUpdateRequest->employee_id)->first();
 
                // This whole approve action previously ran with no

@@ -20,7 +20,6 @@ use App\Models\SOSTeamMemeberModel;
 use App\Models\SOSEmergencyTypesModel;
 use App\Models\SOSChildEmergencyType;
 use App\Models\ResortSiteSettings;
-use Google\Service\CloudControlsPartnerService\Console;
 use Illuminate\Support\Facades\Validator;
 
 class ConfigurationController extends Controller
@@ -92,7 +91,12 @@ class ConfigurationController extends Controller
             'sos.*.role_name' => ['required', 'string', 'max:255'],
             'sos.*.role_name.*' => ['required', 'distinct'],
 
-            'sos.*.assign_permission.*' => 'required|array|min:1',
+            // Was both keyed 'sos.*.assign_permission.*' — a PHP array
+            // literal can't hold the same key twice, so the second
+            // (per-element 'string') silently overwrote the first
+            // (array-level required|array|min:1), which never actually
+            // validated. The array-level rule needs no trailing '.*'.
+            'sos.*.assign_permission' => 'required|array|min:1',
             'sos.*.assign_permission.*' => 'string'
 
             // Custom Rule to ensure uniqueness for each role and permission
@@ -247,6 +251,7 @@ class ConfigurationController extends Controller
                 $insertedId = $insert->id;
             }
             
+            $assignedEmpIds = [];
             if ($insertedId) {
                 foreach($request->employee as $block) {
                     $roleId = $block['member_role'];
@@ -261,11 +266,27 @@ class ConfigurationController extends Controller
                             'emp_id' => $memberId,
                             'role_id' => $roleId
                         ]);
+                        $assignedEmpIds[] = $memberId;
                     }
                 }
             }
-   
+
             DB::commit();
+
+            try {
+                $recipientIds = array_merge($assignedEmpIds, Common::getResortGmEmployeeIds($resort_id));
+                Common::notifyEmployees(
+                    $resort_id,
+                    $recipientIds,
+                    'SOS Team Assignment',
+                    'You have been assigned to the SOS team "' . $request->team_name . '".',
+                    'SOS',
+                    $insertedId
+                );
+            } catch (\Exception $e) {
+                \Log::warning('SOS team assignment notification failed: ' . $e->getMessage());
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'SOS Team Create Successfully',
@@ -395,8 +416,27 @@ class ConfigurationController extends Controller
                     'name' => $request->role_name,
                     'permission' => $permission,
                 ]);
-                
+
                 DB::commit();
+
+                try {
+                    $affectedEmpIds = SOSTeamMemeberModel::where('resort_id', $resort_id)
+                        ->where('role_id', $Main_id)
+                        ->pluck('emp_id')
+                        ->all();
+                    $recipientIds = array_merge($affectedEmpIds, Common::getResortGmEmployeeIds($resort_id));
+                    Common::notifyEmployees(
+                        $resort_id,
+                        $recipientIds,
+                        'SOS Role Permissions Updated',
+                        'The permissions for the SOS role "' . $request->role_name . '" have been updated.',
+                        'SOS',
+                        $Main_id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('SOS role permission update notification failed: ' . $e->getMessage());
+                }
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Role And Permission Updated Successfully',
@@ -475,7 +515,6 @@ class ConfigurationController extends Controller
                                 data-name ="'.$row->name.'"  
                                 data-id="' . e($id) . '"
                                 data-description="'.$row->description.'"
-                                data-teamMembers="'.$row->members.'"
                                 >
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </a>

@@ -87,6 +87,7 @@ class MonthlyCheckInController extends Controller
 
             $upComingMeeting                                =   MonthlyCheckingModel::join('employees as t1', 't1.id', '=', 'monthly_checking_models.emp_id')
                                                                     ->join('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
+                                                                    ->where('monthly_checking_models.resort_id', $this->resort_id)
                                                                     ->where('date_discussion', '>', Carbon::now()->toDateString())
                                                                     ->select([
                                                                         'monthly_checking_models.id',
@@ -94,12 +95,21 @@ class MonthlyCheckInController extends Controller
                                                                         'monthly_checking_models.end_time',
                                                                         'monthly_checking_models.date_discussion',
                                                                         'monthly_checking_models.Area_of_Discussion',
-                                                                        't1.Admin_Parent_id', 
-                                                                        't2.first_name', 
-                                                                        't2.last_name', 
-                                                                        't2.profile_picture', 
+                                                                        't1.Admin_Parent_id',
+                                                                        't2.first_name',
+                                                                        't2.last_name',
+                                                                        't2.profile_picture',
                                                                     ])
-                                                                    ->where('monthly_checking_models.status', 'Confirm')
+                                                                    // Two schedule flows share this table: the legacy one moves
+                                                                    // status to 'Confirm', the newer approval-request flow
+                                                                    // (Performance\MonthlyCheckingController@scheduleRequest)
+                                                                    // leaves status NULL forever and only sets approval_status
+                                                                    // to 'approved' — this bucket only matched the first flow,
+                                                                    // so an employee-approved meeting never showed up here.
+                                                                    ->where(function ($q) {
+                                                                        $q->where('monthly_checking_models.status', 'Confirm')
+                                                                          ->orWhere('monthly_checking_models.approval_status', 'approved');
+                                                                    })
                                                                     ->get()->map(function($item){
                                                                         $item->profile_picture =  Common::getResortUserPicture($item->Admin_Parent_id);
                                                                         return $item;
@@ -354,7 +364,7 @@ class MonthlyCheckInController extends Controller
                 "status"                                    =>  'Rescheduled',
             ]);
 
-            $msg                                =   'Meeting Rescheduled by HR for Monthly Check-In Date '.$request->date_discussion;
+            $msg                                =   'Meeting Rescheduled by HR for Monthly Check-In Date '.Common::formatDate($request->date_discussion);
             $title                              =   'Monthly check-in Meeting Rescheduled';
             $ModuleName                         =   'Performance';
             // Was missing the $type argument entirely (compare the sibling
@@ -614,21 +624,17 @@ class MonthlyCheckInController extends Controller
             $msg                                            =   'Meeting Confirm by '.$monthly->first_name.' for Monthly Check-In';
             $title                                          =   'Monthly check-in Meeting Confirm';
             $ModuleName                                     =   'Performance';
-            $sendMobileNotification                         =   Common::sendMobileNotification(
-                                                                    $this->resort_id,
-                                                                    2,
-                                                                    null,
-                                                                    null,
-                                                                    $title,
-                                                                    $msg,
-                                                                    $ModuleName,
-                                                                    [$createdByEmployeeId->id],
-                                                                    $monthly->id,
-                                                                    false,
-                                                                    'monthly-checkin-created',
-                                                                );
-                                                                
-            event(new ResortNotificationEvent(Common::nofitication($this->resort_id, 10,$title,$msg,0,$createdByEmployeeId->id,$ModuleName)));
+            // Was pairing sendMobileNotification with a separate
+            // nofitication(type 10)+event call — double DB row, double
+            // push. notifyEmployees() does both exactly once.
+            Common::notifyEmployees(
+                $this->resort_id,
+                [$createdByEmployeeId->id],
+                $title,
+                $msg,
+                $ModuleName,
+                $monthly->id
+            );
 
             $response['status']                             =   true;
             $response['message']                            =   'Monthly Check-In meeting confirmed successfully';
@@ -669,8 +675,24 @@ class MonthlyCheckInController extends Controller
                 return response()->json(['success' => false, 'message' => 'Meeting not found or not in Conducted status'], 200);
             }
             
-            $monthly->employee_comment                      =   $request->employee_comment;                   
+            $monthly->employee_comment                      =   $request->employee_comment;
             $monthly->save();
+
+            // Manager who created/scheduled this meeting was never told
+            // the employee replied — same "notify the meeting creator"
+            // pattern as employeeConfirmMeeting() above, using
+            // notifyEmployees() (single DB row + single push per recipient).
+            $createdByEmployeeId                            =   Employee::where('Admin_Parent_id',$monthly->created_by)->first();
+            if ($createdByEmployeeId) {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    [$createdByEmployeeId->id],
+                    'Monthly Check-In Employee Comment',
+                    'Employee comment added by '.$this->user->first_name.' '.$this->user->last_name.' for Monthly Check-In',
+                    'Performance',
+                    $monthly->id
+                );
+            }
 
             $response['status']                             =   true;
             $response['message']                            =   'Employee comment submitted successfully';
@@ -773,7 +795,7 @@ class MonthlyCheckInController extends Controller
             $checkin->save();
 
             $title      = 'Monthly Check-In Approved';
-            $msg        = $this->user->first_name . ' ' . $this->user->last_name . ' has approved the monthly check-in scheduled on ' . date('d M Y', strtotime($checkin->date_discussion)) . '.';
+            $msg        = $this->user->first_name . ' ' . $this->user->last_name . ' has approved the monthly check-in scheduled on ' . Common::formatDate($checkin->date_discussion) . '.';
             $ModuleName = 'Performance';
 
             // created_by is a resort_admins.id (set in MonthlyCheckingModel::boot()),

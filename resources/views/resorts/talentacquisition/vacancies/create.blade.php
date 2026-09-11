@@ -326,6 +326,7 @@
                                             <input class="av-seg-input" type="radio" name="status" value="Inactive" id="flexCheckstatus-inactive">
                                             <label for="flexCheckstatus-inactive">Inactive</label>
                                         </div>
+                                        <p class="av-hint"><strong>Active</strong> — this request will be sent for approval immediately. <strong>Inactive</strong> — your entry will be saved, but nobody will be notified until you switch this to Active and submit it.</p>
                                     </div>
                                 </div>
                             </div>

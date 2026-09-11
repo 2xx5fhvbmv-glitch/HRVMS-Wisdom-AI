@@ -218,7 +218,6 @@
 @endsection
 
 @section('import-scripts')
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script>
 
 $(document).ready(function() {
@@ -299,8 +298,10 @@ $(document).ready(function() {
 
     // View Job Advertisement Modal
     $(document).on('click', '.viewJobAd', function() {
+        let vacancyId = $(this).attr('data-vacancy-id');
         let positionName = $(this).attr('data-position');
         let jobLink = $(this).attr('data-joblink') || '';
+        $(".viewJobAdDownload").attr("data-vacancy-id", vacancyId);
         let allJobImages = [];
         try {
             allJobImages = JSON.parse($(this).attr('data-alljobimages')) || [];
@@ -347,8 +348,8 @@ $(document).ready(function() {
         $(".viewJobAdDownload").attr("data-hrefLink", activeImg);
     });
 
-    // Download the raw poster image as-is (no job link to embed, or the
-    // composite-with-QR-code path below failed for some reason).
+    // Download the raw poster image as-is (no vacancy id to look up, e.g.
+    // this modal instance somehow has none — shouldn't normally happen).
     function downloadPosterImage(imgUrl) {
         let a = document.createElement('a');
         a.href = imgUrl;
@@ -362,62 +363,24 @@ $(document).ready(function() {
     // Download handler for View Job Ad modal. The poster is meant to be
     // shared standalone (WhatsApp, print, etc.) — the "Job Advertisement
     // Link" text in the modal doesn't travel with it, so whoever receives
-    // just the image had no way to reach the application form. Bake a QR
-    // code (+ the link as text) onto the downloaded image itself instead.
+    // just the image had no way to reach the application form.
+    //
+    // Was composited client-side (canvas + qrcodejs), reading the poster
+    // via <img crossOrigin="anonymous"> — poster URLs are presigned Wasabi
+    // URLs, and without permissive CORS headers on that bucket the canvas
+    // was "tainted", canvas.toDataURL() threw, and it silently fell back to
+    // a plain download with no QR/link baked in at all (the exact reported
+    // bug). Compositing now happens server-side
+    // (JobAdvertisementController::downloadComposedAd) — no browser image
+    // fetch, no CORS dependency.
     $(document).on('click', '.viewJobAdDownload', function() {
+        let vacancyId = $(this).attr('data-vacancy-id');
         let imgUrl = $(this).attr('data-hrefLink');
-        let jobLink = $(this).attr('data-joblink') || '';
-        if (!imgUrl) return;
-
-        if (!jobLink.trim()) {
-            downloadPosterImage(imgUrl);
+        if (!vacancyId) {
+            if (imgUrl) downloadPosterImage(imgUrl);
             return;
         }
-
-        let img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = function() {
-            try {
-                let qrSize = 120;
-                let padding = 20;
-                let canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height + qrSize + padding * 2;
-                let ctx = canvas.getContext('2d');
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0);
-
-                let qrContainer = document.createElement('div');
-                new QRCode(qrContainer, { text: jobLink, width: qrSize, height: qrSize });
-                let qrCanvas = qrContainer.querySelector('canvas');
-                let qrX = (canvas.width - qrSize) / 2;
-                let qrY = img.height + padding;
-                if (qrCanvas) {
-                    ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
-                }
-                ctx.fillStyle = '#000000';
-                ctx.font = '14px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('Apply now: ' + jobLink, canvas.width / 2, qrY + qrSize + 18);
-
-                let a = document.createElement('a');
-                a.href = canvas.toDataURL('image/png');
-                a.download = 'job-advertisement.png';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            } catch (e) {
-                // Cross-origin canvas taint or similar — fall back so the
-                // user still gets the poster, just without the embedded link.
-                console.error('Could not embed job link into poster:', e);
-                downloadPosterImage(imgUrl);
-            }
-        };
-        img.onerror = function() {
-            downloadPosterImage(imgUrl);
-        };
-        img.src = imgUrl;
+        window.location.href = "{{ route('resort.ta.jobadvertisment.download', '') }}/" + vacancyId;
     });
 
         $('#jobAD-form').validate({

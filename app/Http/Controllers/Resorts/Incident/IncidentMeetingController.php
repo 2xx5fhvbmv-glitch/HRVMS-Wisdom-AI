@@ -312,21 +312,27 @@ class IncidentMeetingController extends Controller
                         if ($partAdmin && filter_var($partAdmin->email ?? '', FILTER_VALIDATE_EMAIL)) {
                             $name = trim(($partAdmin->first_name ?? '') . ' ' . ($partAdmin->last_name ?? '')) ?: 'there';
                             $bodyHtml = "You have been invited to a meeting in the Incident module.";
-                            Mail::send('emails.incident-notification', [
-                                'recipientName' => $name,
-                                'body'          => $bodyHtml,
-                                'details'       => [
-                                    'Meeting'  => $request->meeting_subject,
-                                    'Date'     => $request->meeting_date,
-                                    'Time'     => $request->meeting_time,
-                                    'Location' => $request->location ?? '—',
-                                ],
-                                'ctaUrl'   => route('incident.meeting'),
-                                'ctaLabel' => 'View meetings',
-                            ], function ($m) use ($partAdmin, $name, $request) {
-                                $m->to($partAdmin->email, $name)
-                                  ->subject('Meeting scheduled: ' . $request->meeting_subject);
-                            });
+                            // Was Mail::send() — blocking SMTP round-trip per
+                            // participant in a loop. Mailer::queue() only
+                            // accepts Mailable instances, not the raw
+                            // view+closure form, hence IncidentNotificationMail
+                            // (same class IncidentController::notifyByEmail() uses).
+                            Mail::to($partAdmin->email, $name)->queue(
+                                new \App\Mail\IncidentNotificationMail(
+                                    $name,
+                                    'Meeting scheduled: ' . $request->meeting_subject,
+                                    $bodyHtml,
+                                    [
+                                        'Meeting'  => $request->meeting_subject,
+                                        'Date'     => $request->meeting_date,
+                                        'Time'     => $request->meeting_time,
+                                        'Location' => $request->location ?? '—',
+                                    ],
+                                    route('incident.meeting'),
+                                    'View meetings',
+                                    $this->resort->resort_id
+                                )
+                            );
                         }
                     } catch (\Throwable $e) {
                         \Log::warning('Incident meeting email failed for participant ' . $participant_id . ': ' . $e->getMessage());
@@ -484,10 +490,33 @@ class IncidentMeetingController extends Controller
             ], 403);
         }
 
+        // Grab participants + meeting details before the row (and its
+        // participant rows) are deleted below, so there's still something
+        // to notify with — same content shape as the "scheduled" message
+        // in store(), just worded as cancelled.
+        $participantIds = IncidentsMeetingParticipants::where('meeting_id', $meeting->id)
+            ->pluck('participant_id')->filter()->unique()->values()->all();
+        $cancelMsg = "Meeting Cancelled: {$meeting->meeting_subject}\n📅 " . Common::formatDate($meeting->meeting_date)
+            . "\n⏰ " . Common::formatDisplayTime($meeting->meeting_time) . "\n📍 {$meeting->location}";
+        $incidentId = $meeting->incident_id;
+
         $meeting->delete();
 
         IncidentsMeetingParticipants::where('meeting_id', $id)->delete();
         IncidentsMeetingExternalParticipants::where('meeting_id', $id)->delete();
+
+        try {
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                $participantIds,
+                'Meeting Cancelled',
+                $cancelMsg,
+                'Incident',
+                $incidentId
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Incident meeting cancel notification failed: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,

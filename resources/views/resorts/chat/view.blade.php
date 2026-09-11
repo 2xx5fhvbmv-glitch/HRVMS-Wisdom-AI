@@ -78,8 +78,14 @@
         console.error('Pusher connection error:', err);
     });
 
-    window.Echo.private('conversation.' + window.currentUserId)
-        .listen('NewConversationMessage', (e) => {
+    {{-- Was subscribed to 'conversation.{id}' listening for
+         'NewConversationMessage' — a channel/event pair nothing ever
+         broadcasts on. ConversationController::sendMessage() actually
+         fires MessageSent on PrivateChannel('chat.{recipientId}'); this
+         page's own inbox is 'chat.' + the logged-in user's own id, since
+         that's the recipient id side of every message addressed to them. --}}
+    window.Echo.private('chat.' + window.currentUserId)
+        .listen('MessageSent', (e) => {
             var isSender = (e.sender_id == window.currentUserId);
             var messageHtml = `
                 <div class="message-wrapper mb-3${isSender ? ' sent-message' : ''}">

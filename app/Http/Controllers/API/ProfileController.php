@@ -104,6 +104,20 @@ class ProfileController extends Controller
           // Assign rank_type to the get_employee array
           $profileArray['get_employee']['rank_type'] = $rankType;
 
+          // Wisdom AI mobile access architecture: rank + department alone
+          // can't be guessed correctly for HR-assigned roles (Clinic
+          // Manager, SOS response team, L&D Manager, Security Officer/
+          // Manager, Engineering/Housekeeping HOD vs employee) — mobile
+          // menus/screens are gated client-side off this payload, not by
+          // any new API 403 here.
+          $moduleAccessPayload = Common::buildModuleAccessPayload($profile, $profile->GetEmployee);
+          $profileArray['get_employee']['department']      = $moduleAccessPayload['department'];
+          $profileArray['get_employee']['access_groups']    = $moduleAccessPayload['access_groups'];
+          $profileArray['get_employee']['module_access']    = $moduleAccessPayload['module_access'];
+          foreach ($moduleAccessPayload['flat'] as $flatKey => $flatValue) {
+              $profileArray['get_employee'][$flatKey] = $flatValue;
+          }
+
           // religion is stored as "0"/"1" (see the web Employee create form's
           // <select id="religion">) — mobile only gets the raw code, so add
           // a human-readable companion field the same way rank_type is added
@@ -220,11 +234,23 @@ class ProfileController extends Controller
 
 
     try {
+      // Only carry the fields this "Personal Information" flow is meant to
+      // change into info_payload — never $request->all(). statusChange()
+      // in InfoUpdateController blindly writes every payload key onto
+      // Employee/ResortAdmin via getFillable(), so an unfiltered payload
+      // let a mobile client smuggle in employment/compensation/security
+      // fields (rank, Dept_id, basic_salary, status, ...) disguised as a
+      // personal-info edit. This allow-list matches exactly the fields the
+      // approval side (resortAdminFields + the dob date-normalize branch)
+      // and show_details.blade.php already special-case for this request
+      // type.
+      $personalInfoFields = ['first_name', 'middle_name', 'last_name', 'personal_phone', 'dob', 'address_line_1', 'address_line_2'];
+
       EmployeeInfoUpdateRequest::create([
         'resort_id'                                   => $this->resort_id,
         'title'                                       => 'Personal Information',
         'employee_id'                                 =>  $this->user->GetEmployee->id,
-        'info_payload'                                => $request->all()
+        'info_payload'                                => $request->only($personalInfoFields)
       ]);
 
       // Was fully commented out — HR never found out a mobile user had
@@ -343,6 +369,12 @@ class ProfileController extends Controller
       $employee->password = $password;
       $employee->save();
 
+      // Security-visibility: let the employee know their password changed,
+      // in case it wasn't them.
+      if ($employee->GetEmployee) {
+        Common::notifyEmployees($this->resort_id, [$employee->GetEmployee->id], 'Password Changed', 'Your password was changed successfully. If this wasn\'t you, please contact HR immediately.', 'Profile');
+      }
+
       $accessToken        = $employee->token();
       $accessToken->revoke();
 
@@ -421,6 +453,9 @@ class ProfileController extends Controller
           }
           $resortAdmin->profile_picture =$path['path'];
           $saveResortAdmin                  = $resortAdmin->save();
+
+          // Self-notify confirmation, same as changePassword() above.
+          Common::notifyEmployees($this->resort_id, [$emp->id], 'Profile Photo Updated', 'Your profile photo was updated successfully.', 'Profile');
 
           $response['status']   = true;
           $response['message']  = 'Profile image uploaded successfully';

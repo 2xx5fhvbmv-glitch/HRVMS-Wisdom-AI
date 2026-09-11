@@ -34,6 +34,12 @@ class TaEmailSent implements ShouldQueue
         // middleware) never reaches this — has to be re-applied here.
         Common::applyResortSmtpConfig($this->resort_id);
 
+        // No Auth session in the queue worker — header/footer can't fall
+        // back to auth('resort-admin')->user(), pass the logo directly.
+        if ($this->resort_id && empty($this->data['resortLogo'])) {
+            $this->data['resortLogo'] = Common::GetResortLogo($this->resort_id);
+        }
+
         // Sending the email
         // Mail::send([], [], function ($message) {
         //     $message->to($this->to)    // Use the recipient's email

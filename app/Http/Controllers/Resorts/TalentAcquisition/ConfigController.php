@@ -420,13 +420,18 @@ class ConfigController extends Controller
             // t_anotification_children has no Resort_id column of its own —
             // scope via the owning t_anotification_parents row so a client
             // can't hold another resort's hiring-request notification.
-            $taupdaet = TAnotificationChild::where("id",$request->ta_id)
+            // Fetched as a model (not a mass ->update()) so Parent_ta_id is
+            // available below for the notification's requester/vacancy lookup.
+            $taupdaetChild = TAnotificationChild::where("id",$request->ta_id)
                                             ->whereIn('Parent_ta_id', TAnotificationParent::where('Resort_id', $this->resort->resort_id)->select('id'))
-                                            ->update([
-                                                                    "status"=>"Hold",
-                                                                    "holding_date" => $request->HoldDate,
-                                                                ]);
-                                                                $rank = $this->resort->GetEmployee->rank;
+                                            ->first();
+            if ($taupdaetChild) {
+                $taupdaetChild->update([
+                    "status"=>"Hold",
+                    "holding_date" => $request->HoldDate,
+                ]);
+            }
+            $rank = $this->resort->GetEmployee->rank;
 
             // Detect effective rank: Finance-related → rank 7, HR-related → rank 3
             $effectiveRank = $rank;
@@ -443,6 +448,44 @@ class ConfigController extends Controller
 
             $getNotifications['FreshVacancies'] = Common::GetTheFreshVacancies($this->resort->resort_id,"Active", $effectiveRank);
             $view = view('resorts.renderfiles.FreshVacancies', compact( 'getNotifications'))->render();
+
+            // Mirrors TaApprovedVcanciesNotification's recipient resolution
+            // (requester + HR + Finance + GM, minus whoever just acted) so
+            // hold gets the same stakeholder fan-out approval already has.
+            if ($taupdaetChild) {
+                try {
+                    $parentNotification = TAnotificationParent::where('Resort_id', $this->resort->resort_id)->find($taupdaetChild->Parent_ta_id);
+                    $parentVacancy = $parentNotification ? Vacancies::find($parentNotification->V_id) : null;
+                    $requesterId = null;
+                    if ($parentVacancy) {
+                        $createdByAdminId = $parentVacancy->getRawOriginal('created_by');
+                        if ($createdByAdminId) {
+                            $requesterId = Employee::where('Admin_Parent_id', $createdByAdminId)->value('id');
+                        }
+                    }
+                    $hrIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+                    $financeIds = Common::getResortFinanceEmployeeIds($this->resort->resort_id);
+                    $gmIds = Employee::where('resort_id', $this->resort->resort_id)->where('rank', 8)->pluck('id')->all();
+                    $allStakeholderIds = array_values(array_unique(array_filter(
+                        array_merge([$requesterId], $hrIds, $financeIds, $gmIds)
+                    )));
+                    $senttoIds = array_values(array_diff($allStakeholderIds, [(int) $this->resort->GetEmployee->id]));
+                    if (!empty($senttoIds)) {
+                        $msg = "Hiring request for " . ($parentVacancy && $parentVacancy->Getposition ? $parentVacancy->Getposition->position_title : 'the position') . " has been put on hold.";
+                        Common::notifyEmployees(
+                            $this->resort->resort_id,
+                            $senttoIds,
+                            'Hiring Request On Hold',
+                            $msg,
+                            'Talent Acquisition',
+                            $parentNotification->V_id ?? 0
+                        );
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('TA hold notification failed: ' . $e->getMessage());
+                }
+            }
+
             DB::commit();
             return response()->json(['success' => true,"view"=>$view , 'message' => 'Hire Requests is on Hold Now.'],200);
 
@@ -510,6 +553,41 @@ class ConfigController extends Controller
 
             // $TalentPool = Common::GetTheFreshVacancies($this->resort->resort_id,"Rejected");
             // $talentPoolview = view('resorts.renderfiles.talentPool', compact( 'TalentPool'))->render();
+
+            // Mirrors TaApprovedVcanciesNotification's recipient resolution
+            // (requester + HR + Finance + GM, minus whoever just acted) so
+            // rejection gets the same stakeholder fan-out approval already has.
+            try {
+                $parentNotification = TAnotificationParent::where('Resort_id', $this->resort->resort_id)->find($taupdaet->Parent_ta_id);
+                $parentVacancy = $parentNotification ? Vacancies::find($parentNotification->V_id) : null;
+                $requesterId = null;
+                if ($parentVacancy) {
+                    $createdByAdminId = $parentVacancy->getRawOriginal('created_by');
+                    if ($createdByAdminId) {
+                        $requesterId = Employee::where('Admin_Parent_id', $createdByAdminId)->value('id');
+                    }
+                }
+                $hrIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+                $financeIds = Common::getResortFinanceEmployeeIds($this->resort->resort_id);
+                $gmIds = Employee::where('resort_id', $this->resort->resort_id)->where('rank', 8)->pluck('id')->all();
+                $allStakeholderIds = array_values(array_unique(array_filter(
+                    array_merge([$requesterId], $hrIds, $financeIds, $gmIds)
+                )));
+                $senttoIds = array_values(array_diff($allStakeholderIds, [(int) $this->resort->GetEmployee->id]));
+                if (!empty($senttoIds)) {
+                    $msg = "Hiring request for " . ($parentVacancy && $parentVacancy->Getposition ? $parentVacancy->Getposition->position_title : 'the position') . " has been rejected. Reason: " . $request->New_Vacancy_Rejected;
+                    Common::notifyEmployees(
+                        $this->resort->resort_id,
+                        $senttoIds,
+                        'Hiring Request Rejected',
+                        $msg,
+                        'Talent Acquisition',
+                        $parentNotification->V_id ?? 0
+                    );
+                }
+            } catch (\Exception $e) {
+                \Log::warning('TA rejection notification failed: ' . $e->getMessage());
+            }
 
             DB::commit();
 

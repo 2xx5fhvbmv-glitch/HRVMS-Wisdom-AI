@@ -71,15 +71,21 @@ class LeaveController extends Controller
             'trans_departure_date'      => 'required_with:transportation|array',
             'trans_departure_date.*'    => 'required_with:transportation.*|date_format:Y-m-d',
 
-            // Additional fields for transportation and destination
-            'dept_date'                 => 'required_with_all:destination,transportation|date_format:Y-m-d',
-            'dept_time'                 => 'required_with_all:destination,transportation|date_format:H:i',
-            'dept_transportation'       => 'required_with_all:destination,transportation|integer',
-            'arrival_date'              => 'required_with_all:destination,transportation|date_format:Y-m-d',
-            'arrival_time'              => 'required_with_all:destination,transportation|date_format:H:i',
-            'arrival_transportation'    => 'required_with_all:destination,transportation|integer',
-            'dept_reason'               => 'required_with_all:destination,transportation',
-            'arrival_reason'            => 'required_with_all:destination,transportation',
+            // Additional fields for transportation and destination — was
+            // required_with_all:destination,transportation, blocking
+            // submission (e.g. a single Maternity Leave with a destination
+            // picked but exact departure/arrival times not yet known) even
+            // though nothing downstream requires these to be set. Made
+            // optional per request; still validated (date/time format,
+            // integer id) whenever a value is actually provided.
+            'dept_date'                 => 'nullable|date_format:Y-m-d',
+            'dept_time'                 => 'nullable|date_format:H:i',
+            'dept_transportation'       => 'nullable|integer',
+            'arrival_date'              => 'nullable|date_format:Y-m-d',
+            'arrival_time'              => 'nullable|date_format:H:i',
+            'arrival_transportation'    => 'nullable|integer',
+            'dept_reason'               => 'nullable',
+            'arrival_reason'            => 'nullable',
         ]);
 
         if ($validator->fails()) {
@@ -168,110 +174,59 @@ class LeaveController extends Controller
                 }
             }
 
-            // Define leave attachment path
-            $leave_attachment                           =   config('settings.leave_attachments');
-            $dynamic_path                               =   $leave_attachment . '/' . $emp_id;
-
-            // Create the directory if it doesn't exist
-            if (!Storage::exists($dynamic_path)) {
-                Storage::makeDirectory($dynamic_path);
-            }
-
-            // Handle file upload if any attachments are provided
+            // Was: unconditional raw Storage::exists()/makeDirectory() on
+            // EVERY leave submission (even with no attachment at all), then
+            // a config('filesystems.default')==='s3' branch that picked the
+            // real upload path (Common::AWSEmployeeFileUpload, StorageHelper-
+            // backed) — but that reads the WRONG env var. STORAGE_DRIVER
+            // (what AWSEmployeeFileUpload/downloads actually key off) and
+            // FILESYSTEM_DRIVER (what this branch checked) can and do
+            // diverge on this server, so this always fell into the 'else'
+            // local-fallback: a raw $file->move(public_path(...)) after a
+            // raw Storage::makeDirectory() that isn't guaranteed to
+            // succeed/be writable — exactly the "Unable to create the
+            // .../leave_attachments/{emp_id} directory" crash reported here
+            // (500, employee 170). AWSEmployeeFileUpload() already handles
+            // the employee-folder + LeaveAttachments-subfolder bookkeeping
+            // internally (firstOrCreate on filemangement_systems) - the
+            // manual DB inserts that used to duplicate that here are gone.
             $filePath                                   =   null;
             if ($request->hasFile('attachments')) {
                 $file = $request->file('attachments');
 
-                // Check storage driver configuration
-                $storageDriver = config('filesystems.default');
+                $status = Common::AWSEmployeeFileUpload($resortId, $file, $employee->Emp_id, 'LeaveAttachments', true);
 
-                if ($storageDriver === 's3') {
-                    // AWS S3 Storage - Ensure folder structure exists in database
-                    $employeeFolderName                     =   $employee->Emp_id;
-                    $SubFolder                              =   "LeaveAttachments";
-
-                    // Check if the employee's main folder exists
-                    $employeeFolder                         =   DB::table('filemangement_systems')
-                                                                    ->where('resort_id', $resortId)
-                                                                    ->where('Folder_Name', $employeeFolderName)
-                                                                    ->where('Folder_Type', 'categorized')
-                                                                    ->first();
-
-                    // If the employee folder doesn't exist, create it
-                    if (!$employeeFolder) {
-                        $employeeFolderId                   =   DB::table('filemangement_systems')->insertGetId([
-                            'resort_id'                     =>  $resortId,
-                            'Folder_unique_id'              =>  \Illuminate\Support\Str::random(10),
-                            'UnderON'                       =>  0,
-                            'Folder_Name'                   =>  $employeeFolderName,
-                            'Folder_Type'                   =>  'categorized',
-                            'created_by'                    =>  null,
-                            'modified_by'                   =>  null,
-                            'created_at'                    =>  now(),
-                            'updated_at'                    =>  now(),
-                        ]);
-
-                        // Retrieve the created folder
-                        $employeeFolder                     =   DB::table('filemangement_systems')
-                                                                    ->where('id', $employeeFolderId)
-                                                                    ->first();
-                    }
-
-                    // Check if the LeaveAttachments subfolder exists
-                    $leaveAttachmentsFolder                 =   DB::table('filemangement_systems')
-                                                                    ->where('resort_id', $resortId)
-                                                                    ->where('UnderON', $employeeFolder->id)
-                                                                    ->where('Folder_Name', $SubFolder)
-                                                                    ->first();
-
-                    // If the LeaveAttachments subfolder doesn't exist, create it
-                    if (!$leaveAttachmentsFolder) {
-                        DB::table('filemangement_systems')->insert([
-                            'resort_id'                     =>  $resortId,
-                            'Folder_unique_id'              =>  \Illuminate\Support\Str::random(10),
-                            'UnderON'                       =>  $employeeFolder->id,
-                            'Folder_Name'                   =>  $SubFolder,
-                            'Folder_Type'                   =>  'categorized',
-                            'created_by'                    =>  null,
-                            'modified_by'                   =>  null,
-                            'created_at'                    =>  now(),
-                            'updated_at'                    =>  now(),
-                        ]);
-                    }
-
-                    $status =   Common::AWSEmployeeFileUpload($resortId,$file, $employee->Emp_id,$SubFolder,true);
-
-                    if ($status['status'] == false) {
-                            return response()->json([
-                            'success' => false,
-                            'message' => 'File upload failed: ' . ($status['msg'] ?? 'Unknown error')
-                        ], 400);
-                    } else {
-                        if($status['status'] == true && isset($status['Chil_file_id']) && !empty($status['Chil_file_id'])) {
-                            $filename = $file->getClientOriginalName();
-                            $filePath = ['Filename' => $filename, 'Child_id' => $status['Chil_file_id']];
-                        }
-                    }
-                } else {
-                    // Local Storage — must land under public/ (like
-                    // leaveUpdate() already does); Storage::storeAs() put it
-                    // in storage/app which the web server can't serve, so
-                    // every attachment URL 404'd.
-                    $leave_attachment                       =   config('settings.leave_attachments');
-                    $dynamic_path                           =   $leave_attachment . '/' . $emp_id;
-
-                    $filename                               =   time() . '_' . $file->getClientOriginalName();
-                    $file->move(public_path($dynamic_path), $filename);
-                    $filePath                               =   $dynamic_path . '/' . $filename;
+                if ($status['status'] == false) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'File upload failed: ' . ($status['msg'] ?? 'Unknown error')
+                    ], 400);
+                } elseif (isset($status['Chil_file_id']) && !empty($status['Chil_file_id'])) {
+                    $filePath = ['Filename' => $file->getClientOriginalName(), 'Child_id' => $status['Chil_file_id']];
                 }
             }
 
             // Process each leave category and create leave records
+            //
+            // combine_with_other == 1 on a category only means it's ALLOWED
+            // to be paired with another category — it says nothing about
+            // whether THIS submission actually is a pairing. Annual Leave
+            // (and any other combinable category) submitted alone, as the
+            // overwhelming majority of leave requests are, was still
+            // getting flag set below purely because the category itself
+            // permits combining — and a non-null flag makes the row
+            // invisible in the web portal's leave-requests grid
+            // (filterLeaveGridRequests()'s whereNull('el.flag')). That's
+            // why a plain single-category Annual Leave extension (and the
+            // original leave, if it was ever submitted the same way)
+            // vanished from the web portal even though nothing was ever
+            // actually combined with anything.
+            $isCombinedSubmission                       =   count($leaveCategoryIds) == 2;
             foreach ($request->leave_category_id as $key => $categoryId) {
                 $leaveDetails                           =   LeaveCategory::where('id', $categoryId)->where('resort_id',$user->resort_id)->first();
 
                 $currentFlag                            =   null;
-                if ($leaveDetails->combine_with_other == 1) {
+                if ($isCombinedSubmission && $leaveDetails->combine_with_other == 1) {
                     $currentFlag                        =   $leaveDetails->leave_category;
                 }
 
@@ -554,6 +509,17 @@ class LeaveController extends Controller
                             'status'                    =>  'Pending',
                         ]);
                     }
+
+                    // Same $passApprovalFlow shape BoardingPassController::boardingPassAdd()
+                    // builds for a standalone pass — that endpoint notifies SM/HR/HOD,
+                    // this one never did. Shared helper so both stay in sync.
+                    Common::notifyBoardingPassApprovalFlow(
+                        $user->resort_id,
+                        $passApprovalFlow,
+                        $boardingPass,
+                        $employee,
+                        $user->first_name . ' ' . $user->last_name
+                    );
                 }
                 $approvalFlow                           =   collect(); // Store the approval flow dynamically
 
@@ -1577,6 +1543,7 @@ class LeaveController extends Controller
                 $leaveDetail                            =   $leave_details_query->select(
                                                                 'el.*',
                                                                 'e.Emp_id as employee_id',
+                                                                'ra.id as admin_parent_id',
                                                                 'e.rank',
                                                                 'e.benefit_grid_level',
                                                                 'els.status as leave_status',
@@ -1620,7 +1587,7 @@ class LeaveController extends Controller
                     $currentYearEnd                     =   Carbon::now()->endOfYear()->format('Y-m-d');
 
                     $leavesTaken                        =   DB::table('employees_leaves')
-                                                                ->where('emp_id', $leaveDetail->employee_id)
+                                                                ->where('emp_id', $leaveDetail->emp_id)
                                                                 ->where('status', 'Approved')
                                                                 ->where(function ($query) use ($currentYearStart, $currentYearEnd) {
                                                                     $query->whereBetween('from_date', [$currentYearStart, $currentYearEnd])
@@ -1635,8 +1602,9 @@ class LeaveController extends Controller
                     $leaveDetail->total_leave_allocation    =   $totalAllocation;
                     $leaveDetail->leaves_taken              =   $leavesTaken;
 
-                    // Update profile picture dynamically
-                    $leaveDetail->employee_profile_picture  =   Common::getResortUserPicture($leaveDetail->employee_id);
+                    // Update profile picture dynamically — getResortUserPicture()
+                    // needs resort_admins.id, not the employee display code.
+                    $leaveDetail->employee_profile_picture  =   Common::getResortUserPicture($leaveDetail->admin_parent_id);
                     $leaveDetail->transportation_details    =   json_decode($leaveDetail->transportation_details, true);
 
                     $baseUrl = url('/');
@@ -1895,6 +1863,7 @@ class LeaveController extends Controller
                 $combineLeaveDetails    =   $combineLeaveDetails->select(
                                                 'el.*',
                                                 'e.Emp_id as employee_id',
+                                                'ra.id as admin_parent_id',
                                                 'e.rank',
                                                 'els.status as leave_status',
                                                 'els.approver_rank',
@@ -1969,13 +1938,14 @@ class LeaveController extends Controller
 
                         if ($leaveDetail->leave_data) {
                             foreach ($leaveDetail->leave_data as $leaveData) {
-                                $leaveData->employee_profile_picture    = Common::getResortUserPicture($leaveData->employee_id);
+                                $leaveData->employee_profile_picture    = Common::getResortUserPicture($leaveData->admin_parent_id);
                                 $leaveData->attachments                 = self::resolveLeaveAttachmentUrl($leaveData->attachments);
                             }
                         }
 
-                        // Update profile picture dynamically
-                        $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->employee_id);
+                        // Update profile picture dynamically — getResortUserPicture()
+                        // needs resort_admins.id, not the employee display code.
+                        $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->admin_parent_id);
                         $leaveDetail->attachments               = self::resolveLeaveAttachmentUrl($leaveDetail->attachments);
                     }
                 }
@@ -2065,6 +2035,7 @@ class LeaveController extends Controller
                 $combineLeaveDetails = $combineLeaveDetails->select(
                     'el.*',
                     'e.Emp_id as employee_id',
+                    'ra.id as admin_parent_id',
                     'e.rank',
                     'e.benefit_grid_level',
                     'els.status as leave_status',
@@ -2117,8 +2088,9 @@ class LeaveController extends Controller
                         $leaveDetail->total_leave_allocation    = $totalAllocation;
                         $leaveDetail->leaves_taken              = $leavesTaken;
 
-                        // Update profile picture dynamically
-                        $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->employee_id);
+                        // Update profile picture dynamically — getResortUserPicture()
+                        // needs resort_admins.id, not the employee display code.
+                        $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->admin_parent_id);
                     }
                 }
                 $totalLeave                         = $combineLeaveDetails->sum('total_days');
@@ -2184,13 +2156,13 @@ class LeaveController extends Controller
             'trans_departure_date.*'                    => 'required_with:transportation.*|date_format:Y-m-d',
 
             // Additional fields for transportation and destination
-            'dept_date'                                 => 'required_with_all:destination,transportation|date_format:Y-m-d',
-            'dept_time'                                 => 'required_with_all:destination,transportation|date_format:H:i',
-            'dept_transportation'                       => 'required_with_all:destination,transportation|integer',
-            'arrival_date'                              => 'required_with_all:destination,transportation|date_format:Y-m-d',
-            'arrival_time'                              => 'required_with_all:destination,transportation|date_format:H:i',
-            'arrival_transportation'                    => 'required_with_all:destination,transportation|integer',
-            'dept_reason'                               => 'required_with_all:destination,transportation',
+            'dept_date'                                 => 'nullable|date_format:Y-m-d',
+            'dept_time'                                 => 'nullable|date_format:H:i',
+            'dept_transportation'                       => 'nullable|integer',
+            'arrival_date'                              => 'nullable|date_format:Y-m-d',
+            'arrival_time'                              => 'nullable|date_format:H:i',
+            'arrival_transportation'                    => 'nullable|integer',
+            'dept_reason'                               => 'nullable',
 
         ]);
 
@@ -2219,7 +2191,15 @@ class LeaveController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
 
-        $leaveFind                                      =   EmployeeLeave::find($request->leave_id);
+        $user                                           =   Auth::guard('api')->user();
+        $employee                                       =   $user->GetEmployee;
+        $emp_id                                         =   $employee->id;
+        $rank                                           =   $employee->rank;
+
+        $leaveFind                                      =   EmployeeLeave::where('id', $request->leave_id)
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('emp_id', $emp_id)
+                                                                ->first();
 
         if (!$leaveFind) {
             return response()->json([
@@ -2227,11 +2207,6 @@ class LeaveController extends Controller
                 'message'                               =>  'Invalid Leave ID .',
             ], 200);
         }
-
-        $user                                           =   Auth::guard('api')->user();
-        $employee                                       =   $user->GetEmployee;
-        $emp_id                                         =   $employee->id;
-        $rank                                           =   $employee->rank;
 
         try {
             DB::beginTransaction();
@@ -2280,22 +2255,23 @@ class LeaveController extends Controller
                 }
             }
 
-            // Define leave attachment path
-            $leave_attachment                           =   config('settings.leave_attachments');
-            $dynamic_path                               =   $leave_attachment . '/' . $emp_id;
-
-            // Create the directory if it doesn't exist
-            if (!Storage::exists($dynamic_path)) {
-                Storage::makeDirectory($dynamic_path);
-            }
-
-            // Handle file upload if any attachments are provided
+            // Same raw Storage::/public_path() bug as leaveAdd() (see the
+            // comment there) — a directory-creation failure here 500s an
+            // edit the same way it did a create. Routed through the same
+            // StorageHelper-backed helper.
             $filePath                                   =   null;
 
             if ($request->hasFile('attachments')) {
-                $fileName                               =   uniqid('attachment_', true) . '.' . $request->attachments->getClientOriginalExtension();
-                $filePath                               =   $dynamic_path . '/' . $fileName;
-                $request->attachments->move(public_path($dynamic_path), $fileName);
+                $status = Common::AWSEmployeeFileUpload($user->resort_id, $request->attachments, $employee->Emp_id, 'LeaveAttachments', true);
+
+                if ($status['status'] == false) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'File upload failed: ' . ($status['msg'] ?? 'Unknown error')
+                    ], 400);
+                } elseif (isset($status['Chil_file_id']) && !empty($status['Chil_file_id'])) {
+                    $filePath = ['Filename' => $request->attachments->getClientOriginalName(), 'Child_id' => $status['Chil_file_id']];
+                }
             }
 
             // Process each leave category and create leave records
@@ -2398,7 +2374,17 @@ class LeaveController extends Controller
 
                 // Update the leave record in the database
 
-                $leaveUpdate                            =   EmployeeLeave::find($request->leave_id);
+                $leaveUpdate                            =   EmployeeLeave::where('id', $request->leave_id)
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('emp_id', $emp_id)
+                                                                ->first();
+
+                if (!$leaveUpdate) {
+                    return response()->json([
+                        'success'                       =>  false,
+                        'message'                       =>  'Invalid Leave ID .',
+                    ], 200);
+                }
 
                 $leaveUpdate->leave_category_id         =   $categoryId;
                 $leaveUpdate->from_date                 =   $fromDate;
@@ -2406,7 +2392,13 @@ class LeaveController extends Controller
                 $leaveUpdate->total_days                =   $totalDays;
                 $leaveUpdate->reason                    =   $request->reason;
                 $leaveUpdate->task_delegation           =   $request->task_delegation;
-                $leaveUpdate->attachments               =   $filePath;
+                // attachments is a plain string column (no array cast) —
+                // $filePath is now an array when a new file was uploaded
+                // (see fix above), so it must be encoded same as
+                // leaveAdd() does, or Eloquent would try to save a raw PHP
+                // array into a string column. Same null-when-no-new-file
+                // behavior as before this fix — not changing that here.
+                $leaveUpdate->attachments               =   $filePath ? (is_array($filePath) ? json_encode($filePath) : $filePath) : null;
 
                 // Only update 'destination' if status is not 'Approved'
                 if ($leaveUpdate->status !== "Approved") {
@@ -2541,6 +2533,26 @@ class LeaveController extends Controller
                         }
                     }
                 }
+            }
+
+            // Whichever approver stage(s) are still Pending on this leave
+            // were never told the request they're about to review just
+            // changed underneath them.
+            $pendingApproverIds                         =   EmployeeLeaveStatus::where('leave_request_id', $request->leave_id)
+                                                                ->where('status', 'Pending')
+                                                                ->pluck('approver_id')
+                                                                ->unique()
+                                                                ->values()
+                                                                ->all();
+            if (!empty($pendingApproverIds)) {
+                Common::notifyEmployees(
+                    $user->resort_id,
+                    $pendingApproverIds,
+                    'Leave Request Updated',
+                    $user->first_name . ' ' . $user->last_name . ' updated a pending leave request awaiting your review.',
+                    'Leave',
+                    $request->leave_id
+                );
             }
 
             DB::commit();
@@ -2701,6 +2713,7 @@ class LeaveController extends Controller
                                                                     'el.reason',
                                                                     'ra.first_name',
                                                                     'ra.last_name',
+                                                                    'e.Admin_Parent_id as admin_parent_id',
                                                                     'lc.leave_type as leave_category',
                                                                     'rp.position_title as position',
                                                                     'els.id as emp_l_s_id',
@@ -2725,6 +2738,20 @@ class LeaveController extends Controller
                                                             ->where('el.status', 'Pending')
                                                             ->where('el.resort_id', $resort_id)
                                                             ->where('e.reporting_to', $emp_id)
+                                                            // Unlike the HR/GM branch above, this had no
+                                                            // els.approver_rank/els.status filter at all — the
+                                                            // employees_leaves_status join is one-to-many (one
+                                                            // row per approval stage), so el.status='Pending'
+                                                            // could pick up ANY stage row, not necessarily the
+                                                            // one currently awaiting this HOD. That's why a
+                                                            // request whose overall status is still "Pending"
+                                                            // could display approve_status="Approved" (a stale,
+                                                            // already-passed stage) at the top level — the real
+                                                            // cause behind Approve/Reject appearing to vanish if
+                                                            // the app reads that field instead of can_approve/
+                                                            // can_reject below.
+                                                            ->where('els.approver_rank', $emp_rank)
+                                                            ->where('els.status', 'Pending')
                                                             ->select(
                                                                 'el.id',
                                                                 'el.emp_id',
@@ -2734,6 +2761,11 @@ class LeaveController extends Controller
                                                                 'el.reason',
                                                                 'ra.first_name',
                                                                 'ra.last_name',
+                                                                // Was never selected — the leave_request list
+                                                                // had no photo field at all (island_pass on the
+                                                                // same dashboard does, via Admin_Parent_id +
+                                                                // getResortUserPicture(); this had neither).
+                                                                'e.Admin_Parent_id as admin_parent_id',
                                                                 'lc.leave_type as leave_category',
                                                                 'rp.position_title as position',
                                                                 'els.id as emp_l_s_id',
@@ -2774,6 +2806,10 @@ class LeaveController extends Controller
 
             // Clear duplicate fields in the base record
             unset($base->approver_rank, $base->approver_id);
+
+            if (isset($base->admin_parent_id)) {
+                $base->employee_profile_picture         =   Common::getResortUserPicture($base->admin_parent_id);
+            }
 
             foreach (Common::buildLeaveApprovalFlow($base->id, $emp_id) as $key => $value) {
                 $base->{$key} = $value;
@@ -2911,7 +2947,10 @@ class LeaveController extends Controller
 
             // Attach approve_data to the main island pass object
             $islandPassQuery->approve_data = $approveData;
-            $islandPassQuery->profile_picture    = Common::getResortUserPicture($islandPassQuery->employee_id);
+            // employee_id here is etp.employee_id (via etp.*) — a real
+            // employees.id, but still the wrong domain: getResortUserPicture()
+            // needs resort_admins.id, which is Admin_Parent_id (already selected).
+            $islandPassQuery->profile_picture    = Common::getResortUserPicture($islandPassQuery->Admin_Parent_id);
         }
 
         return $islandPassQuery;
@@ -3279,6 +3318,7 @@ class LeaveController extends Controller
                                                 'els.approver_rank',
                                                 'els.approver_id',
                                                 // Main employee details
+                                                'ra.id as admin_parent_id',
                                                 'ra.first_name as employee_first_name',
                                                 'ra.last_name as employee_last_name',
                                                 'ra.profile_picture as employee_profile_picture',
@@ -3323,7 +3363,11 @@ class LeaveController extends Controller
 
                     // Add approve_data to the base record
                     $base->approve_data                 = $approveData;
-                    $base->employee_profile_picture     = Common::getResortUserPicture($base->employee_id);
+                    // getResortUserPicture() needs the resort_admins.id
+                    // (Admin_Parent_id) — employee_id here is e.Emp_id, the
+                    // display CODE (e.g. "DR-20"), never a real id, so this
+                    // always missed and fell back to the default picture.
+                    $base->employee_profile_picture     = Common::getResortUserPicture($base->admin_parent_id);
                     $base->attachments                  = self::resolveLeaveAttachmentUrl($base->attachments);
                     // Clear duplicate fields in the base record
                     unset($base->approver_rank, $base->approver_id);
@@ -3419,6 +3463,7 @@ class LeaveController extends Controller
                     'e.rank',
                     'e.benefit_grid_level',
                     // Main employee details
+                    'ra.id as admin_parent_id',
                     'ra.first_name as employee_first_name',
                     'ra.last_name as employee_last_name',
                     'ra.profile_picture as employee_profile_picture',
@@ -3499,8 +3544,14 @@ class LeaveController extends Controller
                     $currentYearStart   = Carbon::now()->startOfYear()->format('Y-m-d');
                     $currentYearEnd     = Carbon::now()->endOfYear()->format('Y-m-d');
 
+                    // employees_leaves.emp_id is the numeric employees.id —
+                    // $leaveDetail->employee_id is e.Emp_id, the display CODE
+                    // (e.g. "DR-20"), never a real id, so this matched zero
+                    // rows and leaves_taken silently reported 0 regardless
+                    // of actual usage. el.emp_id (from el.* above) is the
+                    // same numeric column already on this exact leave row.
                     $leavesTaken    = DB::table('employees_leaves')
-                        ->where('emp_id', $leaveDetail->employee_id)
+                        ->where('emp_id', $leaveDetail->emp_id)
                         ->where('status', 'Approved')
                         ->where(function ($query) use ($currentYearStart, $currentYearEnd) {
                             $query->whereBetween('from_date', [$currentYearStart, $currentYearEnd])
@@ -3515,8 +3566,10 @@ class LeaveController extends Controller
                     $leaveDetail->total_leave_allocation    = $totalAllocation;
                     $leaveDetail->leaves_taken              = $leavesTaken;
 
-                    // Update profile picture dynamically
-                    $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->employee_id);
+                    // Update profile picture dynamically — getResortUserPicture()
+                    // needs the resort_admins.id (Admin_Parent_id), not the
+                    // employee display code.
+                    $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->admin_parent_id);
                     // JSON_ARRAYAGG over the LEFT JOIN to employee_travel_passes
                     // still produces one array entry even when there's no
                     // matching travel pass (e.g. a plain Sick Leave with no
@@ -3779,7 +3832,10 @@ class LeaveController extends Controller
 
             // Attach approve_data to the main island pass object
             $islandPassQuery->approve_data = $approveData;
-            $islandPassQuery->profile_picture    = Common::getResortUserPicture($islandPassQuery->employee_id);
+            // employee_id here is etp.employee_id (via etp.*) — a real
+            // employees.id, but still the wrong domain: getResortUserPicture()
+            // needs resort_admins.id, which is Admin_Parent_id (already selected).
+            $islandPassQuery->profile_picture    = Common::getResortUserPicture($islandPassQuery->Admin_Parent_id);
         }
 
         return $islandPassQuery;
@@ -4164,12 +4220,37 @@ class LeaveController extends Controller
                         null,
                         null,
                         'Leave Request',
-                        $empName->first_name . ' ' . $empName->last_name . 'Your leave request from ' . $leave->from_date . ' to ' . $leave->to_date . ' has been ' . $action . '.',
+                        $empName->first_name . ' ' . $empName->last_name . ' Your leave request from ' . Common::formatDate($leave->from_date) . ' to ' . Common::formatDate($leave->to_date) . ' has been ' . $action . '.',
                         'Leave',
                         [$leave->emp_id],
                         $leave->id,
                         false,
                         'leave-approved',
+                    );
+                }
+
+                // Tell the next approver in the chain their action is now due —
+                // port of BoardingPassController.php's identical
+                // "advance the chain" pattern (its handleTravelPassAction
+                // equivalent), which this method never had: it only ever
+                // notified the applicant, never the next pending approver.
+                $nextPendingStatus                      =   EmployeeLeaveStatus::where('leave_request_id', $leave->id)
+                                                                ->where('status', 'Pending')
+                                                                ->orderBy('id', 'desc')
+                                                                ->first();
+                if ($nextPendingStatus && $nextPendingStatus->approver_id) {
+                    Common::sendMobileNotification(
+                        $user->resort_id,
+                        2,
+                        null,
+                        null,
+                        'Leave Approval Required',
+                        'A leave request is awaiting your approval.',
+                        'Leave',
+                        [$nextPendingStatus->approver_id],
+                        $leave->id,
+                        false,
+                        'leave-approval-required',
                     );
                 }
 
@@ -4193,7 +4274,7 @@ class LeaveController extends Controller
                     null,
                     null,
                     'Leave Request',
-                    $empName->first_name . ' ' . $empName->last_name . 'Your leave request from ' . $leave->from_date . ' to ' . $leave->to_date . ' has been ' . $action . '.',
+                    $empName->first_name . ' ' . $empName->last_name . ' Your leave request from ' . Common::formatDate($leave->from_date) . ' to ' . Common::formatDate($leave->to_date) . ' has been ' . $action . '.',
                     'Leave',
                     [$leave->emp_id],
                     $leave->id,

@@ -26,8 +26,14 @@ class SosReportController extends Controller
 
     protected $resort;
 
-    /** Active / in-flight statuses (not resolved, not rejected). */
-    private const ACTIVE_STATUSES = ['Active', 'Pending', 'Drill-active'];
+    /**
+     * Active / in-flight statuses (not resolved, not rejected) — mirrors
+     * Common::sosOpenStatuses() minus Pending: a still-unapproved incident
+     * isn't "active" for reporting purposes. Was stale casing
+     * ('Drill-active') and missing Real-Active/In-Progress entirely, added
+     * after this list was first written.
+     */
+    private const ACTIVE_STATUSES = ['Active', 'Drill-Active', 'Real-Active', 'In-Progress'];
 
     public function __construct()
     {
@@ -68,7 +74,10 @@ class SosReportController extends Controller
             ['filter' => 'sos_type', 'name' => 'sos_type', 'label' => 'SOS Type', 'type' => 'select', 'placeholder' => 'All types',
                 'options' => $types->map(fn($t) => ['value' => $t->id, 'label' => $t->name])->all()],
             ['filter' => 'status', 'name' => 'status', 'label' => 'Status', 'type' => 'select', 'placeholder' => 'All statuses',
-                'options' => collect(['Pending', 'Active', 'Completed', 'Rejected', 'Drill-active'])->map(fn($s) => ['value' => $s, 'label' => $s])->all()],
+                // Rendered from the real enum so this can't drift again —
+                // was a stale 5-value list missing Real-Active/In-Progress/
+                // Drill-Rejected/Drill-Completed and using old 'Drill-active' casing.
+                'options' => collect(array_merge(['Pending'], Common::sosOpenStatuses(), Common::sosClosedStatuses()))->map(fn($s) => ['value' => $s, 'label' => $s])->all()],
             ['filter' => 'location', 'name' => 'location', 'label' => 'Location', 'type' => 'select', 'placeholder' => 'All locations',
                 'options' => $locations->map(fn($l) => ['value' => $l, 'label' => $l])->all()],
             ['filter' => 'duration', 'name' => 'from_date', 'label' => 'From Date', 'type' => 'date'],

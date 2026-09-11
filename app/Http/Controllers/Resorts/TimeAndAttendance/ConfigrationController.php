@@ -245,6 +245,19 @@ class ConfigrationController extends Controller
                 'status' => 'active',
             ]);
 
+            try {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    Common::getResortHrEmployeeIds($this->resort->resort_id),
+                    'Geofence Zone Created',
+                    'Geofence zone "' . $zone->name . '" was created.',
+                    'TimeAndAttendance',
+                    $zone->id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Geofence create notification failed: ' . $ne->getMessage());
+            }
+
             return response()->json(['success' => true, 'message' => 'Geofence zone created.', 'zone' => $zone]);
         } catch (\Exception $e) {
             \Log::error('Geofence store error: ' . $e->getMessage());
@@ -280,6 +293,19 @@ class ConfigrationController extends Controller
                 'grace_period' => $request->grace_period ?? 10,
             ]);
 
+            try {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    Common::getResortHrEmployeeIds($this->resort->resort_id),
+                    'Geofence Zone Updated',
+                    'Geofence zone "' . $zone->name . '" was updated.',
+                    'TimeAndAttendance',
+                    $zone->id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Geofence update notification failed: ' . $ne->getMessage());
+            }
+
             return response()->json(['success' => true, 'message' => 'Geofence zone updated.', 'zone' => $zone]);
         } catch (\Exception $e) {
             \Log::error('Geofence update error: ' . $e->getMessage());
@@ -294,7 +320,23 @@ class ConfigrationController extends Controller
             return response()->json(['success' => false, 'message' => 'Zone not found.'], 404);
         }
 
+        $zoneId = $zone->id;
+        $zoneName = $zone->name;
         $zone->delete();
+
+        try {
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                Common::getResortHrEmployeeIds($this->resort->resort_id),
+                'Geofence Zone Deleted',
+                'Geofence zone "' . $zoneName . '" was deleted.',
+                'TimeAndAttendance',
+                $zoneId
+            );
+        } catch (\Exception $ne) {
+            \Log::warning('Geofence delete notification failed: ' . $ne->getMessage());
+        }
+
         return response()->json(['success' => true, 'message' => 'Geofence zone deleted.']);
     }
 
@@ -307,6 +349,19 @@ class ConfigrationController extends Controller
 
         $zone->status = $zone->status === 'active' ? 'paused' : 'active';
         $zone->save();
+
+        try {
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                Common::getResortHrEmployeeIds($this->resort->resort_id),
+                'Geofence Zone ' . ucfirst($zone->status),
+                'Geofence zone "' . $zone->name . '" was set to ' . $zone->status . '.',
+                'TimeAndAttendance',
+                $zone->id
+            );
+        } catch (\Exception $ne) {
+            \Log::warning('Geofence toggle notification failed: ' . $ne->getMessage());
+        }
 
         return response()->json(['success' => true, 'message' => 'Zone status updated.', 'zone' => $zone]);
     }

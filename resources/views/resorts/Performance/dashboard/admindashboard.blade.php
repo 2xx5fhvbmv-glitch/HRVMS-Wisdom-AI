@@ -733,32 +733,32 @@
                     </div>
                     <div class="block">
                         <div>
-                            <div><img src="assets/images/flag-maldives.webp'}}" alt="flag">9:00am</div>
-                            <div><img src="{{ URL::asset('resorts_assets/images/flag-India.webp'}}" alt="flag">9:30am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-maldives.webp') }}" alt="flag">9:00am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-India.webp') }}" alt="flag">9:30am</div>
                         </div>
                         <div class="active">
-                            <div><img src="{{ URL::asset('resorts_assets/images/flag-maldives.webp'}}" alt="flag">10:00am</div>
-                            <div><img src="{{ URL::asset('resorts_assets/images/flag-India.webp'}}" alt="flag">10:30am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-maldives.webp') }}" alt="flag">10:00am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-India.webp') }}" alt="flag">10:30am</div>
                         </div>
                         <div class="active">
-                            <div><img src="{{ URL::asset('resorts_assets/images/flag-maldives.webp'}}" alt="flag">11:00am</div>
-                            <div><img src="{{ URL::asset('resorts_assets/images/flag-India.webp'}}" alt="flag">11:30am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-maldives.webp') }}" alt="flag">11:00am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-India.webp') }}" alt="flag">11:30am</div>
                         </div>
                         <div>
-                            <div><img src="{{ URL::asset('resorts_assets/images/flag-maldives.webp'}}" alt="flag">12:00am</div>
-                            <div><img src="{{ URL::asset('resorts_assets/images/flag-India.webp'}}" alt="flag">12:30am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-maldives.webp') }}" alt="flag">12:00am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-India.webp') }}" alt="flag">12:30am</div>
                         </div>
                         <div class="disable">
-                            <div><img src="{{ URL::asset('resorts_assets/images/flag-maldives.webp'}}" alt="flag">2:00am</div>
-                            <div><img src="{{ URL::asset('resorts_assets/images/flag-India.webp'}}" alt="flag">2:30am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-maldives.webp') }}" alt="flag">2:00am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-India.webp') }}" alt="flag">2:30am</div>
                         </div>
                         <div class="disable">
-                            <div><img src="{{ URL::asset('resorts_assets/images/flag-maldives.webp'}}" alt="flag">3:00am</div>
-                            <div><img src="{{ URL::asset('resorts_assets/images/flag-India.webp'}}" alt="flag">3:30am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-maldives.webp') }}" alt="flag">3:00am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-India.webp') }}" alt="flag">3:30am</div>
                         </div>
                         <div>
-                            <div><img src="{{ URL::asset('resorts_assets/images/flag-maldives.webp'}}" alt="flag">4:00am</div>
-                            <div><img src="{{ URL::asset('resorts_assets/flag-India.webp'}}" alt="flag">4:30am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-maldives.webp') }}" alt="flag">4:00am</div>
+                            <div><img src="{{ URL::asset('resorts_assets/images/flag-India.webp') }}" alt="flag">4:30am</div>
                         </div>
                     </div>
                     <p>or</p>

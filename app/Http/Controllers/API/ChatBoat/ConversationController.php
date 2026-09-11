@@ -255,19 +255,37 @@ class ConversationController extends Controller
                 ->where('resort_id', $resort->resort_id)
                 ->first();
 
-            $recipientIds = $group
+            $recipientAdminIds = $group
                 ? array_diff($group->groupMembers()->pluck('user_id')->toArray(), [$conversation->sender_id])
                 : [];
         } else {
-            $recipientIds = [$conversation->type_id];
+            $recipientAdminIds = [$conversation->type_id];
         }
 
-        if (!empty($recipientIds)) {
-            Common::sendMobileNotification(
-                $resort->resort_id, 2, null, null,
-                $resort->full_name, $conversation->message ?: 'Sent an attachment',
-                'Chat', $recipientIds
-            );
+        if (!empty($recipientAdminIds)) {
+            // sender_id/type_id/chat_group_member.user_id are all
+            // resort_admins.id (the api-guard "current user" here is a
+            // ResortAdmin) — sendMobileNotification/notifyEmployees expect
+            // employees.id everywhere (device-token lookup,
+            // resort_notifications.user_id FK). Passing resort_admins ids
+            // straight through silently sent the push/row to whichever
+            // unrelated employee happened to share that numeric id, or to
+            // nobody at all.
+            $recipientEmpIds = \App\Models\Employee::whereIn('Admin_Parent_id', $recipientAdminIds)
+                ->where('resort_id', $resort->resort_id)
+                ->pluck('id')
+                ->toArray();
+
+            if (!empty($recipientEmpIds)) {
+                Common::notifyEmployees(
+                    $resort->resort_id,
+                    $recipientEmpIds,
+                    $resort->full_name,
+                    $conversation->message ?: 'Sent an attachment',
+                    'Chat',
+                    $conversation->id
+                );
+            }
         }
 
         $chat_history = $this->messageThread($resort, $request->type, $request->type_id);

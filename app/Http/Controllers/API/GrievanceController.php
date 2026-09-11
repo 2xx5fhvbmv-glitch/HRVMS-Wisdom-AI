@@ -313,6 +313,27 @@ class GrievanceController extends Controller
                 'description'         => $request->description,
             ]);
 
+            // Notify HR — same HR fan-out GrievanceStore() below uses. This is
+            // the only place this event surfaces when the employee answers
+            // "Yes" and never goes on to file a formal grievance (see the
+            // class doc above the method).
+            $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort_id);
+            if (!empty($hrEmployeeIds)) {
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    'Informal Resolution Attempt Recorded',
+                    $this->user->first_name . ' ' . $this->user->last_name . ' recorded an informal resolution attempt (' . $request->resolved_informally . ').',
+                    'Employee Grievance',
+                    $hrEmployeeIds,
+                    $record->id,
+                    false,
+                    'grievance-informal-resolution',
+                );
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Response recorded successfully.',
@@ -351,10 +372,16 @@ class GrievanceController extends Controller
                 'name'       => trim(optional($subject->resortAdmin)->first_name . ' ' . optional($subject->resortAdmin)->last_name),
                 'department' => optional($subject->department)->name,
                 'position'   => optional($subject->position)->position_title,
+                // Witnesses already got this fix ("Was never returned at
+                // all" above) — the subject/supervisor had the identical
+                // gap, just never noticed since witnesses render as a list
+                // and these two don't.
+                'photo'      => $subject->resortAdmin ? Common::getResortUserPicture($subject->resortAdmin->id) : null,
             ],
             'supervisor' => $supervisor ? [
-                'id'   => $supervisor->id,
-                'name' => trim(optional($supervisor->resortAdmin)->first_name . ' ' . optional($supervisor->resortAdmin)->last_name),
+                'id'    => $supervisor->id,
+                'name'  => trim(optional($supervisor->resortAdmin)->first_name . ' ' . optional($supervisor->resortAdmin)->last_name),
+                'photo' => $supervisor->resortAdmin ? Common::getResortUserPicture($supervisor->resortAdmin->id) : null,
             ] : null,
         ];
     }
@@ -797,6 +824,27 @@ class GrievanceController extends Controller
             $witness->save();
 
             $g = GrivanceSubmissionModel::find($request->grievance_id);
+
+            // Notify HR that a witness statement came in — same HR fan-out
+            // GrievanceStore() uses above. HR is the case owner/committee
+            // contact here: it's HR who requests these statements in the
+            // first place (RequestForStatement(), web side).
+            $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort_id);
+            if (!empty($hrEmployeeIds)) {
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    'Witness Statement Submitted',
+                    $this->user->first_name . ' ' . $this->user->last_name . ' submitted a witness statement for grievance ' . optional($g)->Grivance_id . '.',
+                    'Employee Grievance',
+                    $hrEmployeeIds,
+                    optional($g)->id,
+                    false,
+                    'grievance-witness-statement',
+                );
+            }
 
             return response()->json([
                 'status'  => true,

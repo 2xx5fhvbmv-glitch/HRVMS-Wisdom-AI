@@ -354,6 +354,26 @@ class ResignationController extends Controller
             $resignation->save();
             // Commit the transaction
             DB::commit();
+
+            // HOD/HR were tracking this resignation (same recipients
+            // notified on submit in resignationStore) — tell them it's
+            // been withdrawn so a stale item doesn't linger in either
+            // queue. notifyEmployees() writes the DB row and pushes exactly
+            // once per recipient (pairing sendMobileNotification with a
+            // separate nofitication(type 10) call here would double both).
+            $empName = trim(($this->user->first_name ?? '') . ' ' . ($this->user->last_name ?? '')) ?: 'an employee';
+            $withdrawRecipients = array_values(array_filter([$resignation->hod_id, $resignation->hr_id]));
+            if (!empty($withdrawRecipients)) {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    $withdrawRecipients,
+                    'Resignation Withdrawn',
+                    "{$empName} has withdrawn their resignation request.",
+                    'Resignation',
+                    $resignation->id
+                );
+            }
+
             return response()->json([
                 'success'                               =>  true,
                 'message'                               =>  'Resignation withdrawn successfully.',
@@ -386,14 +406,11 @@ class ResignationController extends Controller
         DB::beginTransaction();
         try {
 
-            $resignation                                =   ExitClearanceFormResponse::create([
-                'assignment_id'                         =>  $request->input('assignment_id'),
-                'response_data'                         =>  json_encode($request->input('response_data')),
-                'submitted_by'                          =>  $this->user->GetEmployee->id,
-                'submitted_date'                        =>  now(),
-            ]);
-
-            $ExitClearanceFormAssignment                =   ExitClearanceFormAssignment::find($request->input('assignment_id'));
+            $ExitClearanceFormAssignment                =   ExitClearanceFormAssignment::where('id', $request->input('assignment_id'))
+                                                                ->where('resort_id', $this->resort_id)
+                                                                ->where('assigned_to_type', 'employee')
+                                                                ->where('assigned_to_id', $this->user->GetEmployee->id)
+                                                                ->first();
 
             if (!$ExitClearanceFormAssignment) {
                 return response()->json([
@@ -401,6 +418,13 @@ class ResignationController extends Controller
                     'message'                           =>  'Form assignment not found'
                 ],200);
             }
+
+            $resignation                                =   ExitClearanceFormResponse::create([
+                'assignment_id'                         =>  $request->input('assignment_id'),
+                'response_data'                         =>  json_encode($request->input('response_data')),
+                'submitted_by'                          =>  $this->user->GetEmployee->id,
+                'submitted_date'                        =>  now(),
+            ]);
 
             $ExitClearanceFormAssignment->status        =   'Completed';
             // Tag the channel that closed the form so HR can tell at a
@@ -484,7 +508,10 @@ class ResignationController extends Controller
 
         DB::beginTransaction();
         try {
-            $EmployeeResignation                =   EmployeeResignation::find($request->input('resignation_id'));
+            $EmployeeResignation                =   EmployeeResignation::where('id', $request->input('resignation_id'))
+                                                            ->where('resort_id', $this->resort_id)
+                                                            ->where('employee_id', $this->user->GetEmployee->id)
+                                                            ->first();
             if (!$EmployeeResignation) {
                 return response()->json(['success' => false, 'message' => 'Resignation not found'], 200);
             }
@@ -501,6 +528,27 @@ class ResignationController extends Controller
 
             // Commit the transaction
             DB::commit();
+
+            // Tell whichever party (HR or HOD) whose meeting this was that
+            // the employee has confirmed — same "employee confirms a
+            // scheduled meeting" notify pattern as
+            // MonthlyCheckInController::employeeConfirmMeeting().
+            // notifyEmployees() writes the DB row and pushes exactly once —
+            // pairing sendMobileNotification with a separate
+            // nofitication(type 10) call here would double both.
+            $recipientId = $request->input('type') == 'HR' ? $EmployeeResignation->hr_id : $EmployeeResignation->hod_id;
+            if ($recipientId) {
+                $empName = trim(($this->user->first_name ?? '') . ' ' . ($this->user->last_name ?? '')) ?: 'The employee';
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    [$recipientId],
+                    'Exit Meeting Confirmed',
+                    "{$empName} has confirmed the scheduled exit meeting.",
+                    'Resignation',
+                    $EmployeeResignation->id
+                );
+            }
+
             return response()->json([
                 'success'                               =>  true,
                 'message'                               =>  'Meeting scheduled Confirm successfully.',

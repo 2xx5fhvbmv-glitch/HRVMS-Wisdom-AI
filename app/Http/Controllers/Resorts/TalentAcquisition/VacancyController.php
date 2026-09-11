@@ -171,7 +171,9 @@ class VacancyController extends Controller
     public function store(Request $request)
     {
 
-        $isDraft = $request->input('status') === 'Draft';
+        // Inactive gets the same treatment as Draft — saved silently, no
+        // compliance checks/approval chain/HR notification, resumable later.
+        $isDraft = in_array($request->input('status'), ['Draft', 'Inactive'], true);
 
         $validatedData = $request->validate([
             'status' => 'required|string',
@@ -502,7 +504,9 @@ class VacancyController extends Controller
 
             return response()->json([
                 'success' => true,
-                'msg' => $isDraft ? 'Vacancy saved as draft.' : 'Vacancy added successfully.',
+                'msg' => $validatedData['status'] === 'Draft' ? 'Vacancy saved as draft.'
+                    : ($validatedData['status'] === 'Inactive' ? 'Vacancy saved. Switch it to Active and resubmit when you\'re ready to send it for approval.'
+                    : 'Vacancy added successfully.'),
             ]);
         DB::beginTransaction();
         try
@@ -522,14 +526,16 @@ class VacancyController extends Controller
     public function edit($id)
     {
         try {
-            $page_title = 'Edit Draft Vacancy';
+            $page_title = 'Edit Vacancy';
             $resort = Auth::guard('resort-admin')->user();
             $resort_id = $resort->resort_id;
             $Dept_id = $resort->GetEmployee->Dept_id;
 
+            // Inactive is a not-yet-submitted state too, same as Draft —
+            // resumable through this same edit/resubmit flow.
             $vacancy = Vacancies::where('id', $id)
                 ->where('Resort_id', $resort_id)
-                ->where('status', 'Draft')
+                ->whereIn('status', ['Draft', 'Inactive'])
                 ->firstOrFail();
 
             $emp_details = Employee::where('Admin_Parent_id', $resort->id)->get();
@@ -624,7 +630,9 @@ class VacancyController extends Controller
 
     public function update(Request $request, $id)
     {
-        $isDraft = $request->input('status') === 'Draft';
+        // Inactive gets the same treatment as Draft — saved silently, no
+        // compliance checks/approval chain/HR notification, resumable later.
+        $isDraft = in_array($request->input('status'), ['Draft', 'Inactive'], true);
 
         $validatedData = $request->validate([
             'status' => 'required|string',
@@ -661,9 +669,11 @@ class VacancyController extends Controller
         $resort = Auth::guard('resort-admin')->user();
         $resort_id = $resort->resort_id;
 
+        // Same not-yet-submitted scope as edit() above — Inactive resumes
+        // through this exact route too, not just Draft.
         $vacancy = Vacancies::where('id', $id)
             ->where('Resort_id', $resort_id)
-            ->where('status', 'Draft')
+            ->whereIn('status', ['Draft', 'Inactive'])
             ->firstOrFail();
 
         $recruitment = !empty($validatedData['recruitement']) ? implode(",", $validatedData['recruitement']) : '';
@@ -908,7 +918,9 @@ class VacancyController extends Controller
 
         return response()->json([
             'success' => true,
-            'msg' => $isDraft ? 'Draft updated successfully.' : 'Vacancy submitted successfully.',
+            'msg' => $validatedData['status'] === 'Draft' ? 'Draft updated successfully.'
+                : ($validatedData['status'] === 'Inactive' ? 'Vacancy saved. Switch it to Active and resubmit when you\'re ready to send it for approval.'
+                : 'Vacancy submitted successfully.'),
         ]);
     }
 
@@ -1390,7 +1402,7 @@ class VacancyController extends Controller
 
                 if ($canSeeAction) {
                     $actions .= '<a href="javascript:void(0)" class="btn btn-sm ta-btn-attention ExtendJobLink" data-ExpiryDate="'.$row->ExpiryDate.'" data-ApplicationId="'.$row->ApplicationId.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend The Job Ad Link"><i class="fa-solid fa-link"></i></a>
-                            <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary viewJobAd ms-1" data-position="'.$row->positionTitle.'" data-joblink="'.htmlspecialchars($row->jobAdLink ?? '', ENT_QUOTES, 'UTF-8').'" data-alljobimages=\''.htmlspecialchars($row->allJobAdImages, ENT_QUOTES, 'UTF-8').'\' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-image"></i></a>';
+                            <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary viewJobAd ms-1" data-vacancy-id="'.e($row->vacancy_id).'" data-position="'.$row->positionTitle.'" data-joblink="'.htmlspecialchars($row->jobAdLink ?? '', ENT_QUOTES, 'UTF-8').'" data-alljobimages=\''.htmlspecialchars($row->allJobAdImages, ENT_QUOTES, 'UTF-8').'\' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-image"></i></a>';
                 }
 
                 return $actions;

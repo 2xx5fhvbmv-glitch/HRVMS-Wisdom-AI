@@ -1013,9 +1013,7 @@ class PromotionController extends Controller
             $promotion->save();
             if ($hr) {
                 $reason = trim((string) $comments) !== '' ? " Reason: {$comments}" : '';
-                $tillDate = $promotion->follow_up_date
-                    ? \Carbon\Carbon::parse($promotion->follow_up_date)->format('d M Y')
-                    : '—';
+                $tillDate = Common::formatDate($promotion->follow_up_date, '—');
                 event(new ResortNotificationEvent(Common::nofitication(
                     $this->resort->resort_id,
                     10,

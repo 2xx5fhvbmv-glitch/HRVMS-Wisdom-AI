@@ -1332,6 +1332,11 @@ class ApplicantsController extends Controller
             }
 
             $interviewerId = $this->resort->id;
+            // interviewer_id column stores a resort_admins id (compared against
+            // ResortAdmin elsewhere in this method) — track the matching
+            // employees.id alongside it separately, since notifyEmployees()
+            // needs the employee id space, not the resort_admins one.
+            $interviewerEmployeeId = $this->resort->GetEmployee->id ?? null;
             $resortTime = $request->ResortInterviewtime ?? $request->MalidivanManualTime1;
             $applicantTime = $request->ApplicantInterviewtime ?? $request->ApplicantManualTime1;
             $interviewDate = Carbon::createFromFormat('Y-m-d', $request->TimeSlotsFormdate)->format('Y-m-d');
@@ -1401,6 +1406,7 @@ class ApplicantsController extends Controller
                             ->first();
                         if ($roundEmployee) {
                             $interviewerId = $roundEmployee->Admin_Parent_id;
+                            $interviewerEmployeeId = $roundEmployee->id;
                         }
                     }
                 }
@@ -1429,6 +1435,21 @@ class ApplicantsController extends Controller
             $Applicant_form_data = Applicant_form_data::find($ApplicantID);
             if (!$Applicant_form_data) {
                 return response()->json(['error' => 'Applicant data not found'], 404);
+            }
+
+            if ($interviewerEmployeeId) {
+                try {
+                    Common::notifyEmployees(
+                        $Resort_id,
+                        [$interviewerEmployeeId],
+                        'Interview Scheduled',
+                        'You have been scheduled to interview ' . trim($Applicant_form_data->first_name . ' ' . $Applicant_form_data->last_name) . ' on ' . $interviewDate . '.',
+                        'Talent Acquisition',
+                        $ApplicantInterViewDetails->id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('Interview scheduling notification failed: ' . $e->getMessage());
+                }
             }
 
             DB::commit();
@@ -1714,6 +1735,37 @@ class ApplicantsController extends Controller
             $statusRecord = ApplicantWiseStatus::updateOrCreate(['id'=>$applicantstatusid], $updateData);
             $applicantstatusid = $statusRecord->id;
             DB::Commit();
+
+            // Round marked Complete → the applicant is now ready for the
+            // NEXT round, but nobody told that round's interviewer. Resolve
+            // them the same way InterviewRequest() does (rank + vacancy's
+            // department) and notify, ahead of any slot actually being booked.
+            if ($Rank == "Complete" && $vacancyRank) {
+                try {
+                    $roundKeys = array_keys($positionRounds);
+                    $currentIdx = array_search((int) $Approved_By, $roundKeys);
+                    if ($currentIdx !== false && $currentIdx < count($roundKeys) - 1 && $vacancy) {
+                        $nextRoundRank = $roundKeys[$currentIdx + 1];
+                        $nextRoundEmployee = Employee::where('rank', $nextRoundRank)
+                            ->where('Dept_id', $vacancy->department)
+                            ->where('resort_id', $Resort_id)
+                            ->where('status', 'Active')
+                            ->first();
+                        if ($nextRoundEmployee) {
+                            Common::notifyEmployees(
+                                $Resort_id,
+                                [$nextRoundEmployee->id],
+                                'Applicant Ready For Your Round',
+                                trim(($applicant->first_name ?? '') . ' ' . ($applicant->last_name ?? '')) . ' has completed the previous interview round and is ready for your round.',
+                                'Talent Acquisition',
+                                $applicantstatusid
+                            );
+                        }
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('Next-round interviewer notification failed: ' . $e->getMessage());
+                }
+            }
 
             if($Rank =="Complete" || $Rank =="Rejected" || $Rank == "Selected")
             {
@@ -2738,6 +2790,109 @@ class ApplicantsController extends Controller
         }
 
         return response()->json(['success' => true, 'files' => $files]);
+    }
+
+    /**
+     * "Download All" as a single .zip named after the candidate + position,
+     * instead of the old per-file loop that just opened every document in
+     * its own browser tab (a plain <a download> is ignored by the browser
+     * for a cross-origin signed URL like the Wasabi ones GetApplicantAWSFile
+     * returns, so it navigated instead of downloading).
+     */
+    public function DownloadAllFilesZip(Request $request, $id)
+    {
+        $ApplicantID = base64_decode($id);
+
+        $applicant = Applicant_form_data::leftJoin('vacancies as v', 'v.id', '=', 'applicant_form_data.Parent_v_id')
+            ->leftJoin('resort_positions as rp', 'rp.id', '=', 'v.position')
+            ->where('applicant_form_data.id', $ApplicantID)
+            ->where('applicant_form_data.resort_id', $this->resort->resort_id)
+            ->select(
+                'applicant_form_data.first_name',
+                'applicant_form_data.last_name',
+                'applicant_form_data.curriculum_vitae',
+                'applicant_form_data.passport_img',
+                'applicant_form_data.passport_photo',
+                'applicant_form_data.full_length_photo',
+                'applicant_form_data.other_document',
+                'rp.position_title'
+            )->first();
+
+        if (!$applicant) {
+            abort(404, 'Applicant Not Found!');
+        }
+
+        $labelled = [
+            'curriculum_vitae'  => 'Curriculum Vitae',
+            'passport_img'      => 'Passport Image',
+            'passport_photo'    => 'Passport Photos',
+            'full_length_photo' => 'Full Length Photo',
+        ];
+
+        $entries = [];
+        foreach ($labelled as $field => $label) {
+            if (!empty($applicant->$field)) {
+                $entries[] = ['path' => $applicant->$field, 'label' => $label];
+            }
+        }
+        if (!empty($applicant->other_document)) {
+            $docs = json_decode($applicant->other_document, true);
+            $docs = is_array($docs) ? $docs : [$applicant->other_document];
+            foreach ($docs as $idx => $docPath) {
+                $entries[] = ['path' => $docPath, 'label' => 'Other Document ' . ($idx + 1)];
+            }
+        }
+
+        if (empty($entries)) {
+            abort(404, 'No files found!');
+        }
+
+        $storageDriver = config('settings.storage_driver');
+        $diskName = $storageDriver === 'local' ? 'local' : ($storageDriver === 'wasabi' ? 'wasabi' : 's3');
+        $disk = \Illuminate\Support\Facades\Storage::disk($diskName);
+
+        $candidateName = trim($applicant->first_name . ' ' . $applicant->last_name) ?: 'Candidate';
+        $position = $applicant->position_title ?: 'Application';
+        $zipName = Str::slug($candidateName . ' ' . $position) . '.zip';
+
+        $tmpZipPath = storage_path('app/tmp/' . uniqid('applicant_docs_') . '.zip');
+        if (!file_exists(dirname($tmpZipPath))) {
+            mkdir(dirname($tmpZipPath), 0755, true);
+        }
+
+        $zip = new \ZipArchive();
+        if ($zip->open($tmpZipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            abort(500, 'Could not create zip file.');
+        }
+
+        $usedNames = [];
+        $addedCount = 0;
+        foreach ($entries as $entry) {
+            if (!$disk->exists($entry['path'])) {
+                continue;
+            }
+            $extension = pathinfo($entry['path'], PATHINFO_EXTENSION) ?: 'pdf';
+            $name = $entry['label'] . '.' . $extension;
+            // Avoid collisions (e.g. two "Other Document" entries sharing a
+            // label after slugging isn't an issue here since labels are
+            // already unique, but the fixed fields could theoretically
+            // collide with a same-named other_document — guard anyway).
+            if (isset($usedNames[$name])) {
+                $name = $entry['label'] . ' (' . (++$usedNames[$name]) . ').' . $extension;
+            } else {
+                $usedNames[$name] = 1;
+            }
+            $zip->addFromString($name, $disk->get($entry['path']));
+            $addedCount++;
+        }
+        $zip->close();
+
+        if ($addedCount === 0) {
+            @unlink($tmpZipPath);
+            abort(404, 'None of this applicant\'s files could be found in storage.');
+        }
+
+        return response()->download($tmpZipPath, $zipName)->deleteFileAfterSend(true);
     }
 
     public function RejectedApplicants(Request $request)

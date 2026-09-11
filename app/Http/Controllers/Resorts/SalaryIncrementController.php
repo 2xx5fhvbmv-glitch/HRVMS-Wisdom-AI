@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Helpers\Common;
 use App\Http\Requests\StoreSalaryIncrementRequest;
+use Auth;
 
 class SalaryIncrementController extends Controller
 {
@@ -17,6 +18,17 @@ class SalaryIncrementController extends Controller
     {
         try {
             $employee_id = $request->employee_id;
+            $resortId = Auth::guard('resort-admin')->user()->resort_id;
+
+            // Employee must belong to the caller's own resort — otherwise
+            // any resort-admin could read another resort's salary history
+            // by guessing/looping employee ids.
+            if (!Employee::where('resort_id', $resortId)->where('id', $employee_id)->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found'
+                ], 404);
+            }
 
             $lastIncrement = SalaryIncrement::where('employee_id', $employee_id)
                 ->latest()
@@ -43,6 +55,8 @@ class SalaryIncrementController extends Controller
     {
         try {
             // Validate request
+            $resortId = Auth::guard('resort-admin')->user()->resort_id;
+
             $validated = $request->validate([
                 'employee_id' => 'required|exists:employees,id',
                 'previous_salary' => 'required|numeric|min:0',
@@ -51,6 +65,16 @@ class SalaryIncrementController extends Controller
                 'increment_percentage' => 'required|numeric',
                 'effective_date' => 'required|date',
             ]);
+
+            // Employee must belong to the caller's own resort — otherwise
+            // any resort-admin could apply a salary change to another
+            // resort's employee by guessing/looping employee ids.
+            if (!Employee::where('resort_id', $resortId)->where('id', $validated['employee_id'])->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found'
+                ], 404);
+            }
 
             // Create new increment record
             $increment = SalaryIncrement::create([
@@ -116,6 +140,11 @@ class SalaryIncrementController extends Controller
     public function saveBulkSalaryIncrement(Request $request)
     {
         // try {
+            // Force resort_id to the caller's own resort — this was trusting
+            // a raw client-supplied resort_id to pick which resort's whole
+            // department got a bulk salary increment applied.
+            $request->merge(['resort_id' => Auth::guard('resort-admin')->user()->resort_id]);
+
             $validated = $request->validate([
                 'resort_id' => 'required|exists:resorts,id',
                 'dept_id' => 'required|exists:resort_departments,id',

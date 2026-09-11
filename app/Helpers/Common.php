@@ -2601,6 +2601,141 @@ class Common
         return (int) end($keys);
     }
 
+    /**
+     * Single source of truth for the applicant progress-ring calculation —
+     * previously duplicated, drifted @php blocks in
+     * TaUserApplicantsSideBar.blade.php and gridviwe.blade.php that
+     * disagreed with each other for the same applicant (the grid card
+     * showed a fully-hired, contract-accepted candidate at ~25% while the
+     * sidebar correctly showed 100%, and had no Rejected handling at all).
+     *
+     * Total steps = 2 (application submitted + HR-shortlisted) + 2 per
+     * interview round (started + completed) + 1 (Selected) + 4 (offer
+     * sent/accepted, contract sent/accepted). Contract Accepted is the
+     * only status that closes the ring — nothing in this pipeline goes
+     * further (onboarding progress after that lives on employees.status,
+     * a separate concern).
+     *
+     * $approvedBy is applicant_wise_statuses.As_ApprovedBy — the rank code
+     * of the round currently under review (0 = pre-HR triage). Once
+     * $status is one of the Offer/Contract family, As_ApprovedBy still
+     * holds the FINAL interview round's rank (those transitions overwrite
+     * the same row rather than appending a new one) — those four step
+     * cases below deliberately never read it.
+     */
+    public static function applicantProgress($status, $approvedBy, $vacancyRank): array
+    {
+        $rounds     = self::getInterviewRoundsForPosition($vacancyRank);
+        // array_keys() on config('settings.PositionInterviewRounds')'s '3'/'2'/'8'
+        // string keys returns real ints (PHP auto-casts numeric-string array
+        // keys) — normalize to strings so array_search below with strict
+        // comparison actually matches against $approvedBy (a DB column value,
+        // frequently a string) instead of silently returning false every time.
+        $roundKeys  = array_map('strval', array_keys($rounds)); // e.g. ['3','2'] or ['3','2','8'] — HR, HOD, GM in order
+        $roundCount = count($roundKeys);
+        $totalSteps = 2 + ($roundCount * 2) + 1 + 4;
+        $selectedStep = 2 + (2 * $roundCount) + 1;
+
+        $roundIndexOf = function ($rankCode) use ($roundKeys) {
+            $idx = array_search((string) $rankCode, $roundKeys, true);
+            return $idx === false ? null : $idx;
+        };
+
+        $state = 'in_progress';
+        $step  = 0;
+
+        switch ($status) {
+            case 'Sortlisted By Wisdom AI':
+                $step = 1;
+                break;
+
+            case 'Rejected By Wisdom AI':
+                // Dead status (never written), kept for old data — treat as
+                // Rejected at the application-triage stage.
+                $step = 1;
+                $state = 'rejected';
+                break;
+
+            case 'Sortlisted':
+                // Round-relative on purpose: booking the NEXT round after one
+                // completes writes 'Sortlisted' with As_ApprovedBy already set
+                // to that next round's rank — i=0 (HR-shortlisted right after
+                // triage) is step 2, i=1 (HOD round about to start) is step 4,
+                // matching the prior round's Complete step exactly.
+                $i = $roundIndexOf($approvedBy) ?? 0;
+                $step = 2 + (2 * $i);
+                break;
+
+            case 'Round':
+                $i = $roundIndexOf($approvedBy) ?? 0;
+                $step = 3 + (2 * $i);
+                break;
+
+            case 'Complete':
+                $i = $roundIndexOf($approvedBy) ?? 0;
+                $step = 4 + (2 * $i);
+                break;
+
+            case 'Rejected':
+                // Same rank code (HR's) is written both for triage rejection
+                // and for a rejection during the actual HR interview round —
+                // the data doesn't distinguish these; treated as one step,
+                // per the known ambiguity this formula deliberately accepts.
+                $i = ((string) $approvedBy === '0') ? 0 : ($roundIndexOf($approvedBy) ?? 0);
+                $step = 2 + (2 * $i);
+                $state = 'rejected';
+                break;
+
+            case 'Selected':
+                $step = $selectedStep;
+                break;
+
+            case 'Offer Letter Sent':
+                $step = $selectedStep + 1;
+                break;
+
+            case 'Offer Letter Accepted':
+                $step = $selectedStep + 2;
+                break;
+
+            case 'Offer Letter Rejected':
+                // Reached "offer sent", then declined.
+                $step = $selectedStep + 1;
+                $state = 'rejected';
+                break;
+
+            case 'Contract Sent':
+                $step = $selectedStep + 3;
+                break;
+
+            case 'Contract Accepted':
+                // == $totalSteps — the only status that closes the ring.
+                $step = $selectedStep + 4;
+                $state = 'success';
+                break;
+
+            case 'Contract Rejected':
+                // Reached "contract sent", then declined.
+                $step = $selectedStep + 3;
+                $state = 'rejected';
+                break;
+
+            default:
+                // 'Pending' (the column's default, never actually written)
+                // or anything unrecognized — pre-triage, step 0.
+                $step = 0;
+        }
+
+        $percent = $totalSteps > 0 ? round(($step / $totalSteps) * 100, 2) : 0;
+
+        return [
+            'step'    => $step,
+            'total'   => $totalSteps,
+            'percent' => $percent,
+            'state'   => $state,
+        ];
+    }
+
     public static function GmApprovedVacancy($resort_id,$rank,$take="")
     {
 
@@ -2998,6 +3133,7 @@ class Common
 		$config = ResortSmtpConfig::where('resort_id', $resortId)->first();
 
 		if (!$config) {
+			Log::warning("No resort_smtp_configs row for resort_id {$resortId} — email falling back to system default (Wisdom) identity.");
 			return;
 		}
 
@@ -4134,6 +4270,21 @@ class Common
     {
         $user = \Auth::guard('resort-admin')->user();
         if (!$user) return $query->whereRaw('0=1');
+
+        // incidents_investigation_meetings has no resort_id column of its
+        // own — it's tenant-scoped only via its parent incident. Was
+        // missing entirely: hasFullDataAccess() (true for a resort's own
+        // HR/GM, not just super/master admin) returned $query unmodified,
+        // so any resort's HR/GM could view/reschedule/delete another
+        // resort's investigation meeting by id.
+        $resortId = $user->resort_id;
+        $query->whereExists(function ($sub) use ($resortId, $alias) {
+            $sub->selectRaw('1')
+                ->from('incidents')
+                ->whereColumn('incidents.id', $alias . '.incident_id')
+                ->where('incidents.resort_id', $resortId);
+        });
+
         if (self::hasFullDataAccess()) return $query;
 
         $emp = $user->GetEmployee ?? null;
@@ -4396,6 +4547,21 @@ class Common
     public static function notifyEmployees($resortId, array $empIds, $title, $message, $module = 'Performance', $requestId = null, $pageId = null)
     {
         $empIds = array_values(array_unique(array_filter($empIds)));
+        if (empty($empIds)) return;
+
+        // Same guard as sendMobileNotification() — $empIds must be
+        // employees.id. A wrong id-domain here silently drops the
+        // notification with no error anywhere.
+        $validIds = Employee::whereIn('id', $empIds)->pluck('id')->all();
+        $invalidIds = array_diff($empIds, $validIds);
+        if (!empty($invalidIds)) {
+            \Log::error('notifyEmployees: $empIds contains id(s) not present in employees table — likely a resort_admins.id or other wrong id-domain', [
+                'module' => $module,
+                'invalid_ids' => array_values($invalidIds),
+                'resort_id' => $resortId,
+            ]);
+        }
+        $empIds = $validIds;
         if (empty($empIds)) return;
 
         foreach ($empIds as $empId) {
@@ -4863,6 +5029,202 @@ class Common
             return false;
         };
         return $matches($name) || $matches($short) || $matches($code);
+    }
+
+    /**
+     * Mirrors isLDDepartment/isSecurityDepartment's alias-matching approach.
+     * Real resort data has this under several names ("Engineering",
+     * "Engineering Maintenance", "ENGINEERING") and codes ("Eng", "EM") —
+     * matched here for the mobile module_access.engineering_hod_xcom/
+     * engineering_employee payload fields.
+     */
+    public static function isEngineeringDepartment($deptId)
+    {
+        if (!$deptId) return false;
+
+        $dept = \App\Models\ResortDepartment::find($deptId);
+        if (!$dept) return false;
+
+        $name  = strtolower(trim($dept->name ?? ''));
+        $short = strtolower(trim($dept->short_name ?? ''));
+        $code  = strtolower(trim($dept->code ?? ''));
+
+        $aliases = ['engineering', 'eng', 'em'];
+        $matches = function ($val) use ($aliases) {
+            if ($val === '') return false;
+            if (in_array($val, $aliases, true)) return true;
+            if (strpos($val, 'engineering') !== false) return true;
+            return false;
+        };
+        return $matches($name) || $matches($short) || $matches($code);
+    }
+
+    /**
+     * Mirrors isLDDepartment/isSecurityDepartment's alias-matching approach.
+     * Used for the mobile module_access.housekeeping_hod_xcom/
+     * housekeeping_employee payload fields.
+     */
+    public static function isHousekeepingDepartment($deptId)
+    {
+        if (!$deptId) return false;
+
+        $dept = \App\Models\ResortDepartment::find($deptId);
+        if (!$dept) return false;
+
+        $name  = strtolower(trim($dept->name ?? ''));
+        $short = strtolower(trim($dept->short_name ?? ''));
+        $code  = strtolower(trim($dept->code ?? ''));
+
+        $aliases = ['housekeeping', 'hk'];
+        $matches = function ($val) use ($aliases) {
+            if ($val === '') return false;
+            if (in_array($val, $aliases, true)) return true;
+            if (strpos($val, 'housekeeping') !== false) return true;
+            return false;
+        };
+        return $matches($name) || $matches($short) || $matches($code);
+    }
+
+    /**
+     * sos_history.status drifted across 3 migrations (Drill-active renamed
+     * Drill-Active; Under-Control/Drill-Under-Control added then dropped
+     * again) and several call sites were written against an earlier version
+     * of this list and never updated. Single source of truth going forward
+     * — don't hardcode a status list at a new call site, use these.
+     *
+     * Drill and Real are deliberately grouped together here per product:
+     * "Drill and Real SOS are meant to behave identically everywhere except
+     * reporting" — only SosReportController should ever split them apart.
+     */
+    public static function sosOpenStatuses(): array
+    {
+        return ['Active', 'Drill-Active', 'Real-Active', 'In-Progress'];
+    }
+
+    public static function sosClosedStatuses(): array
+    {
+        return ['Completed', 'Rejected', 'Drill-Completed', 'Drill-Rejected'];
+    }
+
+    /**
+     * True if this resort admin (Employee::Admin_Parent_id, NOT
+     * employees.id — see Employee::sosTeams()'s own comment on this exact
+     * gotcha) is an active member of any SOS response team for this
+     * resort. Used for module_access.sos_response_team — operational SOS
+     * access is assignment-based, not derivable from rank/department.
+     */
+    public static function isSOSResponseTeamMember($resortId, $resortAdminId)
+    {
+        if (!$resortAdminId) return false;
+
+        return \App\Models\SOSTeamMemeberModel::where('resort_id', $resortId)
+            ->where('emp_id', $resortAdminId)
+            ->exists();
+    }
+
+    /**
+     * Builds the mobile module_access payload (Wisdom AI mobile access
+     * architecture: rank + department alone can't be guessed correctly for
+     * HR-assigned roles like Clinic Manager, SOS response team, L&D
+     * Manager, or Security Officer/Manager — those need an explicit,
+     * server-computed signal). Returns the exact shape requested for
+     * ProfileController::getProfile()'s employee object:
+     *   ['department' => [...], 'access_groups' => [...],
+     *    'module_access' => [...], 'flat' => ['is_clinic_manager' => ..., ...]]
+     *
+     * $employee must have its 'position' and 'department' relations
+     * already loaded (or loadable) — no new eager loads triggered here for
+     * ones already available on the caller's model.
+     */
+    public static function buildModuleAccessPayload($resortAdmin, $employee)
+    {
+        $isMasterAdmin = (int) ($resortAdmin->is_master_admin ?? 0) === 1;
+        $rank          = (int) ($employee->rank ?? 0);
+        $deptId        = $employee->Dept_id ?? null;
+        $positionTitle = optional(optional($employee)->position)->position_title;
+
+        $isHodOrExcom = in_array($rank, [1, 2], true);
+
+        // rank 12 = CLINIC_STAFF (config('settings.Position_Rank')) — same
+        // check as EnsureClinicManagerAccess middleware.
+        $isClinicManager = $isMasterAdmin || $rank === 12;
+
+        $isSosResponseTeam = $isMasterAdmin
+            || self::isSOSResponseTeamMember($employee->resort_id ?? null, $resortAdmin->id ?? null);
+
+        // Same position-title check as EnsureLDManagerAccess middleware.
+        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $isLdManager = $isMasterAdmin
+            || in_array($positionTitle, $ldManagerTitles, true)
+            || self::isLDDepartment($deptId);
+
+        // Same position-title check as EnsureSOSSecurityManagerAccess middleware.
+        $isSecurityManager = $isMasterAdmin || $positionTitle === 'Security Manager';
+        // Broader — any Security department employee (matches
+        // EnsureSOSSecurityStaffAccess's existing gate).
+        $isSecurityOfficer = $isMasterAdmin || self::isSecurityDepartment($deptId);
+
+        $isEngineeringDept = self::isEngineeringDepartment($deptId);
+        // rank 11 = EDHOD (Engineering Department Head) — a distinct rank
+        // code that exists specifically for this role regardless of
+        // whether Dept_id also resolves as Engineering.
+        $isEngineeringHodXcom = ($isEngineeringDept && $isHodOrExcom) || $rank === 11;
+        $isEngineeringEmployee = $isEngineeringDept && !$isEngineeringHodXcom;
+
+        $isHousekeepingDept = self::isHousekeepingDepartment($deptId);
+        $isHousekeepingHodXcom = $isHousekeepingDept && $isHodOrExcom;
+        $isHousekeepingEmployee = $isHousekeepingDept && !$isHousekeepingHodXcom;
+
+        $moduleAccess = [
+            'clinic_manager'        => $isClinicManager,
+            'sos_response_team'     => $isSosResponseTeam,
+            'ld_manager'            => $isLdManager,
+            'security_manager'      => $isSecurityManager,
+            'security_officer'      => $isSecurityOfficer,
+            'engineering_hod_xcom'  => $isEngineeringHodXcom,
+            'engineering_employee'  => $isEngineeringEmployee,
+            'housekeeping_hod_xcom' => $isHousekeepingHodXcom,
+            'housekeeping_employee' => $isHousekeepingEmployee,
+        ];
+
+        $accessGroups = ['everyone'];
+        if ($isHodOrExcom) {
+            $accessGroups[] = 'department_hod_xcom';
+        }
+        foreach ($moduleAccess as $group => $granted) {
+            if ($granted) {
+                $accessGroups[] = $group;
+            }
+        }
+
+        $department = null;
+        $dept = $employee->department ?? null;
+        if ($dept) {
+            $department = [
+                'id'   => $dept->id,
+                'name' => $dept->name,
+                'code' => $dept->code,
+                'slug' => $dept->slug,
+            ];
+        }
+
+        return [
+            'department'     => $department,
+            'access_groups'  => $accessGroups,
+            'module_access'  => $moduleAccess,
+            'flat'           => [
+                'is_clinic_manager'         => $isClinicManager,
+                'is_sos_response_team'      => $isSosResponseTeam,
+                'sos_team_member'           => $isSosResponseTeam,
+                'is_ld_manager'             => $isLdManager,
+                'is_security_manager'       => $isSecurityManager,
+                'is_security_officer'       => $isSecurityOfficer,
+                'is_engineering_hod'        => $isEngineeringHodXcom,
+                'is_engineering_employee'   => $isEngineeringEmployee,
+                'is_housekeeping_hod'       => $isHousekeepingHodXcom,
+                'is_housekeeping_employee'  => $isHousekeepingEmployee,
+            ],
+        ];
     }
 
     /**
@@ -7358,6 +7720,24 @@ class Common
 
     public static function sendMobileNotification($resortId,$type,$feedbackFormId,$trainingId,$title,$message,$module,$sendto,$request_id = null, $skipDbInsert = false, $pageId = null)
     {
+        // $sendto must be employees.id. Passing a resort_admins.id (or any
+        // other id-domain) here fails completely silently downstream — no
+        // exception, nothing delivered — which is exactly how the chat
+        // wrong-recipient bug went unnoticed for weeks. Strip and log
+        // anything that doesn't resolve to a real employee instead of
+        // dropping the whole batch.
+        $validIds = Employee::whereIn('id', (array) $sendto)->pluck('id')->all();
+        $invalidIds = array_diff((array) $sendto, $validIds);
+        if (!empty($invalidIds)) {
+            \Log::error('sendMobileNotification: $sendto contains id(s) not present in employees table — likely a resort_admins.id or other wrong id-domain', [
+                'module' => $module,
+                'invalid_ids' => array_values($invalidIds),
+                'resort_id' => $resortId,
+            ]);
+        }
+        $sendto = $validIds;
+        if (empty($sendto)) return [];
+
         // Initialised up-front so an unrecognised $type can't leave $payload
         // undefined and fatal-error at the Http::post() call below.
         $payload = [];
@@ -7986,16 +8366,27 @@ class Common
             $encryptedData = StorageHelper::disk()->get($ChildFiles->File_Path);
 
             if (empty($encryptedData) || strlen($encryptedData) < 16) {
-                throw new \Exception('Invalid or corrupted encrypted data');
+                \Log::error("GetAWSFile: invalid/corrupted encrypted data for child_file_management id {$id}, resort {$resort_id}, path {$ChildFiles->File_Path}");
+                return ['success' => false, 'NewURLshow' => null, 'mimeType' => null];
             }
 
             $iv = substr($encryptedData, 0, 16);
             $cipherText = substr($encryptedData, 16);
+            // Flush any stale queued OpenSSL error (e.g. left behind by an
+            // unrelated PEM/JWT operation earlier in the same FPM worker)
+            // so a real failure below reports its own actual error, not
+            // noise from something else entirely.
+            while (openssl_error_string() !== false);
             $decryptedData = openssl_decrypt($cipherText, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
 
             if ($decryptedData === false) {
-                $error = openssl_error_string();
-                throw new \Exception("Decryption failed: {$error}");
+                // A single corrupted/undecryptable attachment used to throw
+                // here uncaught, 500-ing the entire page that was showing
+                // it (e.g. clinic appointment-details) instead of just
+                // that one file. Log and skip it like the other failure
+                // paths in this method already do.
+                \Log::error("GetAWSFile: decryption failed for child_file_management id {$id}, resort {$resort_id}, path {$ChildFiles->File_Path}: " . openssl_error_string());
+                return ['success' => false, 'NewURLshow' => null, 'mimeType' => null];
             }
 
             $decryptedFileName = str_replace('.enc', '', basename($ChildFiles->File_Path));
@@ -9244,6 +9635,61 @@ class Common
             ->pluck('id')
             ->map(fn($v) => (int) $v)
             ->all();
+    }
+
+    /**
+     * The active Security Manager for a resort, resolved by position title
+     * (not rank — no Security Manager record actually carries a dedicated
+     * rank, the real seeded example is rank 2/HOD, same gotcha SOSController
+     * already worked around once). Used by every SOS notification path that
+     * needs to reach "the" SM: panic-button trigger, unsafe self-report,
+     * SOS chat replies.
+     */
+    public static function findActiveSecurityManager($resort_id)
+    {
+        $sm = Employee::join('resort_positions as rp', 'employees.Position_id', '=', 'rp.id')
+            ->where('employees.resort_id', $resort_id)
+            ->where('employees.status', 'Active')
+            ->where('rp.position_title', 'Security Manager')
+            ->select('employees.id', 'employees.Admin_Parent_id', 'employees.Emp_id', 'employees.Position_id', 'employees.device_token')
+            ->first();
+
+        return $sm ? $sm->toArray() : null;
+    }
+
+    /**
+     * Notify every approver in a boarding-pass approval flow that a request
+     * is awaiting them — same flow/notify logic BoardingPassController's own
+     * boardingPassAdd() uses, extracted so LeaveController's identical
+     * "boarding pass created alongside a leave request" path (which built
+     * the same $passApprovalFlow but never notified anyone) can call it too
+     * instead of duplicating the notify block a second time.
+     */
+    public static function notifyBoardingPassApprovalFlow($resort_id, $passApprovalFlow, $boardingPass, $employee, $submitterName)
+    {
+        foreach ($passApprovalFlow as $approver) {
+            $sendto = [$approver->id];
+            if (($approver->approver_role ?? null) === 'HOD') {
+                $sendto = array_unique(array_merge(
+                    $sendto,
+                    self::getDepartmentApproverIds($resort_id, $employee->Dept_id)
+                ));
+            }
+
+            self::sendMobileNotification(
+                $resort_id,
+                2,
+                null,
+                null,
+                'Boarding Pass Request',
+                'A boarding pass request has been submitted by ' . $submitterName . '.',
+                'Boarding Pass',
+                $sendto,
+                $boardingPass->id,
+                false,
+                'boarding-pass-request'
+            );
+        }
     }
 
 
