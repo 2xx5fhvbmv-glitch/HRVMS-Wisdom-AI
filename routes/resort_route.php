@@ -283,6 +283,14 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     // Delete a sections
     Route::delete('budget/cost/destroy/{id}', 'BudgetCostController@destroy_costs')->name('resort.budget.destroycost');
 
+    // Cost Configuration for Casuals & Interns — separate screen/table from
+    // Permanent's above (see NonpermanentBudgetCostController for why).
+    Route::get('/budget/cost/nonpermanent', 'NonpermanentBudgetCostController@index')->name('resort.budget.nonpermanent.index');
+    Route::get('/budget/cost/nonpermanent/list', 'NonpermanentBudgetCostController@costlist')->name('resort.budget.nonpermanent.costlist');
+    Route::post('/budget/cost/nonpermanent/store', 'NonpermanentBudgetCostController@store_costs')->name('resort.budget.nonpermanent.storecost');
+    Route::put('/budget/cost/nonpermanent/inlineupdate/{id}', 'NonpermanentBudgetCostController@inlinecostUpdate')->name('resort.budget.nonpermanent.inlinecostupdate');
+    Route::delete('budget/cost/nonpermanent/destroy/{id}', 'NonpermanentBudgetCostController@destroy_costs')->name('resort.budget.nonpermanent.destroycost');
+
     /** Benifit grid  */
     Route::get('/benifit-grid', 'BenifitGridController@index')->name('resort.benifitgrid.index');
     Route::get('/benifit-grid/list', 'BenifitGridController@list')->name('resort.benifitgrid.list');
