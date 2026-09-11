@@ -183,6 +183,7 @@
                 <div class="cb-toolbar">
                     <button type="button" class="btn btn-sm wfp-btn-secondary" id="cbExpandAllBtn">Expand all</button>
                     <button type="button" class="btn btn-sm wfp-btn-secondary" id="cbCollapseAllBtn">Collapse all</button>
+                    <a href="{{ route('resort.budget.GetConsolidateFile') }}" class="btn btn-sm wfp-btn-primary">Export</a>
                 </div>
             </div>
             <div class="viewBudget-accordion" id="accordionViewBudget">
