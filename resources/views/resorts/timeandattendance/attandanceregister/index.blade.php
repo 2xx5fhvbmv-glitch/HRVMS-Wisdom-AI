@@ -24,6 +24,11 @@
                             <h1>{{$page_title}}</h1>
                         </div>
                     </div>
+                    <div class="col-auto">
+                        <a href="{{ route('resort.timeandattendance.nonpermanent.index') }}" class="btn btn-sm wfp-btn-secondary">
+                            Casual &amp; Intern Attendance
+                        </a>
+                    </div>
                 </div>
             </div>
 

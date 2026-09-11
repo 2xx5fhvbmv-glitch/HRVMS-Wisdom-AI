@@ -634,6 +634,13 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/time-and-attendance/download-attendance-template', 'TimeAndAttendance\AttandanceRegisterController@downloadTemplate')->name('resort.timeandattendance.DownloadAttendanceTemplate');
     Route::post('/time-and-attendance/import-attendance', 'TimeAndAttendance\AttandanceRegisterController@ImportAttandance')->name('resort.timeandattendance.ImportAttandance');
 
+    // Casual & Intern attendance — no mobile app access, so a supervisor
+    // marks their daily status and allocates their duty roster from here.
+    Route::get('/time-and-attendance/nonpermanent', 'TimeAndAttendance\AttandanceRegisterController@nonPermanentIndex')->name('resort.timeandattendance.nonpermanent.index');
+    Route::get('/time-and-attendance/nonpermanent/list', 'TimeAndAttendance\AttandanceRegisterController@nonPermanentList')->name('resort.timeandattendance.nonpermanent.list');
+    Route::post('/time-and-attendance/nonpermanent/mark', 'TimeAndAttendance\AttandanceRegisterController@nonPermanentMark')->name('resort.timeandattendance.nonpermanent.mark');
+    Route::post('/time-and-attendance/nonpermanent/allocate-roster', 'TimeAndAttendance\AttandanceRegisterController@nonPermanentAllocateRoster')->name('resort.timeandattendance.nonpermanent.allocateRoster');
+
     //end of time Attendance Module
 
    //Leave Module Start

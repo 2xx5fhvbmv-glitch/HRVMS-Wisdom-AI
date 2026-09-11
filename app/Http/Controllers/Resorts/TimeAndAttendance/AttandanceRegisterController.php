@@ -20,6 +20,9 @@ use Validator;
 use App\Models\ResortHoliday;
 use App\Models\EmployeeOvertime;
 use App\Models\PayrollConfig;
+use App\Models\DutyRoster;
+use App\Models\DutyRosterEntry;
+use App\Models\ChildAttendace;
 class AttandanceRegisterController extends Controller
 {
     protected $resort;
@@ -78,6 +81,296 @@ class AttandanceRegisterController extends Controller
        $ResortDepartment = ResortDepartment::where('status', 'active')->where('resort_id',$this->resort->resort_id)->get();
 
        return view('resorts.timeandattendance.attandanceregister.index',compact('page_title','ResortDepartment'));
+    }
+
+    /**
+     * Web-portal counterpart to Phase 5.3 of the Casual/Intern support
+     * plan — the existing Attendance Register has no single-employee
+     * mark action at all (only the bulk Excel importer below), and
+     * Casual/Intern never had a mobile app to self check-in from. Own
+     * page rather than retrofitting the 1260-line legacy register view:
+     * same underlying tables (parent_attendaces/duty_roster_entries), so
+     * a status marked here shows up identically on the mobile HOD
+     * attendance screen and vice versa — they're not two systems, just
+     * two doors into the same data.
+     */
+    public function nonPermanentIndex()
+    {
+        $page_title = 'Attendance — Casual & Intern';
+        $ResortDepartment = ResortDepartment::where('status', 'active')->where('resort_id', $this->resort->resort_id)->get();
+        $shifts = ShiftSettings::where('resort_id', $this->resort->resort_id)->get(['id', 'ShiftName', 'StartTime', 'EndTime']);
+
+        return view('resorts.timeandattendance.attandanceregister.nonpermanent', compact('page_title', 'ResortDepartment', 'shifts'));
+    }
+
+    /**
+     * Employee list for the tab currently open (Permanent / Casual /
+     * Intern / Everyone), each with today's attendance status if any.
+     */
+    public function nonPermanentList(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+        $category = $request->input('category', 'Casual'); // Permanent|Casual|Intern|All
+        $date = $request->input('date') ?: Carbon::now()->format('Y-m-d');
+
+        $query = Employee::where('resort_id', $resort_id)->where('status', 'Active');
+        if ($category !== 'All') {
+            $query->whereIn('employment_type', Common::manningCategoryEmploymentTypes($category));
+        }
+        // Same department-scoped visibility as every other list in this
+        // controller (Common::getSubordinates() populated in __construct).
+        if (!empty($this->underEmp_id)) {
+            $query->whereIn('id', $this->underEmp_id);
+        }
+
+        $employees = $query->with('resortAdmin')->get(['id', 'Emp_id', 'Admin_Parent_id', 'Dept_id', 'Position_id', 'employment_type']);
+
+        $attendanceByEmp = ParentAttendace::where('resort_id', $resort_id)
+            ->whereIn('Emp_id', $employees->pluck('id'))
+            ->whereDate('date', $date)
+            ->get()
+            ->keyBy('Emp_id');
+
+        $rows = $employees->map(function ($emp) use ($attendanceByEmp) {
+            $att = $attendanceByEmp->get($emp->id);
+            return [
+                'emp_id' => $emp->id,
+                'name' => trim(($emp->resortAdmin->first_name ?? '') . ' ' . ($emp->resortAdmin->last_name ?? '')),
+                'emp_code' => $emp->Emp_id,
+                'employment_type' => $emp->employment_type,
+                'manning_category' => Common::manningCategory($emp->employment_type),
+                'status' => $att->Status ?? null,
+            ];
+        })->values();
+
+        return response()->json(['success' => true, 'date' => $date, 'employees' => $rows]);
+    }
+
+    /**
+     * Mark one employee's daily status for a date. Mirrors
+     * API\TimeAndAttendanceController::hodMarkAttendancePresent()'s
+     * per-employee logic exactly (same auto-provisioned roster for
+     * Casual/Intern with none yet) — kept as its own method rather than
+     * refactoring that already-shipped mobile endpoint to share code,
+     * since the two have different request/response contracts and this
+     * avoids any regression risk to the verified mobile path.
+     */
+    public function nonPermanentMark(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'emp_id' => 'required|integer',
+            'status' => 'required|in:Present,Absent,Sick,DayOff,ShortLeave,HalfDayLeave,FullDayLeave',
+            'date' => 'nullable|date_format:Y-m-d',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $resort_id = $this->resort->resort_id;
+        $empId = (int) $request->emp_id;
+        $status = $request->status;
+        $date = $request->date ?: Carbon::now()->format('Y-m-d');
+        $location = 'Web Attendance Register';
+
+        if (!Employee::where('id', $empId)->where('resort_id', $resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Employee not found in this resort.'], 404);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $parentAttendance = ParentAttendace::where('resort_id', $resort_id)
+                ->where('Emp_id', $empId)
+                ->whereDate('date', $date)
+                ->first();
+
+            if (!$parentAttendance) {
+                $rosterEntry = DutyRosterEntry::where('resort_id', $resort_id)
+                    ->where('Emp_id', $empId)
+                    ->whereDate('date', $date)
+                    ->first();
+
+                if (!$rosterEntry) {
+                    $targetEmployee = Employee::find($empId);
+                    $isNonPermanent = $targetEmployee && Common::manningCategory($targetEmployee->employment_type) !== 'Permanent';
+
+                    if (!$isNonPermanent) {
+                        DB::rollBack();
+                        return response()->json(['success' => false, 'message' => 'No duty roster for this date. Ensure roster exists for ' . $date . '.'], 422);
+                    }
+
+                    $defaultShift = ShiftSettings::where('resort_id', $resort_id)->first();
+                    if (!$defaultShift) {
+                        DB::rollBack();
+                        return response()->json(['success' => false, 'message' => 'No shift configured for this resort — cannot auto-create a roster for this Casual/Intern employee.'], 422);
+                    }
+
+                    $rosterParentId = DB::table('duty_rosters')->insertGetId([
+                        'resort_id' => $resort_id,
+                        'Shift_id' => $defaultShift->id,
+                        'Emp_id' => $empId,
+                        'ShiftDate' => $date . ' - ' . $date,
+                        'Year' => Carbon::parse($date)->format('Y'),
+                        'created_by' => $this->resort->id,
+                        'modified_by' => $this->resort->id,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                    $rosterEntry = DutyRosterEntry::create([
+                        'roster_id' => $rosterParentId,
+                        'resort_id' => $resort_id,
+                        'Shift_id' => $defaultShift->id,
+                        'Emp_id' => $empId,
+                        'date' => $date,
+                        'Status' => 'Present',
+                        'CheckingTime' => $defaultShift->StartTime,
+                        'CheckingOutTime' => $defaultShift->EndTime,
+                    ]);
+                }
+
+                $shiftData = ShiftSettings::where('resort_id', $resort_id)->where('id', $rosterEntry->Shift_id)->first();
+                $startTime = $shiftData ? $shiftData->StartTime : ($rosterEntry->CheckingTime ?? '00:00');
+                $endTime = $shiftData ? $shiftData->EndTime : ($rosterEntry->CheckingOutTime ?? '00:00');
+
+                $parentAttendance = ParentAttendace::create([
+                    'Emp_id' => $empId,
+                    'date' => $date,
+                    'roster_id' => $rosterEntry->roster_id,
+                    'resort_id' => $resort_id,
+                    'Shift_id' => $rosterEntry->Shift_id,
+                    'CheckingTime' => $startTime,
+                    'CheckingOutTime' => $endTime,
+                    'DayWiseTotalHours' => $rosterEntry->DayWiseTotalHours ?? '00:00',
+                    'Status' => $status,
+                    'CheckInCheckOut_Type' => 'Manual',
+                ]);
+                ChildAttendace::create([
+                    'Parent_attd_id' => $parentAttendance->id,
+                    'InTime_out' => $startTime,
+                    'OutTime_out' => $endTime,
+                    'InTime_Location' => $location,
+                    'OutTime_Location' => $location,
+                ]);
+            } else {
+                $shiftData = ShiftSettings::where('resort_id', $resort_id)->where('id', $parentAttendance->Shift_id)->first();
+                $startTime = $shiftData ? $shiftData->StartTime : ($parentAttendance->CheckingTime ?? '00:00');
+                $endTime = $shiftData ? $shiftData->EndTime : ($parentAttendance->CheckingOutTime ?? '00:00');
+                $parentAttendance->CheckingTime = $startTime;
+                $parentAttendance->CheckingOutTime = $endTime;
+                $parentAttendance->Status = $status;
+                $parentAttendance->CheckInCheckOut_Type = 'Manual';
+                $parentAttendance->save();
+
+                ChildAttendace::updateOrCreate(
+                    ['Parent_attd_id' => $parentAttendance->id],
+                    ['InTime_out' => $startTime, 'OutTime_out' => $endTime, 'InTime_Location' => $location, 'OutTime_Location' => $location]
+                );
+            }
+
+            DB::commit();
+
+            try {
+                Common::notifyEmployees(
+                    $resort_id,
+                    [$empId],
+                    'Attendance Marked ' . $status,
+                    'Your attendance for ' . $date . ' was marked ' . $status . ' by your supervisor.',
+                    'Attendance',
+                    null
+                );
+            } catch (\Exception $notifErr) {
+                \Log::warning('nonPermanentMark notify failed: ' . $notifErr->getMessage());
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Attendance marked ' . $status . '.',
+                'emp_id' => $empId,
+                'status' => $parentAttendance->Status,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Lets a supervisor allocate/adjust a Casual/Intern employee's duty
+     * roster for a date directly from the web — the mobile-first
+     * auto-provisioned row from nonPermanentMark() is the default; this
+     * lets a supervisor set the actual shift without needing the app
+     * (which Casual/Intern don't have anyway).
+     */
+    public function nonPermanentAllocateRoster(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'emp_id' => 'required|integer',
+            'shift_id' => 'required|integer',
+            'date' => 'required|date_format:Y-m-d',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $resort_id = $this->resort->resort_id;
+        $empId = (int) $request->emp_id;
+
+        $employee = Employee::where('id', $empId)->where('resort_id', $resort_id)->first();
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee not found in this resort.'], 404);
+        }
+        if (Common::manningCategory($employee->employment_type) === 'Permanent') {
+            return response()->json(['success' => false, 'message' => 'This action is for Casual/Intern staff only — Permanent rosters are managed via the Duty Roster module.'], 422);
+        }
+
+        $shift = ShiftSettings::where('resort_id', $resort_id)->where('id', $request->shift_id)->first();
+        if (!$shift) {
+            return response()->json(['success' => false, 'message' => 'Shift not found in this resort.'], 404);
+        }
+
+        $existingEntry = DutyRosterEntry::where('resort_id', $resort_id)
+            ->where('Emp_id', $empId)
+            ->whereDate('date', $request->date)
+            ->first();
+
+        if ($existingEntry) {
+            $existingEntry->Shift_id = $shift->id;
+            $existingEntry->CheckingTime = $shift->StartTime;
+            $existingEntry->CheckingOutTime = $shift->EndTime;
+            $existingEntry->save();
+            DB::table('duty_rosters')->where('id', $existingEntry->roster_id)->update([
+                'Shift_id' => $shift->id,
+                'modified_by' => $this->resort->id,
+                'updated_at' => now(),
+            ]);
+        } else {
+            $rosterParentId = DB::table('duty_rosters')->insertGetId([
+                'resort_id' => $resort_id,
+                'Shift_id' => $shift->id,
+                'Emp_id' => $empId,
+                'ShiftDate' => $request->date . ' - ' . $request->date,
+                'Year' => Carbon::parse($request->date)->format('Y'),
+                'created_by' => $this->resort->id,
+                'modified_by' => $this->resort->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            DutyRosterEntry::create([
+                'roster_id' => $rosterParentId,
+                'resort_id' => $resort_id,
+                'Shift_id' => $shift->id,
+                'Emp_id' => $empId,
+                'date' => $request->date,
+                'Status' => 'Present',
+                'CheckingTime' => $shift->StartTime,
+                'CheckingOutTime' => $shift->EndTime,
+            ]);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Roster allocated for ' . $request->date . '.']);
     }
 
     public function CheckoutTimeMissing(Request $request)
