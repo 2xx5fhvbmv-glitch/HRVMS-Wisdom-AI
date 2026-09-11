@@ -242,7 +242,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/manning/fetchemployees', 'ManningResponseController@fetchEmployees')->name('manning.fetch.employees');
     Route::post('/manning/fetch/currentyeardata', 'ManningResponseController@fetchCurrentYearData')->name('manning.fetch.currentYearData');
     Route::post('/manning/responses/saveDraft', 'ManningResponseController@saveDraft')->name('manning.responses.saveDraft');
-    Route::get('/manning/responses/get-draft-data/{resortId}/{deptId}/{year}', 'ManningResponseController@getDraft')->name('manning.responses.getDraft');
+    Route::get('/manning/responses/get-draft-data/{resortId}/{deptId}/{year}/{employmentType?}', 'ManningResponseController@getDraft')->name('manning.responses.getDraft');
     Route::post( '/manning/responses/show/department/wise-budget-data', 'ManningResponseController@ShowDepartmentWiseBudgetData')->name('resort.department.wise.budget.data');
     Route::put( '/manning/responses/update-budget-data/{id}', 'ManningResponseController@updateBudgetData')->name('resort.budget.update');
     Route::put( '/manning/responses/update-grand-total', 'ManningResponseController@updateParentTotal')->name('resort.budget.updateParentTotal');

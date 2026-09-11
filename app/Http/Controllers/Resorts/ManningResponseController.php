@@ -101,9 +101,15 @@ class ManningResponseController extends Controller
 
         // Fetch manning response for the current year and position
         // Use first() to get a single record
+        // employment_type defaults to Permanent — every existing caller
+        // (before Casual/Intern manning existed) only ever meant the
+        // permanent submission, so no behavior change for them.
+        $employmentType = $request->input('employment_type', 'Permanent');
+
         $manningResponse = ManningResponse::where('dept_id', $dept_id)
             ->where('resort_id', $resort_id)
             ->where('year', $currentYear)
+            ->where('employment_type', $employmentType)
             ->first(); // Use first() to get one record instead of a collection
 
         // Check if the manning response exists
@@ -143,6 +149,7 @@ class ManningResponseController extends Controller
                 'resort_id' => 'required|integer',
                 'dept_id' => 'required|integer',
                 'year' => 'required|integer',
+                'employment_type' => 'nullable|string|in:Permanent,Casual,Intern',
                 'monthly_data' => 'required|array',
                 'total_headcount' => 'required|integer',
                 'total_filled_headcount' => 'required|integer',
@@ -154,11 +161,17 @@ class ManningResponseController extends Controller
             // and rewrite Resort B's workforce-planning numbers. Always
             // derive it from the authenticated resort-admin instead.
             $validated['resort_id'] = Auth::guard('resort-admin')->user()->resort_id;
+            // Permanent/Casual/Intern are independent submissions — an HOD
+            // picks which one they're filling in, nothing forces all three
+            // together. Defaults to Permanent so every existing caller
+            // (predating Casual/Intern manning) behaves exactly as before.
+            $validated['employment_type'] = $validated['employment_type'] ?? 'Permanent';
 
-            // Check if a ManningResponse already exists for the given resort, department, and year
+            // Check if a ManningResponse already exists for the given resort, department, year AND category
             $manningResponse = ManningResponse::where('resort_id', $validated['resort_id'])
                 ->where('dept_id', $validated['dept_id'])
                 ->where('year', $validated['year'])
+                ->where('employment_type', $validated['employment_type'])
                 ->first();
 
             if ($manningResponse) {
@@ -177,6 +190,7 @@ class ManningResponseController extends Controller
                     'resort_id' => $validated['resort_id'],
                     'dept_id' => $validated['dept_id'],
                     'year' => $validated['year'],
+                    'employment_type' => $validated['employment_type'],
                     'total_headcount' => $validated['total_headcount'],
                     'total_filled_positions' => $validated['total_filled_headcount'] ?? 0,
                     'total_vacant_positions' => $validated['total_vacant_headcount'] ?? 0,
@@ -276,6 +290,7 @@ class ManningResponseController extends Controller
                 'resort_id' => 'required|integer',
                 'dept_id' => 'required|integer',
                 'year' => 'required|integer',
+                'employment_type' => 'nullable|string|in:Permanent,Casual,Intern',
                 'monthly_data' => 'required|array',
                 'vacant_positions' => 'required|array',
                 'filled_positions' => 'required|array',
@@ -289,13 +304,15 @@ class ManningResponseController extends Controller
             // workforce-planning draft. Always derive it from the
             // authenticated resort-admin instead.
             $validated['resort_id'] = Auth::guard('resort-admin')->user()->resort_id;
+            $validated['employment_type'] = $validated['employment_type'] ?? 'Permanent';
 
             // Save or update the ManningResponse
             $manningResponse = ManningResponse::updateOrCreate(
                 [
                     'resort_id' => $validated['resort_id'],
                     'dept_id' => $validated['dept_id'],
-                    'year' => $validated['year']
+                    'year' => $validated['year'],
+                    'employment_type' => $validated['employment_type'],
                 ],
                 [
                     'total_headcount' => $validated['total_headcount'],
@@ -339,7 +356,7 @@ class ManningResponseController extends Controller
         }
     }
 
-    public function getDraft($resortId, $deptId, $year)
+    public function getDraft($resortId, $deptId, $year, $employmentType = 'Permanent')
     {
         // {resortId} is a client-supplied URL segment — never trust it.
         // Always resolve the draft against the authenticated resort-admin's
@@ -349,7 +366,8 @@ class ManningResponseController extends Controller
         // Prepare the manning response query
         $manningResponseQuery = ManningResponse::where('resort_id', $resortId)
             ->where('dept_id', $deptId)
-            ->where('year', $year);
+            ->where('year', $year)
+            ->where('employment_type', $employmentType);
 
         // Debug SQL and bindings for the manning response query
         // dd($manningResponseQuery->toSql(), $manningResponseQuery->getBindings());
