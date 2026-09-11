@@ -34,6 +34,14 @@ class LiabilityEstimationController extends Controller
     public function index()
     {
         $page_title = 'Initial Liability Estimation';
+        // 3-way category tab, same pattern as Budget's ViewBudget()/
+        // viewConsolidatedBudget() — Permanent (unchanged, reads
+        // resort_budget_costs as today), Casual & Intern (reads the new
+        // resort_nonpermanent_budget_costs table), All Combined (sum of
+        // both legs). Defaults to 'Permanent' so this page's existing
+        // headline figure is completely unaffected for every caller that
+        // doesn't pass the new param.
+        $employmentType = request()->input('employment_type', 'Permanent');
         $currentYear = Carbon::now()->year;
         $currentMonth = Carbon::now()->month;
         $totalVisa = $totalInsurance = $totalPermit = $totalMedical = $totalQuota = 0;
@@ -97,63 +105,100 @@ class LiabilityEstimationController extends Controller
         $costsForBreakdown    = collect();
         $empIdsForBreakdown   = [];
         try {
-            $activeForBreakdown = DB::table('employees')
-                ->where('resort_id', $resortId)
-                ->where('status', 'Active')
-                ->get(['id', 'basic_salary', 'proposed_salary', 'nationality', 'religion', 'benefit_grid_level']);
-            foreach ($activeForBreakdown as $emp) {
-                $shared = (float) (($emp->proposed_salary ?? 0) > 0
-                    ? $emp->proposed_salary
-                    : ($emp->basic_salary ?? 0));
-                $estLegEmployeeSalary += $shared * 12;
+            // Which category leg(s) to include — same 3-way split as
+            // Budget's ViewBudget()/viewConsolidatedBudget(). Computed as
+            // up to two independent (employees, cost-template-table) legs
+            // so "All Combined" can sum them without cross-applying a
+            // Permanent cost template to a Casual/Intern employee or vice
+            // versa — each leg only ever matches its own category's costs.
+            $legsToRun = [];
+            if ($employmentType === 'Permanent' || $employmentType === 'All') {
+                $legsToRun[] = ['category' => 'Permanent', 'table' => 'resort_budget_costs', 'types' => Common::manningCategoryEmploymentTypes('Permanent')];
             }
-            $costsForBreakdown = DB::table('resort_budget_costs')
-                ->where('resort_id', $resortId)->where('status', 'active')
-                ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details', 'benefit_grid_levels']);
-            // PERFORMANCE: pre-fetch saved per-month overrides + the
-            // DollertoMVR rate in TWO queries instead of letting
-            // annualCostForEmployee do (employees × templates) × 2
-            // sub-queries inside the inner loop. Page load on a 100-emp
-            // resort drops from ~12s to ~0.8s with these prefetches.
-            $savedByKey = []; // [emp_id][cost_id][month] = value
-            foreach (DB::table('resort_employee_budget_cost_configurations')
-                ->where('resort_id', $resortId)->where('year', $currentYear)
-                ->whereIn('employee_id', $activeForBreakdown->pluck('id'))
-                ->get(['employee_id', 'resort_budget_cost_id', 'month', 'value']) as $row) {
-                $savedByKey[$row->employee_id][$row->resort_budget_cost_id][$row->month] = (float) $row->value;
+            if ($employmentType === 'Casual' || $employmentType === 'Intern' || $employmentType === 'All') {
+                if ($employmentType === 'All') {
+                    $legsToRun[] = ['category' => 'Casual', 'table' => 'resort_nonpermanent_budget_costs', 'types' => Common::manningCategoryEmploymentTypes('Casual')];
+                    $legsToRun[] = ['category' => 'Intern', 'table' => 'resort_nonpermanent_budget_costs', 'types' => Common::manningCategoryEmploymentTypes('Intern')];
+                } else {
+                    $legsToRun[] = ['category' => $employmentType, 'table' => 'resort_nonpermanent_budget_costs', 'types' => Common::manningCategoryEmploymentTypes($employmentType)];
+                }
             }
+
             $prefetchedDollarToMvr = (float) (DB::table('resort_site_settings')
                 ->where('resort_id', $resortId)->value('DollertoMVR') ?: 15.42);
             if ($prefetchedDollarToMvr <= 0) $prefetchedDollarToMvr = 15.42;
 
-            foreach ($costsForBreakdown as $c) {
-                $isMvr = strtoupper(trim((string) ($c->amount_unit ?? 'USD'))) === 'MVR';
-                $mvrToUsdRate = $isMvr ? (1.0 / $prefetchedDollarToMvr) : 1.0;
-                $tmplSum = 0.0;
-                foreach ($activeForBreakdown as $emp) {
-                    $tmplSum += self::fastAnnualCostForEmployee(
-                        $resortId, $currentYear, $c, $emp,
-                        $savedByKey[$emp->id][$c->id] ?? [], $isMvr, $mvrToUsdRate
-                    );
+            $empIdsForBreakdown = [];
+            foreach ($legsToRun as $leg) {
+                $legEmployees = DB::table('employees')
+                    ->where('resort_id', $resortId)
+                    ->where('status', 'Active')
+                    ->whereIn('employment_type', $leg['types'])
+                    ->get(['id', 'basic_salary', 'proposed_salary', 'nationality', 'religion', 'benefit_grid_level']);
+                $activeForBreakdown = $activeForBreakdown->merge($legEmployees);
+                $empIdsForBreakdown = array_merge($empIdsForBreakdown, $legEmployees->pluck('id')->all());
+
+                foreach ($legEmployees as $emp) {
+                    $shared = (float) (($emp->proposed_salary ?? 0) > 0
+                        ? $emp->proposed_salary
+                        : ($emp->basic_salary ?? 0));
+                    $estLegEmployeeSalary += $shared * 12;
                 }
-                if ($tmplSum > 0) {
-                    $label = $c->particulars ?: ($c->cost_title ?: 'Other');
-                    $perTemplateAnnual[$label] = ($perTemplateAnnual[$label] ?? 0) + $tmplSum;
+
+                $legCostColumns = $leg['table'] === 'resort_budget_costs'
+                    ? ['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details', 'benefit_grid_levels']
+                    : ['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details', 'applies_to'];
+                $legCosts = DB::table($leg['table'])
+                    ->where('resort_id', $resortId)->where('status', 'active')
+                    ->get($legCostColumns);
+                $costsForBreakdown = $costsForBreakdown->merge($legCosts);
+
+                // PERFORMANCE: pre-fetch saved per-month overrides instead of
+                // letting annualCostForEmployee do (employees × templates) × 2
+                // sub-queries inside the inner loop.
+                $savedByKey = []; // [emp_id][cost_id][month] = value
+                foreach (DB::table('resort_employee_budget_cost_configurations')
+                    ->where('resort_id', $resortId)->where('year', $currentYear)
+                    ->whereIn('employee_id', $legEmployees->pluck('id'))
+                    ->get(['employee_id', 'resort_budget_cost_id', 'month', 'value']) as $row) {
+                    $savedByKey[$row->employee_id][$row->resort_budget_cost_id][$row->month] = (float) $row->value;
                 }
-                $estLegCostTemplate += $tmplSum;
+
+                foreach ($legCosts as $c) {
+                    $isMvr = strtoupper(trim((string) ($c->amount_unit ?? 'USD'))) === 'MVR';
+                    $mvrToUsdRate = $isMvr ? (1.0 / $prefetchedDollarToMvr) : 1.0;
+                    $tmplSum = 0.0;
+                    foreach ($legEmployees as $emp) {
+                        $tmplSum += self::fastAnnualCostForEmployee(
+                            $resortId, $currentYear, $c, $emp,
+                            $savedByKey[$emp->id][$c->id] ?? [], $isMvr, $mvrToUsdRate,
+                            $leg['category']
+                        );
+                    }
+                    if ($tmplSum > 0) {
+                        $label = $c->particulars ?: ($c->cost_title ?: 'Other');
+                        $perTemplateAnnual[$label] = ($perTemplateAnnual[$label] ?? 0) + $tmplSum;
+                    }
+                    $estLegCostTemplate += $tmplSum;
+                }
             }
-            $dollarToMvr = (float) (DB::table('resort_site_settings')
-                ->where('resort_id', $resortId)->value('DollertoMVR') ?: 15.42);
-            if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
-            $empIdsForBreakdown = $activeForBreakdown->pluck('id')->all();
+
+            $dollarToMvr = $prefetchedDollarToMvr;
             $allowMonthly = empty($empIdsForBreakdown) ? 0 : (float) DB::table('employees_allowance')
                 ->whereIn('employee_id', $empIdsForBreakdown)
                 ->selectRaw("COALESCE(SUM(CASE WHEN amount_unit = 'MVR' THEN amount * (1.0 / {$dollarToMvr}) ELSE amount END), 0) as t")
                 ->value('t');
             $estLegEmployeeAllowance = $allowMonthly * 12;
-            foreach (DB::table('resort_vacant_budget_costs')
-                ->where('resort_id', $resortId)->where('year', $currentYear)->get() as $v) {
-                $estLegVacant += Common::annualBudgetForVacantSlot($resortId, $currentYear, $v);
+            // Vacant-slot liability stays Permanent-only regardless of the
+            // active tab — resort_vacant_budget_costs has no employment_type
+            // concept yet (it's keyed off manning_responses' vacant slots,
+            // which Phase 2 only partially extended). Flagged as a scoping
+            // limit of this pass, not silently applied to every tab.
+            if ($employmentType === 'Permanent' || $employmentType === 'All') {
+                foreach (DB::table('resort_vacant_budget_costs')
+                    ->where('resort_id', $resortId)->where('year', $currentYear)->get() as $v) {
+                    $estLegVacant += Common::annualBudgetForVacantSlot($resortId, $currentYear, $v);
+                }
             }
         } catch (\Throwable $e) {
             // Breakdown failures shouldn't break the page render.
@@ -1050,7 +1095,8 @@ class LiabilityEstimationController extends Controller
             'reductionData','allowanceTypes',
             'estLegs','currentLegs',
             'allowanceBreakdownForView',
-            'estVsActualRows'
+            'estVsActualRows',
+            'employmentType'
         ));
     }
 
@@ -1345,7 +1391,8 @@ class LiabilityEstimationController extends Controller
      */
     private static function fastAnnualCostForEmployee(
         $resortId, int $year, $cost, $employee,
-        array $savedByMonth, bool $isMvrTemplate, float $mvrToUsdRate
+        array $savedByMonth, bool $isMvrTemplate, float $mvrToUsdRate,
+        ?string $manningCategory = null
     ): float {
         $isLocal  = strtolower(trim((string) ($employee->nationality ?? ''))) === 'maldivian';
         $isMuslim = strtolower(trim((string) ($employee->religion    ?? ''))) === 'muslim';
@@ -1358,7 +1405,7 @@ class LiabilityEstimationController extends Controller
                 $total += $savedByMonth[$m];
             } else {
                 $val = \App\Helpers\Common::computeBudgetCostMonthlyValue(
-                    $cost, $m, $year, $isLocal, $isMuslim, $basicForPercent, $benefitGridLevel
+                    $cost, $m, $year, $isLocal, $isMuslim, $basicForPercent, $benefitGridLevel, $manningCategory
                 );
                 if ($isMvrTemplate) $val *= $mvrToUsdRate;
                 $total += $val;
