@@ -26,6 +26,13 @@
                     </div>
                 </div>
             </div>
+            @php $liabCategory = $employmentType ?? 'Permanent'; @endphp
+            <div class="liability-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
+                @foreach (['Permanent' => 'Permanent', 'Casual' => 'Casual', 'Intern' => 'Intern', 'All' => 'All Combined'] as $catValue => $catLabel)
+                    <a href="{{ route('people.liability.index', ['employment_type' => $catValue]) }}"
+                       class="btn btn-sm {{ $liabCategory === $catValue ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}">{{ $catLabel }}</a>
+                @endforeach
+            </div>
             <div class="card card-liabilityOverPeopleEmp">
                 <div class="row g-3 mb-4">
                     <div class="col-md-4">
