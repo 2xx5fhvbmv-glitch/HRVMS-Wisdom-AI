@@ -8,33 +8,17 @@
     Survey, timeandattendance all render .hireReq-block too).
 --}}
 <style>
-    /* --- New Hire Requests ---
-       Phase 2a tokenisation: exact-hex matches now point at the SSOT
-       (--line/--muted/--ink/--faint/--teal/--teal-3). #fff on
-       .hireReq-initials stays literal — contrast-on-a-colored-avatar
-       text, not a surface. #F1F7F7 (row hover tint) has no exact token
-       match (nearest is --teal-soft #F5F8F8, off by 4 in R — outside the
-       ≤2-per-channel near-duplicate bar) — left literal. */
-    .hireReq-card-v2 { border: 1px solid var(--line); }
-    .hireReq-card-v2 .hireReq-initials {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #fff;
-        font-weight: 600;
-        font-size: 13px;
-    }
-    .hireReq-card-v2 .hireReq-level-badge {
-        margin-left: 6px;
-        font-size: 10px;
-        padding: 2px 8px;
-        vertical-align: 1px;
-    }
-    .hireReq-card-v2 .hireReq-block p { color: var(--muted); }
-    .hireReq-card-v2 .hireReq-block h6 { color: var(--ink); }
-    .hireReq-card-v2 .hireReq-empty { color: var(--muted); margin: 0; }
+    /* New Hire Requests now has its own scoped stylesheet —
+       _new_hire_requests_styles.blade.php (nhr- prefixed) — included
+       alongside this one by every dashboard that renders the card. The
+       old .hireReq-card-v2 rules that used to live here are gone: that
+       class (and the shared .hireReq-block/.img-circle markup it scoped)
+       is no longer applied by _new_hire_requests_card.blade.php or
+       renderfiles/FreshVacancies.blade.php, so these rules had nothing
+       left to match. .hireReq-block/.img-circle themselves are untouched
+       and keep working exactly as before for every OTHER module that
+       still renders them (master-dashboard, Performance, Survey,
+       timeandattendance). */
 
     /* --- Open Vacancies ---
        Header font-size is intentionally NOT overridden here — it inherits
@@ -217,14 +201,11 @@
         min-height: 0;
         overflow-y: auto;
     }
-    /* .hireReq-main's own site-wide rule caps it at max-height:350px with
-       no flex — override just inside this scoped card so it fills the
-       remaining space of the fixed 450px card instead. */
-    .ta-toprow-section .ta-toprow-card.hireReq-card-v2 .hireReq-main {
-        flex: 1 1 auto;
-        min-height: 0;
-        max-height: none;
-    }
+    /* New Hire Requests' own .nhr-list (defined in
+       _new_hire_requests_styles.blade.php) already flexes/scrolls by
+       default — nothing to override here, unlike the old .hireReq-main
+       it replaced (that class carries a site-wide max-height:350px with
+       no flex, since other modules still rely on it as-is). */
 
     /* Spacing between the main content row above and this full-width row —
        Bootstrap's row gutters (g-3/g-xxl-4) only add space BETWEEN columns

@@ -136,23 +136,33 @@
         position: absolute;
         bottom: 100%;
         right: 0;
-        background: #1a1a2e;
+        background: rgba(8,26,30,.72);
+        backdrop-filter: blur(20px) saturate(150%);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
+        border: 1px solid rgba(255,255,255,.10);
         color: #fff;
         padding: 10px 14px;
-        border-radius: 8px;
+        border-radius: 14px;
         font-size: 12px;
         white-space: nowrap;
         z-index: 1000;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        box-shadow: 0 12px 34px rgba(0,0,0,.30);
         min-width: 180px;
     }
+    /* Downward border-triangle, flush below the body (no overlap) so its
+       single translucent layer reads as the same tint as the frosted body
+       — a rotated square overlapping the body would double up two
+       translucent layers into a solid-looking "charcoal diamond". */
     .ewt-cell .ewt-tooltip::after {
         content: '';
         position: absolute;
-        top: 100%;
-        right: 20px;
-        border: 6px solid transparent;
-        border-top-color: #1a1a2e;
+        right: 14px;
+        top: calc(100% - 1px);
+        width: 0;
+        height: 0;
+        border-left: 7px solid transparent;
+        border-right: 7px solid transparent;
+        border-top: 7px solid rgba(8,26,30,.72);
     }
     .ewt-cell:hover .ewt-tooltip {
         display: block;
@@ -164,24 +174,38 @@
     }
     .ewt-tooltip-bottom .ewt-tooltip::after {
         top: auto !important;
-        bottom: 100% !important;
-        border-top-color: transparent !important;
-        border-bottom-color: #1a1a2e !important;
+        bottom: calc(100% - 1px) !important;
+        border-top: none !important;
+        border-bottom: 7px solid rgba(8,26,30,.72) !important;
     }
     .ewt-tooltip .ewt-row {
         display: flex;
         justify-content: space-between;
         gap: 12px;
-        padding: 3px 0;
+        padding: 5px 0;
     }
     .ewt-tooltip .ewt-row + .ewt-row {
-        border-top: 1px solid rgba(255,255,255,0.1);
+        border-top: 1px solid rgba(255,255,255,.14);
     }
     .ewt-tooltip .ewt-label {
-        color: #a0a0b8;
+        color: rgba(255,255,255,.66);
     }
     .ewt-tooltip .ewt-value {
         font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+    @media (prefers-reduced-transparency: reduce) {
+        .ewt-cell .ewt-tooltip {
+            background: #06181c;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+        }
+        .ewt-cell .ewt-tooltip::after {
+            border-top-color: #06181c;
+        }
+        .ewt-tooltip-bottom .ewt-tooltip::after {
+            border-bottom-color: #06181c;
+        }
     }
 
     /* Employee avatar — same 32px bump as the Payslip/Pension lists. */

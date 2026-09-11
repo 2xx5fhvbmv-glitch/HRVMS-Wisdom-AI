@@ -1,29 +1,26 @@
-@if(isset($getNotifications['FreshVacancies']) && $getNotifications['FreshVacancies']->isNotEmpty())
-    @foreach ($getNotifications['FreshVacancies'] as $vacancy)
-
-        <div class="hireReq-block">
-            <div class="img-circle">
-                <img src="{{ Common::getResortUserPicture($vacancy->resort_id)}}" alt="image">
-            </div>
-            <div>
-                <h6>{{ $vacancy->Department }} ({{ $vacancy->rank_name }})  </h6>
-                <p>Requested to Hire 1 {{ $vacancy->Position ?? 'Position' }}</p>
-                {{-- <a href="#" class="a-link">Send Interview Request</a> --}}
-            </div>
-            <div class="icon">
-                <a href="javascript:void(0)" class="respondOfFreshmodal"
-                        data-images="{{ Common::getResortUserPicture($vacancy->resort_id) }}"
-                        data-V_id="{{ $vacancy->V_id }}"
-                        data-departmentName="{{ $vacancy->Department }}"
-                        data-rank="{{ $vacancy->rank_name }}"
-                        data-position="{{ $vacancy->Position }}"
-                        data-ta_id ="{{ $vacancy->ta_id }}"
-                        data-Child_ta_id ="{{ $vacancy->Child_ta_id }}">
-                    Respond
-        </a>
-            </div>
-        </div>
+{{--
+    Replaces #FreshHiringRequest's innerHTML (the .nhr-list inside the New
+    Hire Requests card — see _new_hire_requests_card.blade.php) after a
+    Respond/Approve/Reject/Hold action. Renders the same
+    _new_hire_request_row partial that card uses on initial page load, so
+    the list stays visually and functionally identical after a refresh
+    instead of reverting to old markup.
+--}}
+@php
+    $nhrRows = isset($getNotifications['FreshVacancies']) ? $getNotifications['FreshVacancies'] : collect();
+    // Same one-query batch as the initial card render (see
+    // _new_hire_requests_card.blade.php) instead of resolving each row's
+    // photo individually.
+    $nhrPhotoMap = Common::getResortUserPicturesBatch($nhrRows->pluck('creator_admin_id')->filter()->all());
+    $nhrDefaultPhoto = url(config('settings.default_picture'));
+@endphp
+@if($nhrRows->isNotEmpty())
+    @foreach ($nhrRows as $vacancy)
+        @include('resorts.talentacquisition.dashboard._new_hire_request_row', [
+            'vacancy' => $vacancy,
+            'nhrPhoto' => $nhrPhotoMap[$vacancy->creator_admin_id ?? 0] ?? $nhrDefaultPhoto,
+        ])
     @endforeach
 @else
-    <p>No new hire requests available.</p>
+    <p class="nhr-empty">No new hire requests available.</p>
 @endif

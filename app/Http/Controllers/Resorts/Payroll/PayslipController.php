@@ -399,11 +399,22 @@ class PayslipController extends Controller
         }
         $page_title ='Full and Final Settlement';
         $resort_id = $this->resort->resort_id;
-        $employees = EmployeeResignation::with('employee.resortAdmin')->where('resort_id',$resort_id)->where('status','Approved')->where('full_and_final_settlement','no')->get();
+        // employee.position/employee.department eager-loaded alongside the
+        // existing resortAdmin so the employee-picker dropdown can show
+        // position/department per row without an N+1 (Blade previously only
+        // had resortAdmin loaded).
+        $employees = EmployeeResignation::with(['employee.resortAdmin', 'employee.position', 'employee.department'])->where('resort_id',$resort_id)->where('status','Approved')->where('full_and_final_settlement','no')->get();
         $positions = ResortPosition::where('status','active')->where('resort_id',$resort_id)->get();
         $departments = ResortDepartment::where('status','active')->where('resort_id',$resort_id)->get();
         $deductions = Deduction::where('resort_id',$resort_id)->get();
         $earnings = Earnings::where('resort_id',$resort_id)->get();
+        // Batch-fetched profile pictures for the employee-picker dropdown —
+        // one query for the whole list instead of Common::getResortUserPicture()
+        // called per row (same N+1 fix pattern the batch helper's own
+        // docblock documents for the identical shape elsewhere).
+        $employeePictures = Common::getResortUserPicturesBatch(
+            $employees->pluck('employee.resortAdmin.id')->filter()->values()->all()
+        );
 
         // Optional pre-select when deep-linked from Exit Clearance "Full
         // And Final Settlement" button — that view passes `?empId=` as a
@@ -434,7 +445,7 @@ class PayslipController extends Controller
 
         return view('resorts.payroll.payslip.fullandfinalsettlement',compact(
             'page_title','positions','departments','employees','deductions','earnings','preselectedEmployeeId',
-            'displayCurrency','displayCurrencyCode','dollarToMvr'
+            'displayCurrency','displayCurrencyCode','dollarToMvr','employeePictures'
         ));
     }
 
