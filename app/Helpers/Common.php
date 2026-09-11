@@ -6482,12 +6482,23 @@ class Common
      * Inputs: $cost is a row/object from resort_budget_costs.
      * Output: USD amount this cost contributes to the given month.
      */
-    public static function computeBudgetCostMonthlyValue($cost, int $month, int $year, bool $isLocal, bool $isMuslim, float $basicSalary, ?int $benefitGridLevel = null): float
+    public static function computeBudgetCostMonthlyValue($cost, int $month, int $year, bool $isLocal, bool $isMuslim, float $basicSalary, ?int $benefitGridLevel = null, ?string $manningCategory = null): float
     {
         $details = trim((string) ($cost->details ?? 'Both'));
         if ($details === 'Locals Only' && !$isLocal)  return 0.0;
         if ($details === 'Xpat Only'   &&  $isLocal)  return 0.0;
         if ($details === 'Muslim Only' && !$isMuslim) return 0.0;
+
+        // applies_to only exists on resort_nonpermanent_budget_costs rows
+        // (Casual & Intern Cost Configuration) — a plain resort_budget_costs
+        // row has no such property and $cost->applies_to reads as null,
+        // so this is a no-op for every existing Permanent-cost caller.
+        // $manningCategory is likewise only passed by callers iterating
+        // Casual/Intern employees.
+        $appliesTo = $cost->applies_to ?? null;
+        if ($appliesTo && $appliesTo !== 'Both' && $manningCategory && $appliesTo !== $manningCategory) {
+            return 0.0;
+        }
 
         // Benefit-grade scope (new in 2026-06). When a template is scoped
         // to specific benefit_grid_levels (e.g. Medical Insurance Int'l

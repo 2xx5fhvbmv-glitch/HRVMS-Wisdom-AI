@@ -122,6 +122,7 @@
                             @endif
                             @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.index', config('settings.resort_permissions.view')))
                                 <li><a href="{{ route('resort.budget.index') }}"><span class="cfg-txt"><b>Cost Configuration</b><small>Salary bands & cost inputs</small></span><svg class="cfg-go" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a></li>
+                                <li><a href="{{ route('resort.budget.nonpermanent.index') }}"><span class="cfg-txt"><b>Cost Configuration for Casuals & Interns</b><small>Separate cost items for non-permanent staff</small></span><svg class="cfg-go" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a></li>
                             @endif
                             <li><a href="{{ route('resort.Add.Employee') }}"><span class="cfg-txt"><b>Add Employee</b><small>Onboard staff records</small></span><svg class="cfg-go" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a></li>
                             @if(App\Helpers\Common::checkRouteWisePermission('resort.benifitgrid.index', config('settings.resort_permissions.create')))
