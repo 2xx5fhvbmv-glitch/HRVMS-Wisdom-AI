@@ -113,6 +113,22 @@ class Common
     }
 
     /**
+     * The literal employees.employment_type enum values that belong to one
+     * manning category — the inverse of manningCategory(), for building a
+     * ->whereIn('employment_type', ...) filter. Single source of truth so
+     * a query filtering "just the Permanent employees for this position"
+     * can't drift out of sync with what manningCategory() actually buckets.
+     */
+    public static function manningCategoryEmploymentTypes(string $category): array
+    {
+        return match ($category) {
+            'Casual' => ['Casual'],
+            'Intern' => ['Internship'],
+            default  => ['Full-Time', 'Part-Time', 'Contract', 'Probationary', 'Temporary'],
+        };
+    }
+
+    /**
      * Same 3-bucket mapping as manningCategory(), but for the separate,
      * differently-spelled enum on vacancies.employee_type /
      * offline_interviews.employee_type — NOT the employees.employment_type

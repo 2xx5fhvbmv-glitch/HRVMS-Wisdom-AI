@@ -55,6 +55,10 @@ class BudgetController extends Controller
         $resortId = auth()->guard('resort-admin')->user()->resort_id;
         $Budget_id = $data['manning_response_id'] ?? null;
         $Message_id = $data['Message_id'] ?? null;
+        // Which of the 3 manning categories this render shows — see
+        // ViewBudget()'s identical param for the full rationale. Defaults
+        // to 'Permanent' so every existing caller is unaffected.
+        $employmentType = $request->input('employment_type', 'Permanent');
         $departmentsData = collect();
         $rank = config('settings.Position_Rank');
         $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
@@ -64,8 +68,16 @@ class BudgetController extends Controller
         }elseif($employeeRankPosition['position'] == "Finance" && ($employeeRankPosition['rank'] == "HOD" || $employeeRankPosition['rank'] == "XCOM" )){
             $employeeDeptId = $this->resort->getEmployee->Dept_id;
             // Get all Finance/GM approved dept ids
+            // Scoped to the same employment_type as the rest of this page —
+            // otherwise a dept could appear in this Finance-role list off
+            // the back of, say, its Casual budget reaching Finance, while
+            // the page then renders that dept's (unrelated) Permanent
+            // content. Product may eventually want "any type reaching
+            // Finance/GM" to surface the dept regardless of which tab is
+            // open — flagged, not decided here.
             $manningResponseDeptsId = ManningResponse::where('year', $year)
                 ->where('resort_id', $resortId)
+                ->where('employment_type', $employmentType)
                 ->whereIn('budget_process_status', ['Finance', 'GM'])
                 ->pluck('dept_id')
                 ->toArray();
@@ -83,8 +95,10 @@ class BudgetController extends Controller
         }elseif($employeeRankPosition['position'] == "GM" && ($employeeRankPosition['rank'] == "HOD" || $employeeRankPosition['rank'] == "XCOM" )){
             $employeeDeptId = $this->resort->getEmployee->Dept_id;
             // Get all Finance/GM approved dept ids
+            // Same employment_type scoping/caveat as the Finance branch above.
             $manningResponseDeptsId = ManningResponse::where('year', $year)
                 ->where('resort_id', $resortId)
+                ->where('employment_type', $employmentType)
                 ->where('budget_process_status', 'GM')
                 ->pluck('dept_id')
                 ->toArray();
@@ -116,6 +130,7 @@ class BudgetController extends Controller
         // when viewing year=2027.
         $manningResponseIdsForYear = ManningResponse::where('year', $year)
             ->where('resort_id', $resortId)
+            ->where('employment_type', $employmentType)
             ->whereIn('dept_id', $departmentIds)
             ->pluck('id')
             ->all();
@@ -130,10 +145,11 @@ class BudgetController extends Controller
                     $join->whereRaw('1 = 0');
                 }
             })
-            ->leftJoin('manning_responses as mr', function ($join) use ($year, $resortId) {
+            ->leftJoin('manning_responses as mr', function ($join) use ($year, $resortId, $employmentType) {
                 $join->on('pmd.manning_response_id', '=', 'mr.id')
                     ->where('mr.year', '=', $year)
-                    ->where('mr.resort_id', '=', $resortId);
+                    ->where('mr.resort_id', '=', $resortId)
+                    ->where('mr.employment_type', '=', $employmentType);
             })
             ->where('p.resort_id', '=', $resortId)
             ->whereIn('p.dept_id', $departmentIds)
@@ -163,6 +179,10 @@ class BudgetController extends Controller
             ->where('e.resort_id', $resortId)
             ->whereIn('e.Dept_id', $departmentIds)
             ->where('e.status', 'Active')
+            // Same category match as ViewBudget's employees query — a
+            // Casual/Intern employee shouldn't fill the Permanent tab's
+            // headcount for the same position.
+            ->whereIn('e.employment_type', Common::manningCategoryEmploymentTypes($employmentType))
             ->where(function ($q) use ($today) {
                 $q->whereNull('e.last_working_day')
                   ->orWhereDate('e.last_working_day', '>', $today);
@@ -335,9 +355,10 @@ class BudgetController extends Controller
                     ->join('employees as t3', 't3.id', "=", "t2.Emp_id")
                     ->join('resort_positions as t4', 't4.id', "=", "t3.Position_id")
                     ->leftJoin('position_monthly_data as pmd', 't4.id', '=', 'pmd.position_id')
-                    ->leftJoin('manning_responses as mr', function($join) use ($resortId, $year) {
+                    ->leftJoin('manning_responses as mr', function($join) use ($resortId, $year, $employmentType) {
                         $join->on('pmd.manning_response_id', '=', 'mr.id')
-                            ->where('mr.year', '=', $year);
+                            ->where('mr.year', '=', $year)
+                            ->where('mr.employment_type', '=', $employmentType);
                     })
                     ->where('t1.resort_id', '=', $resortId)
                     ->where('t1.Department_id', '=', $department->id)
@@ -383,6 +404,7 @@ class BudgetController extends Controller
             $latestBudget = ManningResponse::where('year', $year)
                 ->where('resort_id', $resortId)
                 ->where('dept_id', $department->id)
+                ->where('employment_type', $employmentType)
                 ->latest()
                 ->first();
 
@@ -417,7 +439,15 @@ class BudgetController extends Controller
 
 
         $resortDepartmentsCount = ResortDepartment::where('resort_id', $resortId)->count();
-        $resortManningResponseCount = ManningResponse::where('year', $year) ->where('resort_id', $resortId)->count();
+        // Distinct depts, not raw row count, AND scoped to this page's
+        // employment_type — up to 3 manning_responses rows can now exist
+        // per dept (one per category), so counting rows would make this
+        // triple the dept count and "isBudgetCompleted" could never be true.
+        $resortManningResponseCount = ManningResponse::where('year', $year)
+            ->where('resort_id', $resortId)
+            ->where('employment_type', $employmentType)
+            ->distinct('dept_id')
+            ->count('dept_id');
             if($resortDepartmentsCount == $resortManningResponseCount){
                 $isBudgetCompleted = true;
             }else{
@@ -793,7 +823,7 @@ class BudgetController extends Controller
      * department must not see other departments' totals in that response,
      * same as they never see them in the page's rendered DOM today.
      */
-    private function getRankWiseDepartmentIds($resortId, $year)
+    private function getRankWiseDepartmentIds($resortId, $year, $employmentType = 'Permanent')
     {
         $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
 
@@ -814,9 +844,14 @@ class BudgetController extends Controller
             }
             elseif ($employeeRankPosition['position'] == "Finance" && ($employeeRankPosition['rank'] == "HOD" || $employeeRankPosition['rank'] == "XCOM")) {
                 $employeeDeptId = $this->resort->getEmployee->Dept_id;
-                // Get all Finance/GM approved dept ids
+                // Get all Finance/GM approved dept ids — scoped to the
+                // caller's employment_type, same caveat as ViewManning's
+                // identical branch (flagged, not decided: whether a dept
+                // should surface here off ANY category reaching Finance/GM
+                // is a product call, not made here).
                 $manningResponseDeptsId = ManningResponse::where('year', $year)
                     ->where('resort_id', $resortId)
+                    ->where('employment_type', $employmentType)
                     ->whereIn('budget_process_status', ['Finance', 'GM'])
                     ->pluck('dept_id')
                     ->toArray();
@@ -834,9 +869,10 @@ class BudgetController extends Controller
 
             } elseif ($employeeRankPosition['position'] == "GM" && ($employeeRankPosition['rank'] == "HOD" || $employeeRankPosition['rank'] == "XCOM")) {
                 $employeeDeptId = $this->resort->getEmployee->Dept_id;
-                // Get all Finance/GM approved dept ids
+                // Same employment_type scoping/caveat as the Finance branch above.
                 $manningResponseDeptsId = ManningResponse::where('year', $year)
                     ->where('resort_id', $resortId)
+                    ->where('employment_type', $employmentType)
                     ->where('budget_process_status', 'GM')
                     ->pluck('dept_id')
                     ->toArray();
@@ -878,6 +914,11 @@ class BudgetController extends Controller
         $resortId = auth()->guard('resort-admin')->user()->resort_id;
         $Budget_id = $request->input('manning_response_id') ?? null;
         $Message_id = $request->input('Message_id') ?? null;
+        // Which of the 3 manning categories this dashboard render shows.
+        // Defaults to 'Permanent' so every existing caller (URL/AJAX call
+        // with no employment_type param) behaves exactly as before —
+        // Casual/Intern only appear when a tab/filter explicitly asks.
+        $employmentType = $request->input('employment_type', 'Permanent');
 
         $rank = config('settings.Position_Rank');
 
@@ -886,7 +927,7 @@ class BudgetController extends Controller
         // Extracted into getRankWiseDepartmentIds() (unchanged logic) so
         // getAllBudgetTotals() can apply the exact same rank-based scoping
         // without a second, separately-maintained copy of this branching.
-        $rank_wise_departments = $this->getRankWiseDepartmentIds($resortId, $year);
+        $rank_wise_departments = $this->getRankWiseDepartmentIds($resortId, $year, $employmentType);
 
         // Iterate ALL active departments (subject to role scope), then
         // look up the optional matching ManningResponse + non-terminal
@@ -894,9 +935,16 @@ class BudgetController extends Controller
         // (as the prior code did) silently DROPPED departments that
         // hadn't been put through a manning cycle yet — exactly the
         // Exec Office / L&D / Security gap on live.
+        //
+        // Scoped to one employment_type — without this, once a dept has up
+        // to 3 manning_responses rows (Permanent/Casual/Intern for the same
+        // year), keyBy('dept_id') below would silently keep only whichever
+        // row the DB happened to return last for that dept, discarding the
+        // other 1-2 categories from the entire dashboard.
         $manningByDept = ManningResponse::with('department')
             ->where('manning_responses.year', $year)
             ->where('manning_responses.resort_id', $resortId)
+            ->where('manning_responses.employment_type', $employmentType)
             ->whereIn('dept_id', $rank_wise_departments)
             ->leftJoin('budget_statuses as bs', function ($join) {
                 $join->on('bs.Budget_id', '=', 'manning_responses.id');
@@ -945,11 +993,12 @@ class BudgetController extends Controller
             $department->departmentPositions = DB::table('resort_positions as p')
                 ->leftJoin('employees as e', 'e.Position_id', '=', 'p.id')
                 ->leftJoin('position_monthly_data as pmd', 'p.id', '=', 'pmd.position_id')
-                ->leftJoin('manning_responses as mr', function($join) use ($year, $resortId, $department) {
+                ->leftJoin('manning_responses as mr', function($join) use ($year, $resortId, $department, $employmentType) {
                     $join->on('pmd.manning_response_id', '=', 'mr.id')
                          ->where('mr.year', '=', $year)
                          ->where('mr.resort_id', '=', $resortId)
-                         ->where('mr.dept_id', '=', $department->dept_id);
+                         ->where('mr.dept_id', '=', $department->dept_id)
+                         ->where('mr.employment_type', '=', $employmentType);
                 })
                 ->where('p.resort_id', '=', $resortId)
                 ->where('p.dept_id', '=', $department->dept_id)
@@ -962,6 +1011,10 @@ class BudgetController extends Controller
                     DB::raw('COALESCE(MAX(pmd.vacantcount), 0) as vacantcount'),
                     DB::raw('COALESCE(MAX(pmd.headcount), 0) as headcount')
                 )
+                // employment_type is now pinned in the join itself (one mr
+                // row max per dept+year+type), so grouping by mr.id can't
+                // multiply a position into duplicate rows the way it could
+                // when up to 3 untyped mr rows could all join the same pmd.
                 ->groupBy('p.id', 'p.position_title', 'mr.id')
                 ->get();
 
@@ -972,6 +1025,11 @@ class BudgetController extends Controller
                         ->where('position_id', $position->Position_id)
                         ->where('Dept_id', $position->dept_id)
                         ->where('e.status', 'Active')
+                        // Match the dashboard's selected manning category —
+                        // without this, a Casual/Intern employee in the same
+                        // physical position slot as a Permanent one would
+                        // show up filling the Permanent tab's headcount too.
+                        ->whereIn('e.employment_type', Common::manningCategoryEmploymentTypes($employmentType))
                         ->get([
                             'e.resort_id',
                             'e.id as Empid',
@@ -1531,6 +1589,10 @@ class BudgetController extends Controller
         }
 
         $selectedYear = $request->get('year', Carbon::now()->year);
+        // Which of the 3 manning categories this render shows — see
+        // ViewBudget()'s identical param for the full rationale. Defaults
+        // to 'Permanent' so every existing caller is unaffected.
+        $employmentType = $request->get('employment_type', 'Permanent');
         $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
 
         // Resort-wide setting, same value for every employee/vacant row on
@@ -1552,17 +1614,20 @@ class BudgetController extends Controller
             $yearlyBudgets = ManningResponse::where('year', $selectedYear)
                                 ->where('resort_id', $resortId)
                                 ->where('dept_id', $this->resort->getEmployee->Dept_id)
+                                ->where('employment_type', $employmentType)
                                 ->with(['positionMonthlyData', 'GetBudgetStatus'])
                                 ->get();
         }elseif($employeeRankPosition['position'] == "Finance" && ($employeeRankPosition['rank'] == "HOD" || $employeeRankPosition['rank'] == "XCOM" )){
             $yearlyBudgets = ManningResponse::where('year', $selectedYear)
                             ->where('resort_id', $resortId)
+                            ->where('employment_type', $employmentType)
                             ->whereIn('budget_process_status', ['Finance', 'GM'])
                             ->with(['positionMonthlyData', 'GetBudgetStatus'])
                             ->get();
         }elseif($employeeRankPosition['position'] == "GM" && ($employeeRankPosition['rank'] == "HOD" || $employeeRankPosition['rank'] == "XCOM" )){
             $yearlyBudgets = ManningResponse::where('year', $selectedYear)
                             ->where('resort_id', $resortId)
+                            ->where('employment_type', $employmentType)
                             ->where('budget_process_status', 'GM')
                             ->with(['positionMonthlyData', 'GetBudgetStatus'])
                             ->get();
@@ -1571,6 +1636,7 @@ class BudgetController extends Controller
         {
             $yearlyBudgets = ManningResponse::where('year', $selectedYear)
             ->where('resort_id', $resortId)
+            ->where('employment_type', $employmentType)
             ->with(['positionMonthlyData', 'GetBudgetStatus'])
             ->get();
         }
@@ -1877,6 +1943,11 @@ class BudgetController extends Controller
                         ->where('e.Position_id', $positionId)
                         ->where('e.status', 'Active')
                         ->where('e.resort_id', $resortId)
+                        // Same category match as ViewBudget/ViewManning's
+                        // employees queries — without this, a Casual/Intern
+                        // employee in this position slot would count (and
+                        // cost) toward whichever category tab is open.
+                        ->whereIn('e.employment_type', Common::manningCategoryEmploymentTypes($employmentType))
                         ->select(
                             'e.id as emp_id',
                             'e.id',
@@ -2074,7 +2145,13 @@ class BudgetController extends Controller
             }
 
                 $resortDepartmentsCount = ResortDepartment::where('resort_id', $resortId)->count();
-                $resortManningResponseCount = ManningResponse::where('year', $selectedYear) ->where('resort_id', $resortId)->count();
+                // Distinct depts + employment_type-scoped — same fix and
+                // same reasoning as ViewManning's identical count above.
+                $resortManningResponseCount = ManningResponse::where('year', $selectedYear)
+                    ->where('resort_id', $resortId)
+                    ->where('employment_type', $employmentType)
+                    ->distinct('dept_id')
+                    ->count('dept_id');
 
                     if($resortDepartmentsCount == $resortManningResponseCount){
                         $isBudgetCompleted = true;
@@ -2897,6 +2974,7 @@ class BudgetController extends Controller
         try {
             $departmentId = $request->input('department_id');
             $year = $request->input('year', date('Y'));
+            $employmentType = $request->input('employment_type', 'Permanent');
             $resortId = auth()->guard('resort-admin')->user()->resort_id;
 
             // Get manning response for this department — OPTIONAL. The
@@ -2908,9 +2986,16 @@ class BudgetController extends Controller
             // positions, employees — exists independently of manning, so
             // we return the structure regardless. Manning is only needed
             // for the workflow-state metadata which we leave null.
+            //
+            // employment_type filter: without it, once a dept has up to 3
+            // manning_responses rows (one per category), ->first() with no
+            // ordering arbitrarily returns whichever the DB happens to
+            // return first — silently swapping which category's
+            // workflow-state metadata this drill-down modal shows.
             $manningResponse = ManningResponse::where('dept_id', $departmentId)
                 ->where('year', $year)
                 ->where('resort_id', $resortId)
+                ->where('employment_type', $employmentType)
                 ->first();
 
             // Get sections
@@ -2963,6 +3048,7 @@ class BudgetController extends Controller
         try {
             $positionId = $request->input('position_id');
             $year = $request->input('year', date('Y'));
+            $employmentType = $request->input('employment_type', 'Permanent');
             $resortId = auth()->guard('resort-admin')->user()->resort_id;
 
             $position = ResortPosition::where('resort_id', $resortId)->find($positionId);
@@ -2979,18 +3065,26 @@ class BudgetController extends Controller
             // so we proceed even when it's missing and source the
             // metadata (vacant count, monthly data) from the persisted
             // budget tables instead.
+            //
+            // employment_type filter: without it, ->first() would
+            // arbitrarily return whichever of up to 3 rows (one per
+            // category) the DB happens to pick, mixing that category's
+            // vacant counts/proposed salaries into whatever tab is open.
             $manningResponse = ManningResponse::where('dept_id', $position->dept_id)
                 ->where('year', $year)
                 ->where('resort_id', $resortId)
+                ->where('employment_type', $employmentType)
                 ->first();
 
-            // Get employees
+            // Get employees — scoped to the same category as the manning
+            // response above, same reasoning as ViewBudget/ViewManning.
             $employees = DB::table('employees as e')
                 ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
                 ->where('e.Position_id', $positionId)
                 ->where('e.Dept_id', $position->dept_id)
                 ->where('e.resort_id', $resortId)
                 ->where('e.status', 'Active')
+                ->whereIn('e.employment_type', Common::manningCategoryEmploymentTypes($employmentType))
                 ->get([
                     'e.resort_id',
                     'e.id as Empid',
@@ -3062,6 +3156,7 @@ class BudgetController extends Controller
                 ->where('Position_id', $positionId)
                 ->where('Dept_id', $position->dept_id)
                 ->where('status', 'Active')
+                ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType))
                 ->where(function ($q) use ($today) {
                     $q->whereNull('last_working_day')
                       ->orWhereDate('last_working_day', '>', $today);
@@ -3484,12 +3579,13 @@ class BudgetController extends Controller
         try {
             $resortId = auth()->guard('resort-admin')->user()->resort_id;
             $year = (int) $request->input('year', date('Y'));
+            $employmentType = $request->input('employment_type', 'Permanent');
 
             // Same rank-based scoping ViewBudget() applies to what's
             // rendered — without this, a department-scoped HOD would see
             // every other department's totals in this response, even
             // though the page only ever renders their own.
-            $rankWiseDepartments = $this->getRankWiseDepartmentIds($resortId, $year);
+            $rankWiseDepartments = $this->getRankWiseDepartmentIds($resortId, $year, $employmentType);
 
             // ---- Resort-wide lookups, once ----
             $dollarToMvr = (float) (DB::table('resort_site_settings')
@@ -3520,6 +3616,10 @@ class BudgetController extends Controller
                 ->where('resort_id', $resortId)
                 ->where('status', 'Active')
                 ->whereIn('Position_id', $positionIds)
+                // Scoped to the requested category — without this, a
+                // Casual/Intern employee's salary/cost total would blend
+                // into the resort-wide Permanent budget total badge.
+                ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType))
                 ->get(['id', 'Position_id', 'basic_salary', 'proposed_salary', 'nationality', 'religion', 'benefit_grid_level']);
             $employeeIds = $employees->pluck('id');
 
@@ -3591,6 +3691,10 @@ class BudgetController extends Controller
                 ->join('manning_responses', 'position_monthly_data.manning_response_id', '=', 'manning_responses.id')
                 ->where('manning_responses.resort_id', $resortId)
                 ->where('manning_responses.year', $year)
+                // Without this, once a position has up to 3 manning_responses
+                // rows (one per category) feeding pmd rows, MAX(headcount)
+                // mixes across all of them instead of just this category's.
+                ->where('manning_responses.employment_type', $employmentType)
                 ->whereIn('position_monthly_data.position_id', $positionIds)
                 ->groupBy('position_monthly_data.position_id')
                 ->selectRaw('position_monthly_data.position_id as position_id, MAX(position_monthly_data.headcount) as max_headcount')
@@ -3609,6 +3713,7 @@ class BudgetController extends Controller
                 ->where(function ($q) use ($today) {
                     $q->whereNull('last_working_day')->orWhereDate('last_working_day', '>', $today);
                 })
+                ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType))
                 ->whereIn('Position_id', $positionIds)
                 ->groupBy('Position_id', 'Dept_id')
                 ->selectRaw('Position_id, Dept_id, COUNT(*) as cnt')
