@@ -842,16 +842,22 @@ class OfflineInterviewController extends Controller
         $marital = strtolower((string) $applicant->marital_status) === 'married' ? 'Married' : 'Single';
         $title   = strtolower((string) $applicant->gender) === 'female' ? 'Miss' : 'Mr';
 
-        // Map employee_type to the employees enum.
+        // Map employee_type to the employees enum. Must stay consistent with
+        // Common::manningCategoryForVacancy()'s vacancy-side mapping — a
+        // "Temporary / Project" vacancy draws its headcount from the Casual
+        // manning budget pool (confirmed decision), so the resulting
+        // employee needs employment_type='Casual' too, not 'Temporary' —
+        // otherwise Common::manningCategory() (whose default arm treats
+        // 'Temporary' as Permanent) would silently bucket this hire back
+        // into Permanent for filled-vs-vacant/liability/reporting, even
+        // though its budget came out of Casual.
         $employmentType = 'Full-Time';
         $vacType = strtolower((string) $oi->employee_type);
         if (str_contains($vacType, 'intern') || str_contains($vacType, 'trainee')) {
             $employmentType = 'Internship';
         } elseif (str_contains($vacType, 'replace')) {
             $employmentType = 'Contract';
-        } elseif (str_contains($vacType, 'temporary')) {
-            $employmentType = 'Temporary';
-        } elseif (str_contains($vacType, 'casual')) {
+        } elseif (str_contains($vacType, 'temporary') || str_contains($vacType, 'casual')) {
             $employmentType = 'Casual';
         }
 
