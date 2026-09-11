@@ -169,6 +169,31 @@ class VacancyController extends Controller
         }
     }
 
+    /**
+     * Vacant slots left for a position this month: approved headcount minus
+     * whatever's already tied up by other active (non closed/cancelled/
+     * draft) vacancies for it. Same calc getVacancyStatus() already does
+     * for its live status widget — reused here so store()/update() gate on
+     * the identical number the form shows the user, instead of a second,
+     * possibly-drifting copy of the same math.
+     */
+    private function computeAvailableSlots($manningresponse, $positionId, $resort_id)
+    {
+        $currentMonth = Carbon::now()->month;
+        $positionData = PositionMonthlyData::where('position_id', $positionId)
+            ->where('month', $currentMonth)
+            ->where('manning_response_id', $manningresponse->id)
+            ->first();
+        $vacantCount = $positionData->vacantcount ?? 0;
+
+        $existingVacancies = Vacancies::where('Resort_id', $resort_id)
+            ->where('position', $positionId)
+            ->whereNotIn('status', ['Closed', 'Cancelled', 'Draft'])
+            ->sum('Total_position_required') ?? 0;
+
+        return max(0, $vacantCount - $existingVacancies);
+    }
+
     public function store(Request $request)
     {
 
@@ -205,7 +230,8 @@ class VacancyController extends Controller
             'employee_name' => 'nullable|string|max:255',
             'duration' => 'nullable|string|max:255',
             'amount_unit'=> 'nullable|string|in:MVR,USD',
-            'is_required_local' => 'required|string|in:Yes,No'
+            'is_required_local' => 'required|string|in:Yes,No',
+            'justification' => 'nullable|string|max:2000',
         ]);
         $resort = Auth::guard('resort-admin')->user();
         $resort_id = $resort->resort_id;
@@ -262,6 +288,30 @@ class VacancyController extends Controller
                     'success' => false,
                     'msg' => 'Manning budget for this department has not been approved yet for this year. A vacancy cannot be created until the budget is approved.',
                 ]);
+            }
+
+            // Approved budget exists, but the requested count itself may
+            // still exceed what's actually vacant — previously purely
+            // informational (the form just showed an "Out of Budget"
+            // warning and let the request through with no reason captured).
+            // Now requires a justification, and the vacancy is held at
+            // out_of_budget_status='Pending' for Finance/GM review instead
+            // of silently proceeding as if it were within budget.
+            $outOfBudgetStatus = null;
+            $justification = null;
+            if (!$isDraft && $manningresponse) {
+                $availableSlots = $this->computeAvailableSlots($manningresponse, $positionId, $resort_id);
+                $requestedCount = (int) $validatedData['Total_position_required'];
+                if ($requestedCount > $availableSlots) {
+                    if (empty($validatedData['justification'])) {
+                        return response()->json([
+                            'success' => false,
+                            'msg' => 'This request exceeds the approved headcount for this position (' . $availableSlots . ' available). Please provide a justification to submit it for Finance/GM review.',
+                        ]);
+                    }
+                    $justification = $validatedData['justification'];
+                    $outOfBudgetStatus = 'Pending';
+                }
             }
 
             $budgeted_salary = 0;
@@ -356,7 +406,24 @@ class VacancyController extends Controller
             $vacancy->status = $validatedData['status'];
             $vacancy->amount_unit = $amountUnit;
             $vacancy->is_required_local = $request->is_required_local;
+            $vacancy->justification = $justification;
+            $vacancy->out_of_budget_status = $outOfBudgetStatus;
             $vacancy->save();
+
+            if ($outOfBudgetStatus === 'Pending') {
+                try {
+                    Common::notifyEmployees(
+                        $resort_id,
+                        Common::getResortHrEmployeeIds($resort_id),
+                        'Out-of-Budget Vacancy Needs Review',
+                        'A vacancy request exceeds the approved headcount and needs justification review.',
+                        'WorkForce Planning',
+                        $vacancy->id
+                    );
+                } catch (\Exception $notifErr) {
+                    \Log::warning('Out-of-budget vacancy notify failed: ' . $notifErr->getMessage());
+                }
+            }
 
             // Skip notifications, compliance checks, and approval flow for Draft
             if (!$isDraft) {
@@ -677,7 +744,8 @@ class VacancyController extends Controller
             'employee_name' => 'nullable|string|max:255',
             'duration' => 'nullable|string|max:255',
             'amount_unit' => 'nullable|string|in:MVR,USD',
-            'is_required_local' => 'required|string|in:Yes,No'
+            'is_required_local' => 'required|string|in:Yes,No',
+            'justification' => 'nullable|string|max:2000',
         ]);
 
         $resort = Auth::guard('resort-admin')->user();
@@ -719,6 +787,25 @@ class VacancyController extends Controller
                 'success' => false,
                 'msg' => 'Manning budget for this department has not been approved yet for this year. A vacancy cannot be created until the budget is approved.',
             ]);
+        }
+
+        // Same over-budget justification gate as store() — see there for
+        // the full rationale.
+        $outOfBudgetStatus = null;
+        $justification = null;
+        if (!$isDraft && $manningresponse) {
+            $availableSlots = $this->computeAvailableSlots($manningresponse, $positionId, $resort_id);
+            $requestedCount = (int) $validatedData['Total_position_required'];
+            if ($requestedCount > $availableSlots) {
+                if (empty($validatedData['justification'])) {
+                    return response()->json([
+                        'success' => false,
+                        'msg' => 'This request exceeds the approved headcount for this position (' . $availableSlots . ' available). Please provide a justification to submit it for Finance/GM review.',
+                    ]);
+                }
+                $justification = $validatedData['justification'];
+                $outOfBudgetStatus = 'Pending';
+            }
         }
 
         $budgeted_salary = 0;
@@ -802,7 +889,24 @@ class VacancyController extends Controller
         $vacancy->status = $validatedData['status'];
         $vacancy->amount_unit = $amountUnit;
         $vacancy->is_required_local = $request->is_required_local;
+        $vacancy->justification = $justification;
+        $vacancy->out_of_budget_status = $outOfBudgetStatus;
         $vacancy->save();
+
+        if ($outOfBudgetStatus === 'Pending') {
+            try {
+                Common::notifyEmployees(
+                    $resort_id,
+                    Common::getResortHrEmployeeIds($resort_id),
+                    'Out-of-Budget Vacancy Needs Review',
+                    'A vacancy request exceeds the approved headcount and needs justification review.',
+                    'WorkForce Planning',
+                    $vacancy->id
+                );
+            } catch (\Exception $notifErr) {
+                \Log::warning('Out-of-budget vacancy notify failed: ' . $notifErr->getMessage());
+            }
+        }
 
         // If submitted (not draft), run the approval workflow
         if (!$isDraft) {
@@ -2493,6 +2597,129 @@ class VacancyController extends Controller
         }
     }
 
+    /**
+     * Advance a vacancy's out-of-budget justification through the same
+     * HR -> Finance -> GM chain manning budgets already use (see
+     * ResortAllNotificationController::SendToFinance()/ReviseBudget() and
+     * BudgetController::approveBudget() — same role gating and status
+     * vocabulary, applied to a single vacancy instead of a whole
+     * department's manning_responses rows for a year).
+     *
+     * Body: vacancy_id, action ('forward'|'reject'|'approve'), comment (optional).
+     * - forward: HR moves Pending -> Finance; Finance moves Finance -> GM.
+     * - reject: any non-GM stage sends it back to the requesting HOD with a
+     *   comment (mirrors ReviseBudget) — out_of_budget_status = 'Rejected'.
+     * - approve: GM only, terminal — out_of_budget_status = 'Approved', the
+     *   vacancy proceeds as if it were within budget.
+     */
+    public function processOutOfBudgetReview(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'vacancy_id' => 'required|integer',
+            'action' => 'required|string|in:forward,reject,approve',
+            'comment' => 'nullable|string|max:2000',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'msg' => $validator->errors()->first()], 400);
+        }
 
+        $resort = Auth::guard('resort-admin')->user();
+        $resort_id = $resort->resort_id;
+        $action = $request->action;
+
+        $vacancy = Vacancies::where('id', $request->vacancy_id)
+            ->where('Resort_id', $resort_id)
+            ->whereNotNull('out_of_budget_status')
+            ->first();
+        if (!$vacancy) {
+            return response()->json(['success' => false, 'msg' => 'Vacancy with a pending out-of-budget review not found.'], 404);
+        }
+
+        $employeeRankPosition = Common::getEmployeeRankPosition($resort->GetEmployee);
+        $role = $employeeRankPosition['position'] ?? null;
+
+        if ($action === 'approve') {
+            if ($role !== 'GM') {
+                return response()->json(['success' => false, 'msg' => 'Only GM can approve an out-of-budget request.'], 403);
+            }
+            $vacancy->out_of_budget_status = 'Approved';
+            $vacancy->out_of_budget_comment = $request->comment;
+            $vacancy->save();
+
+            try {
+                $hod = Common::FindResortHODDepartment($resort_id, $vacancy->department);
+                Common::notifyEmployees(
+                    $resort_id,
+                    $hod ? [$hod->id] : [],
+                    'Out-of-Budget Vacancy Approved',
+                    'Your out-of-budget vacancy request has been approved by GM.',
+                    'WorkForce Planning',
+                    $vacancy->id
+                );
+            } catch (\Exception $e) {
+                \Log::warning('Out-of-budget approve notify failed: ' . $e->getMessage());
+            }
+
+            return response()->json(['success' => true, 'msg' => 'Out-of-budget request approved.']);
+        }
+
+        if ($action === 'reject') {
+            if (!in_array($role, ['HR', 'Finance', 'GM'], true)) {
+                return response()->json(['success' => false, 'msg' => 'Not authorised to reject this request.'], 403);
+            }
+            $vacancy->out_of_budget_status = 'Rejected';
+            $vacancy->out_of_budget_comment = $request->comment;
+            $vacancy->save();
+
+            try {
+                $hod = Common::FindResortHODDepartment($resort_id, $vacancy->department);
+                Common::notifyEmployees(
+                    $resort_id,
+                    $hod ? [$hod->id] : [],
+                    'Out-of-Budget Vacancy Rejected',
+                    'Your out-of-budget vacancy request was rejected' . ($request->comment ? (': ' . $request->comment) : '.'),
+                    'WorkForce Planning',
+                    $vacancy->id
+                );
+            } catch (\Exception $e) {
+                \Log::warning('Out-of-budget reject notify failed: ' . $e->getMessage());
+            }
+
+            return response()->json(['success' => true, 'msg' => 'Out-of-budget request rejected.']);
+        }
+
+        // forward
+        if ($role === 'HR' && $vacancy->out_of_budget_status === 'Pending') {
+            $vacancy->out_of_budget_status = 'Finance';
+            $vacancy->save();
+            $recipientIds = Common::getResortFinanceEmployeeIds($resort_id);
+            $nextStage = 'Finance';
+        } elseif ($role === 'Finance' && $vacancy->out_of_budget_status === 'Finance') {
+            $vacancy->out_of_budget_status = 'GM';
+            $vacancy->save();
+            $recipientIds = Common::getResortGmEmployeeIds($resort_id);
+            $nextStage = 'GM';
+        } else {
+            return response()->json([
+                'success' => false,
+                'msg' => 'This request is not awaiting your review stage.',
+            ], 403);
+        }
+
+        try {
+            Common::notifyEmployees(
+                $resort_id,
+                $recipientIds,
+                'Out-of-Budget Vacancy Needs Review',
+                'An out-of-budget vacancy request has been forwarded to ' . $nextStage . ' for review.',
+                'WorkForce Planning',
+                $vacancy->id
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Out-of-budget forward notify failed: ' . $e->getMessage());
+        }
+
+        return response()->json(['success' => true, 'msg' => 'Forwarded to ' . $nextStage . '.']);
+    }
 
 }

@@ -380,6 +380,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get( 'talent-acquisition/view-all-vacancies', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','GetViewVacancies'])->name('resort.ta.ViewVacancies');
     Route::get( 'talent-acquisition/all-vacancies', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','GetAllVacancies'])->name('resort.ta.GetAllVacancies');
     Route::post( '/talent-acquisition/get-vacancy-status', 'TalentAcquisition\VacancyController@getVacancyStatus')->name('resort.vacancies.getstatus');
+    Route::post( '/talent-acquisition/vacancy/out-of-budget-review', 'TalentAcquisition\VacancyController@processOutOfBudgetReview')->name('resort.vacancies.outOfBudgetReview');
 
     Route::get( 'talent-acquisition/alltodolist', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','ViewAllToDo'])->name('resort.ta.alltodolist');
     Route::get( 'talent-acquisition/shortlisted/applicants', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','shortlistedapplicantsShareLink'])->name('resort.ta.shortlistedapplicants');
