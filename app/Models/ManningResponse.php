@@ -24,6 +24,7 @@ class ManningResponse extends Model
     protected $fillable = [
         'resort_id','dept_id',
         'year',
+        'employment_type',
         'month',
         'total_filled_positions',
         'total_vacant_positions',
