@@ -102,47 +102,49 @@ class EmployeeChatController extends Controller
                     'message'               => $message,
                     ]);
 
-                    $base_url = env('BASE_URL', 'http://localhost:2053');
-                    // BASE_URL is commented out/unset in every env file, so this
-                    // resolves to the localhost fallback — nothing listens there
-                    // in prod. A connection failure here used to propagate to
-                    // the method's outer catch and roll back the whole message
-                    // (including the row just created above), so the endpoint
-                    // could 500 on every send. This relay is legacy/best-effort;
-                    // it must never be able to block message persistence or the
-                    // notification below.
-                    try {
-                        Http::post($base_url . '/sendChatMessage', [
-
-                            'sender_id'         => $sender_id,
-                            'receiver_id'       => $receiver_id,
-                            'conversation_id'   => $conversationId,
-                            'message'           => $message ?? null,
-                            'timestamp'         => now(),
-                        ]);
-                    } catch (\Exception $e) {
-                        \Log::warning('EmployeeChatController: legacy sendChatMessage relay failed: ' . $e->getMessage());
-                    }
-
-                    // This endpoint sent zero notifications by any mechanism —
-                    // the call above only reaches a legacy websocket relay
-                    // (BASE_URL is unset in every env file, so it silently
-                    // fails inside the outer try/catch). Without a push/DB
-                    // row, a receiver whose app wasn't open never learned a
-                    // message arrived. receiver_id here is already
-                    // employees.id (validated via Rule::exists('employees',
-                    // 'id') above), so no id-domain translation is needed.
-                    Common::notifyEmployees(
-                        $this->resort_id,
-                        [$receiver_id],
-                        trim(($senderProfile->first_name ?? '') . ' ' . ($senderProfile->last_name ?? '')),
-                        $message,
-                        'Chat',
-                        $Newmessage->id,
-                        'employee-chat-message'
-                    );
-
                     DB::commit();
+
+                    // Relay + push were previously sent synchronously here, same as
+                    // ConversationController::sendMessage used to do — the FCM send
+                    // costs a full uncached Google OAuth round trip plus one POST per
+                    // device token, which delayed the response by several seconds.
+                    // A slow response invites the mobile client to time out and retry
+                    // the whole send-message request, re-creating the message row
+                    // above and re-firing the notification (the duplicate "i am
+                    // coming" pushes stacking on the lock screen). Deferred to run
+                    // after the response is flushed, matching the fix already applied
+                    // to ConversationController::sendMessage.
+                    dispatch(function () use ($sender_id, $receiver_id, $conversationId, $message, $senderProfile, $Newmessage) {
+                        $base_url = env('BASE_URL', 'http://localhost:2053');
+                        // BASE_URL is commented out/unset in every env file, so this
+                        // resolves to the localhost fallback — nothing listens there
+                        // in prod. This relay is legacy/best-effort; it must never be
+                        // able to block message persistence or the notification below.
+                        try {
+                            Http::post($base_url . '/sendChatMessage', [
+                                'sender_id'         => $sender_id,
+                                'receiver_id'       => $receiver_id,
+                                'conversation_id'   => $conversationId,
+                                'message'           => $message ?? null,
+                                'timestamp'         => now(),
+                            ]);
+                        } catch (\Exception $e) {
+                            \Log::warning('EmployeeChatController: legacy sendChatMessage relay failed: ' . $e->getMessage());
+                        }
+
+                        // receiver_id here is already employees.id (validated via
+                        // Rule::exists('employees', 'id') above), so no id-domain
+                        // translation is needed.
+                        Common::notifyEmployees(
+                            $this->resort_id,
+                            [$receiver_id],
+                            trim(($senderProfile->first_name ?? '') . ' ' . ($senderProfile->last_name ?? '')),
+                            $message,
+                            'Chat',
+                            $Newmessage->id,
+                            'employee-chat-message'
+                        );
+                    })->afterResponse();
                     return response()->json(['message' => 'Message sent successfully', 'message'=>['message_id'=>$Newmessage->id,'profile_picture'=>Common::getResortUserPicture($senderProfile->id),'message'=>$message],'chat history' => $chatHistory]);
                 }else{
                     return response()->json(['chat history' => $chatHistory]);
