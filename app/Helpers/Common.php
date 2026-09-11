@@ -9205,6 +9205,18 @@ class Common
 
     public static function FCMTokenPushNotification()
     {
+        // Google OAuth tokens are valid 3600s (see 'exp' below) but this was
+        // hitting oauth2.googleapis.com fresh on EVERY push send — every
+        // chat message, every notification, every recipient batch — adding
+        // a full synchronous OAuth round trip on top of the FCM send itself.
+        // Cached for 55 minutes (safety margin under the 60-minute expiry).
+        return \Cache::remember('fcm_oauth_access_token', 3300, function () {
+            return self::fetchFCMOAuthToken();
+        });
+    }
+
+    private static function fetchFCMOAuthToken()
+    {
         // Was env(), not config() — silently returns null in production
         // whenever `php artisan config:cache` has run (Laravel stops reading
         // .env entirely once the config cache exists). Routed through
