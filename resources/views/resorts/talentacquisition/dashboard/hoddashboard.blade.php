@@ -137,7 +137,7 @@
                          shouldn't see this section exist in the first place. --}}
                     @if($canSeeAllDepts || $effectiveRank == 7)
                     <div class="col-lg-12">
-                        @include('resorts.talentacquisition.dashboard._new_hire_requests_card', ['newHireRequestsTitle' => 'Hire Requests Pending Your Approval'])
+                        @include('resorts.talentacquisition.dashboard._new_hire_requests_card', ['newHireRequestsTitle' => 'Hire requests pending your approval'])
                     </div>
                     @endif
 
@@ -489,6 +489,10 @@
     @include('resorts.talentacquisition.dashboard._partials.vacancy_approval_modals')
 @endif
 @include('resorts.talentacquisition.dashboard._ta_widgets_v2_styles')
+@include('resorts.talentacquisition.dashboard._new_hire_requests_styles')
+@include('resorts.talentacquisition.dashboard._respond_modal_styles')
+@include('resorts._datepicker_calendar_styles')
+@include('resorts.talentacquisition.dashboard._hold_date_modal_styles')
 @endsection
 
 @section('import-css')
@@ -589,4 +593,5 @@
         });
     });
 </script>
+@include('resorts._datepicker_calendar_script')
 @endsection
