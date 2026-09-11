@@ -474,6 +474,7 @@
                         data: {
                             position_id: positionId,
                             requested_vacancy: 1,
+                            employee_type: $("input[name='employee_type']:checked").val(),
                             "_token": "{{ csrf_token() }}"
                         },
                         success: function(response) {
@@ -667,6 +668,11 @@
                     data: {
                         position_id: positionId,
                         requested_vacancy: requestedVacancy,
+                        // Which manning pool (Permanent/Casual/Intern) the
+                        // live Budgeted/Out-of-Budget verdict should read —
+                        // without this the check always defaulted to
+                        // Permanent's budget regardless of the selected type.
+                        employee_type: $("input[name='employee_type']:checked").val(),
                         "_token": "{{ csrf_token() }}"
                     },
                     success: function(response) {
