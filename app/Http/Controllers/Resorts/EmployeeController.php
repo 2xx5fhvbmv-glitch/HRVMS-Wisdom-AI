@@ -18,6 +18,8 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Models\ImportHistory;
 
 use App\Jobs\ImportEmployeesJob;
+use App\Jobs\ImportCasualInternEmployeesJob;
+use App\Exports\CasualInternEmployeeTemplateExport;
 class EmployeeController extends Controller
 {
 
@@ -144,6 +146,69 @@ class EmployeeController extends Controller
             \Log::emergency("Message: ".$e->getMessage());
             return response()->json(['success' => false, 'msg' => 'An error occurred while loading the page. Please try again later.'], 500);
         }
+    }
+
+    /**
+     * Bulk-onboarding page for existing Casual/Intern staff (Phase 6 of
+     * the Casual/Intern support plan) — mirrors AddEmployee()'s "Import
+     * Employee" page pattern but its own screen, since the required
+     * fields are a much smaller set than the Master Import template.
+     */
+    public function ImportCasualInternEmployee()
+    {
+        $page_title = 'Import Casual & Intern Employees';
+        return view('resorts.employees.ImportCasualInternEmp', compact('page_title'));
+    }
+
+    public function downloadCasualInternTemplate()
+    {
+        return Excel::download(new CasualInternEmployeeTemplateExport, 'CasualInternEmployeeTemplate.xlsx');
+    }
+
+    public function ImportCasualInternEmployeeUpload(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'Employeefile' => 'required|file|mimes:xls,xlsx',
+        ], [
+            'Employeefile.required' => 'Please upload an Excel file.',
+            'Employeefile.file' => 'The uploaded file must be a valid file.',
+            'Employeefile.mimes' => 'The file must be an Excel sheet (xls or xlsx).',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'msg' => $validator->errors()->first()], 422);
+        }
+        if (!$request->hasFile('Employeefile')) {
+            return response()->json(['success' => false, 'msg' => 'No file uploaded'], 422);
+        }
+
+        $file = $request->file('Employeefile');
+        $relativePath = $file->store('imports', 'local');
+        $fullPath = storage_path('app/' . $relativePath);
+        if (!file_exists($fullPath)) {
+            return response()->json(['success' => false, 'msg' => 'Failed to store uploaded file'], 500);
+        }
+
+        $admin = Auth::guard('resort-admin')->user();
+
+        $history = ImportHistory::create([
+            'resort_id' => $admin->resort_id,
+            'module' => 'casual_intern_employee',
+            'file_name' => $file->getClientOriginalName(),
+            'status' => 'queued',
+            'created_by' => $admin->id,
+        ]);
+
+        ImportCasualInternEmployeesJob::dispatch($history->id, $fullPath, $admin->resort_id, $admin->id);
+
+        return response()->json([
+            'processing' => true,
+            'history_id' => $history->id,
+            // Reuses the same generic polling endpoint importStatus() already
+            // uses for the Permanent import — it just looks up by history
+            // id + resort scope, nothing Permanent-specific about it.
+            'status_url' => route('resort.import.status', $history->id),
+        ]);
     }
 
     public function exportRelatedDepartment()

@@ -24,7 +24,10 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
-                <div class="col-auto">
+                <div class="col-auto d-flex gap-2">
+                    <a href="{{ route('resort.employee.importCasualIntern') }}" class="btn btn-sm wfp-btn-secondary">
+                        Import Casual &amp; Intern Staff
+                    </a>
                     <a href="{{ route('resort.budget.config') }}" class="btn btn-sm wfp-btn-neutral">
                         <i class="fa-solid fa-arrow-left"></i> Back to Configuration
                     </a>
