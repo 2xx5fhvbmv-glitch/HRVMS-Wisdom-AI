@@ -47,6 +47,9 @@ class Vacancies extends Model
       'pension',
       'recruitment',
       'is_required_local',
+      'justification',
+      'out_of_budget_status',
+      'out_of_budget_comment',
       'created_by',
       'modified_by',
       'Total_position_required'
