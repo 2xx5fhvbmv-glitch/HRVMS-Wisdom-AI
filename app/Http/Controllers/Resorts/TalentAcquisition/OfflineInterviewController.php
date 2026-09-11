@@ -657,8 +657,31 @@ class OfflineInterviewController extends Controller
             $oi->modified_by   = optional($this->resort)->id;
             $oi->save();
 
-            // Auto-create the Employee on Selected.
+            // Auto-create the Employee on Selected — but only once the
+            // manning budget for this category (Permanent/Casual/Intern,
+            // resolved from the requisition snapshot's employee_type) has
+            // actually been approved. Without this, a Casual/Intern hire
+            // could complete (create a real Employee row) even though its
+            // budget was never signed off by Finance/GM — the same gap
+            // Phase 1.1 closed for vacancy CREATION, now closed here for
+            // hire COMPLETION too.
             if ($oi->is_selected === 'Yes' && !$oi->created_employee_id) {
+                $manningCategory = Common::manningCategoryForVacancy($oi->employee_type ?? 'Permanant');
+                $hasApprovedBudget = \App\Models\ManningResponse::where('resort_id', $resort_id)
+                    ->where('dept_id', $oi->department_id)
+                    ->where('employment_type', $manningCategory)
+                    ->where('year', Carbon::now()->year)
+                    ->where('budget_process_status', 'Approved')
+                    ->exists();
+
+                if (!$hasApprovedBudget) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Cannot finalize this hire: the ' . $manningCategory . ' manning budget for this department has not been approved yet.',
+                    ], 422);
+                }
+
                 $result = $this->convertToEmployee($oi, $request->input('override_email'));
                 if (!$result['success']) {
                     DB::rollBack();
