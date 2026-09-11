@@ -464,7 +464,8 @@ class BudgetController extends Controller
                 'summary',
                 'year',
                 'employeeRankPosition',
-                'isBudgetCompleted'
+                'isBudgetCompleted',
+                'employmentType'
             ));
     }
 
