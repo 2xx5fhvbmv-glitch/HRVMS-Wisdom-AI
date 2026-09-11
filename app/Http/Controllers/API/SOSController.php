@@ -949,6 +949,7 @@ class SOSController extends Controller
             $sosHistoryData                             =   SOSHistoryModel::join('sos_emergency_types as set', 'sos_history.emergency_id', '=', 'set.id')
                                                                 ->join('employees as e', 'sos_history.emp_initiated_by', '=', 'e.id')
                                                                 ->join('resort_admins as ra', 'e.Admin_Parent_id', '=', 'ra.id')
+                                                                ->leftJoin('resort_positions as rp', 'e.position_id', '=', 'rp.id')
                                                                 ->where('sos_history.resort_id', $this->resort_id)
                                                                 ->select(
                                                                     'sos_history.*',
@@ -956,6 +957,7 @@ class SOSController extends Controller
                                                                     'ra.first_name',
                                                                     'ra.last_name',
                                                                     'ra.profile_picture',
+                                                                    'rp.position_title',
                                                                     'e.Admin_Parent_id',
                                                                 )
                                                                 ->where('sos_history.id', $sosId)
@@ -1481,6 +1483,7 @@ class SOSController extends Controller
             $pendingSos                                  =   SOSHistoryModel::join('sos_emergency_types as set', 'sos_history.emergency_id', '=', 'set.id')
                                                                 ->join('employees as e', 'sos_history.emp_initiated_by', '=', 'e.id')
                                                                 ->join('resort_admins as ra', 'e.Admin_Parent_id', '=', 'ra.id')
+                                                                ->leftJoin('resort_positions as rp', 'e.position_id', '=', 'rp.id')
                                                                 ->where('sos_history.resort_id', $this->resort_id)
                                                                 ->where('sos_history.status', 'Pending')
                                                                 ->orderBy('sos_history.created_at', 'desc')
@@ -1489,6 +1492,7 @@ class SOSController extends Controller
                                                                     'set.name as emergency_name',
                                                                     'ra.first_name',
                                                                     'ra.last_name',
+                                                                    'rp.position_title',
                                                                     'e.Admin_Parent_id'
                                                                 )
                                                                 ->get()->map(function ($item) {
@@ -1496,9 +1500,25 @@ class SOSController extends Controller
                                                                     return $item;
                                                                 });
 
-            $activeSosCount                              =   SOSHistoryModel::where('resort_id', $this->resort_id)
-                                                                ->whereIn('status', ['Active', 'Real-Active', 'In-Progress'])
-                                                                ->count();
+            $activeSos                                  =   SOSHistoryModel::join('sos_emergency_types as set', 'sos_history.emergency_id', '=', 'set.id')
+                                                                ->join('employees as e', 'sos_history.emp_initiated_by', '=', 'e.id')
+                                                                ->join('resort_admins as ra', 'e.Admin_Parent_id', '=', 'ra.id')
+                                                                ->leftJoin('resort_positions as rp', 'e.position_id', '=', 'rp.id')
+                                                                ->where('sos_history.resort_id', $this->resort_id)
+                                                                ->whereIn('sos_history.status', ['Active', 'Real-Active', 'In-Progress'])
+                                                                ->orderBy('sos_history.created_at', 'desc')
+                                                                ->select(
+                                                                    'sos_history.*',
+                                                                    'set.name as emergency_name',
+                                                                    'ra.first_name',
+                                                                    'ra.last_name',
+                                                                    'rp.position_title',
+                                                                    'e.Admin_Parent_id'
+                                                                )
+                                                                ->get()->map(function ($item) {
+                                                                    $item->profile_picture = Common::getResortUserPicture($item->Admin_Parent_id);
+                                                                    return $item;
+                                                                });
 
             return response()->json([
                 'success'                               =>  true,
@@ -1506,7 +1526,8 @@ class SOSController extends Controller
                 'data'                                  =>  [
                     'pending_approval_count'             =>  $pendingSos->count(),
                     'pending_approval'                   =>  $pendingSos,
-                    'active_sos_count'                   =>  $activeSosCount,
+                    'active_sos_count'                   =>  $activeSos->count(),
+                    'active_sos'                          =>  $activeSos,
                 ],
             ], 200);
 
