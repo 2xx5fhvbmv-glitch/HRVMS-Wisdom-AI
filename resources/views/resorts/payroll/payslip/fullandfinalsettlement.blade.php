@@ -27,68 +27,108 @@
                 </div>
             </div>
             <div>
-                <div class="card">
-                    <form id="final-settlement-form" method="POST" data-parsley-validate>
+                <form id="final-settlement-form" method="POST" data-parsley-validate>
     @csrf
-                        <div class="row g-md-4 g-3 mb-md-4 mb-3">
-                            <div class="col-xl-4 col-md-6">
-                                <label for="select_emp" class="form-label">SELECT EMPLOYEE OR EMPLOYEE ID<span class="red-mark">*</span></label>
-                                <select class="form-select dd-native-select" name="select_emp" id="select_emp" onchange="getEmpDetails(this.value)"
-                                    data-parsley-required="true" data-parsley-error-message="Please select an employee" data-parsley-errors-container="#select_emp_error">
-                                    <option value="">Select Employees</option>
-                                    @if($employees)
-                                        @foreach($employees as $emp)
-                                            {{-- Each option carries the employee's nationality so the
-                                                 pension column can be hidden client-side for non-Maldivian
-                                                 (foreign) employees — pension contribution is a Maldives-
-                                                 specific deduction and shouldn't appear in their F&F. --}}
-                                            <option value="{{$emp->employee->id}}"
-                                                data-nationality="{{ $emp->employee->nationality }}"
-                                                @if(!empty($preselectedEmployeeId) && (int) $preselectedEmployeeId === (int) $emp->employee->id) selected @endif>
-                                                {{$emp->employee->Emp_id}} - {{$emp->employee->resortAdmin->full_name}}
-                                            </option>
-                                        @endforeach
-                                    @endif
-                                </select>
-                                @php $selectedEmp = !empty($preselectedEmployeeId) ? collect($employees)->first(function($e) use ($preselectedEmployeeId){ return (int)$e->employee->id === (int)$preselectedEmployeeId; }) : null; @endphp
-                                <div class="dd" data-target="#select_emp">
-                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                        <span class="dd-lbl">{{ $selectedEmp ? ($selectedEmp->employee->Emp_id . ' - ' . $selectedEmp->employee->resortAdmin->full_name) : 'Select Employees' }}</span>
-                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                    </button>
-                                    <div class="dd-panel" role="listbox" aria-label="Employee">
-                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
-                                        <div class="dd-scroll">
-                                            <div class="dd-item{{ !$selectedEmp ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Employees</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                    <div class="ffs-wrap" id="ffsWrap">
+
+                        {{-- ════════════════════ Settlement setup + Employee details ════════════════════ --}}
+                        <div class="ffs-card ffs-combo ffs-span2">
+                            <div class="ffs-cl">
+                                <div class="ffs-ct"><h2>Settlement setup</h2></div>
+                                <div class="ffs-grid ffs-g2">
+                                    <div class="ffs-f ffs-fspan">
+                                        <label for="select_emp">Select employee or employee ID <span class="ffs-req">*</span></label>
+                                        <select class="form-select dd-native-select" name="select_emp" id="select_emp" onchange="getEmpDetails(this.value)"
+                                            data-parsley-required="true" data-parsley-error-message="Please select an employee" data-parsley-errors-container="#select_emp_error">
+                                            <option value="">Select Employee</option>
                                             @if($employees)
                                                 @foreach($employees as $emp)
-                                                <div class="dd-item{{ !empty($preselectedEmployeeId) && (int) $preselectedEmployeeId === (int) $emp->employee->id ? ' active' : '' }}" role="option" data-value="{{ $emp->employee->id }}"><span class="dd-nm">{{ $emp->employee->Emp_id }} - {{ $emp->employee->resortAdmin->full_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    {{-- Each option carries the employee's nationality so the
+                                                         pension column can be hidden client-side for non-Maldivian
+                                                         (foreign) employees — pension contribution is a Maldives-
+                                                         specific deduction and shouldn't appear in their F&F. --}}
+                                                    <option value="{{$emp->employee->id}}"
+                                                        data-nationality="{{ $emp->employee->nationality }}"
+                                                        @if(!empty($preselectedEmployeeId) && (int) $preselectedEmployeeId === (int) $emp->employee->id) selected @endif>
+                                                        {{$emp->employee->Emp_id}} - {{$emp->employee->resortAdmin->full_name}}
+                                                    </option>
                                                 @endforeach
                                             @endif
+                                        </select>
+                                        @php $selectedEmp = !empty($preselectedEmployeeId) ? collect($employees)->first(function($e) use ($preselectedEmployeeId){ return (int)$e->employee->id === (int)$preselectedEmployeeId; }) : null; @endphp
+                                        <div class="dd ffs-emp-dd" data-target="#select_emp">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">{{ $selectedEmp ? ($selectedEmp->employee->Emp_id . ' - ' . $selectedEmp->employee->resortAdmin->full_name) : 'Select Employee' }}</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Employee">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item{{ !$selectedEmp ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($employees)
+                                                        @foreach($employees as $emp)
+                                                        @php
+                                                            $ddAdminId = $emp->employee->resortAdmin->id ?? null;
+                                                            $ddFullName = $emp->employee->resortAdmin->full_name ?? '';
+                                                            $ddParts = preg_split('/\s+/', trim($ddFullName));
+                                                            $ddInitials = strtoupper(($ddParts[0][0] ?? '') . (isset($ddParts[1]) ? $ddParts[1][0] : '')) ?: '?';
+                                                            // getResortUserPicturesBatch() always resolves to at least
+                                                            // the app's generic silhouette default — only render <img>
+                                                            // for a REAL uploaded photo, never the generic placeholder,
+                                                            // so the initials fallback shows instead per the photo-first
+                                                            // convention.
+                                                            $ddDefaultPicture = url(config('settings.default_picture'));
+                                                            $ddPhoto = $ddAdminId ? ($employeePictures[$ddAdminId] ?? null) : null;
+                                                            if ($ddPhoto === $ddDefaultPicture) { $ddPhoto = null; }
+                                                            $ddPosition = $emp->employee->position->position_title ?? null;
+                                                            $ddDepartment = $emp->employee->department->name ?? null;
+                                                            $ddSub = trim(collect([$emp->employee->Emp_id, collect([$ddPosition, $ddDepartment])->filter()->implode(' – ')])->filter()->implode(' · '));
+                                                        @endphp
+                                                        <div class="dd-item{{ !empty($preselectedEmployeeId) && (int) $preselectedEmployeeId === (int) $emp->employee->id ? ' active' : '' }}" role="option" data-value="{{ $emp->employee->id }}">
+                                                            <span class="ffs-dd-av">
+                                                                <span class="ffs-dd-av-fallback">{{ $ddInitials }}</span>
+                                                                @if($ddPhoto)<img src="{{ $ddPhoto }}" alt="" onerror="this.remove()">@endif
+                                                            </span>
+                                                            <span class="ffs-dd-text">
+                                                                <span class="dd-nm">{{ $emp->employee->Emp_id }} - {{ $ddFullName }}</span>
+                                                                @if($ddSub)<span class="ffs-dd-sub">{{ $ddSub }}</span>@endif
+                                                            </span>
+                                                            <svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>
+                                                        </div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
                                         </div>
+                                        <div id="select_emp_error"></div>
+                                    </div>
+                                    <div class="ffs-f">
+                                        <label for="resignation_date">Resignation effective date <span class="ffs-req">*</span></label>
+                                        <input type="text" id="resignation_date" name="resignation_date" class="ffs-inp ffs-ro" placeholder="Resignation effective date"
+                                            disabled required>
+                                    </div>
+                                    <div class="ffs-f">
+                                        <label for="last_day">Last working day <span class="ffs-req">*</span></label>
+                                        <input type="text" id="last_day" name="last_day" class="ffs-inp ffs-ro" placeholder="Last working day" disabled required>
                                     </div>
                                 </div>
-                                <div id="select_emp_error"></div>
                             </div>
-                            <div class="col-xl-4 col-md-6">
-                                <div class="empDetails-user">
-                                    <div class="img-circle" id="img-circle">
-                                        <img src="">
-                                    </div>
-                                    <div>
-                                        <h4> <span class="badge badge-themeNew"></span></h4>
-                                        <p></p>
-                                    </div>
+                            <div class="ffs-cr ffs-pcard">
+                                <div class="ffs-ct"><h2>Employee details</h2></div>
+                                <div class="ffs-pc-empty" id="pcEmpty">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                                    Select an employee to load their details and settlement.
                                 </div>
-                            </div>
-                            <div class="col-xl-4 col-sm-6">
-                                <label for="resignation_date" class="form-label">RESIGNATION EFFECTIVE DATE<span class="red-mark">*</span></label>
-                                <input type="text" id="resignation_date" name="resignation_date" class="form-control" placeholder="RESIGNATION EFFECTIVE DATE"
-                                    disabled required >
-                            </div>
-                            <div class="col-xl-4 col-sm-6">
-                                <label for="last_day" class="form-label">LAST WORKING DAY<span class="red-mark">*</span></label>
-                                <input type="text" id="last_day" name="last_day" class="form-control" placeholder="LAST WORKING DAY" disabled required>
+                                <div class="ffs-pc-body" id="pcBody">
+                                    <div class="ffs-pc-head">
+                                        <span class="ffs-pa" id="img-circle"><img src="" alt=""></span>
+                                        <div class="ffs-pn" id="pcName"></div>
+                                    </div>
+                                    <div class="ffs-prow"><span class="ffs-k">Employee ID</span><span class="ffs-v" id="pcId"></span></div>
+                                    <div class="ffs-prow"><span class="ffs-k">Department</span><span class="ffs-v" id="pcDept"></span></div>
+                                    <div class="ffs-prow"><span class="ffs-k">Position</span><span class="ffs-v" id="pcPos"></span></div>
+                                    <div class="ffs-prow"><span class="ffs-k">Status</span><span class="ffs-stbadge"><i class="ffs-dot"></i>Resigned</span></div>
+                                </div>
                             </div>
                         </div>
 
@@ -105,20 +145,21 @@
                              readonly so users can't introduce bogus commas.
                              Submit handler strips commas back before POST so
                              Laravel's `numeric` validator stays happy. ──── --}}
-                        <div class="fullFinal-main mb-md-4 mb-3">
-                            <div class="fullFinal-head">
-                                <i class="fa-solid fa-arrow-down me-2 text-success"></i>Earnings
-                            </div>
-                            <div class="card-body fullFinal-block">
-                                <div class="row g-md-4 g-3">
-                                    <div class="col-xl-4 col-sm-6">
-                                        <label for="basic_salary" class="form-label">Basic Salary (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
-                                        <input type="text" id="basic_salary" class="form-control money-field" name="basic_salary"
-                                            placeholder="Basic salary" data-parsley-required="true" readonly>
+                        <div class="ffs-card ffs-locked">
+                            <div class="ffs-ct"><span class="ffs-ic ffs-up"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><h2>Earnings</h2></div>
+                            <div class="ffs-line">
+                                <div class="ffs-lrow">
+                                    <div class="ffs-lk">
+                                        <div class="ffs-t">Basic salary <span class="display-currency-label ffs-u">{{ $displayCurrencyCode ?? 'MVR' }}</span> <span class="ffs-req">*</span></div>
                                     </div>
-                                    <div class="col-xl-4 col-sm-6">
-                                        <label for="earned_salary" class="form-label d-flex align-items-center">
-                                            <span>Earned Salary (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></span>
+                                    <div class="ffs-lv">
+                                        <input type="text" id="basic_salary" class="form-control money-field" name="basic_salary"
+                                            placeholder="0.00" data-parsley-required="true" readonly>
+                                    </div>
+                                </div>
+                                <div class="ffs-lrow">
+                                    <div class="ffs-lk">
+                                        <div class="ffs-t">Earned salary <span class="display-currency-label ffs-u">{{ $displayCurrencyCode ?? 'MVR' }}</span> <span class="ffs-req">*</span>
                                             {{-- Manual override toggle. Earned Salary is normally
                                                  derived from attendance (worked × daily rate); HR
                                                  can flip this to enter a manual figure when
@@ -126,46 +167,52 @@
                                                  icon, input becomes editable, Gross Earning recomputes
                                                  on blur. Edit OFF: restores the attendance-derived
                                                  value and re-locks the field. --}}
-                                            <a href="javascript:void(0)" id="earned_salary_edit_toggle"
-                                               class="ms-2 text-themeSkyblue" title="Edit Earned Salary manually"
-                                               style="font-size:12px;">
+                                            <a href="javascript:void(0)" id="earned_salary_edit_toggle" class="ffs-edit" title="Edit Earned Salary manually">
                                                 <i class="fa-solid fa-pencil"></i>
                                             </a>
-                                        </label>
-                                        <input type="text" id="earned_salary" class="form-control money-field" name="earned_salary"
-                                            placeholder="Earned salary" data-parsley-required="true" readonly>
+                                        </div>
                                         {{-- Attendance-based earning breakdown — populated by
                                              getEmpDetails() with worked/expected days, daily
                                              rate. Same formula payroll uses (basic ÷ days_in_period)
                                              × (present + day_off). Red banner if attendance gap. --}}
-                                        <small id="earning-breakdown"
-                                               class="form-text d-block text-muted mt-1"
-                                               style="font-size:11px;"></small>
+                                        <div id="earning-breakdown" class="ffs-n"></div>
                                     </div>
-                                    <div class="col-xl-4 col-sm-6">
-                                        <label for="service_charge" class="form-label">Service Charge (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
+                                    <div class="ffs-lv">
+                                        <input type="text" id="earned_salary" class="form-control money-field" name="earned_salary"
+                                            placeholder="0.00" data-parsley-required="true" readonly>
+                                    </div>
+                                </div>
+                                <div class="ffs-lrow">
+                                    <div class="ffs-lk">
+                                        <div class="ffs-t">Service charge <span class="display-currency-label ffs-u">{{ $displayCurrencyCode ?? 'MVR' }}</span> <span class="ffs-req">*</span></div>
+                                    </div>
+                                    <div class="ffs-lv">
                                         <input type="text" id="service_charge" class="form-control money-field"
-                                            name="service_charge" placeholder="Service Charge" data-parsley-required="true">
+                                            name="service_charge" placeholder="0.00" data-parsley-required="true">
                                     </div>
-                                    <div class="col-xl-4 col-sm-6">
-                                        <label for="leave_balance" class="form-label">Leave Balance (days)<span class="red-mark">*</span></label>
+                                </div>
+                                <div class="ffs-lrow">
+                                    <div class="ffs-lk">
+                                        <div class="ffs-t">Leave balance <span class="ffs-u">days</span> <span class="ffs-req">*</span></div>
+                                        <div id="leave-breakdown" class="ffs-n"></div>
+                                    </div>
+                                    <div class="ffs-lv">
                                         {{-- step="0.01" so HR-edited fractional days (4.60, 5.01, etc.)
                                              pass HTML5 + Parsley validation. Without it, type="number"
                                              defaults to step=1 and rejects any decimal as
                                              "This value seems to be invalid." --}}
-                                        <input type="number" name="leave_balance" id="leave_balance" class="form-control" min="0" max="500" step="0.01" placeholder="Leave Balance" readonly data-parsley-required="true" data-parsley-type="number"
+                                        <input type="number" name="leave_balance" id="leave_balance" class="form-control" min="0" max="500" step="0.01" placeholder="0.00" readonly data-parsley-required="true" data-parsley-type="number"
                                             data-parsley-min="0" data-parsley-trigger="change">
-                                        <small id="leave-breakdown"
-                                               class="form-text d-block text-muted mt-1"
-                                               style="font-size:11px;"></small>
                                     </div>
-                                    <div class="col-xl-4 col-sm-6">
-                                        <label for="leave_encashment" class="form-label">LEAVE ENCASHMENT (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
+                                </div>
+                                <div class="ffs-lrow">
+                                    <div class="ffs-lk">
+                                        <div class="ffs-t">Leave encashment <span class="display-currency-label ffs-u">{{ $displayCurrencyCode ?? 'MVR' }}</span> <span class="ffs-req">*</span></div>
+                                        <div id="leave-encashment-formula" class="ffs-n"></div>
+                                    </div>
+                                    <div class="ffs-lv">
                                         <input type="text" id="leave_encashment" name="leave_encashment" class="form-control money-field"
-                                            placeholder="Leave Encashment" data-parsley-required="true" readonly>
-                                        <small id="leave-encashment-formula"
-                                               class="form-text d-block text-muted mt-1"
-                                               style="font-size:11px;"></small>
+                                            placeholder="0.00" data-parsley-required="true" readonly>
                                     </div>
                                 </div>
                             </div>
@@ -178,183 +225,157 @@
                              Settlement PDF (MRPS Employee Mandatory Contribution
                              = Pension; Notice Period / Adjustments live in the
                              dynamic Deduction block below). ─────────────────── --}}
-                        {{-- ═════════════════════════════════════════════════════════
-                             Card order (per HR layout request):
-                               1. Earnings (above)
-                               2. Allowance Breakdown
-                               3. Deductions (EWT / Pension / Loan / Notice)
-                               4. Deduction repeater (ad-hoc)
-                               5. Leave Balance & Encashment Breakdown
-                               6. Settlement Breakdown (totals, last)
-                             Moving Allowance up and the ad-hoc Deduction up keeps
-                             every settlement input above the Leave Breakdown table
-                             so HR reviews inputs first, then sees the rolled-up
-                             totals at the bottom.
-                             ═════════════════════════════════════════════════════ --}}
-
-                        {{-- ───── Allowance Breakdown (was below — moved up so it
-                             sits next to Earnings, since allowances ARE earnings). --}}
-                        <div class="fullFinal-main mb-md-4 mb-3">
-                            <div class="fullFinal-head">
-                                Allowance Breakdown
-                            </div>
-                            <div class="card-body fullFinal-block">
-                                <table class="table" id="allowance-details">
-                                    <thead>
-                                        <tr>
-                                            <th>Allowance Name</th>
-                                            <th class="text-end">Amount (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <!-- Populated by JS -->
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <th class="text-end">Total</th>
-                                            <th class="text-end" id="total-allowances">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div class="fullFinal-main mb-md-4 mb-3">
-                            <div class="fullFinal-head">
-                                <i class="fa-solid fa-arrow-up me-2 text-danger"></i>Deductions
-                            </div>
-                            <div class="card-body fullFinal-block">
-                                <div class="row g-md-4 g-3">
-                                    <div class="col-xl-4 col-sm-6">
-                                        <label for="tax" class="form-label">EWT (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
-                                        <input type="text" id="tax" class="form-control money-field" name="tax"
-                                            placeholder="EWT" data-parsley-required="true" readonly>
+                        <div class="ffs-card ffs-locked">
+                            <div class="ffs-ct"><span class="ffs-ic ffs-dn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><h2>Deductions</h2></div>
+                            <div class="ffs-line">
+                                <div class="ffs-lrow">
+                                    <div class="ffs-lk">
+                                        <div class="ffs-t">EWT / LWT <span class="display-currency-label ffs-u">{{ $displayCurrencyCode ?? 'MVR' }}</span> <span class="ffs-req">*</span></div>
                                         {{-- Surfaced when taxable income clears the MIRA EWT
                                              threshold but the employee isn't EWT-enrolled or
                                              has no TIN on file. Same warning shape as the
                                              Employee Details "Salary Details" card. --}}
-                                        <small id="ewt-warning"
-                                               class="form-text d-block text-danger mt-1"
-                                               style="font-size:11px; display:none !important;">
-                                            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                                        <div id="ewt-warning" class="ffs-n ffs-warn" style="display:none">
                                             <span id="ewt-warning-text"></span>
-                                        </small>
+                                        </div>
                                     </div>
-                                    {{-- Pension column — only Maldivian (Local) employees
-                                         contribute to MRPS. JS toggles visibility based on the
-                                         selected employee's data-nationality option attr;
-                                         foreigners get the column hidden AND
-                                         data-parsley-required stripped so Parsley doesn't
-                                         block submit on an invisible field. --}}
-                                    <div class="col-xl-4 col-sm-6" id="pension-col">
-                                        <label for="pension" class="form-label">PENSION / MRPS (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
+                                    <div class="ffs-lv">
+                                        <input type="text" id="tax" class="form-control money-field" name="tax"
+                                            placeholder="0.00" data-parsley-required="true" readonly>
+                                    </div>
+                                </div>
+                                {{-- Pension column — only Maldivian (Local) employees
+                                     contribute to MRPS. JS toggles visibility based on the
+                                     selected employee's data-nationality option attr;
+                                     foreigners get the column hidden AND
+                                     data-parsley-required stripped so Parsley doesn't
+                                     block submit on an invisible field. --}}
+                                <div class="ffs-lrow" id="pension-col">
+                                    <div class="ffs-lk">
+                                        <div class="ffs-t">Pension / MRPS <span class="display-currency-label ffs-u">{{ $displayCurrencyCode ?? 'MVR' }}</span> <span class="ffs-req">*</span></div>
+                                    </div>
+                                    <div class="ffs-lv">
                                         <input type="text" id="pension" class="form-control money-field" name="pension"
-                                            placeholder="Pension" data-parsley-required="true" readonly>
+                                            placeholder="0.00" data-parsley-required="true" readonly>
                                     </div>
-                                    <div class="col-xl-4 col-sm-6">
-                                        <label for="loan_payment" class="form-label">LOAN OR ADVANCE PAYMENT (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
-                                        <input type="text" id="loan_payment" name="loan_payment" class="form-control money-field"
-                                            placeholder="Enter Amount" data-parsley-required="true" readonly>
+                                </div>
+                                <div class="ffs-lrow">
+                                    <div class="ffs-lk">
+                                        <div class="ffs-t">Loan or advance <span class="display-currency-label ffs-u">{{ $displayCurrencyCode ?? 'MVR' }}</span> <span class="ffs-req">*</span></div>
                                         {{-- Loan vs Salary Advance bucket breakdown — built
                                              from payroll_recovery_schedule rows joined to
                                              payroll_advance. Hidden when nothing's
                                              outstanding so the line doesn't shout 0.00. --}}
-                                        <small id="loan-breakdown"
-                                               class="form-text d-block text-muted mt-1"
-                                               style="font-size:11px;"></small>
+                                        <div id="loan-breakdown" class="ffs-n"></div>
                                     </div>
-                                    {{-- Notice Period Charge — fetched from the Notice
-                                         Period module config (employee_notice_period.period
-                                         = required days). Charge = max(0, required − served)
-                                         × dailySalary. Field is editable so HR can override
-                                         (e.g. management waived part of it) but the
-                                         breakdown below shows the computed reference value. --}}
-                                    <div class="col-xl-4 col-sm-6">
-                                        <label for="notice_period_charge" class="form-label">Notice Period Charge (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
+                                    <div class="ffs-lv">
+                                        <input type="text" id="loan_payment" name="loan_payment" class="form-control money-field"
+                                            placeholder="0.00" data-parsley-required="true" readonly>
+                                    </div>
+                                </div>
+                                {{-- Notice Period Charge — fetched from the Notice
+                                     Period module config (employee_notice_period.period
+                                     = required days). Charge = max(0, required − served)
+                                     × dailySalary. Field is editable so HR can override
+                                     (e.g. management waived part of it) but the
+                                     breakdown below shows the computed reference value. --}}
+                                <div class="ffs-lrow">
+                                    <div class="ffs-lk">
+                                        <div class="ffs-t">Notice period charge <span class="display-currency-label ffs-u">{{ $displayCurrencyCode ?? 'MVR' }}</span> <span class="ffs-req">*</span></div>
+                                        <div id="notice-period-breakdown" class="ffs-n"></div>
+                                    </div>
+                                    <div class="ffs-lv">
                                         <input type="text" id="notice_period_charge" name="notice_period_charge"
-                                            class="form-control money-field" placeholder="Notice Period Charge"
+                                            class="form-control money-field" placeholder="0.00"
                                             data-parsley-required="true">
-                                        <small id="notice-period-breakdown"
-                                               class="form-text d-block text-muted mt-1"
-                                               style="font-size:11px;"></small>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {{-- ───── Deduction repeater (was below — moved up so the
-                             ad-hoc rows sit next to the Deductions card and the
-                             Leave Breakdown / Settlement totals follow as the
-                             final summary cards). --}}
-                        <div class="fullFinal-main mb-md-4 mb-3">
-                            <div class="fullFinal-head">Deduction</div>
-                            <div class="fullFinal-block">
-                                {{-- IMPORTANT: this initial row must carry the .deduction-row
-                                     class so the submit JS picks it up. Without it the JS only
-                                     iterated rows appended by "Add More" and silently dropped
-                                     anything HR typed into the first slot (reported as
-                                     "Uniform Damage 100 USD didn't reach the review page"). --}}
-                                <div class="row g-md-4 g-3 deduction-row">
-                                    <!-- Initial deduction row -->
-                                    <div class="col-xl-3 col-sm">
-                                        <select class="form-select dd-native-select deduction-select" id="deductionSelect_0" data-parsley-required-if="#deduction-amount-first" data-parsley-trigger="change">
-                                            <option value="">Select Deduction</option>
-                                            @foreach($deductions as $deduction)
-                                                <option value="{{ $deduction->id }}" data-unit="{{ $deduction->currency }}">{{ $deduction->deduction_name }}</option>
-                                            @endforeach
-                                        </select>
-                                        <div class="dd" data-target="#deductionSelect_0">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Deduction</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Deduction">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a deduction…"></div>
-                                                <div class="dd-scroll">
-                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Deduction</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                    @foreach($deductions as $deduction)
-                                                    <div class="dd-item" role="option" data-value="{{ $deduction->id }}"><span class="dd-nm">{{ $deduction->deduction_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                    @endforeach
-                                                </div>
+                            {{-- IMPORTANT: this initial row must carry the .deduction-row
+                                 class so the submit JS picks it up. Without it the JS only
+                                 iterated rows appended by "Add more" and silently dropped
+                                 anything HR typed into the first slot (reported as
+                                 "Uniform Damage 100 USD didn't reach the review page"). --}}
+                            <div class="ffs-mdrow deduction-row">
+                                <div class="ffs-f">
+                                    <label>Add deduction</label>
+                                    <select class="form-select dd-native-select deduction-select" id="deductionSelect_0" data-parsley-required-if="#deduction-amount-first" data-parsley-trigger="change">
+                                        <option value="">Select Deduction</option>
+                                        @foreach($deductions as $deduction)
+                                            <option value="{{ $deduction->id }}" data-unit="{{ $deduction->currency }}">{{ $deduction->deduction_name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="dd" data-target="#deductionSelect_0">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Deduction</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Deduction">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a deduction…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Deduction</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @foreach($deductions as $deduction)
+                                                <div class="dd-item" role="option" data-value="{{ $deduction->id }}"><span class="dd-nm">{{ $deduction->deduction_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-xl-3 col-sm">
-                                        <input type="number" id="deduction-amount-first" class="form-control deduction-amount" placeholder="Enter Amount" data-parsley-type="number" data-parsley-min="0" data-parsley-trigger="change">
-                                    </div>
-                                    <div class="col-xl-3 col-sm">
-                                        <input type="text" class="form-control amount-unit" placeholder="Amount Unit" readonly>
-                                    </div>
-                                    <div class="col-xl-3 col-auto align-self-end">
-                                        <a href="#" class="btn payroll-btn-positive btn-sm add-fullFinal add-deduction">Add More</a>
-                                    </div>
                                 </div>
+                                <div class="ffs-f">
+                                    <label for="deduction-amount-first">Amount</label>
+                                    <input type="number" id="deduction-amount-first" class="ffs-inp deduction-amount" placeholder="Enter amount" data-parsley-type="number" data-parsley-min="0" data-parsley-trigger="change">
+                                </div>
+                                <div class="ffs-f ffs-unitf">
+                                    <label>Unit</label>
+                                    <input type="text" class="ffs-inp amount-unit" placeholder="—" readonly>
+                                </div>
+                                <a href="#" class="ffs-addbtn add-fullFinal add-deduction"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add more</a>
                             </div>
                             <div class="deductions-container"></div>
                         </div>
 
-                        {{-- ───── Leave Balance & Encashment Breakdown ─────
-                             ONE table that backs BOTH the "Leave Balance (days)" and
-                             "LEAVE ENCASHMENT" inputs above. Each row shows the per-
+                        {{-- ───── Allowance breakdown | Leave balance & encashment ───── --}}
+                        <div class="ffs-card ffs-locked">
+                            <div class="ffs-ct"><h2>Allowance breakdown</h2></div>
+                            <table class="table ffs-tbl" id="allowance-details">
+                                <thead>
+                                    <tr>
+                                        <th>Allowance name</th>
+                                        <th class="text-end">Amount (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Populated by JS -->
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <th class="text-end">Total</th>
+                                        <th class="text-end" id="total-allowances">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        {{-- ONE table that backs BOTH the "Leave balance (days)" and
+                             "Leave encashment" inputs above. Each row shows the per-
                              category leave name (Annual / Sick / Day Off / Public Holiday
                              / Other), the unused days carried forward, and the days ×
                              daily_salary value. The Days column totals to the Leave
-                             Balance input; the Amount column totals to the LEAVE
-                             ENCASHMENT input. Populated by JS in getEmpDetails(). --}}
-                        <div class="fullFinal-main mb-md-4 mb-3">
-                            <div class="fullFinal-head d-flex align-items-center">
-                                <span>Leave Balance &amp; Encashment Breakdown</span>
-                                <small class="text-muted ms-2 flex-grow-1" style="font-size:12px; font-weight:400;">
-                                    Days column → Leave Balance · Amount column → Leave Encashment
-                                </small>
+                             Balance input; the Amount column totals to the Leave
+                             Encashment input. Populated by JS in getEmpDetails(). --}}
+                        <div class="ffs-card ffs-locked">
+                            <div class="ffs-ct">
+                                <h2>Leave balance &amp; encashment</h2>
+                                <span class="ffs-spacer"></span>
                                 {{-- Reset button: re-renders the table from the server-supplied
                                      breakdown stashed at last render, discarding HR edits + any
                                      manually-added rows. Disabled until #payable-leaves has a
                                      stash (i.e. after the first employee fetch). --}}
-                                <button type="button" class="btn btn-sm payroll-btn-secondary ms-2"
+                                <button type="button" class="btn btn-sm payroll-btn-secondary"
                                         id="reset-payable-leaves"
                                         title="Reset rows to the values calculated by the system">
-                                    <i class="fa-solid fa-rotate-left me-1"></i>Reset to original
+                                    <i class="fa-solid fa-rotate-left me-1"></i>Reset
                                 </button>
                                 {{-- Add-row button: appends a manual entry to the table so HR can
                                      record settlement items that aren't in the leave grid (extra
@@ -365,34 +386,32 @@
                                     <i class="fa-solid fa-plus me-1"></i>Add row
                                 </button>
                             </div>
-                            <div class="card-body fullFinal-block">
-                                <table class="table" id="payable-leaves">
-                                    <thead>
-                                        <tr>
-                                            <th>Leave Type</th>
-                                            <th class="text-end" style="width:120px;">Days</th>
-                                            <th class="text-end">Daily Rate</th>
-                                            <th class="text-end">Amount (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)</th>
-                                            <th style="width:40px;"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <!-- Populated by JS -->
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <th>Total</th>
-                                            <th class="text-end" id="payable-leaves-days-total">0.00</th>
-                                            <th class="text-end">—</th>
-                                            <th class="text-end" id="payable-leaves-amount-total">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
-                                            <th></th>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
+                            <table class="table ffs-tbl" id="payable-leaves">
+                                <thead>
+                                    <tr>
+                                        <th>Leave type</th>
+                                        <th class="text-end" style="width:120px;">Days</th>
+                                        <th class="text-end">Rate</th>
+                                        <th class="text-end">Amount (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)</th>
+                                        <th style="width:40px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Populated by JS -->
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <th>Total</th>
+                                        <th class="text-end" id="payable-leaves-days-total">0.00</th>
+                                        <th class="text-end">—</th>
+                                        <th class="text-end" id="payable-leaves-amount-total">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
+                                        <th></th>
+                                    </tr>
+                                </tfoot>
+                            </table>
                         </div>
 
-                        {{-- ───── Settlement Details Breakdown ─────
+                        {{-- ───── Settlement breakdown (full width) ─────
                              Same shape as the review page: per-source row
                              (Basic Salary for N worked days, Service Charge,
                              Leave Days Salary, Allowance) → Gross Earning at
@@ -400,42 +419,31 @@
                              figure is built without leaving the page. All
                              cells are converted to the display currency
                              through mvrToDisplay() in the JS below. --}}
-                        <div class="fullFinal-main mb-md-4 mb-3">
-                            <div class="fullFinal-head">
-                                Settlement Breakdown
-                                <small class="text-muted ms-2" style="font-size:12px; font-weight:400;">
-                                    Earnings − Deductions → Net Settlement
-                                </small>
+                        <div class="ffs-card ffs-locked ffs-span2">
+                            <div class="ffs-ct"><h2>Settlement breakdown</h2><span class="ffs-sub">Earnings − Deductions = Net settlement</span></div>
+                            <div class="ffs-settle" id="settlement-details">
+                                <div class="ffs-s2col" id="settlement-earnings-col">
+                                    <div class="ffs-s2h">Earnings</div>
+                                    <!-- Populated by JS -->
+                                </div>
+                                <div class="ffs-s2col ffs-ded" id="settlement-deductions-col">
+                                    <div class="ffs-s2h">Deductions</div>
+                                    <!-- Populated by JS -->
+                                </div>
+                                <div class="ffs-s2net">
+                                    <span class="ffs-lbl">Net settlement</span>
+                                    <span class="ffs-amt" id="settlement-details-total">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</span>
+                                </div>
                             </div>
-                            <div class="card-body fullFinal-block">
-                                <table class="table" id="settlement-details">
-                                    <thead>
-                                        <tr>
-                                            <th>Source</th>
-                                            <th class="text-end">Amount (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="settlement-details-body">
-                                        <!-- Populated by JS: earnings → Gross Earning subtotal → deductions → Total Deductions subtotal -->
-                                    </tbody>
-                                    <tfoot>
-                                        <tr class="fw-bold">
-                                            <th class="fw-bold">Net Settlement</th>
-                                            <th class="text-end fw-bold" id="settlement-details-total">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
-                                        </tr>
-                                    </tfoot>
-                                </table>
+                            <input type="hidden" name="last_working_date" id="last_working_date"/>
+                            <input type="hidden" name="payroll_start_date" id="payroll_start_date"/>
+                            <input type="hidden" name="payment_mode" id="payment_mode"/>
+                            <div class="ffs-cfoot">
+                                <button type="submit" id="submit" class="btn payroll-btn-primary ffs-submit @if(Common::checkRouteWisePermission('payslip.fullandfinalsettlement',config('settings.resort_permissions.create')) == false) d-none @endif" disabled>Submit settlement</button>
                             </div>
                         </div>
-                        <input type="hidden" name="last_working_date" id="last_working_date"/>
-                        <input type="hidden" name="payroll_start_date" id="payroll_start_date"/>
-                        <input type="hidden" name="payment_mode" id="payment_mode"/>
-
-                        <div class="card-footer text-end">
-                            <button type="submit" class="btn payroll-btn-primary  @if(Common::checkRouteWisePermission('payslip.fullandfinalsettlement',config('settings.resort_permissions.create')) == false) d-none @endif">Submit</button>
-                        </div>
-                    </form>
-                </div>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -449,6 +457,153 @@
     border-color: #dc3545 !important; /* red border */
     box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
 }
+
+/* ════════════════════════════════════════════════════════════════
+   Full & Final Settlement — frontend-only restyle. Scoped ffs-
+   prefixed classes so nothing here leaks onto the shared
+   .fullFinal-, .empDetails-user, .img-circle classes other pages
+   (Accommodation, Leave PDF) still use.
+   ════════════════════════════════════════════════════════════════ */
+.ffs-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.ffs-span2 { grid-column: 1 / -1; }
+@media (max-width: 900px) { .ffs-wrap { grid-template-columns: 1fr; } }
+
+.ffs-card { background: #fff; border-radius: 18px; box-shadow: 0 1px 2px rgba(1,70,83,.05), 0 16px 40px rgba(1,70,83,.10); padding: 24px 26px; }
+
+/* combined setup + employee details card */
+.ffs-card.ffs-combo { padding: 0; display: grid; grid-template-columns: 1.25fr 1fr; }
+.ffs-combo .ffs-cl { padding: 24px 30px 24px 26px; }
+.ffs-combo .ffs-cr { padding: 24px 26px 24px 30px; border-left: 1px solid var(--line, #EEF2F2); }
+@media (max-width: 900px) { .ffs-card.ffs-combo { grid-template-columns: 1fr; } .ffs-combo .ffs-cr { border-left: none; border-top: 1px solid var(--line, #EEF2F2); } }
+.ffs-ct { display: flex; align-items: center; gap: 11px; margin-bottom: 18px; }
+.ffs-ct .ffs-ic { width: 30px; height: 30px; flex: none; border-radius: 9px; display: grid; place-items: center; }
+.ffs-ct .ffs-ic.ffs-up { background: var(--teal-soft, #f1f7f7); color: var(--teal); }
+.ffs-ct .ffs-ic.ffs-dn { background: #fbeceb; color: #B4462F; }
+.ffs-ct h2 { font-size: 18px; font-weight: 600; color: var(--ink); }
+.ffs-ct .ffs-sub { font-size: 12.5px; color: #99A1A5; font-weight: 400; }
+.ffs-ct .ffs-spacer { flex: 1; }
+
+.ffs-grid { display: grid; gap: 18px 22px; }
+.ffs-grid.ffs-g2 { grid-template-columns: 1fr 1fr; }
+.ffs-fspan { grid-column: 1 / -1; }
+.ffs-f label { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; letter-spacing: .2px; text-transform: uppercase; color: #6B7378; margin-bottom: 8px; }
+.ffs-req { color: #C7CDCF; font-weight: 400; }
+.ffs-edit { color: var(--teal); display: inline-grid; place-items: center; cursor: pointer; margin-left: 4px; }
+.ffs-inp,
+.ffs-card .form-control,
+.ffs-card .form-select { width: 100%; border: 1px solid var(--line, #EEF2F2); border-radius: 12px; padding: 13px 15px; font: inherit; font-size: 15px; color: var(--ink); background: #fff; outline: none; transition: border-color .14s, box-shadow .14s; }
+.ffs-card .form-control:focus,
+.ffs-card .form-select:focus,
+.ffs-inp:focus { border-color: #cfe0e1; box-shadow: 0 0 0 3px rgba(1,70,83,.05); }
+.ffs-inp.ffs-ro,
+.ffs-card .form-control[disabled],
+.ffs-card .form-control[readonly] { background: #F7F8F8; color: #6B7378; border-color: transparent; }
+.ffs-n { font-size: 12.5px; color: #99A1A5; margin-top: 8px; line-height: 1.5; }
+.ffs-n.ffs-warn { color: #B4462F; }
+.ffs-n.ffs-warn::before { content: "⚠  "; }
+/* getEmpDetails() toggles Bootstrap's own text-danger/text-warning/
+   text-muted utility classes on #earning-breakdown and
+   #notice-period-breakdown (attendance-gap / notice-shortfall warnings)
+   — compound selectors here so those colors win regardless of CSS
+   load order against the plain .ffs-n grey default above. */
+.ffs-n.text-danger { color: #B4462F; }
+.ffs-n.text-warning { color: #B4462F; }
+.ffs-n.text-muted { color: #99A1A5; }
+
+/* statement-row line items (earnings / deductions) — same rhythm as settlement breakdown */
+.ffs-line { border: 1px solid var(--line, #EEF2F2); border-radius: 14px; overflow: hidden; }
+.ffs-lrow { display: flex; align-items: flex-start; gap: 16px; padding: 15px 16px; border-bottom: 1px solid #F3F6F6; }
+.ffs-lrow:last-child { border-bottom: none; }
+.ffs-lrow .ffs-lk { flex: 1; min-width: 0; padding-top: 2px; }
+.ffs-lrow .ffs-lk .ffs-t { font-size: 14px; font-weight: 500; color: var(--ink); display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.ffs-lrow .ffs-lk .ffs-t .ffs-u { color: #99A1A5; font-weight: 400; font-size: 12.5px; }
+.ffs-lrow .ffs-lv { flex: none; width: 148px; }
+.ffs-lrow .ffs-lv .form-control { text-align: right; font-variant-numeric: tabular-nums; padding: 11px 13px; border-radius: 10px; }
+
+/* employee-details panel (Incident "Reported by" style) */
+.ffs-pcard .ffs-ct { border-bottom: 1px solid var(--line, #EEF2F2); padding-bottom: 14px; margin-bottom: 16px; }
+.ffs-pc-empty { display: flex; align-items: center; gap: 12px; color: #99A1A5; font-size: 14px; padding: 6px 2px; }
+.ffs-pc-body { display: none; }
+.ffs-wrap.selected .ffs-pc-empty { display: none; }
+.ffs-wrap.selected .ffs-pc-body { display: block; }
+.ffs-pc-head { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line, #EEF2F2); }
+.ffs-pa { width: 52px; height: 52px; flex: none; border-radius: 50%; background: var(--teal-soft, #f1f7f7); color: var(--teal); font-size: 16px; font-weight: 600; display: grid; place-items: center; overflow: hidden; }
+.ffs-pa img { width: 100%; height: 100%; object-fit: cover; }
+.ffs-pn { font-size: 17px; font-weight: 600; color: var(--ink); }
+.ffs-prow { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 13px 0; border-bottom: 1px solid #F3F6F6; font-size: 14px; }
+.ffs-prow:last-child { border-bottom: none; }
+.ffs-prow .ffs-k { color: #6B7378; }
+.ffs-prow .ffs-v { font-weight: 600; text-align: right; color: var(--ink); }
+.ffs-stbadge { display: inline-flex; align-items: center; gap: 7px; background: #F7F8F8; color: #3A4145; font-size: 12.5px; font-weight: 600; padding: 5px 11px; border-radius: 20px; }
+.ffs-stbadge .ffs-dot { width: 6px; height: 6px; border-radius: 50%; background: #99A1A5; }
+
+/* locked downstream — dimmed + inert until an employee is selected */
+.ffs-locked { transition: opacity .3s, filter .3s; }
+.ffs-wrap:not(.selected) .ffs-locked { opacity: .4; filter: grayscale(.3); pointer-events: none; user-select: none; }
+@media (prefers-reduced-motion: reduce) { .ffs-locked { transition: none; } }
+
+/* tables */
+.ffs-tbl { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--line, #EEF2F2); border-radius: 14px; overflow: hidden; margin: 0; }
+/* .ffs-tbl doubled on th/td/tfoot rules — the app's own default.css ships
+   ".table thead th{padding:0 10px 12px;font-size:16px}" and
+   ".table tbody td{padding:16px 10px}" (both 1-class-2-element selectors,
+   higher specificity than a plain ".ffs-tbl th"/".ffs-tbl td"), which was
+   silently winning and zeroing out the top/left padding here. Repeating
+   the class is the standard, minimal specificity bump — it doesn't touch
+   default.css, which every other .table on the site still needs untouched. */
+.ffs-tbl.ffs-tbl th { background: var(--teal-soft, #f1f7f7); text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: #6B7378; padding: 12px 15px !important; border-bottom: 1px solid var(--line, #EEF2F2); }
+.ffs-tbl.ffs-tbl td { padding: 13px 15px !important; border-bottom: 1px solid #F3F6F6; font-size: 14px; vertical-align: middle; }
+/* default.css also zeroes padding-left specifically on :first-child cells
+   (!important, for other DataTables-style tables app-wide) — restore it
+   here too, scoped to these two tables only. */
+.ffs-tbl.ffs-tbl th:first-child,
+.ffs-tbl.ffs-tbl td:first-child { padding-left: 15px !important; }
+.ffs-tbl.ffs-tbl tr:last-child td { border-bottom: none; }
+.ffs-tbl .text-end { text-align: right; font-variant-numeric: tabular-nums; }
+.ffs-tbl.ffs-tbl tfoot tr td,
+.ffs-tbl.ffs-tbl tfoot tr th { font-weight: 600; background: #fcfdfd; font-size: 14.5px; padding: 13px 15px !important; }
+.ffs-tbl.ffs-tbl tfoot tr td:first-child,
+.ffs-tbl.ffs-tbl tfoot tr th:first-child { padding-left: 15px !important; }
+.ffs-tbl .form-control-sm { border: 1px solid var(--line, #EEF2F2); border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+
+.ffs-mdrow { display: grid; grid-template-columns: 1fr 1fr 90px auto; gap: 12px; align-items: end; margin-top: 18px; padding: 18px 26px 24px; border-top: 1px dashed var(--line, #EEF2F2); }
+.ffs-mdrow .ffs-f label { margin-bottom: 8px; }
+.ffs-unitf .ffs-inp { text-align: center; color: #99A1A5; }
+.ffs-addbtn { background: var(--teal-soft, #f1f7f7); color: var(--teal); border: 1px solid #dcebeb; border-radius: 11px; padding: 12px 17px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; text-decoration: none; height: fit-content; }
+.ffs-addbtn:hover { background: #e7f1f1; color: var(--teal); }
+
+/* rows appended by "Add more" / removed by the .remove-deduction handler */
+.ffs-mdrow-added { display: grid; grid-template-columns: 1fr 1fr 90px auto; gap: 12px; align-items: end; padding: 16px 26px; border-top: 1px solid #F3F6F6; }
+
+/* settlement — two columns (earnings buildup | deductions) + full-width net bar */
+.ffs-settle { border: 1px solid var(--line, #EEF2F2); border-radius: 14px; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; }
+.ffs-s2col { padding-bottom: 6px; }
+.ffs-s2col.ffs-ded { border-left: 1px solid var(--line, #EEF2F2); }
+.ffs-s2h { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: #99A1A5; padding: 15px 18px 4px; }
+.ffs-s2row { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 11px 18px; font-size: 14px; border-top: 1px solid #F3F6F6; }
+.ffs-s2row .ffs-lbl { color: #3A4145; }
+.ffs-s2row .ffs-amt { font-variant-numeric: tabular-nums; font-weight: 500; white-space: nowrap; }
+.ffs-s2row.ffs-strong { font-weight: 600; background: #fcfdfd; }
+.ffs-s2col.ffs-ded .ffs-s2row .ffs-amt { color: #B4462F; }
+.ffs-s2net { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 18px; background: var(--teal-soft, #f1f7f7); border-top: 1px solid var(--line, #EEF2F2); }
+.ffs-s2net .ffs-lbl { font-weight: 600; font-size: 15px; color: var(--ink); }
+.ffs-s2net .ffs-amt { color: var(--teal); font-weight: 600; font-size: 20px; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .ffs-settle { grid-template-columns: 1fr; } .ffs-s2col.ffs-ded { border-left: none; border-top: 1px solid var(--line, #EEF2F2); } }
+
+.ffs-cfoot { display: flex; justify-content: flex-end; margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--line, #EEF2F2); }
+.ffs-submit:disabled { opacity: .55; cursor: default; transform: none !important; box-shadow: none !important; }
+
+/* employee dropdown — each row: photo-first avatar (initials fallback)
+   + a stacked name/position-department text block, vertically centered
+   against the avatar (matches the Incident "Reported by" avatar-row
+   pattern used elsewhere, rather than top-aligning against wrapped text). */
+.ffs-emp-dd .dd-item { align-items: center; gap: 11px; }
+.ffs-dd-av { position: relative; width: 34px; height: 34px; flex: none; border-radius: 50%; background: var(--teal-soft, #f1f7f7); overflow: hidden; }
+.ffs-dd-av-fallback { position: absolute; inset: 0; display: grid; place-items: center; color: var(--teal); font-size: 12px; font-weight: 600; }
+.ffs-dd-av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ffs-dd-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ffs-emp-dd .dd-nm { flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ffs-dd-sub { font-size: 12px; color: #99A1A5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
 @endsection
 
@@ -792,27 +947,26 @@
         });
 
         // ─── Render ───────────────────────────────────────────────
-        var $body = $('#settlement-details-body').empty();
+        // Two-column settlement layout (Earnings | Deductions) — each
+        // column keeps its own static .ffs-s2h header in the Blade
+        // markup, so only the .ffs-s2row lines are cleared/rebuilt here.
+        var $earnCol = $('#settlement-earnings-col');
+        var $dedCol  = $('#settlement-deductions-col');
+        $earnCol.find('.ffs-s2row').remove();
+        $dedCol.find('.ffs-s2row').remove();
         var grossMvr = 0;
         earningRows.forEach(function (r) {
             grossMvr += r.value;
-            $body.append(
-                '<tr><td>' + r.label + '</td>' +
-                '<td class="text-end">' + formatMoney(mvrToDisplay(r.value)) + '</td></tr>'
+            $earnCol.append(
+                '<div class="ffs-s2row"><span class="ffs-lbl">' + r.label + '</span>' +
+                '<span class="ffs-amt">' + formatMoney(mvrToDisplay(r.value)) + '</span></div>'
             );
         });
-        // Gross Earning subtotal (carries the same role the old footer
-        // played; sits above the deduction rows so HR sees the
-        // pre-deduction figure clearly). Use <th> for both cells so the
-        // bold weight applies to the AMOUNT too — Bootstrap's
-        // `fw-bold table-light` on <tr> didn't always inherit through
-        // to the cell text on some themes (reported as "amount should
-        // be bold" by HR).
-        $body.append(
-            '<tr class="table-light fw-bold">' +
-                '<th class="fw-bold">Gross Earning</th>' +
-                '<th class="text-end fw-bold">' + formatMoney(mvrToDisplay(grossMvr)) + '</th>' +
-            '</tr>'
+        // Gross Earning subtotal — sits above the deductions column so HR
+        // sees the pre-deduction figure clearly.
+        $earnCol.append(
+            '<div class="ffs-s2row ffs-strong"><span class="ffs-lbl">Gross earning</span>' +
+            '<span class="ffs-amt">' + formatMoney(mvrToDisplay(grossMvr)) + '</span></div>'
         );
 
         var deductionsMvr = 0;
@@ -820,16 +974,14 @@
             deductionsMvr += d.value;
             // Negative-styling cue: red text + leading minus so the
             // direction reads clearly even at a glance.
-            $body.append(
-                '<tr class="text-danger"><td>' + d.label + '</td>' +
-                '<td class="text-end">− ' + formatMoney(mvrToDisplay(d.value)) + '</td></tr>'
+            $dedCol.append(
+                '<div class="ffs-s2row"><span class="ffs-lbl">' + d.label + '</span>' +
+                '<span class="ffs-amt">− ' + formatMoney(mvrToDisplay(d.value)) + '</span></div>'
             );
         });
-        $body.append(
-            '<tr class="table-light fw-bold">' +
-                '<th class="fw-bold">Total Deductions</th>' +
-                '<th class="text-end text-danger fw-bold">− ' + formatMoney(mvrToDisplay(deductionsMvr)) + '</th>' +
-            '</tr>'
+        $dedCol.append(
+            '<div class="ffs-s2row ffs-strong"><span class="ffs-lbl">Total deductions</span>' +
+            '<span class="ffs-amt">− ' + formatMoney(mvrToDisplay(deductionsMvr)) + '</span></div>'
         );
 
         var netMvr = grossMvr - deductionsMvr;
@@ -1094,16 +1246,33 @@
             data: { employee_id: empId },
             success: function(response) {
                 if (response.success) {
-                    console.log(response.data);
-                    // Update Profile Picture
-                    $("#img-circle img").attr("src", response.data.profile_picture || "assets/images/user-2.svg");
+                    // Un-dims Earnings/Deductions/Allowance/Leave/Settlement
+                    // and reveals the Employee details panel (CSS keyed off
+                    // .selected on the wrapper).
+                    document.getElementById('ffsWrap').classList.add('selected');
+                    $('#submit').prop('disabled', false);
 
-                    // Update Name and Employee ID
-                    $(".empDetails-user h4").html(response.data.full_name + 
-                        ` <span class="badge badge-themeNew">#${response.data.emp_id}</span>`);
+                    // Photo-first avatar with an initials fallback — the
+                    // photo URL from Common::getResortUserPicture() is
+                    // already guaranteed non-empty, but the file itself can
+                    // still 404 (never-uploaded/removed), so onerror swaps
+                    // in the initials chip rather than showing a broken image.
+                    var fullName = response.data.full_name || '';
+                    var nameParts = fullName.trim().split(/\s+/);
+                    var initials = ((nameParts[0] || '').charAt(0) + (nameParts[1] ? nameParts[1].charAt(0) : '')).toUpperCase() || '?';
+                    $("#img-circle").html(
+                        '<img src="' + (response.data.profile_picture || '') + '" alt="' + fullName + '" onerror="this.parentNode.textContent=\'' + initials + '\'">'
+                    );
 
-                    // Update Position & Department
-                    $(".empDetails-user p").text(response.data.position + " - " + response.data.department);
+                    // Employee details panel — Employee ID / Department /
+                    // Position are separate rows (Status is static "Resigned"
+                    // text in the Blade markup: every employee on this page
+                    // is, by definition, a resigning employee awaiting
+                    // settlement).
+                    $("#pcName").text(fullName);
+                    $("#pcId").text(response.data.emp_id);
+                    $("#pcDept").text(response.data.department);
+                    $("#pcPos").text(response.data.position);
 
                     // Update Resignation & Last Working Day — normalise
                     // backend ISO `YYYY-MM-DD` to `dd/mm/yyyy` so the F&F
@@ -1238,12 +1407,12 @@
                     // (handles the empty-but-add-row case too).
                     recalcPayableLeaves();
 
-                    // ─── Settlement Details (Earning breakdown) table ───
-                    // Rebuild from the same numbers populating the input
-                    // fields above so the table can NEVER disagree with
-                    // the Earning Salary input. Same idea as the review
-                    // page's Settlement Details card.
-                    var $sdBody = $('#settlement-details-body').empty();
+                    // ─── Settlement Details (Earning breakdown) columns ───
+                    // Rebuilt from the same numbers populating the input
+                    // fields above (by recomputeGrossEarning() below) so the
+                    // breakdown can NEVER disagree with the Earning Salary
+                    // input. Same idea as the review page's Settlement
+                    // Details card.
                     // Mirrors the payroll review's component shape:
                     //   earned_salary  → (basic ÷ days) × paid_days
                     //   + allowances   → SUM of EmployeeAllowance rows
@@ -1473,42 +1642,41 @@
         e.preventDefault();
         var deductionUid = 'deductionSelect_' + (++deductionSelectUidCounter);
         $(".deductions-container").append(`
-            <div class="fullFinal-block">
-                <div class="row g-md-4 g-3 deduction-row">
-                    <div class="col-xl-3 col-sm">
-                        <select class="form-select dd-native-select deduction-select" id="${deductionUid}" name="deductionFor[]">
-                            <option value="">Select Deduction</option>
-                            @foreach($deductions as $deduction)
-                                <option value="{{$deduction->id}}" data-unit="{{$deduction->currency}}">{{$deduction->deduction_name}}</option>
-                            @endforeach
-                        </select>
-                        <div class="dd" data-target="#${deductionUid}">
-                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                <span class="dd-lbl">Select Deduction</span>
-                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                            </button>
-                            <div class="dd-panel" role="listbox" aria-label="Deduction">
-                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a deduction…"></div>
-                                <div class="dd-scroll">
-                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Deduction</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                    @foreach($deductions as $deduction)
-                                    <div class="dd-item" role="option" data-value="{{$deduction->id}}"><span class="dd-nm">{{$deduction->deduction_name}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                    @endforeach
-                                </div>
+            <div class="ffs-mdrow-added deduction-row">
+                <div class="ffs-f">
+                    <label>Deduction</label>
+                    <select class="form-select dd-native-select deduction-select" id="${deductionUid}" name="deductionFor[]">
+                        <option value="">Select Deduction</option>
+                        @foreach($deductions as $deduction)
+                            <option value="{{$deduction->id}}" data-unit="{{$deduction->currency}}">{{$deduction->deduction_name}}</option>
+                        @endforeach
+                    </select>
+                    <div class="dd" data-target="#${deductionUid}">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select Deduction</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Deduction">
+                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a deduction…"></div>
+                            <div class="dd-scroll">
+                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Deduction</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @foreach($deductions as $deduction)
+                                <div class="dd-item" role="option" data-value="{{$deduction->id}}"><span class="dd-nm">{{$deduction->deduction_name}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @endforeach
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-3 col-sm">
-                        <input type="number" class="form-control deduction-amount" placeholder="Enter Amount" name="deduction_amount[]"
-                            data-parsley-type="number" data-parsley-min="0" data-parsley-required-if="#deductionFor" data-parsley-trigger="change">
-                    </div>
-                    <div class="col-xl-3 col-sm">
-                         <input type="text" class="form-control amount-unit" name="amount_unit[]" placeholder="Amount Unit" readonly>
-                     </div>
-                    <div class="col-xl-3 col-auto align-self-end">
-                        <a href="#" class="btn payroll-btn-secondary btn-sm remove-deduction">Remove</a>
-                    </div>
                 </div>
+                <div class="ffs-f">
+                    <label for="${deductionUid}_amt">Amount</label>
+                    <input type="number" id="${deductionUid}_amt" class="ffs-inp deduction-amount" placeholder="Enter amount" name="deduction_amount[]"
+                        data-parsley-type="number" data-parsley-min="0" data-parsley-required-if="#deductionFor" data-parsley-trigger="change">
+                </div>
+                <div class="ffs-f ffs-unitf">
+                    <label>Unit</label>
+                    <input type="text" class="ffs-inp amount-unit" name="amount_unit[]" placeholder="—" readonly>
+                </div>
+                <a href="#" class="btn payroll-btn-secondary btn-sm remove-deduction">Remove</a>
             </div>
         `);
     });
@@ -1516,7 +1684,7 @@
     // Remove Deduction
     $(document).on("click", ".remove-deduction", function(e) {
         e.preventDefault();
-        $(this).closest(".fullFinal-block").remove();
+        $(this).closest(".ffs-mdrow-added").remove();
     });
 
   

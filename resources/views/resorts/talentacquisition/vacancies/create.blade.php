@@ -21,226 +21,260 @@
                 </div>
             </div>
             <div>
-                <form id="add-new-vacancy" >
+                <form id="add-new-vacancy">
                     <div class="card">
-                        <div class="row g-md-4 g-3 mb-4">
-                            <div class="col-sm-6 ">
-                                <label for="select-budgeted" class="form-label">BUDGETED OR OUT OF BUDGET?</label>
-                                <!-- <select class="form-select select2t-none" id="select-budgeted"
-                                    aria-label="Default select example" name="budgeted">
-                                    <option value="Budgeted">Budgeted</option>
-                                    <option value="Out Of Budgeted">Out Of Budgeted</option>
-                                </select> -->
-                                <select id="vacancy_status" class="form-select dd-native-select" name="budgeted">
-                                    <option value="Budgeted">Budgeted</option>
-                                    <option value="Out of Budget">Out of Budget</option>
-                                </select>
-                                <div class="dd" data-target="#vacancy_status">
-                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                        <span class="dd-lbl">Budgeted</span>
-                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                    </button>
-                                    <div class="dd-panel" role="listbox" aria-label="Budget Status">
-                                        <div class="dd-scroll">
-                                            <div class="dd-item active" role="option" data-value="Budgeted"><span class="dd-nm">Budgeted</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                            <div class="dd-item" role="option" data-value="Out of Budget"><span class="dd-nm">Out of Budget</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-sm-6 d-md-inline-block d-none">
+                        <div class="av-flow">
 
-                            </div>
-                            <div class="col-sm-6 ">
-                                <label for="txt-department" class="form-label">DEPARTMENT</label>
-                                <input type="text" class="form-control" name="department" id="txt-department" placeholder="DEPARTMENT" value="{{$department_details[0]->name}}" disabled>
-                                <input type="hidden" class="form-control" name="dept_id" id="dept_id"  value="{{$department_details[0]->id}}" readonly>
-                            </div>
-                            <div class="col-sm-6 ">
-                                <label for="txt-required-starting-date" class="form-label">REQUIRED STARTING DATE</label>
-                                <input type="text" class="form-control" name="required_starting_date" id="txt-required-starting-date" placeholder="REQUIRED STARTING DATE">
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="col-12">
-                                <div class="card-title ">
-                                    <div class="row justify-content-start align-items-center g-">
-                                        <div class="col">
-                                            <h3>Position Details</h3>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row g-md-4 g-3">
-                                <div class="col-sm-6 ">
-                                    <label for="txt-position-title" class="form-label">POSITION TITLE</label>
-                                    <select name="position" id="position" class="form-control form-select dd-native-select">
-                                        @if($resort_positions)
-                                            <option value="">Select Position</option>
-                                            @foreach($resort_positions as $position)
-                                                <option value="{{$position->id}}" data-budgeted="{{ in_array($position->id, $budgetedPositionIds) ? '1' : '0' }}" data-available="{{ $positionAvailableSlots[$position->id] ?? 0 }}">{{$position->position_title}}</option>
-                                            @endforeach
-                                        @endif
-                                    </select>
-                                    <div class="dd" data-target="#position">
-                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                            <span class="dd-lbl">Select Position</span>
-                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                        </button>
-                                        <div class="dd-panel" role="listbox" aria-label="Position">
-                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
-                                            <div class="dd-scroll">
-                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                @if($resort_positions)
-                                                    @foreach($resort_positions as $position)
-                                                    <div class="dd-item" role="option" data-value="{{ $position->id }}"><span class="dd-nm">{{ $position->position_title }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                    @endforeach
-                                                @endif
+                            {{-- 1. General information --}}
+                            <div class="av-step">
+                                <span class="av-num">1</span>
+                                <div class="av-sh">General information</div>
+                                <div class="av-grid">
+                                    <div class="av-f">
+                                        <label for="vacancy_status">Budgeted or out of budget <span class="av-req">*</span></label>
+                                        <select id="vacancy_status" class="form-select dd-native-select" name="budgeted">
+                                            <option value="Budgeted">Budgeted</option>
+                                            <option value="Out of Budget">Out of Budget</option>
+                                        </select>
+                                        <div class="dd" data-target="#vacancy_status">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Budgeted</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Budget status">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value="Budgeted"><span class="dd-nm">Budgeted</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="Out of Budget"><span class="dd-nm">Out of Budget</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div class="col-sm-6 ">
-                                    <label for="txt-position-title" class="form-label">Required No of Vacancy</label>
-                                    <input type="number" name="Total_position_required" id="Total_position_required" class="form-control" min="1"/>
-                                    <div id="vacancy-validation-msg" style="display:none; margin-top:5px;"></div>
-                                    <small id="vacancy-manning-info" class="text-muted" style="display:none; margin-top:3px;"></small>
-                                </div>
-                                <div class="col-sm-6 ">
-                                    <label for="txt-reporting-to" class="form-label">REPORTING TO</label>
-                                    <select name="reporting_to" id="reporting_to" class="form-control form-select dd-native-select">
-                                        @if($reportingEmployees)
-                                            <option value="">Select Reporting To</option>
-                                            @foreach($reportingEmployees as $emp)
-                                                <option value="{{$emp->id}}" {{ $emp_details[0]->id == $emp->id ? 'selected' : '' }}>{{$emp->first_name}}   {{$emp->last_name}}</option>
-                                            @endforeach
-                                        @endif
-                                    </select>
-                                    @php $selectedReportingTo = $reportingEmployees ? $reportingEmployees->firstWhere('id', $emp_details[0]->id) : null; @endphp
-                                    <div class="dd" data-target="#reporting_to">
-                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                            <span class="dd-lbl">{{ $selectedReportingTo ? $selectedReportingTo->first_name.' '.$selectedReportingTo->last_name : 'Select Reporting To' }}</span>
-                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                        </button>
-                                        <div class="dd-panel" role="listbox" aria-label="Reporting To">
-                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
-                                            <div class="dd-scroll">
-                                                <div class="dd-item{{ $selectedReportingTo ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Reporting To</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                @if($reportingEmployees)
-                                                    @foreach($reportingEmployees as $emp)
-                                                    <div class="dd-item{{ ($emp_details[0]->id == $emp->id) ? ' active' : '' }}" role="option" data-value="{{ $emp->id }}"><span class="dd-nm">{{ $emp->first_name }} {{ $emp->last_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                    @endforeach
-                                                @endif
-                                            </div>
-                                        </div>
+                                    <div class="av-f">
+                                        <label for="txt-department">Department <span class="av-req">*</span></label>
+                                        <input type="text" class="av-inp" name="department" id="txt-department" placeholder="e.g. Human Resources" value="{{ $department_details[0]->name }}" disabled>
+                                        <input type="hidden" name="dept_id" id="dept_id" value="{{ $department_details[0]->id }}" readonly>
                                     </div>
-                                </div>
-                                <div class="col-sm-6 ">
-                                    <label for="txt-rank" class="form-label">RANK</label>
-                                    <input type="text" class="form-control" id="txt-rank" placeholder="RANK" name="rank" disabled>
-                                    <input type="hidden" class="form-control" id="rank_id" name="rank_id">
-                                </div>
-                                <div class="col-sm-6 ">
-                                    <label for="select-division" class="form-label">DIVISION</label>
-                                    <input type="text" class="form-control" id="txt-division" name="division" placeholder="DIVISION" value="{{$resort_divisions[0]->name}}" disabled>
-                                    <input type="hidden" class="form-control" id="division_id" name="division_id" value="{{$resort_divisions[0]->id}}">
-                                </div>
-                                <div class="col-sm-6 ">
-                                    <label for="select-selection" class="form-label">SECTION</label>
-                                    <input type="text" class="form-control" id="txt-section" name="section" placeholder="SECTION" value="{{ $sectionName }}" disabled>
-                                    <input type="hidden" class="form-control" id="section_id" name="section_id" value="{{ $sectionId }}">
-                                </div>
-
-                                <div class="col-sm-6" id="budgeted-salary-container" style="display:none;">
-                                    <label class="form-label">BUDGETED SALARY</label>
-                                    <input type="text" class="form-control" id="txt-budgeted-salary-display" placeholder="—" disabled>
-                                </div>
-                                <div class="col-sm-6" id="budgeted-allowance-container" style="display:none;">
-                                    <label class="form-label">ALLOWANCES</label>
-                                    <div id="allowance-list"></div>
-                                </div>
-
-                                <div class="col-12">
-                                    <label for="select-selection" class="form-label">EMPLOYEE TYPE</label>
-                                    <ul class="nav mt-2 ">
-                                        <li class="form-radio">
-                                            <input class="form-radio-input" type="radio" value="Permanant" id="radio-permanant" name="employee_type" checked>
-                                            <label class="form-radio-label" for="radio-permanant">
-                                                Permanant
-                                            </label>
-                                        </li>
-                                        <li class="form-radio ">
-                                            <input class="form-radio-input" type="radio" value="Casual/Agency" id="radio-casual-Agency" name="employee_type">
-                                            <label class="form-radio-label" for="radio-casual-Agency">
-                                                Casual/Agency
-                                            </label>
-                                        </li>
-                                        <li class="form-radio ">
-                                            <input class="form-radio-input" type="radio" value="Trainee / Intern" id="radio-trainee-intern" name="employee_type">
-                                            <label class="form-radio-label" for="radio-trainee-intern">
-                                                Trainee / Intern
-                                            </label>
-                                        </li>
-                                        <li class="form-radio ">
-                                            <input class="form-radio-input" type="radio" value="Replacement" id="radio-replacement" name="employee_type">
-                                            <label class="form-radio-label" for="radio-replacement">
-                                                Replacement
-                                            </label>
-                                        </li>
-                                        <li class="form-radio ">
-                                            <input class="form-radio-input" type="radio" value="Temporary / Project"
-                                                id="radio-temporary-project" name="employee_type">
-                                            <label class="form-radio-label" for="radio-temporary-project">
-                                                Temporary / Project
-                                            </label>
-                                        </li>
-                                    </ul>
-                                </div>
-                                <div class="col-12" id="temp-div" style="display: none;">
-                                    <div id="" class="row g-md-4 g-3 row-cols-xl-5 row-cols-md-3  row-cols-sm-2 row-cols-1">
-                                        <div class="col txt-service-provider" id="service-provider-container">
-                                            <!-- Textbox for adding a new service provider -->
-                                            <div>
-                                                <!-- Textbox for new service provider -->
-                                                <label for="new_service_provider">New Service Provider</label>
-                                                <input type="text" name="new_service_provider" id="new_service_provider" placeholder="Enter new service provider" class="form-control">
-                                            </div>
-
-                                            <div>
-                                                <!-- Selectbox for existing service providers -->
-                                                <label for="service_provider">Select Service Provider</label>
-                                                <select name="service_provider" id="service_provider" class="form-select dd-native-select">
-                                                    <option value="">-- Select a service provider --</option>
-                                                    @foreach($serviceProviders as $provider)
-                                                        <option value="{{ $provider->name }}">{{ $provider->name }}</option>
-                                                    @endforeach
-                                                </select>
-                                                <div class="dd" data-target="#service_provider">
-                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                        <span class="dd-lbl">-- Select a service provider --</span>
-                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                                    </button>
-                                                    <div class="dd-panel" role="listbox" aria-label="Service Provider">
-                                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a provider…"></div>
-                                                        <div class="dd-scroll">
-                                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">-- Select a service provider --</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                            @foreach($serviceProviders as $provider)
-                                                            <div class="dd-item" role="option" data-value="{{ $provider->name }}"><span class="dd-nm">{{ $provider->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                            @endforeach
+                                    <div class="av-f">
+                                        <label for="txt-required-starting-date">Required starting date <span class="av-req">*</span></label>
+                                        <div class="av-datewrap" id="dateWrap">
+                                            <input type="text" class="av-inp av-datebtn" name="required_starting_date" id="txt-required-starting-date" placeholder="Select a date" readonly>
+                                            <span class="av-date-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
+                                            <div class="av-datepop">
+                                                <div class="wcal-card">
+                                                    <div class="wcal-head">
+                                                        <span class="wcal-m" id="avCalMonth"></span>
+                                                        <div class="wcal-nav">
+                                                            <button type="button" id="avCalPrev" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+                                                            <button type="button" id="avCalNext" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
                                                         </div>
+                                                    </div>
+                                                    <div class="wcal-grid" id="avCalGrid"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- 2. Position details --}}
+                            <div class="av-step">
+                                <span class="av-num">2</span>
+                                <div class="av-sh">Position details</div>
+                                <div class="av-grid">
+                                    <div class="av-f">
+                                        <label for="position">Position title <span class="av-req">*</span></label>
+                                        <select name="position" id="position" class="form-control form-select dd-native-select">
+                                            @if($resort_positions)
+                                                <option value="">Select position</option>
+                                                @foreach($resort_positions as $position)
+                                                    <option value="{{$position->id}}" data-budgeted="{{ in_array($position->id, $budgetedPositionIds) ? '1' : '0' }}" data-available="{{ $positionAvailableSlots[$position->id] ?? 0 }}">{{$position->position_title}}</option>
+                                                @endforeach
+                                            @endif
+                                        </select>
+                                        <div class="dd" data-target="#position">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select position</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Position">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($resort_positions)
+                                                        @foreach($resort_positions as $position)
+                                                        <div class="dd-item" role="option" data-value="{{ $position->id }}"><span class="dd-nm">{{ $position->position_title }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="av-f">
+                                        <label for="Total_position_required">Required no. of vacancy <span class="av-req">*</span></label>
+                                        <input type="number" name="Total_position_required" id="Total_position_required" class="av-inp" min="1" placeholder="e.g. 2">
+                                        <div id="vacancy-validation-msg" style="display:none; margin-top:7px; font-size:12.5px;"></div>
+                                        <small id="vacancy-manning-info" class="text-muted" style="display:none; margin-top:5px; font-size:12px;"></small>
+                                    </div>
+                                    <div class="av-f">
+                                        <label for="reporting_to">Reporting to <span class="av-req">*</span></label>
+                                        <select name="reporting_to" id="reporting_to" class="form-control form-select dd-native-select">
+                                            @if($reportingEmployees)
+                                                <option value="">Select manager</option>
+                                                @foreach($reportingEmployees as $emp)
+                                                    <option value="{{$emp->id}}" {{ $emp_details[0]->id == $emp->id ? 'selected' : '' }}>{{$emp->first_name}} {{$emp->last_name}}</option>
+                                                @endforeach
+                                            @endif
+                                        </select>
+                                        @php $selectedReportingTo = $reportingEmployees ? $reportingEmployees->firstWhere('id', $emp_details[0]->id) : null; @endphp
+                                        <div class="dd" data-target="#reporting_to">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">{{ $selectedReportingTo ? $selectedReportingTo->first_name.' '.$selectedReportingTo->last_name : 'Select manager' }}</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Reporting to">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item{{ $selectedReportingTo ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select manager</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($reportingEmployees)
+                                                        @foreach($reportingEmployees as $emp)
+                                                        <div class="dd-item{{ ($emp_details[0]->id == $emp->id) ? ' active' : '' }}" role="option" data-value="{{ $emp->id }}"><span class="dd-nm">{{ $emp->first_name }} {{ $emp->last_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="av-f">
+                                        <label for="txt-rank">Rank</label>
+                                        <input type="text" class="av-inp" id="txt-rank" placeholder="e.g. Line Workers" name="rank" disabled>
+                                        <input type="hidden" id="rank_id" name="rank_id">
+                                    </div>
+                                    <div class="av-f">
+                                        <label for="txt-division">Division</label>
+                                        <input type="text" class="av-inp" id="txt-division" name="division" placeholder="e.g. Administrative &amp; General" value="{{ $resort_divisions[0]->name }}" disabled>
+                                        <input type="hidden" id="division_id" name="division_id" value="{{ $resort_divisions[0]->id }}">
+                                    </div>
+                                    <div class="av-f">
+                                        <label for="txt-section">Section</label>
+                                        <input type="text" class="av-inp" id="txt-section" name="section" placeholder="e.g. Admin" value="{{ $sectionName }}" disabled>
+                                        <input type="hidden" id="section_id" name="section_id" value="{{ $sectionId }}">
+                                    </div>
+                                    <div class="av-f" id="budgeted-salary-container" style="display:none;">
+                                        <label for="txt-budgeted-salary-display">Budgeted salary</label>
+                                        <input type="text" class="av-inp" id="txt-budgeted-salary-display" placeholder="&mdash;" disabled>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- 3. Allowances --}}
+                            <div class="av-step">
+                                <span class="av-num">3</span>
+                                <div class="av-sh">Allowances <span class="av-sub">&middot; auto-applied from position</span></div>
+                                <div id="budgeted-allowance-container">
+                                    <div id="allowance-list">
+                                        <div class="av-emptybox">
+                                            <div class="av-ei"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M8 4v16"/></svg></div>
+                                            <p>Allowances load automatically once you <span class="av-hi">select a position</span> above.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- 4. Employee type --}}
+                            <div class="av-step">
+                                <span class="av-num">4</span>
+                                <div class="av-sh">Employee type</div>
+                                <div class="av-pills">
+                                    <input class="av-pill-input" type="radio" value="Permanant" id="radio-permanant" name="employee_type" checked>
+                                    <label class="av-pill" for="radio-permanant">Permanent</label>
+
+                                    <input class="av-pill-input" type="radio" value="Casual/Agency" id="radio-casual-Agency" name="employee_type">
+                                    <label class="av-pill" for="radio-casual-Agency">Casual / Agency</label>
+
+                                    <input class="av-pill-input" type="radio" value="Trainee / Intern" id="radio-trainee-intern" name="employee_type">
+                                    <label class="av-pill" for="radio-trainee-intern">Trainee / Intern</label>
+
+                                    <input class="av-pill-input" type="radio" value="Replacement" id="radio-replacement" name="employee_type">
+                                    <label class="av-pill" for="radio-replacement">Replacement</label>
+
+                                    <input class="av-pill-input" type="radio" value="Temporary / Project" id="radio-temporary-project" name="employee_type">
+                                    <label class="av-pill" for="radio-temporary-project">Temporary / Project</label>
+                                </div>
+
+                                <div id="permanent-div">
+                                    <div class="av-f" style="max-width:260px; margin-top:18px;">
+                                        <label>For local</label>
+                                        <div class="av-seg">
+                                            <input class="av-seg-input" type="radio" name="is_required_local" value="Yes" id="is_local-yes">
+                                            <label for="is_local-yes">Yes</label>
+                                            <input class="av-seg-input" type="radio" name="is_required_local" value="No" id="is_local-no" checked>
+                                            <label for="is_local-no">No</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="replacement-employee" style="display:none;">
+                                    <div class="av-f" style="max-width:400px; margin-top:18px;">
+                                        <label for="txt-employee-name">Employee name</label>
+                                        <select name="employee_name" id="txt-employee-name" class="form-control form-select dd-native-select">
+                                            <option value="">Select employee</option>
+                                            @if(isset($departmentEmployees))
+                                                @foreach($departmentEmployees as $emp)
+                                                    <option value="{{ $emp->first_name }} {{ $emp->last_name }}">{{ $emp->first_name }} {{ $emp->last_name }} - {{ $emp->position_title ?? '' }}</option>
+                                                @endforeach
+                                            @endif
+                                        </select>
+                                        <div class="dd" data-target="#txt-employee-name">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select employee</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Employee">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if(isset($departmentEmployees))
+                                                        @foreach($departmentEmployees as $emp)
+                                                        <div class="dd-item" role="option" data-value="{{ $emp->first_name }} {{ $emp->last_name }}"><span class="dd-nm">{{ $emp->first_name }} {{ $emp->last_name }} - {{ $emp->position_title ?? '' }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="av-sppanel" id="temp-div" style="display:none;">
+                                    <div class="av-sph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Service provider &amp; details</div>
+                                    <div class="av-subgrid">
+                                        <div class="av-f" id="service-provider-container">
+                                            <label for="service_provider">Select service provider</label>
+                                            <select name="service_provider" id="service_provider" class="form-select dd-native-select">
+                                                <option value="">Select a provider</option>
+                                                @foreach($serviceProviders as $provider)
+                                                    <option value="{{ $provider->name }}">{{ $provider->name }}</option>
+                                                @endforeach
+                                            </select>
+                                            <div class="dd" data-target="#service_provider">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Select a provider</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Service provider">
+                                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a provider…"></div>
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select a provider</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @foreach($serviceProviders as $provider)
+                                                        <div class="dd-item" role="option" data-value="{{ $provider->name }}"><span class="dd-nm">{{ $provider->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
-
-                                        <div class="col">
-                                            <label for="txt-duration" class="form-label">DURATION</label>
-                                            <input type="text" class="form-control" name="duration" id="txt-duration" placeholder="e.g. 3 Months, 6 Months, 1 Year">
-                                        </div>
-
-                                        <div class="col txt-salary">
-                                            <label for="txt-budget-salary" class="form-label">Amount Unit <span class="req_span">*</span></label>
+                                        <div class="av-f"><label for="new_service_provider">Or add new provider</label><input type="text" class="av-inp" name="new_service_provider" id="new_service_provider" placeholder="Enter new service provider"></div>
+                                        <div class="av-f"><label for="txt-duration">Duration</label><input type="text" class="av-inp" name="duration" id="txt-duration" placeholder="e.g. 3 months, 1 year"></div>
+                                        <div class="av-f">
+                                            <label for="amount_unit">Amount unit <span class="av-req">*</span></label>
                                             <select name="amount_unit" id="amount_unit" required class="form-select dd-native-select">
                                                 <option value="MVR">MVR</option>
                                                 <option value="USD">USD</option>
@@ -250,7 +284,7 @@
                                                     <span class="dd-lbl">MVR</span>
                                                     <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                                                 </button>
-                                                <div class="dd-panel" role="listbox" aria-label="Amount Unit">
+                                                <div class="dd-panel" role="listbox" aria-label="Amount unit">
                                                     <div class="dd-scroll">
                                                         <div class="dd-item active" role="option" data-value="MVR"><span class="dd-nm">MVR</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
                                                         <div class="dd-item" role="option" data-value="USD"><span class="dd-nm">USD</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
@@ -258,229 +292,49 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col txt-salary">
-                                            <label for="select-salary" class="form-label">SALARY</label>
-                                            <input type="text" name="salary" id="salary" class="form-control" placeholder="SALARY"/>
-                                        </div>
-                                        <div class="col txt-food">
-                                            <label for="select-food" class="form-label">FOOD</label>
-                                            <input type="text" name="food" id="food" class="form-control" placeholder="FOOD"/>
-                                        </div>
-                                        <div class="col txt-accommodation">
-                                            <label for="txt-accommodation" class="form-label">ACCOMMODATION</label>
-                                            <input type="text" class="form-control" name="accommodation" id="txt-accommodation" placeholder="ACCOMMODATION">
-                                        </div>
-                                        <div class="col txt-transporatation">
-                                            <label for="txt-transporatation" class="form-label">TRANSPORTATION</label>
-                                            <input type="text" class="form-control" name="transportation" id="txt-TRANSPORTATION" placeholder="TRANSPORTATION">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="replacement-employee" style="display: none;">
-                            <div class="col-md-4 col-sm-6 mb-3">
-                                <label for="txt-employee-name" class="form-label">Employee Name</label>
-                                <select name="employee_name" id="txt-employee-name" class="form-control form-select dd-native-select">
-                                    <option value="">Select Employee</option>
-                                    @if(isset($departmentEmployees))
-                                        @foreach($departmentEmployees as $emp)
-                                            <option value="{{ $emp->first_name }} {{ $emp->last_name }}">{{ $emp->first_name }} {{ $emp->last_name }} - {{ $emp->position_title ?? '' }}</option>
-                                        @endforeach
-                                    @endif
-                                </select>
-                                <div class="dd" data-target="#txt-employee-name">
-                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                        <span class="dd-lbl">Select Employee</span>
-                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                    </button>
-                                    <div class="dd-panel" role="listbox" aria-label="Employee">
-                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
-                                        <div class="dd-scroll">
-                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                            @if(isset($departmentEmployees))
-                                                @foreach($departmentEmployees as $emp)
-                                                <div class="dd-item" role="option" data-value="{{ $emp->first_name }} {{ $emp->last_name }}"><span class="dd-nm">{{ $emp->first_name }} {{ $emp->last_name }} - {{ $emp->position_title ?? '' }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                @endforeach
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="permanent-div">
-                            {{-- Budget, Funding & Benefits - commented out for now --}}
-                            {{-- <div class="col-12">
-                                <div class="card-title mt-md-4 mt-3">
-                                    <div class="row justify-content-start align-items-center g-">
-                                        <div class="col">
-                                            <h3>Budget, Funding & Benefits</h3>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row g-md-3 g-2">
-                                <div class="col-md-3 col-sm-6 ">
-                                    <label for="txt-budget-salary" class="form-label">Amount Unit <span class="req_span">*</span></label>
-                                    <select name="amount_unit" id="amount_unit" required class="form-select">
-                                        <option value="MVR">MVR</option>
-                                        <option value="USD">USD</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3 col-sm-6 ">
-                                    <label for="txt-budget-salary" class="form-label">BUDGET SALARY <span class="req_span">*</span></label>
-                                    <input type="text" class="form-control" name="budget_salary" id="txt-budget-salary" placeholder="BUDGET SALARY" required>
-                                </div>
-                                <div class="col-md-3 col-sm-6 ">
-                                    <label for="txt-acommocation2" class="form-label">ACOMMODATION</label>
-                                    <input type="text" class="form-control" name="budgeted_accommodation" id="txt-acommocation2" placeholder="ACOMMODATION">
-                                </div>
-                                <div class="col-md-3 col-sm-6  ">
-                                    <label for="txt-rank" class="form-label">SERVICE CHARGE</label>
-                                    <ul class="d-flex navalign-items-center">
-                                        <li class="form-check ">
-                                            <input class="form-check-input" type="radio" name="service_charge" value="YES" id="flexCheckservicechares-yes" checked>
-                                            <label class="form-check-label" for="flexCheckservicechares-yes">
-                                                Yes
-                                            </label>
-                                        </li>
-                                        <li class="form-check ">
-                                            <input class="form-check-input" type="radio" name="service_charge" value="NO"
-                                                id="flexCheckservicechares-no">
-                                            <label class="form-check-label" for="flexCheckservicechares-no">
-                                                No
-                                            </label>
-                                        </li>
-                                    </ul>
-                                </div>
-                                <div class="col-md-3 col-sm-6 ">
-                                    <label for="txt-proposed-salary" class="form-label">PROPOSED SALARY <span class="req_span">*</span></label>
-                                    <input type="text" class="form-control" id="txt-proposed-salary"
-                                        placeholder="Proposed Salary" name="proposed_salary" required
-                                        title="Used by the BUDGET module as the planned future salary for this position. Payroll continues to use the employee's Basic Salary until an approved Salary Increment is applied. If you set this without an approved increment, budget will diverge from payroll for this employee.">
-                                    <small class="form-text text-muted" style="font-size:11px;">
-                                        Used by Budget; Payroll uses Basic Salary until an Increment is approved.
-                                    </small>
-                                </div>
-                                <div class="col-md-3 col-sm-6 ">
-                                    <label for="txt-allowances" class="form-label">ALLOWANCES</label>
-                                    <input type="text" class="form-control" name="allowance" id="txt-allowances" placeholder="Allowances">
-                                </div>
-                                <div class="col-md-3 col-sm-6 ">
-                                    <label for="txt-uniform" class="form-label">UNIFORM</label>
-                                    <ul class="d-flex nav align-items-center">
-                                        <li class="form-check ">
-                                            <input class="form-check-input" type="radio" name="uniform" value="YES" id="flexCheckUNIFORM-yes" checked>
-                                            <label class="form-check-label" for="flexCheckUNIFORM-yes">
-                                                Yes
-                                            </label>
-                                        </li>
-                                        <li class="form-check ">
-                                            <input class="form-check-input" type="radio" name="uniform" value="NO"  id="flexCheckUNIFORM-no">
-                                            <label class="form-check-label" for="flexCheckUNIFORM-no">
-                                                No
-                                            </label>
-                                        </li>
-                                    </ul>
-                                </div>
-                                <div class="col-md-4 col-sm-6 ">
-                                    <label for="txt-Medical" class="form-label">MEDICAL</label>
-                                    <input type="text" class="form-control" name="medical" id="txt-Medical" placeholder="Medical">
-                                </div>
-                                <div class="col-md-4 col-sm-6 ">
-                                    <label for="txt-Insurance" class="form-label">INSURANCE</label>
-                                    <input type="text" class="form-control" name="insurance" id="txt-Insurance" placeholder="Insurance">
-                                </div>
-                                <div class="col-md-4 col-sm-6 ">
-                                    <label for="txt-Pension" class="form-label">PENSION</label>
-                                    <input type="text" class="form-control" name="pension" id="txt-Pension" placeholder="Pension">
-                                </div>
-                            </div> --}}
-
-                            <div class="row g-md-3 g-2">
-                                <div class="col-md-3 col-sm-6 ">
-                                    <label for="txt-transport" class="form-label">For Local</label>
-                                    <ul class="d-flex nav align-items-center">
-                                        <li class="form-check ">
-                                            <input class="form-check-input" type="radio" name="is_required_local" value="Yes" id="is_local-yes" >
-                                            <label class="form-check-label" for="is_local-yes">
-                                                Yes
-                                            </label>
-                                        </li>
-                                        <li class="form-check ">
-                                            <input class="form-check-input" type="radio" name="is_required_local" value="No"  id="is_local-no" checked>
-                                            <label class="form-check-label" for="is_local-no">
-                                                No
-                                            </label>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mb-5">
-                            <div class="card-title mt-md-4 mt-3">
-                                <div class="row justify-content-start align-items-center g-">
-                                    <div class="col">
-                                        <h3>Recruitment</h3>
+                                        <div class="av-f"><label for="salary">Salary</label><input type="text" name="salary" id="salary" class="av-inp" placeholder="Salary"></div>
+                                        <div class="av-f"><label for="food">Food</label><input type="text" name="food" id="food" class="av-inp" placeholder="Food"></div>
+                                        <div class="av-f"><label for="txt-accommodation">Accommodation</label><input type="text" class="av-inp" name="accommodation" id="txt-accommodation" placeholder="Accommodation"></div>
+                                        <div class="av-f"><label for="txt-TRANSPORTATION">Transportation</label><input type="text" class="av-inp" name="transportation" id="txt-TRANSPORTATION" placeholder="Transportation"></div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" name="recruitement[]" value="Online job posting" id="recruitment1" checked>
-                                <label class="form-check-label" for="recruitment1">
-                                    Online job posting
-                                </label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" name="recruitement[]" value="Recruiter" id="recruitment2">
-                                <label class="form-check-label" for="recruitment2">
-                                    Recruiter
-                                </label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" name="recruitement[]" value="Agency" id="recruitment3">
-                                <label class="form-check-label" for="recruitment3">
-                                    Agency
-                                </label>
-                            </div>
-                        </div>
+                            {{-- 5. Recruitment & status --}}
+                            <div class="av-step">
+                                <span class="av-num">5</span>
+                                <div class="av-sh">Recruitment &amp; status</div>
+                                <div class="av-subrow">
+                                    <div>
+                                        <span class="av-gl">Recruitment</span>
+                                        <div class="av-pills">
+                                            <input class="av-chipc-input" type="checkbox" name="recruitement[]" value="Online job posting" id="recruitment1" checked>
+                                            <label class="av-chipc" for="recruitment1"><span class="av-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Online job posting</label>
 
-                        <div class="mb-5">
-                            <div class="col-md-4 col-sm-6 ">
-                                <label for="txt-rank" class="form-label">Status</label>
-                                <ul class="d-flex nav align-items-center">
-                                    <li class="form-check ">
-                                        <input class="form-check-input" type="radio" name="status" value="Active" id="flexCheckstatus-active" checked>
-                                        <label class="form-check-label" for="flexCheckstatus-active">
-                                            Active
-                                        </label>
-                                    </li>
-                                    <li class="form-check ">
-                                        <input class="form-check-input" type="radio" name="status" value="Inactive"  id="flexCheckstatus-inactive">
-                                        <label class="form-check-label" for="flexCheckstatus-inactive">
-                                            Inactive
-                                        </label>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
+                                            <input class="av-chipc-input" type="checkbox" name="recruitement[]" value="Recruiter" id="recruitment2">
+                                            <label class="av-chipc" for="recruitment2"><span class="av-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Recruiter</label>
 
-                        <div class="card-footer row justify-content-between g-3">
-                            <div class="col-auto">
-                                <div class="d-flex align-items-center">
-                                    <a href="javascript:void(0)" class="btn ta-btn-neutral btn-sm" id="saveAsDraftBtn">Save As Draft</a>
-                                    <!-- <a href="#" class="text-theme text-underline fw-600 mx-sm-3 mx-2">View</a>
-                                    <a href="#" class="text-theme text-underline fw-600">Download</a> -->
+                                            <input class="av-chipc-input" type="checkbox" name="recruitement[]" value="Agency" id="recruitment3">
+                                            <label class="av-chipc" for="recruitment3"><span class="av-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Agency</label>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span class="av-gl">Status</span>
+                                        <div class="av-seg">
+                                            <input class="av-seg-input" type="radio" name="status" value="Active" id="flexCheckstatus-active" checked>
+                                            <label for="flexCheckstatus-active">Active</label>
+                                            <input class="av-seg-input" type="radio" name="status" value="Inactive" id="flexCheckstatus-inactive">
+                                            <label for="flexCheckstatus-inactive">Inactive</label>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="col-auto ms-auto">
-                                <button type="submit" class="btn ta-btn-primary btn-sm">Submit</button>
-                            </div>
+                        </div>
+
+                        <div class="av-foot">
+                            <a href="javascript:void(0)" class="av-draft" id="saveAsDraftBtn">Save as draft</a>
+                            <button type="submit" class="av-submit">Submit</button>
                         </div>
                     </div>
                 </form>
@@ -491,18 +345,76 @@
 
 @section('import-css')
 @include('resorts._dropdown_styles')
-@include('resorts.talentacquisition._ta_buttons_v2_styles')
+@include('resorts._datepicker_calendar_styles')
+@include('resorts.talentacquisition.vacancies._add_vacancy_styles')
 @endsection
 
 @section('import-scripts')
     <script type="text/javascript">
-        // new DataTable('#example');
         $(document).ready(function () {
-            flatpickr('#txt-required-starting-date', {
-                dateFormat: 'd/m/Y',
-                allowInput: true,
-                appendTo: document.body
+
+            // ---- Required starting date: canonical pop-up calendar ----
+            // Replaces the old flatpickr instance. The visible field stays a
+            // real, focusable <input readonly> (not type=hidden/display:none)
+            // so jQuery Validate's default :hidden ignore rule doesn't skip
+            // its required check.
+            var avDateWrap = document.getElementById('dateWrap');
+            var avDateInput = document.getElementById('txt-required-starting-date');
+            var AV_MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            function avPad(n) { return n < 10 ? '0' + n : '' + n; }
+            function fmtAvDate(dateObj) { return avPad(dateObj.getDate()) + '/' + avPad(dateObj.getMonth() + 1) + '/' + dateObj.getFullYear(); }
+            var avDatepicker = window.wisdomDatepicker.create({
+                monthEl: document.getElementById('avCalMonth'),
+                gridEl: document.getElementById('avCalGrid'),
+                prevEl: document.getElementById('avCalPrev'),
+                nextEl: document.getElementById('avCalNext'),
+                onSelect: function (isoDate, dateObj) {
+                    avDateInput.value = fmtAvDate(dateObj);
+                    $(avDateInput).valid();
+                    avDateWrap.classList.remove('open');
+                }
             });
+            avDateInput.addEventListener('click', function (e) {
+                e.stopPropagation();
+                document.querySelectorAll('.dd.open').forEach(function (d) { d.classList.remove('open'); });
+                avDateWrap.classList.toggle('open');
+            });
+            document.addEventListener('click', function (e) {
+                if (!avDateWrap.contains(e.target)) avDateWrap.classList.remove('open');
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') avDateWrap.classList.remove('open');
+            });
+
+            // ---- Allowances table (shared by both AJAX call sites below) ----
+            function avEsc(s) {
+                return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                });
+            }
+            function avFmtAmt(n) { return (parseFloat(n) || 0).toFixed(2); }
+            // Distinct from avRenderAllowances([]) below — that's "this
+            // position genuinely has no allowances configured", shown after
+            // a real lookup; this is "nothing to look up yet" (no position
+            // chosen). Allowances are keyed by position only, not by the
+            // vacancy quantity field, so this only needs to run when the
+            // position itself is cleared.
+            function avEmptyPositionBox() {
+                return '<div class="av-emptybox"><div class="av-ei"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M8 4v16"/></svg></div><p>Allowances load automatically once you <span class="av-hi">select a position</span> above.</p></div>';
+            }
+            function avRenderAllowances(allowances) {
+                if (!allowances || allowances.length === 0) {
+                    return '<div class="av-emptybox"><div class="av-ei"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M8 4v16"/></svg></div><p>No allowances configured for this position.</p></div>';
+                }
+                var total = 0;
+                var rows = allowances.map(function (item) {
+                    total += parseFloat(item.amount) || 0;
+                    var pct = item.unit === '%' ? ' <span class="av-pct">' + avEsc(item.raw_amount) + '%</span>' : '';
+                    return '<tr><td>' + avEsc(item.name) + pct + '</td><td class="av-amt">' + avFmtAmt(item.amount) + '</td></tr>';
+                }).join('');
+                return '<table class="av-tbl"><thead><tr><th>Particulars</th><th class="av-amt">Amount (USD)</th></tr></thead><tbody>' + rows +
+                    '<tr class="av-totrow"><td>Total allowances</td><td class="av-amt">' + avFmtAmt(total) + '</td></tr></tbody></table>';
+            }
 
             $('#service_provider').on('change', function() {
                 toggleInput();
@@ -570,29 +482,14 @@
                                 $('#txt-budgeted-salary-display').val('—');
                             }
                             $('#budgeted-salary-container').show();
-
-                            var allowanceHtml = '';
-                            if (response.all_allowances && response.all_allowances.length > 0) {
-                                allowanceHtml = '<table class="table table-sm table-bordered mb-0"><thead><tr><th>Particulars</th><th>Amount</th></tr></thead><tbody>';
-                                response.all_allowances.forEach(function(item) {
-                                    var displayAmt = item.unit === '%'
-                                        ? item.raw_amount + '% (' + item.amount + ')'
-                                        : item.amount;
-                                    allowanceHtml += '<tr><td>' + item.name + '</td><td>' + displayAmt + '</td></tr>';
-                                });
-                                allowanceHtml += '</tbody></table>';
-                            } else {
-                                allowanceHtml = '<span class="text-muted">No allowances configured</span>';
-                            }
-                            $('#allowance-list').html(allowanceHtml);
-                            $('#budgeted-allowance-container').show();
+                            $('#allowance-list').html(avRenderAllowances(response.all_allowances));
                         }
                     });
                 } else {
                     $('#txt-rank').val('');
                     $('#rank_id').val('');
                     $('#budgeted-salary-container').hide();
-                    $('#budgeted-allowance-container').hide();
+                    $('#allowance-list').html(avEmptyPositionBox());
                 }
             });
 
@@ -645,14 +542,14 @@
                 messages: {
                     "budgeted": { required: "Budgeted field is required." },
                     "department": { required: "Department field is required." },
-                    "required_starting_date": { required: "Required Starting date is required." },
+                    "required_starting_date": { required: "Required starting date is required." },
                     "position": { required: "Position field is required." },
-                    "reporting_to": { required: "Reporting To field is required." },
+                    "reporting_to": { required: "Reporting to field is required." },
                     "rank": { required: "Rank field is required." },
                     "division": { required: "Division field is required." },
                     "section": { required: "Section field is required." },
-                    "Total_position_required": { required: "Required No of Vacancy field is required." },
-                    "employee_name": { required: "Employee Name is required when employee type is Replacement." }
+                    "Total_position_required": { required: "Required no. of vacancy field is required." },
+                    "employee_name": { required: "Employee name is required when employee type is Replacement." }
                 },
                 submitHandler: function(form) {
                     // Check if Save As Draft was clicked
@@ -779,39 +676,14 @@
                             isProgrammaticBudgetUpdate = false;
                         }
 
-                        $('#txt-budget-salary').val(response.budgeted_salary);
-                        $('#txt-proposed-salary').val(response.proposed_salary);
-                        $('#txt-Pension').val(response.pension);
-                        $('#txt-allowances').val(response.allowance);
-                        $('#txt-Medical').val(response.medical);
-                        $('#txt-acommocation2').val(response.accommodation);
-                        $('#txt-Insurance').val(response.insurance);
-
                         // Show budgeted salary and allowances for the selected position
                         if (response.budgeted_salary > 0) {
                             $('#txt-budgeted-salary-display').val(response.budgeted_salary);
-                            $('#budgeted-salary-container').show();
                         } else {
                             $('#txt-budgeted-salary-display').val('—');
-                            $('#budgeted-salary-container').show();
                         }
-
-                        var allowanceHtml = '';
-                        if (response.all_allowances && response.all_allowances.length > 0) {
-                            allowanceHtml = '<table class="table table-sm table-bordered mb-0"><thead><tr><th>Particulars</th><th>Amount</th></tr></thead><tbody>';
-                            response.all_allowances.forEach(function(item) {
-                                var displayAmt = item.unit === '%'
-                                    ? item.raw_amount + '% (' + item.amount + ')'
-                                    : item.amount;
-                                allowanceHtml += '<tr><td>' + item.name + '</td><td>' + displayAmt + '</td></tr>';
-                            });
-                            allowanceHtml += '</tbody></table>';
-                            $('#allowance-list').html(allowanceHtml);
-                            $('#budgeted-allowance-container').show();
-                        } else {
-                            $('#allowance-list').html('<span class="text-muted">No allowances configured</span>');
-                            $('#budgeted-allowance-container').show();
-                        }
+                        $('#budgeted-salary-container').show();
+                        $('#allowance-list').html(avRenderAllowances(response.all_allowances));
 
                         // Show manning info
                         var infoHtml = 'Approved: ' + response.headcount +
@@ -860,7 +732,13 @@
                         $('#vacancy-validation-msg').hide();
                         $('#vacancy-manning-info').hide();
                         $('#budgeted-salary-container').hide();
-                        $('#budgeted-allowance-container').hide();
+                        // Allowances are keyed by position, not quantity —
+                        // only reset them if the position itself is also
+                        // unset; clearing just the quantity shouldn't wipe
+                        // an already-loaded allowances table.
+                        if (!positionId) {
+                            $('#allowance-list').html(avEmptyPositionBox());
+                        }
                         $(self).removeClass('is-invalid');
                     }
                 }, 400); // 400ms debounce
@@ -876,7 +754,6 @@
                     $('#vacancy-validation-msg').hide();
                     $('#vacancy-manning-info').hide();
                     $('#budgeted-salary-container').hide();
-                    $('#budgeted-allowance-container').hide();
                 }
             });
 
@@ -919,4 +796,5 @@
         });
     </script>
 @include('resorts._dropdown_script')
+@include('resorts._datepicker_calendar_script')
 @endsection

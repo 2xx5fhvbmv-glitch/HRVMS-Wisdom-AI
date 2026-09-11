@@ -115,6 +115,10 @@
 @section('import-css')
 @include('resorts.payroll._payroll_buttons_v2_styles')
 @include('resorts._dropdown_styles')
+<style>
+    /* Employee avatar — same 32px bump as the Payslip/Pension/EWT lists. */
+    #employee-table .tableUser-block .img-circle { width: 32px; height: 32px; min-width: 32px; }
+</style>
 @endsection
 
 @section('import-scripts')

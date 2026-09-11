@@ -27,90 +27,72 @@
             </div>
         </div>
 
-        <div>
-            <div class="row g-4">
-                <div class="col-lg-5">
-                    <div class="card mb-30">
-                        <div class="card-title">
-                            <h3>Add Shopkeeper</h3>
-                        </div>
+        <div class="sk-wrap">
 
-                        <form id="shopkeeperForm">
+            <!-- Add shopkeeper -->
+            <div class="sk-card">
+                <div class="sk-ct"><h2>Add shopkeeper</h2></div>
+
+                <form id="shopkeeperForm">
     @csrf
-                            <div class="earnings-main">
-                                <div class="earnings-block mb-md-4 mb-3">
-                                    <div class="row align-items-end g-md-4 g-2 earnings-row">
-                                        <div class="col-sm-6">
-                                            <label for="name" class="form-label">FULL NAME <span class="red-mark"> * </span></label>
-                                            <input type="text" class="form-control name" id="name"
-                                                placeholder="Full Name" name="name">
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <label for="email" class="form-label">EMAIL <span class="red-mark"> * </span></label>
-                                            <input type="email" class="form-control email" id="email"
-                                                placeholder="Email" name="email">
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <label for="contact_no" class="form-label">Contact No <span class="red-mark"> * </span></label>
-                                            <input type="tel" class="form-control" id="contact_no" name="contact_no" pattern="[0-9]{10}" maxlength="10" placeholder="Contact No" oninput="this.value = this.value.replace(/[^0-9]/g, '');" >
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="card-footer text-end">
-                                <button type="submit" class="checkprogress btn payroll-btn-primary btn-sm">Submit</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <div class="col-lg-7">
-                    <div class="card mb-30">
-                        <div class="card-title">
-                            <div class="row g-1">
-                                <div class="col">
-                                    <h3>Recent Shopkeepers</h3>
-                                </div>
-                                <div class="col-auto">
-                                    <a href="{{route('shopkeepers.index')}}" class="a-link">View All</a>
-                                </div>
-                            </div>
+                    <div class="sk-grid">
+                        <div class="sk-f">
+                            <label for="name">Full name <span class="sk-req">*</span></label>
+                            <input type="text" class="sk-inp name" id="name" placeholder="e.g. Tuck Shop" name="name">
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Contact</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse($recentShopkeepers as $index => $shopkeeper)
-                                        <tr>
-                                            <td>{{ $index + 1 }}</td>
-                                            <td>{{ $shopkeeper->name }}</td>
-                                            <td>{{ $shopkeeper->email }}</td>
-                                            <td>{{ $shopkeeper->contact_no }}</td>
-                                            <td>
-                                                <a href="{{ route('resort.shopkeeper.payments', $shopkeeper->id) }}" class="btn btn-sm payroll-btn-secondary">
-                                                    <i class="fa-solid fa-eye"></i>
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="5" class="text-center text-muted py-3">No shopkeepers added yet</td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
+                        <div class="sk-f">
+                            <label for="email">Email <span class="sk-req">*</span></label>
+                            <input type="email" class="sk-inp email" id="email" placeholder="name@example.com" name="email">
+                        </div>
+                        <div class="sk-f">
+                            <label for="contact_no">Contact no <span class="sk-req">*</span></label>
+                            <input type="tel" class="sk-inp" id="contact_no" name="contact_no" pattern="[0-9]{10}" maxlength="10" placeholder="Contact number" oninput="this.value = this.value.replace(/[^0-9]/g, '');">
                         </div>
                     </div>
-                </div>
+                    <div class="sk-cfoot">
+                        <button type="submit" class="checkprogress sk-submit">Submit</button>
+                    </div>
+                </form>
             </div>
+
+            <!-- Recent shopkeepers -->
+            <div class="sk-card">
+                <div class="sk-ct"><h2>Recent shopkeepers</h2><span class="sk-spacer"></span>
+                    <a href="{{ route('shopkeepers.index') }}" class="sk-viewall">View all <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                </div>
+                <table class="sk-tbl">
+                    <thead><tr><th class="sk-idx">#</th><th>Name</th><th>Email</th><th>Contact</th><th class="sk-act">Action</th></tr></thead>
+                    <tbody>
+                        @forelse($recentShopkeepers as $index => $shopkeeper)
+                            @php
+                                $skParts = preg_split('/\s+/', trim($shopkeeper->name));
+                                $skInitials = strtoupper(($skParts[0][0] ?? '') . (isset($skParts[1]) ? $skParts[1][0] : '')) ?: '?';
+                                $skPhoto = !empty($shopkeeper->profile_photo) ? asset(config('settings.ShopkeeperProfile_folder') . '/' . $shopkeeper->profile_photo) : null;
+                            @endphp
+                            <tr>
+                                <td class="sk-idx">{{ $index + 1 }}</td>
+                                <td>
+                                    <div class="sk-nm">
+                                        <span class="sk-av">
+                                            <span class="sk-av-fallback">{{ $skInitials }}</span>
+                                            @if($skPhoto)<img src="{{ $skPhoto }}" alt="{{ $shopkeeper->name }}" onerror="this.remove()">@endif
+                                        </span>
+                                        <span class="sk-t">{{ $shopkeeper->name }}</span>
+                                    </div>
+                                </td>
+                                <td class="sk-email">{{ $shopkeeper->email }}</td>
+                                <td class="sk-num">{{ $shopkeeper->contact_no }}</td>
+                                <td class="sk-act">
+                                    <a href="{{ route('resort.shopkeeper.payments', $shopkeeper->id) }}" class="sk-ico view" title="View"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></a>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5" class="sk-empty">No shopkeepers added yet</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
         </div>
     </div>
 </div>
@@ -118,6 +100,7 @@
 
 @section('import-css')
 @include('resorts.payroll._payroll_buttons_v2_styles')
+@include('resorts.payroll.shopkeeper._shopkeeper_styles')
 @endsection
 
 @section('import-scripts')
