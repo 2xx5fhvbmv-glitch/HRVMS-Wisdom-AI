@@ -10285,6 +10285,136 @@ class Common
             }
         }
     }
+    /**
+     * Strips the background off a photographed signature so only the ink
+     * strokes remain, for the capture -> preview -> confirm e-signature
+     * upload flow (mobile + web, same server-side step per the shared
+     * spec). Threshold-based, not AI background removal — intervention/
+     * image (^2.7) is already a project dependency and this server only
+     * has GD (no Imagick), so a plain "near-white becomes transparent"
+     * pass needs no new dependency or external API call. Works well for
+     * a signature on plain white/light paper; a messier photo (shadows,
+     * off-white paper) would need a third-party API instead — not built
+     * here, flagged as the documented tradeoff.
+     *
+     * @param string $rawImageContents Raw bytes of the uploaded photo.
+     * @return string Raw PNG bytes with background pixels made transparent.
+     */
+    public static function removeSignatureBackground(string $rawImageContents): string
+    {
+        $image = \Intervention\Image\Facades\Image::make($rawImageContents);
+
+        // Bound the pixel-loop cost below — a signature doesn't need to be
+        // huge, and this runs synchronously in the request.
+        if ($image->width() > 900) {
+            $image->resize(900, null, function ($constraint) {
+                $constraint->aspectRatio();
+                $constraint->upsize();
+            });
+        }
+
+        $gd = $image->getCore();
+        imagealphablending($gd, false);
+        imagesavealpha($gd, true);
+        $width = imagesx($gd);
+        $height = imagesy($gd);
+        $transparent = imagecolorallocatealpha($gd, 255, 255, 255, 127);
+        // 0 (opaque) .. 255 (white) brightness scale — pixels brighter than
+        // this become fully transparent. Ink (dark strokes) stays opaque.
+        $threshold = 200;
+
+        for ($y = 0; $y < $height; $y++) {
+            for ($x = 0; $x < $width; $x++) {
+                $rgb = imagecolorat($gd, $x, $y);
+                $r = ($rgb >> 16) & 0xFF;
+                $g = ($rgb >> 8) & 0xFF;
+                $b = $rgb & 0xFF;
+                $brightness = (int) round(($r + $g + $b) / 3);
+                if ($brightness >= $threshold) {
+                    imagesetpixel($gd, $x, $y, $transparent);
+                }
+            }
+        }
+
+        ob_start();
+        imagepng($gd);
+        return ob_get_clean();
+    }
+
+    /**
+     * Copies whatever signature is CURRENTLY on an approver's profile into
+     * a permanent, immutable location tied to one specific approval/
+     * consent record, and returns the frozen name/path/timestamp for the
+     * caller to store on that record. Never re-derive a past approval's
+     * signature from ResortAdmin.signature_img later — that's the live
+     * value, not the historical one; a re-upload or profile change must
+     * never alter what a past approval shows.
+     *
+     * Call this ONCE, at the exact moment an approval/consent action is
+     * recorded (e.g. inside API\LeaveController::handleLeaveAction()),
+     * after confirming signature_img is non-empty (same "Authorized
+     * signature is missing" gate already proven in
+     * InterviewAssessmentController et al.).
+     *
+     * @param int $resortAdminId The approver — Auth::guard('api'|'resort-admin')->user()->id.
+     * @param string $approvalContext Short slug identifying the module, e.g. 'leave'.
+     * @param int|string $recordId The approval record's own id (folder-scopes the snapshot).
+     * @return array{name: ?string, signature_img: ?string, timestamp: ?\Illuminate\Support\Carbon}
+     */
+    public static function snapshotSignature(int $resortAdminId, string $approvalContext, $recordId): array
+    {
+        $admin = ResortAdmin::with('resort')->find($resortAdminId);
+        $timestamp = now();
+
+        if (!$admin || empty($admin->signature_img)) {
+            return ['name' => $admin ? trim($admin->first_name . ' ' . $admin->last_name) : null, 'signature_img' => null, 'timestamp' => $timestamp];
+        }
+
+        $name = trim($admin->first_name . ' ' . $admin->last_name);
+        $resortFolder = optional($admin->resort)->resort_id ?: $admin->resort_id;
+        $ext = pathinfo($admin->signature_img, PATHINFO_EXTENSION) ?: 'png';
+        $snapshotPath = $resortFolder . '/public/approvals/' . $approvalContext . '/' . $recordId . '/signature.' . $ext;
+
+        try {
+            $contents = StorageHelper::get($admin->signature_img);
+            StorageHelper::put($snapshotPath, $contents);
+        } catch (\Throwable $e) {
+            \Log::warning('snapshotSignature: failed to copy signature for approver ' . $resortAdminId . ' (' . $approvalContext . '/' . $recordId . '): ' . $e->getMessage());
+            return ['name' => $name, 'signature_img' => null, 'timestamp' => $timestamp];
+        }
+
+        return ['name' => $name, 'signature_img' => $snapshotPath, 'timestamp' => $timestamp];
+    }
+
+    /**
+     * Resolves a StorageHelper-relative path (local disk today, Wasabi in
+     * prod — see CLAUDE.md storage rules) to a base64 data: URI, for
+     * embedding directly in a PDF template via <img src="...">. Used by
+     * the shared signature-block partial (resources/views/resorts/
+     * pdf_partials/_signature_block.blade.php) instead of a local
+     * filesystem path or a public URL — Dompdf can't reliably fetch a
+     * remote Wasabi URL mid-render, and a local path breaks the moment
+     * storage isn't local (the exact bug LetterheadSetting::
+     * imageAbsolutePath() already has via public_path()).
+     */
+    public static function signatureImageDataUri(?string $path): ?string
+    {
+        if (empty($path)) {
+            return null;
+        }
+        try {
+            if (!StorageHelper::disk()->exists($path)) {
+                return null;
+            }
+            $contents = StorageHelper::get($path);
+            $mime = StorageHelper::disk()->mimeType($path) ?: 'image/png';
+            return 'data:' . $mime . ';base64,' . base64_encode($contents);
+        } catch (\Throwable $e) {
+            \Log::warning('signatureImageDataUri failed for path ' . $path . ': ' . $e->getMessage());
+            return null;
+        }
+    }
+
     public static function UploadProfileAwsPic($basePath,$file)
     {
         $data = [];

@@ -13,7 +13,8 @@ class EmployeeLeaveStatus extends Model
     use HasFactory;
     protected $table = 'employees_leaves_status';
     protected $fillable = [
-        'leave_request_id','status','comments','approver_rank','approver_id','approved_at'
+        'leave_request_id','status','comments','approver_rank','approver_id','approved_at',
+        'signature_img','signature_name','signed_at'
     ];
     public static function boot(){
         parent::boot();
