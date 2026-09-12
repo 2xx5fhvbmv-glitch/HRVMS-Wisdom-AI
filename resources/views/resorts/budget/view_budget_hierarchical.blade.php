@@ -471,22 +471,42 @@
         </div>
 
         @php
-            // Same 3-way viewing tabs as View Manning — reuses this page's
-            // existing grid unchanged, just feeding it a different category.
-            $vbCategory = $employmentType ?? 'Permanent';
+            // 3 tabs (Permanent / Casual & Intern / All Combined) — same
+            // category model as View Manning, but this page's drill-down
+            // is a single AJAX-driven accordion controller, not a simple
+            // JSON-templated grid (see build spec item 2.1's controller
+            // comment). "Casual & Intern" therefore reuses that one
+            // accordion pointed at whichever of Casual/Intern the small
+            // sub-toggle below picks, rather than rendering both at once.
+            $vbCategoryView = $categoryView ?? 'permanent';
         @endphp
         <div class="vb-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
-            @foreach (['Permanent' => 'Permanent', 'Casual' => 'Casual', 'Intern' => 'Intern'] as $catValue => $catLabel)
-                <a href="{{ route('resort.budget.viewbudget', ['year' => request()->get('year', date('Y')), 'employment_type' => $catValue]) }}"
-                   class="btn btn-sm {{ $vbCategory === $catValue ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}">{{ $catLabel }}</a>
+            @foreach ([
+                'permanent'    => 'Permanent',
+                'nonpermanent' => 'Casual & Intern',
+                'all'          => 'All Combined',
+            ] as $tabValue => $tabLabel)
+                <a href="{{ route('resort.budget.viewbudget', ['year' => request()->get('year', date('Y')), 'category_view' => $tabValue]) }}"
+                   class="btn btn-sm {{ $vbCategoryView === $tabValue ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}">{{ $tabLabel }}</a>
             @endforeach
+            @if($vbCategoryView === 'nonpermanent')
+                <div class="vb-sub-toggle" style="display:flex;gap:4px;margin-left:8px;padding-left:8px;border-left:1px solid var(--line,#EEF2F2);">
+                    @foreach (['Casual' => 'Casual', 'Intern' => 'Intern'] as $subValue => $subLabel)
+                        <a href="{{ route('resort.budget.viewbudget', ['year' => request()->get('year', date('Y')), 'category_view' => 'nonpermanent', 'sub' => $subValue]) }}"
+                           class="btn btn-xs {{ ($activeSub ?? 'Casual') === $subValue ? 'wfp-btn-accent' : 'wfp-btn-secondary' }}">{{ $subLabel }}</a>
+                    @endforeach
+                </div>
+            @endif
         </div>
         <div class="card">
             <div class="card-header">
                 <div class="row g-md-3 g-2 align-items-center justify-content-between">
                     <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                         <form method="GET" action="{{ route('resort.budget.viewbudget') }}" id="yearFilterForm">
-                            <input type="hidden" name="employment_type" value="{{ $vbCategory }}">
+                            <input type="hidden" name="category_view" value="{{ $vbCategoryView }}">
+                            @if($vbCategoryView === 'nonpermanent')
+                                <input type="hidden" name="sub" value="{{ $activeSub ?? 'Casual' }}">
+                            @endif
                             <select class="form-select" name="year" id="yearFilter" onchange="document.getElementById('yearFilterForm').submit();">
                                 @php
                                     $currentYear = date('Y');
@@ -714,6 +734,11 @@ $(document).ready(function() {
     const resortId = {{ $resortId }};
     const year = {{ $year }};
     const csrfToken = '{{ csrf_token() }}';
+    // Threaded into every hierarchy AJAX call below so expanding an
+    // accordion node under Casual/Intern/All Combined fetches THAT
+    // category's data instead of silently defaulting to Permanent
+    // server-side (see build spec item 2.1's blade companion).
+    const employmentType = "{{ $employmentType }}";
 
     // Track loaded departments
     const loadedDepartments = {};
@@ -763,6 +788,7 @@ $(document).ready(function() {
             method: 'GET',
             data: {
                 year: year,
+                employment_type: employmentType,
                 _token: csrfToken
             },
             success: function(response) {
@@ -1170,6 +1196,7 @@ $(document).ready(function() {
             data: {
                 department_id: departmentId,
                 year: year,
+                employment_type: employmentType,
                 _token: csrfToken
             },
             success: function(response) {
@@ -1352,6 +1379,7 @@ $(document).ready(function() {
             data: {
                 position_id: positionId,
                 year: year,
+                employment_type: employmentType,
                 _token: csrfToken
             },
             success: function(response) {

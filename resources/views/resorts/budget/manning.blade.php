@@ -73,65 +73,122 @@
 
     <div class="card vm-card">
         @php
-            // Reshape $departmentsData into the exact object shape the
-            // client-side render function expects — the reference's own
-            // DEPTS[] shape ({name, open, positions:[{title, count, seats}]}),
-            // so the ported avatar()/seatCell()/posRows()/deptBlock()
-            // functions need no logic changes, just real field names.
+            // Reshape one category's departmentsData into the exact object
+            // shape the client-side render function expects — the
+            // reference's own DEPTS[] shape ({name, open,
+            // positions:[{title, count, seats}]}), so the ported
+            // avatar()/seatCell()/posRows()/deptBlock() functions need no
+            // logic changes, just real field names.
             $Rank = config('settings.Position_Rank');
-            $DEPTS = $departmentsData->values()->map(function ($deptData, $key) use ($Rank) {
-                $positions = $deptData['positions']->map(function ($pos) use ($Rank) {
-                    $seats = $pos->employees->map(function ($employee) use ($Rank) {
+            $vmBuildDepts = function ($departmentsData) use ($Rank) {
+                return collect($departmentsData)->values()->map(function ($deptData, $key) use ($Rank) {
+                    $positions = collect($deptData['positions'])->map(function ($pos) use ($Rank) {
+                        $seats = collect($pos->employees)->map(function ($employee) use ($Rank) {
+                            return [
+                                'name' => trim(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')),
+                                'rank' => $Rank[$employee->rank] ?? '',
+                                'nation' => $employee->nationality,
+                                // No photo column is selected by this query — every
+                                // seat renders via the initials fallback below, per
+                                // the "never fabricate a photo" rule. Wiring a real
+                                // photo would mean adding a column to the
+                                // employeesByPosition select in ViewManning(), a
+                                // backend change outside this task's scope.
+                                'photo' => null,
+                                'outOfBudget' => (bool) ($employee->out_of_budget ?? false),
+                            ];
+                        })->values()->all();
+                        for ($i = 0; $i < (int) $pos->vacantcount; $i++) {
+                            $seats[] = ['vacant' => true];
+                        }
                         return [
-                            'name' => trim(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')),
-                            'rank' => $Rank[$employee->rank] ?? '',
-                            'nation' => $employee->nationality,
-                            // No photo column is selected by this query — every
-                            // seat renders via the initials fallback below, per
-                            // the "never fabricate a photo" rule. Wiring a real
-                            // photo would mean adding a column to the
-                            // employeesByPosition select in ViewManning(), a
-                            // backend change outside this task's scope.
-                            'photo' => null,
-                            'outOfBudget' => (bool) ($employee->out_of_budget ?? false),
+                            'title' => $pos->position_title,
+                            'count' => (int) ($pos->headcount ?? 0),
+                            'seats' => $seats,
                         ];
-                    })->values()->all();
-                    for ($i = 0; $i < (int) $pos->vacantcount; $i++) {
-                        $seats[] = ['vacant' => true];
-                    }
+                    })->values();
+
                     return [
-                        'title' => $pos->position_title,
-                        'count' => (int) ($pos->headcount ?? 0),
-                        'seats' => $seats,
+                        'name' => $deptData['department']->name,
+                        'open' => $key === 0,
+                        'budgetId' => $deptData['Budget_id'],
+                        'deptId' => $deptData['department']->id,
+                        'positions' => $positions,
                     ];
                 })->values();
+            };
 
-                return [
-                    'name' => $deptData['department']->name,
-                    'open' => $key === 0,
-                    'budgetId' => $deptData['Budget_id'],
-                    'deptId' => $deptData['department']->id,
-                    'positions' => $positions,
-                ];
-            })->values();
+            // "All Combined" needs one real blended dataset, not just a
+            // summed headline number — merge the 3 categories'
+            // departmentsData by department, then by position id (same
+            // physical resort_positions row), summing headcount/vacantcount
+            // and concatenating each position's employees across categories.
+            $vmMergeDepartmentsData = function (array $sets) {
+                $deptMap = [];
+                foreach ($sets as $set) {
+                    foreach ($set as $deptData) {
+                        $deptId = $deptData['department']->id;
+                        if (!isset($deptMap[$deptId])) {
+                            $deptMap[$deptId] = [
+                                'department' => $deptData['department'],
+                                'positions' => [],
+                                'Budget_id' => $deptData['Budget_id'],
+                            ];
+                        }
+                        foreach ($deptData['positions'] as $position) {
+                            $posId = $position->id;
+                            if (!isset($deptMap[$deptId]['positions'][$posId])) {
+                                $merged = clone $position;
+                                $merged->headcount = (int) ($position->headcount ?? 0);
+                                $merged->vacantcount = (int) ($position->vacantcount ?? 0);
+                                $merged->employees = collect($position->employees)->values();
+                                $deptMap[$deptId]['positions'][$posId] = $merged;
+                            } else {
+                                $existing = $deptMap[$deptId]['positions'][$posId];
+                                $existing->headcount += (int) ($position->headcount ?? 0);
+                                $existing->vacantcount += (int) ($position->vacantcount ?? 0);
+                                $existing->employees = $existing->employees->concat(collect($position->employees))->values();
+                            }
+                        }
+                    }
+                }
+                return collect(array_values($deptMap))->map(function ($d) {
+                    $d['positions'] = collect(array_values($d['positions']));
+                    return $d;
+                })->values();
+            };
+
+            // 3 tabs (Permanent / Casual & Intern / All Combined) — viewing
+            // is independent of submission, which stays a separate
+            // per-category form per HOD. Reuses this same page/grid, just
+            // feeding it whichever category(ies) the controller resolved
+            // for the current tab (see BudgetController::ViewManning).
+            $vmCategoryView = $categoryView ?? 'permanent';
+
+            $vmSections = [];
+            if ($vmCategoryView === 'nonpermanent') {
+                $vmSections[] = ['id' => 'vm-list-casual', 'label' => 'Casual', 'depts' => $vmBuildDepts($dataByCategory['Casual']['departmentsData'])];
+                $vmSections[] = ['id' => 'vm-list-intern', 'label' => 'Intern', 'depts' => $vmBuildDepts($dataByCategory['Intern']['departmentsData'])];
+            } elseif ($vmCategoryView === 'all') {
+                $vmSections[] = ['id' => 'vm-list', 'label' => null, 'depts' => $vmBuildDepts($vmMergeDepartmentsData(array_map(fn($d) => $d['departmentsData'], $dataByCategory)))];
+            } else {
+                $vmSections[] = ['id' => 'vm-list', 'label' => null, 'depts' => $vmBuildDepts($departmentsData)];
+            }
         @endphp
 
-        @php
-            // Viewing is 3-tab (Permanent / Casual / Intern) — independent
-            // of submission, which stays a separate per-category form per
-            // HOD. Reuses this same page/grid, just feeding it whichever
-            // category's manning_responses row the controller resolves.
-            $vmCategory = $employmentType ?? 'Permanent';
-        @endphp
         <div class="vm-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
-            @foreach (['Permanent' => 'Permanent', 'Casual' => 'Casual', 'Intern' => 'Intern'] as $catValue => $catLabel)
-                <a href="{{ route('resort.budget.manning', ['year' => $year, 'employment_type' => $catValue]) }}"
-                   class="btn btn-sm {{ $vmCategory === $catValue ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}">{{ $catLabel }}</a>
+            @foreach ([
+                'permanent'    => 'Permanent',
+                'nonpermanent' => 'Casual & Intern',
+                'all'          => 'All Combined',
+            ] as $tabValue => $tabLabel)
+                <a href="{{ route('resort.budget.manning', ['year' => $year, 'category_view' => $tabValue]) }}"
+                   class="btn btn-sm {{ $vmCategoryView === $tabValue ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}">{{ $tabLabel }}</a>
             @endforeach
         </div>
         <div class="vm-tools">
             <form method="GET" action="{{ route('resort.budget.manning') }}" id="yearFilterForm">
-                <input type="hidden" name="employment_type" value="{{ $vmCategory }}">
+                <input type="hidden" name="category_view" value="{{ $vmCategoryView }}">
                 <select class="form-select dd-native-select" id="yearFilter" name="year"
                     onchange="document.getElementById('yearFilterForm').submit();">
                     @php
@@ -161,7 +218,13 @@
             </form>
         </div>
 
-        <div id="vm-list"></div>
+        @foreach ($vmSections as $section)
+            @if($section['label'])
+                <h5 class="vm-section-label mt-3 mb-2">{{ $section['label'] }}</h5>
+            @endif
+            <div class="vm-section-subtotal text-muted small mb-2" id="{{ $section['id'] }}-subtotal"></div>
+            <div id="{{ $section['id'] }}"></div>
+        @endforeach
     </div>
         </div>
     </div>
@@ -208,7 +271,7 @@
 <script>
 (function () {
     var VM_CAN_REVISE = @json($vmCanRevise);
-    var DEPTS = @json($DEPTS);
+    var VM_SECTIONS = @json($vmSections);
 
     function vmEsc(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
     function vmInitials(n) {
@@ -288,8 +351,28 @@
         '</div>';
     }
 
-    var $list = document.getElementById('vm-list');
-    if ($list) $list.innerHTML = DEPTS.map(vmDeptBlock).join('');
+    VM_SECTIONS.forEach(function (section) {
+        var $list = document.getElementById(section.id);
+        if ($list) $list.innerHTML = section.depts.map(vmDeptBlock).join('');
+
+        // Section subtotal — computed the same way vmDeptBlock already
+        // computes each department's own "X positions · Y filled · Z
+        // vacant" line, just summed across every department in this
+        // section instead of one. Casual/Intern each get their own (not
+        // blended); the single-section Permanent/All Combined tabs get one.
+        var totalPos = 0, filled = 0, vac = 0;
+        section.depts.forEach(function (d) {
+            d.positions.forEach(function (p) {
+                totalPos++;
+                (p.seats || []).forEach(function (s) { s.vacant ? vac++ : filled++; });
+            });
+        });
+        var $subtotal = document.getElementById(section.id + '-subtotal');
+        if ($subtotal) {
+            $subtotal.textContent = totalPos + ' position' + (totalPos !== 1 ? 's' : '') + ' · ' + filled + ' filled' +
+                (vac ? ' · ' + vac + ' vacant' : '');
+        }
+    });
 
     document.querySelectorAll('.vm-dept').forEach(function (el) {
         var hd = el.querySelector('.vm-dhd');

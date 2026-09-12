@@ -53,15 +53,66 @@ class BudgetController extends Controller
         $page_title = 'View Manning';
         $year = $request->input('year') ?? date('Y');
         $resortId = auth()->guard('resort-admin')->user()->resort_id;
+        $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
+
+        // Tab key (permanent / nonpermanent / all), not a raw category — each
+        // maps to the set of employment_type categories that tab's content
+        // needs. See build spec item 2.1. Only manning.blade.php's tab bar
+        // links here, so no back-compat needed for the old employment_type
+        // param name.
+        $categoryView = $request->input('category_view', 'permanent');
+        $categories = match ($categoryView) {
+            'nonpermanent' => ['Casual', 'Intern'],
+            'all'          => ['Permanent', 'Casual', 'Intern'],
+            default        => ['Permanent'],
+        };
+
+        $dataByCategory = [];
+        foreach ($categories as $cat) {
+            $dataByCategory[$cat] = $this->resolveManningCategoryData($cat, $year, $resortId, $employeeRankPosition);
+        }
+
+        // Flat back-compat variables for the 'permanent' tab — identical
+        // shape/behavior to what this method always returned for a single
+        // category, so nothing downstream that only ever renders Permanent
+        // needs to change.
+        $primary           = $dataByCategory[$categories[0]];
+        $departmentsData   = $primary['departmentsData'];
+        $summary           = $primary['summary'];
+        $isBudgetCompleted = $primary['isBudgetCompleted'];
+        $Budget_id         = $primary['Budget_id'];
+        $Message_id        = $primary['Message_id'];
+        $employmentType    = $categories[0];
+
+        return view('resorts.budget.manning', compact(
+            'page_title',
+            'Budget_id',
+            'Message_id',
+            'resortId',
+            'departmentsData',
+            'summary',
+            'year',
+            'employeeRankPosition',
+            'isBudgetCompleted',
+            'employmentType',
+            'dataByCategory',
+            'categories',
+            'categoryView'
+        ));
+    }
+
+    /**
+     * Single-category worker behind ViewManning() — extracted verbatim
+     * (see build spec item 2.1) so the "3 tabs → up to 3 categories" fan-out
+     * can call this once per category instead of duplicating ~400 lines of
+     * batch-prefetch logic per tab.
+     */
+    private function resolveManningCategoryData($employmentType, $year, $resortId, $employeeRankPosition)
+    {
         $Budget_id = $data['manning_response_id'] ?? null;
         $Message_id = $data['Message_id'] ?? null;
-        // Which of the 3 manning categories this render shows — see
-        // ViewBudget()'s identical param for the full rationale. Defaults
-        // to 'Permanent' so every existing caller is unaffected.
-        $employmentType = $request->input('employment_type', 'Permanent');
         $departmentsData = collect();
         $rank = config('settings.Position_Rank');
-        $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
 
         if(($employeeRankPosition['position'] != "HR" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" )) && ($employeeRankPosition['position'] != "GM" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" )) && ($employeeRankPosition['position'] != "Finance" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" ))) {
             $departments = ResortDepartment::where('id',$this->resort->getEmployee->Dept_id)->where('resort_id', $resortId)->get();
@@ -455,18 +506,7 @@ class BudgetController extends Controller
             }
             // dd($departmentsData);
 
-            return view('resorts.budget.manning', compact(
-                'page_title',
-                'Budget_id',
-                'Message_id',
-                'resortId',
-                'departmentsData',
-                'summary',
-                'year',
-                'employeeRankPosition',
-                'isBudgetCompleted',
-                'employmentType'
-            ));
+            return compact('departmentsData', 'summary', 'isBudgetCompleted', 'Budget_id', 'Message_id');
     }
 
     public function CompareBudget($deptID, $budgetId, ?Request $request = null)
@@ -913,18 +953,123 @@ class BudgetController extends Controller
         $year = $request->input('year') ?? date('Y');
 
         $resortId = auth()->guard('resort-admin')->user()->resort_id;
-        $Budget_id = $request->input('manning_response_id') ?? null;
-        $Message_id = $request->input('Message_id') ?? null;
-        // Which of the 3 manning categories this dashboard render shows.
-        // Defaults to 'Permanent' so every existing caller (URL/AJAX call
-        // with no employment_type param) behaves exactly as before —
-        // Casual/Intern only appear when a tab/filter explicitly asks.
-        $employmentType = $request->input('employment_type', 'Permanent');
-
-        $rank = config('settings.Position_Rank');
-
         $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
 
+        // Tab key (permanent / nonpermanent / all) — see build spec item
+        // 2.1 and ViewManning()'s identical pattern. Only view_budget_
+        // hierarchical.blade.php's tab bar links here, so no back-compat
+        // needed for the old employment_type param name.
+        //
+        // Unlike Manning's simple JSON-templated grid, this page's
+        // department/section/position/employee detail loads lazily via 6
+        // separate AJAX endpoints wired to ONE global accordion controller
+        // (loadedDepartments{}, window.budgetTotals, one nav card) — not
+        // designed for two categories rendered simultaneously. Rather than
+        // duplicating that whole controller, "Casual & Intern" reuses the
+        // exact same single-accordion machinery pointed at whichever of
+        // the two is picked via `sub` (defaulting to Casual), with its own
+        // small in-page toggle. "All Combined" instead uses the literal
+        // sentinel employment_type='all', which the 6 AJAX endpoints
+        // already know how to blend (see getDepartmentHierarchy() /
+        // getPositionEmployees() / getAllBudgetTotals()).
+        $categoryView = $request->input('category_view', 'permanent');
+        $categories = match ($categoryView) {
+            'nonpermanent' => ['Casual', 'Intern'],
+            'all'          => ['Permanent', 'Casual', 'Intern'],
+            default        => ['Permanent'],
+        };
+
+        $dataByCategory = [];
+        foreach ($categories as $cat) {
+            $dataByCategory[$cat] = $this->resolveViewBudgetCategoryData($cat, $year, $resortId, $employeeRankPosition);
+        }
+
+        if ($categoryView === 'nonpermanent') {
+            $activeSub               = in_array($request->input('sub'), ['Casual', 'Intern'], true) ? $request->input('sub') : 'Casual';
+            $primary                 = $dataByCategory[$activeSub];
+            $divisions               = $primary['divisions'];
+            $manningResponses        = $primary['manningResponses'];
+            $departments             = $primary['departments'];
+            $approvedBudgetIdsLookup = $primary['approvedBudgetIdsLookup'];
+            $employmentType          = $activeSub;
+        } elseif ($categoryView === 'all') {
+            // Merge department "slots" across the 3 categories by dept_id
+            // (first-found wins: Permanent, then Casual, then Intern) so a
+            // department with ONLY a Casual/Intern manning response still
+            // appears here instead of being silently skipped — the actual
+            // position/employee/vacant figures are blended live by the AJAX
+            // endpoints per department, this merge only decides which
+            // department slots exist to expand.
+            $mergedByDept = [];
+            foreach (['Permanent', 'Casual', 'Intern'] as $cat) {
+                foreach ($dataByCategory[$cat]['departments'] as $dept) {
+                    if (!isset($mergedByDept[$dept->dept_id])) {
+                        $mergedByDept[$dept->dept_id] = $dept;
+                    }
+                }
+            }
+            $departments = collect(array_values($mergedByDept));
+            $manningResponses = $departments;
+
+            $approvedBudgetIdsLookup = collect();
+            foreach (['Permanent', 'Casual', 'Intern'] as $cat) {
+                $approvedBudgetIdsLookup = $approvedBudgetIdsLookup->merge($dataByCategory[$cat]['approvedBudgetIdsLookup']);
+            }
+
+            // Division scoping (rank_wise_departments) doesn't differ by
+            // category for normal users — only the rare Finance/GM
+            // forwarding edge case does, which 'all' doesn't specially
+            // resolve (same simplification as getAllBudgetTotals' dept
+            // scoping fallback). Permanent's already-hydrated division
+            // tree is reused rather than re-querying a 4th time.
+            $divisions = $dataByCategory['Permanent']['divisions'];
+            $employmentType = 'all';
+        } else {
+            $primary                 = $dataByCategory['Permanent'];
+            $divisions               = $primary['divisions'];
+            $manningResponses        = $primary['manningResponses'];
+            $departments             = $primary['departments'];
+            $approvedBudgetIdsLookup = $primary['approvedBudgetIdsLookup'];
+            $employmentType          = 'Permanent';
+        }
+        $available_rank = $employeeRankPosition['position'];
+        // Which of Casual/Intern the "Casual & Intern" tab's in-page toggle
+        // currently shows — only meaningful when $categoryView is
+        // 'nonpermanent', but always defined so the view can safely check it.
+        $activeSub = $employmentType === 'Casual' || $employmentType === 'Intern' ? $employmentType : null;
+
+        // Get resort budget costs for the modal — resort-wide, not
+        // category-scoped, so this is computed once regardless of tab.
+        $resortCosts = ResortBudgetCost::where('resort_id', $resortId)
+            ->where('status', 'active')
+            ->orderBy('id')
+            ->get();
+
+        return view('resorts.budget.view_budget_hierarchical')->with(compact(
+            'page_title',
+            'divisions',
+            'resortId',
+            'year',
+            'employeeRankPosition',
+            'available_rank',
+            'manningResponses',
+            'departments',
+            'resortCosts',
+            'approvedBudgetIdsLookup',
+            'employmentType',
+            'dataByCategory',
+            'categories',
+            'categoryView',
+            'activeSub'
+        ));
+    }
+
+    /**
+     * Single-category worker behind ViewBudget() — extracted verbatim
+     * (build spec item 2.1), same pattern as resolveManningCategoryData().
+     */
+    private function resolveViewBudgetCategoryData($employmentType, $year, $resortId, $employeeRankPosition)
+    {
         // Extracted into getRankWiseDepartmentIds() (unchanged logic) so
         // getAllBudgetTotals() can apply the exact same rank-based scoping
         // without a second, separately-maintained copy of this branching.
@@ -1227,8 +1372,6 @@ class BudgetController extends Controller
         // (prepared in lines 492-669 with proper vacant_details and is_in_manning_request)
         $manningResponses = $departments;
 
-        $available_rank = $employeeRankPosition['position'];
-
         // Build a Budget_id → is-locked map. Once GM has approved the budget
         // (status='Approved' OR budget_process_status='Approved'/'Completed')
         // the Revise Budget button must disable for that department, so HR
@@ -1252,25 +1395,7 @@ class BudgetController extends Controller
         $approvedBudgetIds = $approvedBudgetIds->merge($approvedByProcess)->unique()->values();
         $approvedBudgetIdsLookup = $approvedBudgetIds->flip(); // O(1) `isset` checks
 
-        // Get resort budget costs for the modal
-        $resortCosts = ResortBudgetCost::where('resort_id', $resortId)
-            ->where('status', 'active')
-            ->orderBy('id')
-            ->get();
-
-        return view('resorts.budget.view_budget_hierarchical')->with(compact(
-            'page_title',
-            'divisions',
-            'resortId',
-            'year',
-            'employeeRankPosition',
-            'available_rank',
-            'manningResponses',
-            'departments',
-            'resortCosts',
-            'approvedBudgetIdsLookup',
-            'employmentType'
-        ));
+        return compact('divisions', 'manningResponses', 'departments', 'approvedBudgetIdsLookup');
     }
 
     public function ConsolidateBudget(Request $request)
@@ -1591,10 +1716,6 @@ class BudgetController extends Controller
         }
 
         $selectedYear = $request->get('year', Carbon::now()->year);
-        // Which of the 3 manning categories this render shows — see
-        // ViewBudget()'s identical param for the full rationale. Defaults
-        // to 'Permanent' so every existing caller is unaffected.
-        $employmentType = $request->get('employment_type', 'Permanent');
         $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
 
         // Resort-wide setting, same value for every employee/vacant row on
@@ -1611,6 +1732,29 @@ class BudgetController extends Controller
             $mvrToDollarRate = 1 / $resortSettingsForRate->DollertoMVR;
         }
 
+        // Tab key (permanent / nonpermanent / all) — same model as
+        // ViewManning()/ViewBudget() (build spec item 2.1). Unlike those,
+        // this endpoint already builds one big in-memory tree per category
+        // (not a lazy per-node AJAX system), so "All Combined" merges the
+        // 3 categories' trees for real (mergeConsolidatedBudgetTrees()
+        // below) instead of the reduced-risk representative-fallback used
+        // on View Budget's deep drill-down. "Casual & Intern" still uses
+        // the `sub` in-page toggle (Casual XOR Intern rendered at a time)
+        // — this page's markup/JS wasn't built for two full trees stacked
+        // in one card, and duplicating that is out of scope here.
+        $categoryView = $request->get('category_view', 'permanent');
+        $categoriesNeeded = match ($categoryView) {
+            'nonpermanent' => ['Casual', 'Intern'],
+            'all'          => ['Permanent', 'Casual', 'Intern'],
+            default        => ['Permanent'],
+        };
+
+        // The existing single-category tree builder below is wrapped in a
+        // closure (rather than moved into a separate method) so its ~500
+        // lines of already-proven batch-prefetch logic stay completely
+        // unmoved and unchanged — only invoked once per needed category
+        // instead of assuming exactly one.
+        $resolveCategory = function ($employmentType) use ($request, $selectedYear, $resortId, $employeeRankPosition, $mvrToDollarRate) {
         // Retrieve manning responses by resort and year
         if(($employeeRankPosition['position'] != "HR" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" )) && ($employeeRankPosition['position'] != "GM" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" )) && ($employeeRankPosition['position'] != "Finance" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" ))) {
             $yearlyBudgets = ManningResponse::where('year', $selectedYear)
@@ -1679,6 +1823,17 @@ class BudgetController extends Controller
             ->whereIn('id', $inScopeDeptIds)
             ->where('resort_id', $resortId)
             ->get();
+
+        // Multi-category ("All Combined"/"Casual & Intern") calls this
+        // closure once per category — a category can legitimately have
+        // zero in-scope departments (e.g. Intern manning never done for
+        // this resort) where the single-category flow below assumes at
+        // least the legacy non-ajax $MainArray branch is reachable. Short-
+        // circuit with an empty tree instead of falling into that branch,
+        // which doesn't handle ajax requests at all.
+        if ($request->ajax() && $departmentsInScope->isEmpty()) {
+            return ['consolidatedBudget' => [], 'header' => []];
+        }
 
         if ($departmentsInScope->isNotEmpty())
         {
@@ -2160,25 +2315,13 @@ class BudgetController extends Controller
                     }else{
                         $isBudgetCompleted = false;
                     }
-            // Return the partial view for AJAX requests
-
-            // dd($consolidatedBudget);
+            // Multi-category calls: hand the (already fully-totaled) tree
+            // back to the caller instead of rendering here — "All
+            // Combined" still needs to MERGE up to 3 of these trees before
+            // there's anything to render, and rendering 3 separate HTML
+            // fragments here would be thrown away anyway.
             if ($request->ajax()) {
-                $html = view('resorts.renderfiles.consolidated', compact(
-                    'consolidatedBudget',
-                    'header',
-                    'resortCosts',
-                    'selectedYear',
-                    'employeeRankPosition',
-                    'mvrToDollarRate'
-                ))->render();
-
-                $isBudgetCompleted = true; // ← your custom condition
-
-                return response()->json([
-                    'html' => $html,
-                    'isBudgetCompleted' => $isBudgetCompleted
-                ]);
+                return compact('consolidatedBudget', 'header');
             }
         }
         else{
@@ -2247,6 +2390,167 @@ class BudgetController extends Controller
             'resortCosts',
             'selectedYear'
         ));
+        }; // end $resolveCategory closure
+
+        // Non-ajax direct-URL access never participates in the tab
+        // feature (the page's own JS always calls this via $.ajax with a
+        // category_view) — preserve the exact original single-category
+        // (Permanent) behavior/response shape for that path untouched.
+        if (!$request->ajax()) {
+            return $resolveCategory('Permanent');
+        }
+
+        $categoryResults = [];
+        foreach ($categoriesNeeded as $cat) {
+            $categoryResults[$cat] = $resolveCategory($cat);
+        }
+
+        if ($categoryView === 'nonpermanent') {
+            $activeSub = in_array($request->input('sub'), ['Casual', 'Intern'], true) ? $request->input('sub') : 'Casual';
+            $consolidatedBudget = $categoryResults[$activeSub]['consolidatedBudget'];
+            $header = $categoryResults[$activeSub]['header'];
+        } elseif ($categoryView === 'all') {
+            // Real merge (not a representative-fallback) — this endpoint
+            // builds one in-memory nested array per category rather than
+            // View Budget's lazy per-node AJAX system, so combining the up
+            // to 3 trees here is tractable: same division/department/
+            // section/position NAMES recur across categories (they're the
+            // same catalog entities), so matching on those names and
+            // summing each level's already-computed calculated_total
+            // (rather than re-deriving it) is correct and doesn't risk
+            // double-counting.
+            $merged = $this->mergeConsolidatedBudgetTrees(array_map(fn ($r) => $r['consolidatedBudget'], $categoryResults));
+            $consolidatedBudget = $merged;
+            $header = $categoryResults['Permanent']['header'];
+        } else {
+            $consolidatedBudget = $categoryResults['Permanent']['consolidatedBudget'];
+            $header = $categoryResults['Permanent']['header'];
+        }
+
+        $resortCosts = ResortBudgetCost::where('resort_id', $resortId)
+            ->select('id', 'particulars', 'amount', 'amount_unit')
+            ->get();
+
+        $html = view('resorts.renderfiles.consolidated', compact(
+            'consolidatedBudget',
+            'header',
+            'resortCosts',
+            'selectedYear',
+            'employeeRankPosition',
+            'mvrToDollarRate'
+        ))->render();
+
+        // Matches the original endpoint's own "your custom condition"
+        // override — the AJAX response has always unconditionally
+        // reported the budget as completed regardless of the computed
+        // per-category value, preserved here rather than changed as part
+        // of this unrelated tab feature.
+        return response()->json([
+            'html' => $html,
+            'isBudgetCompleted' => true,
+        ]);
+    }
+
+    /**
+     * Merges up to 3 categories' already-fully-totaled consolidatedBudget
+     * trees (see viewConsolidatedBudget()) into one blended tree for the
+     * "All Combined" tab — matched by division/department/section/position
+     * NAME (the same catalog entities recur across categories). Employees
+     * are unioned (a position can have Permanent AND Casual staff in the
+     * same slot); vacant_configurations are NOT summed — resort_vacant_
+     * budget_costs has no employment_type column, so every category's copy
+     * is identical, and taking the first-seen one avoids double-counting
+     * the same persisted vacant row 3 times. calculated_total at every
+     * level is summed directly from each category's already-computed
+     * figure rather than re-derived, since Common::calculatePositionTotal()
+     * has already run once per category on its own employees/vacants.
+     */
+    private function mergeConsolidatedBudgetTrees(array $trees): array
+    {
+        $merged = [];
+        foreach ($trees as $tree) {
+            foreach ($tree as $divisionName => $divisionData) {
+                if (!isset($merged[$divisionName])) {
+                    $merged[$divisionName] = [
+                        'division_id' => $divisionData['division_id'],
+                        'departments' => [],
+                        'calculated_total' => 0,
+                    ];
+                }
+                $merged[$divisionName]['calculated_total'] += (float) ($divisionData['calculated_total'] ?? 0);
+
+                foreach ($divisionData['departments'] as $departmentName => $departmentData) {
+                    if (!isset($merged[$divisionName]['departments'][$departmentName])) {
+                        $merged[$divisionName]['departments'][$departmentName] = [
+                            'department_id'        => $departmentData['department_id'],
+                            'manning_response_id'   => $departmentData['manning_response_id'],
+                            'total_headcount'       => 0,
+                            'filled_positions'      => 0,
+                            'vacant_positions'      => 0,
+                            'sections'              => [],
+                            'positions'             => [],
+                            'calculated_total'      => 0,
+                        ];
+                    }
+                    $mergedDept =& $merged[$divisionName]['departments'][$departmentName];
+                    $mergedDept['total_headcount']  += (int) ($departmentData['total_headcount'] ?? 0);
+                    $mergedDept['filled_positions'] += (int) ($departmentData['filled_positions'] ?? 0);
+                    $mergedDept['vacant_positions'] += (int) ($departmentData['vacant_positions'] ?? 0);
+                    $mergedDept['calculated_total'] += (float) ($departmentData['calculated_total'] ?? 0);
+
+                    foreach (($departmentData['sections'] ?? []) as $sectionName => $sectionData) {
+                        if (!isset($mergedDept['sections'][$sectionName])) {
+                            $mergedDept['sections'][$sectionName] = [
+                                'section_id' => $sectionData['section_id'],
+                                'positions' => [],
+                                'calculated_total' => 0,
+                            ];
+                        }
+                        $mergedDept['sections'][$sectionName]['calculated_total'] += (float) ($sectionData['calculated_total'] ?? 0);
+                        foreach (($sectionData['positions'] ?? []) as $positionName => $positionData) {
+                            $mergedDept['sections'][$sectionName]['positions'][$positionName] =
+                                $this->mergeConsolidatedPositionData($mergedDept['sections'][$sectionName]['positions'][$positionName] ?? null, $positionData);
+                        }
+                    }
+
+                    foreach (($departmentData['positions'] ?? []) as $positionName => $positionData) {
+                        $mergedDept['positions'][$positionName] =
+                            $this->mergeConsolidatedPositionData($mergedDept['positions'][$positionName] ?? null, $positionData);
+                    }
+                    unset($mergedDept);
+                }
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Merges one category's positionData into an accumulator (null on the
+     * first category seen for this position). See mergeConsolidatedBudgetTrees().
+     */
+    private function mergeConsolidatedPositionData(?array $accumulator, array $positionData): array
+    {
+        if ($accumulator === null) {
+            $accumulator = $positionData;
+            $accumulator['employees'] = collect($positionData['employees'] ?? [])->values();
+            return $accumulator;
+        }
+
+        $accumulator['employees'] = collect($accumulator['employees'] ?? [])
+            ->concat(collect($positionData['employees'] ?? []))
+            ->values();
+
+        $accumulator['max_counts']['max_headcount']  = (int) ($accumulator['max_counts']['max_headcount'] ?? 0) + (int) ($positionData['max_counts']['max_headcount'] ?? 0);
+        $accumulator['max_counts']['max_filledcount'] = (int) ($accumulator['max_counts']['max_filledcount'] ?? 0) + (int) ($positionData['max_counts']['max_filledcount'] ?? 0);
+        // Vacant data (max_vacantcount, vacant_count, vacant_configurations)
+        // is identical across categories (shared, category-agnostic table)
+        // — deliberately NOT summed, so the accumulator's first-seen copy
+        // is kept as-is rather than re-assigned here.
+
+        $accumulator['calculated_total'] = (float) ($accumulator['calculated_total'] ?? 0) + (float) ($positionData['calculated_total'] ?? 0);
+
+        return $accumulator;
     }
 
     /**
@@ -2994,11 +3298,20 @@ class BudgetController extends Controller
             // ordering arbitrarily returns whichever the DB happens to
             // return first — silently swapping which category's
             // workflow-state metadata this drill-down modal shows.
-            $manningResponse = ManningResponse::where('dept_id', $departmentId)
+            //
+            // 'all' ("All Combined" tab) has no single row to point at —
+            // this metadata object only drives the dept-level workflow
+            // status badge, not the actual position/employee figures
+            // (those are correctly blended per-position in
+            // getPositionEmployees()), so a representative row (any
+            // category, unfiltered) is an acceptable simplification here.
+            $manningResponseQuery = ManningResponse::where('dept_id', $departmentId)
                 ->where('year', $year)
-                ->where('resort_id', $resortId)
-                ->where('employment_type', $employmentType)
-                ->first();
+                ->where('resort_id', $resortId);
+            if ($employmentType !== 'all') {
+                $manningResponseQuery->where('employment_type', $employmentType);
+            }
+            $manningResponse = $manningResponseQuery->first();
 
             // Get sections
             $sections = ResortSection::where('dept_id', $departmentId)
@@ -3058,6 +3371,19 @@ class BudgetController extends Controller
                 return response()->json(['success' => false, 'message' => 'Position not found']);
             }
 
+            // "All Combined" tab: $employmentType arrives as the literal
+            // string 'all' (see view_budget_hierarchical.blade.php) — not a
+            // real manning_responses.employment_type value. There can be up
+            // to 3 manning_response rows (one per real category) for this
+            // dept/year; combine their position_monthly_data for the
+            // headcount/vacant math below instead of picking just one.
+            // Per-employee "proposed salary" override enrichment further
+            // down still needs exactly ONE manning_response id to look up
+            // StoreManningResponseParent against, so it's intentionally
+            // skipped for 'all' (flagged simplification, not a silent gap:
+            // base salary still shows, just not the proposed override).
+            $isAllCategories = $employmentType === 'all';
+
             // Get manning response — OPTIONAL. The previous build 403'd the
             // request when no manning row existed, which silently zero'd
             // out the view-budget badges for every dept that hadn't been
@@ -3072,21 +3398,33 @@ class BudgetController extends Controller
             // arbitrarily return whichever of up to 3 rows (one per
             // category) the DB happens to pick, mixing that category's
             // vacant counts/proposed salaries into whatever tab is open.
-            $manningResponse = ManningResponse::where('dept_id', $position->dept_id)
+            $manningResponseQuery = ManningResponse::where('dept_id', $position->dept_id)
                 ->where('year', $year)
-                ->where('resort_id', $resortId)
-                ->where('employment_type', $employmentType)
-                ->first();
+                ->where('resort_id', $resortId);
+            if (!$isAllCategories) {
+                $manningResponseQuery->where('employment_type', $employmentType);
+            }
+            $manningResponses = $isAllCategories ? $manningResponseQuery->get() : $manningResponseQuery->get();
+            // Single representative row for the "one manning_response_id"
+            // enrichment paths below — null under 'all' so that enrichment
+            // (which needs exactly one id) is skipped, per the note above.
+            $manningResponse = $isAllCategories ? null : $manningResponses->first();
+            $manningResponseIds = $manningResponses->pluck('id')->all();
 
             // Get employees — scoped to the same category as the manning
             // response above, same reasoning as ViewBudget/ViewManning.
+            // 'all' means every category, so the filter is simply omitted
+            // (an employee's own employment_type already disambiguates
+            // which real category they belong to; no blending needed here).
             $employees = DB::table('employees as e')
                 ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
                 ->where('e.Position_id', $positionId)
                 ->where('e.Dept_id', $position->dept_id)
                 ->where('e.resort_id', $resortId)
                 ->where('e.status', 'Active')
-                ->whereIn('e.employment_type', Common::manningCategoryEmploymentTypes($employmentType))
+                ->when(!$isAllCategories, function ($q) use ($employmentType) {
+                    $q->whereIn('e.employment_type', Common::manningCategoryEmploymentTypes($employmentType));
+                })
                 ->get([
                     'e.resort_id',
                     'e.id as Empid',
@@ -3103,11 +3441,27 @@ class BudgetController extends Controller
 
             // Get position monthly data — empty collection when there's no
             // manning response (downstream loops handle empty gracefully).
-            $monthlyData = $manningResponse
+            $monthlyData = !empty($manningResponseIds)
                 ? PositionMonthlyData::where('position_id', $positionId)
-                    ->where('manning_response_id', $manningResponse->id)
+                    ->whereIn('manning_response_id', $manningResponseIds)
                     ->get()
                 : collect();
+
+            // 'all' can now have up to 3 rows per month (one per category).
+            // The rest of this method's per-month math (below) was written
+            // for exactly one row per month — collapse to one SUMMED row
+            // per month first (total headcount/vacant across categories),
+            // so "All Combined" adds the categories together rather than
+            // reading an arbitrary single one via ->first()/max().
+            if (count($manningResponseIds) > 1) {
+                $monthlyData = $monthlyData->groupBy('month')->map(function ($rows, $month) {
+                    return (object) [
+                        'month' => $month,
+                        'headcount' => $rows->sum('headcount'),
+                        'vacantcount' => $rows->sum('vacantcount'),
+                    ];
+                })->values();
+            }
 
             // Get vacant position counts
             $vacantCounts = [];
@@ -3158,7 +3512,9 @@ class BudgetController extends Controller
                 ->where('Position_id', $positionId)
                 ->where('Dept_id', $position->dept_id)
                 ->where('status', 'Active')
-                ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType))
+                ->when(!$isAllCategories, function ($q) use ($employmentType) {
+                    $q->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType));
+                })
                 ->where(function ($q) use ($today) {
                     $q->whereNull('last_working_day')
                       ->orWhereDate('last_working_day', '>', $today);
@@ -3582,12 +3938,23 @@ class BudgetController extends Controller
             $resortId = auth()->guard('resort-admin')->user()->resort_id;
             $year = (int) $request->input('year', date('Y'));
             $employmentType = $request->input('employment_type', 'Permanent');
+            $isAllCategories = $employmentType === 'all';
 
             // Same rank-based scoping ViewBudget() applies to what's
             // rendered — without this, a department-scoped HOD would see
             // every other department's totals in this response, even
             // though the page only ever renders their own.
-            $rankWiseDepartments = $this->getRankWiseDepartmentIds($resortId, $year, $employmentType);
+            //
+            // getRankWiseDepartmentIds() needs one concrete category name
+            // for its Finance/GM "which depts did THIS category's budget
+            // reach" branch — 'all' has no single such answer, so this
+            // uses Permanent's scope as a representative fallback for that
+            // one narrow, rare-role (Finance/GM HOD/XCOM) decision. Every
+            // other user (HR/GM/regular HOD) gets identical scoping
+            // regardless of category, so this only matters for that edge
+            // case, and only for department scoping — the actual employee
+            // totals below still cover every category when 'all'.
+            $rankWiseDepartments = $this->getRankWiseDepartmentIds($resortId, $year, $isAllCategories ? 'Permanent' : $employmentType);
 
             // ---- Resort-wide lookups, once ----
             $dollarToMvr = (float) (DB::table('resort_site_settings')
@@ -3621,7 +3988,12 @@ class BudgetController extends Controller
                 // Scoped to the requested category — without this, a
                 // Casual/Intern employee's salary/cost total would blend
                 // into the resort-wide Permanent budget total badge.
-                ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType))
+                // 'all' ("All Combined") omits the filter entirely — every
+                // category's employees legitimately contribute to a
+                // blended total there.
+                ->when(!$isAllCategories, function ($q) use ($employmentType) {
+                    $q->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType));
+                })
                 ->get(['id', 'Position_id', 'basic_salary', 'proposed_salary', 'nationality', 'religion', 'benefit_grid_level']);
             $employeeIds = $employees->pluck('id');
 
@@ -3689,18 +4061,39 @@ class BudgetController extends Controller
             // ================================================================
             $today = Carbon::today()->toDateString();
 
-            $maxHeadcountByPosition = DB::table('position_monthly_data')
-                ->join('manning_responses', 'position_monthly_data.manning_response_id', '=', 'manning_responses.id')
-                ->where('manning_responses.resort_id', $resortId)
-                ->where('manning_responses.year', $year)
-                // Without this, once a position has up to 3 manning_responses
-                // rows (one per category) feeding pmd rows, MAX(headcount)
-                // mixes across all of them instead of just this category's.
-                ->where('manning_responses.employment_type', $employmentType)
-                ->whereIn('position_monthly_data.position_id', $positionIds)
-                ->groupBy('position_monthly_data.position_id')
-                ->selectRaw('position_monthly_data.position_id as position_id, MAX(position_monthly_data.headcount) as max_headcount')
-                ->pluck('max_headcount', 'position_id');
+            if ($isAllCategories) {
+                // "All Combined": sum headcount ACROSS categories for the
+                // same position+month first (a position can have separate
+                // Permanent/Casual/Intern manning_response rows contributing
+                // to the same month), then take the max across months —
+                // same "peak headcount across the year" semantic as the
+                // single-category query below, just applied to the summed
+                // total instead of one category's own figure.
+                $monthTotals = DB::table('position_monthly_data')
+                    ->join('manning_responses', 'position_monthly_data.manning_response_id', '=', 'manning_responses.id')
+                    ->where('manning_responses.resort_id', $resortId)
+                    ->where('manning_responses.year', $year)
+                    ->whereIn('position_monthly_data.position_id', $positionIds)
+                    ->groupBy('position_monthly_data.position_id', 'position_monthly_data.month')
+                    ->selectRaw('position_monthly_data.position_id as position_id, SUM(position_monthly_data.headcount) as month_total');
+                $maxHeadcountByPosition = DB::query()->fromSub($monthTotals, 't')
+                    ->groupBy('position_id')
+                    ->selectRaw('position_id, MAX(month_total) as max_headcount')
+                    ->pluck('max_headcount', 'position_id');
+            } else {
+                $maxHeadcountByPosition = DB::table('position_monthly_data')
+                    ->join('manning_responses', 'position_monthly_data.manning_response_id', '=', 'manning_responses.id')
+                    ->where('manning_responses.resort_id', $resortId)
+                    ->where('manning_responses.year', $year)
+                    // Without this, once a position has up to 3 manning_responses
+                    // rows (one per category) feeding pmd rows, MAX(headcount)
+                    // mixes across all of them instead of just this category's.
+                    ->where('manning_responses.employment_type', $employmentType)
+                    ->whereIn('position_monthly_data.position_id', $positionIds)
+                    ->groupBy('position_monthly_data.position_id')
+                    ->selectRaw('position_monthly_data.position_id as position_id, MAX(position_monthly_data.headcount) as max_headcount')
+                    ->pluck('max_headcount', 'position_id');
+            }
 
             $deptsWithManning = DB::table('manning_responses')
                 ->where('resort_id', $resortId)
@@ -3715,7 +4108,9 @@ class BudgetController extends Controller
                 ->where(function ($q) use ($today) {
                     $q->whereNull('last_working_day')->orWhereDate('last_working_day', '>', $today);
                 })
-                ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType))
+                ->when(!$isAllCategories, function ($q) use ($employmentType) {
+                    $q->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType));
+                })
                 ->whereIn('Position_id', $positionIds)
                 ->groupBy('Position_id', 'Dept_id')
                 ->selectRaw('Position_id, Dept_id, COUNT(*) as cnt')

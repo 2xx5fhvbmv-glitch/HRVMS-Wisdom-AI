@@ -296,6 +296,17 @@
                     @csrf
 
                     <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-500 d-block mb-2">Manning Category</label>
+                            <div class="mrf-seg" id="employment_type_seg">
+                                <input class="mrf-seg-input" type="radio" name="employment_type" value="Permanent" id="employment_type-permanent" checked>
+                                <label for="employment_type-permanent">Permanent</label>
+                                <input class="mrf-seg-input" type="radio" name="employment_type" value="Casual" id="employment_type-casual">
+                                <label for="employment_type-casual">Casual</label>
+                                <input class="mrf-seg-input" type="radio" name="employment_type" value="Intern" id="employment_type-intern">
+                                <label for="employment_type-intern">Intern</label>
+                            </div>
+                        </div>
                         <div class="form-check mb-3 fw-500">
                             <input class="form-check-input" type="checkbox" value="" id="flexCheckChecked">
                             <label class="form-check-label" for="flexCheckChecked">
@@ -450,6 +461,18 @@
 
 @section('import-css')
 @include('resorts.workforce_planning._wfp_buttons_v2_styles')
+<style>
+    /* Manning category selector — hidden-radio + :checked sibling label
+       technique, same as the av-seg pattern used for Employee Type /
+       Status elsewhere (talentacquisition/vacancies/_add_vacancy_styles).
+       Scoped under mrf- (Manning Response Form) so it can't leak onto any
+       other page. */
+    .mrf-seg { display: inline-flex; background: #F7F8F8; border: 1px solid var(--line, #EEF2F2); border-radius: 11px; padding: 3px; gap: 2px; }
+    .mrf-seg-input { position: absolute; opacity: 0; width: 1px; height: 1px; overflow: hidden; }
+    .mrf-seg label { border: none; background: none; font: inherit; font-size: 13.5px; font-weight: 600; color: #6B7378; padding: 9px 22px; border-radius: 8px; cursor: pointer; transition: background .14s, color .14s; }
+    .mrf-seg-input:checked + label { background: var(--teal, #014653); color: #fff; }
+    .mrf-seg-input:focus-visible + label { outline: 2px solid var(--teal, #014653); outline-offset: 2px; }
+</style>
 @endsection
 
 @section('import-scripts')
@@ -502,9 +525,24 @@
 
             $("#Submit_message_id").val($("#BudgetRejacted_message_id").val());
 
-                fetchDraftData(resort_id, Dept_id, year);
+                fetchDraftData(resort_id, Dept_id, year, $('input[name="employment_type"]:checked').val());
 
 
+            });
+
+            // Switching Permanent/Casual/Intern must not leak one category's
+            // numbers into another's submission (see build spec item 1.3).
+            // Reset the grid to zero first (same lightweight reset the
+            // "Same As This Year" checkbox already uses when unchecked —
+            // no per-cell AJAX storm), then load whatever draft/submission
+            // actually exists for the newly-selected category, reusing
+            // fetchDraftData() rather than a second reload path.
+            $(document).on('change', 'input[name="employment_type"]', function () {
+                $('.input-number').val(0);
+                $('[id^="filled_positions_"]').val(0);
+                $('[id^="vacant_positions_"]').val(0);
+                updateTotalHeadcount();
+                fetchDraftData(resort_id, Dept_id, year, $(this).val());
             });
 
 
@@ -1245,6 +1283,7 @@
                     data: {
                         dept_id: deptID,
                         resort_id: resort_id,
+                        employment_type: $('input[name="employment_type"]:checked').val(),
                         _token: '{{ csrf_token() }}'
                     },
                     success: function(response) {
@@ -1318,14 +1357,15 @@
             }
         });
 
-        function fetchDraftData(resort_id, Dept_id, year) {
-            // console.log(resort_id, Dept_id, year);
+        function fetchDraftData(resort_id, Dept_id, year, employment_type) {
+            // console.log(resort_id, Dept_id, year, employment_type);
             $.ajax({
                 // Use JavaScript string interpolation to pass the dynamic values in the URL
-                url: `{{ route('manning.responses.getDraft', ['resortId' => ':resort_id', 'deptId' => ':Dept_id', 'year' => ':year']) }}`
+                url: `{{ route('manning.responses.getDraft', ['resortId' => ':resort_id', 'deptId' => ':Dept_id', 'year' => ':year', 'employmentType' => ':employment_type']) }}`
                     .replace(':resort_id', resort_id)
                     .replace(':Dept_id', Dept_id)
-                    .replace(':year', year),
+                    .replace(':year', year)
+                    .replace(':employment_type', employment_type || 'Permanent'),
                 type: 'GET',
                 success: function(response) {
                     // console.log("AJAX Response:", response); // Log the response regardless of success or failure
