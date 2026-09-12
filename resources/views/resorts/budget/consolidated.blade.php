@@ -144,11 +144,27 @@
                 </div>
             </div>
         </div>
-        <div class="cb-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
-            @foreach (['Permanent' => 'Permanent', 'Casual' => 'Casual', 'Intern' => 'Intern'] as $catValue => $catLabel)
-                <button type="button" class="btn btn-sm cb-category-btn {{ $catValue === 'Permanent' ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}"
-                        data-category="{{ $catValue }}" onclick="cbSwitchCategory('{{ $catValue }}', this)">{{ $catLabel }}</button>
+        <div class="cb-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;align-items:center;">
+            @foreach ([
+                'permanent'    => 'Permanent',
+                'nonpermanent' => 'Casual & Intern',
+                'all'          => 'All Combined',
+            ] as $tabValue => $tabLabel)
+                <button type="button" class="btn btn-sm cb-tab-btn {{ $tabValue === 'permanent' ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}"
+                        data-tab="{{ $tabValue }}" onclick="cbSwitchTab('{{ $tabValue }}', this)">{{ $tabLabel }}</button>
             @endforeach
+            {{-- Casual/Intern sub-toggle — this page fetches its whole tree
+                 in one AJAX call (unlike View Budget's lazy per-node
+                 system), but the rendered partial/JS still assumes exactly
+                 one category at a time, so "Casual & Intern" shows one of
+                 the two rather than both stacked, same reduced-risk
+                 pattern as View Budget's identical tab. --}}
+            <div class="vb-sub-toggle d-none" id="cbSubToggle" style="display:flex;gap:4px;margin-left:8px;padding-left:8px;border-left:1px solid var(--line,#EEF2F2);">
+                @foreach (['Casual' => 'Casual', 'Intern' => 'Intern'] as $subValue => $subLabel)
+                    <button type="button" class="btn btn-xs cb-sub-btn {{ $subValue === 'Casual' ? 'wfp-btn-accent' : 'wfp-btn-secondary' }}"
+                            data-sub="{{ $subValue }}" onclick="cbSwitchSub('{{ $subValue }}', this)">{{ $subLabel }}</button>
+                @endforeach
+            </div>
         </div>
         <div class="card">
             <div class="card-header">
@@ -241,16 +257,41 @@
         }
     }
 
-    // Same 3-way viewing tabs as View Manning/View Budget — cbCategory
-    // tracks which is active; fetchConsolidatedBudget() below sends it
-    // alongside the year on every (re)load.
-    let cbCategory = 'Permanent';
-    function cbSwitchCategory(category, btn) {
-        cbCategory = category;
-        document.querySelectorAll('.cb-category-btn').forEach(b => b.classList.remove('wfp-btn-primary'));
-        document.querySelectorAll('.cb-category-btn').forEach(b => b.classList.add('wfp-btn-secondary'));
+    // 3 tabs (Permanent / Casual & Intern / All Combined) — cbTab tracks
+    // which is active, cbSub tracks which of Casual/Intern the "Casual &
+    // Intern" tab's sub-toggle shows. fetchConsolidatedBudget() below
+    // resolves these into the single `employment_type` value the endpoint
+    // expects ('Permanent' | 'Casual' | 'Intern' | 'all') on every
+    // (re)load — same category model as View Manning/View Budget.
+    let cbTab = 'permanent';
+    let cbSub = 'Casual';
+
+    function cbEffectiveEmploymentType() {
+        if (cbTab === 'nonpermanent') return cbSub;
+        if (cbTab === 'all') return 'all';
+        return 'Permanent';
+    }
+
+    function cbSwitchTab(tab, btn) {
+        cbTab = tab;
+        document.querySelectorAll('.cb-tab-btn').forEach(b => {
+            b.classList.remove('wfp-btn-primary');
+            b.classList.add('wfp-btn-secondary');
+        });
         btn.classList.remove('wfp-btn-secondary');
         btn.classList.add('wfp-btn-primary');
+        document.getElementById('cbSubToggle').classList.toggle('d-none', tab !== 'nonpermanent');
+        fetchConsolidatedBudget(document.getElementById('year').value);
+    }
+
+    function cbSwitchSub(sub, btn) {
+        cbSub = sub;
+        document.querySelectorAll('.cb-sub-btn').forEach(b => {
+            b.classList.remove('wfp-btn-accent');
+            b.classList.add('wfp-btn-secondary');
+        });
+        btn.classList.remove('wfp-btn-secondary');
+        btn.classList.add('wfp-btn-accent');
         fetchConsolidatedBudget(document.getElementById('year').value);
     }
 
@@ -264,7 +305,7 @@
             $.ajax({
                 url: url, // Use the generated URL
                 type: 'GET',
-                data: { year: selectedYear, employment_type: cbCategory },
+                data: { year: selectedYear, employment_type: cbEffectiveEmploymentType() },
                 success: function(response) {
                     $('#accordionViewBudget').html(response.html); // Update this to match your HTML structure
                     $('#cbSearchInput').val('');
