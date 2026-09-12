@@ -101,16 +101,28 @@
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label" for="header_img">Select Authorized Signature Image </label>
-                                <div class="uploadFile-block">
+                                <label class="form-label" for="sig-raw-input">Select Authorized Signature Image </label>
+                                {{-- Own capture -> preview -> confirm flow, separate from the
+                                     main profile form's single save (see e-signature docs) —
+                                     no `name` attribute, so this file is never part of the
+                                     #ProfileUpdate submit; it's uploaded via its own AJAX
+                                     round trip to /profile/signature/preview instead. --}}
+                                <div class="uploadFile-block" id="sig-idle-block">
                                     <div class="uploadFile-btn">
                                         <a href="#" class="btn wfp-btn-primary btn-sm">Upload File</a>
-                                        <input type="file" name="signature_img" id="signature_img"  >
+                                        <input type="file" id="sig-raw-input" accept="image/*">
                                     </div>
                                     <div class="uploadFile-text">
-                                        <img id="signature_show_img" class="logo-img" width="100px" accept="image/*" src="{{ Common::getResortUserPicture($profile->id,1) }}">
+                                        <img id="signature_show_img" class="logo-img" width="100px" src="{{ Common::getResortUserPicture($profile->id,1) }}">
                                     </div>
                                 </div>
+                                <div id="sig-preview-block" style="display:none;" class="mt-2">
+                                    <img id="sig-preview-img" class="logo-img" width="100px" style="background:repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 50% / 12px 12px;">
+                                    <p class="mb-1" style="font-size:13px;">Is this signature clear?</p>
+                                    <button type="button" class="btn wfp-btn-primary btn-sm" id="sig-confirm-yes">Yes</button>
+                                    <button type="button" class="btn wfp-btn-secondary btn-sm" id="sig-confirm-no">No, retake</button>
+                                </div>
+                                <div id="sig-uploading-msg" style="display:none;font-size:13px;color:#6B7378;">Processing…</div>
                             </div>
                         </div>
                     </div>
@@ -672,15 +684,78 @@ $(document).ready(function(){
         if (__cropperTargetInput) __cropperTargetInput.value = '';
     });
 
-    $("#signature_img").on("change", function(event) {
+    // Capture -> server-side background removal -> preview -> confirm/retry.
+    // Two round trips, nothing saved until "Yes" — see the e-signature docs.
+    $("#sig-raw-input").on("change", function(event) {
         var file = event.target.files[0];
-        if (file) {
-            var output = document.getElementById("signature_show_img");
-            output.src = URL.createObjectURL(file);
-            output.onload = function() {
-                URL.revokeObjectURL(output.src);
-            };
-        }
+        if (!file) return;
+
+        $('#sig-idle-block').hide();
+        $('#sig-preview-block').hide();
+        $('#sig-uploading-msg').show();
+
+        var formData = new FormData();
+        formData.append('signature_image', file);
+        formData.append('_token', '{{ csrf_token() }}');
+
+        $.ajax({
+            url: "{{ route('resort.profile.signature.preview') }}",
+            type: 'POST',
+            data: formData,
+            contentType: false,
+            processData: false,
+            success: function(response) {
+                $('#sig-uploading-msg').hide();
+                if (response.success) {
+                    $('#sig-preview-img').attr('src', response.preview_url);
+                    $('#sig-preview-block').data('token', response.preview_token).show();
+                } else {
+                    toastr.error(response.msg || 'Failed to process signature.', 'Error', { positionClass: 'toast-bottom-right' });
+                    $('#sig-idle-block').show();
+                }
+            },
+            error: function(xhr) {
+                $('#sig-uploading-msg').hide();
+                $('#sig-idle-block').show();
+                toastr.error((xhr.responseJSON && xhr.responseJSON.msg) || 'Failed to process signature.', 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
+
+    $('#sig-confirm-yes').on('click', function() {
+        var token = $('#sig-preview-block').data('token');
+        var $btn = $(this);
+        $btn.prop('disabled', true).text('Saving…');
+
+        $.ajax({
+            url: "{{ route('resort.profile.signature.confirm') }}",
+            type: 'POST',
+            data: { preview_token: token, _token: '{{ csrf_token() }}' },
+            success: function(response) {
+                $btn.prop('disabled', false).text('Yes');
+                if (response.success) {
+                    $('#signature_show_img').attr('src', response.signature_url);
+                    $('#sig-preview-block').hide();
+                    $('#sig-idle-block').show();
+                    $('#sig-raw-input').val('');
+                    toastr.success(response.msg, 'Success', { positionClass: 'toast-bottom-right' });
+                } else {
+                    toastr.error(response.msg || 'Failed to save signature.', 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            },
+            error: function(xhr) {
+                $btn.prop('disabled', false).text('Yes');
+                toastr.error((xhr.responseJSON && xhr.responseJSON.msg) || 'Failed to save signature.', 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
+
+    // "No" — nothing to call server-side (no reject endpoint by design,
+    // see the e-signature docs); just discard and let the user retry.
+    $('#sig-confirm-no').on('click', function() {
+        $('#sig-preview-block').hide();
+        $('#sig-idle-block').show();
+        $('#sig-raw-input').val('');
     });
 
     function togglePasswordVisibility(inputId, buttonId) {
