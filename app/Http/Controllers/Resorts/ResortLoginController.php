@@ -22,6 +22,9 @@ use App\Models\Position;
 use App\Models\ResortPosition; 
 use App\Models\Employee;
 use Storage;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
+use App\Helpers\StorageHelper;
 class ResortLoginController extends Controller
 {
     public function logout()
@@ -284,18 +287,13 @@ class ResortLoginController extends Controller
                     }
                     $resortAdmin->profile_picture =$path['path'];
             }
-            if ($request->file('signature_img'))
-            {
-                $emp = Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
-                $main_folder = $resortAdmin->resort->resort_id;
-                $basePath    = $main_folder . '/public/categorized/' .$emp->Emp_id.'/Signature';
-                $path        = Common::UploadProfileAwsPic($basePath,$request->signature_img);
-                if($path['status'] == false)
-                {
-                    return response()->json(['success' => false]);
-                }
-                $resortAdmin->signature_img =$path['path'];
-            }
+            // Signature upload moved to its own preview/confirm flow
+            // (signaturePreview()/signatureConfirm() below) — this form no
+            // longer accepts a raw signature_img file directly. A plain
+            // single-shot save-whatever-was-uploaded here would skip the
+            // required background-removal + "is this clear?" confirm step
+            // the spec requires, and would need re-running through that
+            // flow anyway.
 
             $saveResortAdmin = $resortAdmin->save();
             DB::commit();
@@ -316,6 +314,111 @@ class ResortLoginController extends Controller
         }
 
     }
+
+    /**
+     * Web counterpart of API\ProfileController::signaturePreview() — same
+     * spec, same two-round-trip shape (see the e-signature docs), only the
+     * guard differs (resort-admin session here instead of api/Passport).
+     * Step 1: upload the raw photo, get back a background-removed preview.
+     * Nothing is saved as the real signature until signatureConfirm().
+     */
+    public function signaturePreview(Request $request)
+    {
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'signature_image' => 'required|file|mimes:jpg,jpeg,png,gif,webp,heic,heif',
+        ], [
+            'signature_image.mimes' => 'The image must be a type of:jpg,jpeg,png,gif,webp,heic,heif',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $resortAdmin = Auth::guard('resort-admin')->user();
+            $emp = Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
+            if (!$emp) {
+                return response()->json(['success' => false, 'msg' => 'Employee not found'], 200);
+            }
+
+            $rawContents = file_get_contents($request->file('signature_image')->getRealPath());
+            $processed = Common::removeSignatureBackground($rawContents);
+
+            $token = Str::random(40);
+            $mainFolder = $resortAdmin->resort->resort_id;
+            $tempPath = $mainFolder . '/public/categorized/' . $emp->Emp_id . '/SignaturePreview/' . $token . '.png';
+            StorageHelper::put($tempPath, $processed);
+
+            // Same 10-minute window + resort_admin-scoped cache key as the
+            // mobile endpoint — the two platforms share this exact flow.
+            Cache::put('signature_preview_' . $token, [
+                'resort_admin_id' => $resortAdmin->id,
+                'temp_path' => $tempPath,
+            ], now()->addMinutes(10));
+
+            return response()->json([
+                'success' => true,
+                'preview_url' => StorageHelper::temporaryUrl($tempPath, 15),
+                'preview_token' => $token,
+            ]);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'msg' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Step 2 — user confirmed the processed preview looks right. Persists
+     * it as the real signature_img. No reject endpoint by design — on "No"
+     * the frontend just discards the preview and lets the user retry.
+     */
+    public function signatureConfirm(Request $request)
+    {
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'preview_token' => 'required|string',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $resortAdmin = Auth::guard('resort-admin')->user();
+            $cacheKey = 'signature_preview_' . $request->preview_token;
+            $preview = Cache::get($cacheKey);
+
+            if (!$preview || (int) $preview['resort_admin_id'] !== (int) $resortAdmin->id) {
+                return response()->json(['success' => false, 'msg' => 'Preview expired, please retake'], 200);
+            }
+
+            $emp = Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
+            if (!$emp) {
+                return response()->json(['success' => false, 'msg' => 'Employee not found'], 200);
+            }
+
+            $mainFolder = $resortAdmin->resort->resort_id;
+            $finalPath = $mainFolder . '/public/categorized/' . $emp->Emp_id . '/Signature/signature.png';
+            StorageHelper::put($finalPath, StorageHelper::get($preview['temp_path']));
+
+            $resortAdmin->signature_img = $finalPath;
+            $resortAdmin->save();
+
+            StorageHelper::delete($preview['temp_path']);
+            Cache::forget($cacheKey);
+
+            return response()->json([
+                'success' => true,
+                'msg' => 'Signature saved',
+                'signature_url' => StorageHelper::temporaryUrl($finalPath, 30),
+            ]);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'msg' => 'Server error'], 500);
+        }
+    }
+
     public function checkRankWiseRoute($admin)
     {
         $redirectRoute = null;

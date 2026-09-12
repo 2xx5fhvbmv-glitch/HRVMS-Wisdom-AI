@@ -194,6 +194,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get( '/user/profile', ['App\Http\Controllers\Resorts\ResortLoginController','ResortProfile'] )->name('resort.user.profile');
     Route::post('/admin-notifications/{id}/dismiss', 'AdminBroadcastNotificationController@dismiss')->name('resort.adminBroadcast.dismiss');
     Route::post( '/update/user/profile', ['App\Http\Controllers\Resorts\ResortLoginController','UpdateResortProfile'] )->name('resort.Updateuser.profile');
+    Route::post( '/profile/signature/preview', ['App\Http\Controllers\Resorts\ResortLoginController','signaturePreview'] )->name('resort.profile.signature.preview');
+    Route::post( '/profile/signature/confirm', ['App\Http\Controllers\Resorts\ResortLoginController','signatureConfirm'] )->name('resort.profile.signature.confirm');
     Route::post( '/change/password', ['App\Http\Controllers\Resorts\ResortLoginController','changePassword'] )->name('resort.profile.changePassword');
     /***Manning page  */
     Route::get('/manning', 'ManningController@index')->name('resort.manning.index');
