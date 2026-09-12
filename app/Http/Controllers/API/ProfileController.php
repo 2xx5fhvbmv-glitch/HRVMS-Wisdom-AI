@@ -22,6 +22,9 @@ use DateTime;
 use DateTimeZone;
 use Validator;
 use Storage;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
+use App\Helpers\StorageHelper;
 
 class ProfileController extends Controller
 {
@@ -470,6 +473,142 @@ class ProfileController extends Controller
       \Log::error($e->getMessage());
       return response()->json(['success' => false, 'message' => 'Server error'], 500);
     }
+  }
+
+  /**
+   * Step 1 of the signature capture flow (mobile + web, same spec): upload
+   * the raw photo, get back a background-removed preview. Nothing is
+   * saved as the real signature yet — that only happens on
+   * signatureConfirm(), after the user has seen the processed result and
+   * said it's clear. Near-copy of changeProfileImage()'s upload pattern,
+   * with the background-removal step + a short-lived preview instead of
+   * saving straight to signature_img.
+   */
+  public function signaturePreview(Request $request)
+  {
+    $user = Auth::guard('api')->user();
+    if (!$user) {
+      return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+    }
+
+    $validator = Validator::make($request->all(), [
+      'signature_image' => 'required|file|mimes:jpg,jpeg,png,gif,webp,heic,heif',
+    ], [
+      'signature_image.mimes' => 'The image must be a type of:jpg,jpeg,png,gif,webp,heic,heif',
+    ]);
+    if ($validator->fails()) {
+      return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+    }
+
+    try {
+      $resortAdmin = ResortAdmin::find($user->id);
+      $emp = Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
+      if (!$emp) {
+        return response()->json(['success' => false, 'message' => 'Employee not found'], 200);
+      }
+
+      $rawContents = file_get_contents($request->file('signature_image')->getRealPath());
+      $processed = Common::removeSignatureBackground($rawContents);
+
+      $token = Str::random(40);
+      $mainFolder = $resortAdmin->resort->resort_id;
+      $tempPath = $mainFolder . '/public/categorized/' . $emp->Emp_id . '/SignaturePreview/' . $token . '.png';
+      StorageHelper::put($tempPath, $processed);
+
+      // 10-minute window to confirm — same "temp file, cleaned up whether
+      // confirmed or abandoned" shape the spec calls for. Scoped to this
+      // resort_admin so a leaked/guessed token can't be confirmed by
+      // someone else's session.
+      Cache::put('signature_preview_' . $token, [
+        'resort_admin_id' => $resortAdmin->id,
+        'temp_path' => $tempPath,
+      ], now()->addMinutes(10));
+
+      return response()->json([
+        'success' => true,
+        'preview_url' => StorageHelper::temporaryUrl($tempPath, 15),
+        'preview_token' => $token,
+      ]);
+    } catch (\Exception $e) {
+      \Log::emergency("File: " . $e->getFile());
+      \Log::emergency("Line: " . $e->getLine());
+      \Log::error($e->getMessage());
+      return response()->json(['success' => false, 'message' => 'Server error'], 500);
+    }
+  }
+
+  /**
+   * Step 2 — user tapped "Yes, it's clear". Persists the previewed image
+   * as the real signature_img. No reject endpoint exists by design (see
+   * the mobile e-signature doc) — on "No" the app just discards the
+   * preview and lets the user retry from step 1; the temp file behind an
+   * abandoned preview simply expires with its cache entry.
+   */
+  public function signatureConfirm(Request $request)
+  {
+    $user = Auth::guard('api')->user();
+    if (!$user) {
+      return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+    }
+
+    $validator = Validator::make($request->all(), [
+      'preview_token' => 'required|string',
+    ]);
+    if ($validator->fails()) {
+      return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+    }
+
+    try {
+      $resortAdmin = ResortAdmin::find($user->id);
+      $cacheKey = 'signature_preview_' . $request->preview_token;
+      $preview = Cache::get($cacheKey);
+
+      if (!$preview || (int) $preview['resort_admin_id'] !== (int) $resortAdmin->id) {
+        return response()->json(['success' => false, 'message' => 'Preview expired, please retake'], 200);
+      }
+
+      $emp = Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
+      if (!$emp) {
+        return response()->json(['success' => false, 'message' => 'Employee not found'], 200);
+      }
+
+      $mainFolder = $resortAdmin->resort->resort_id;
+      $finalPath = $mainFolder . '/public/categorized/' . $emp->Emp_id . '/Signature/signature.png';
+      StorageHelper::put($finalPath, StorageHelper::get($preview['temp_path']));
+
+      $resortAdmin->signature_img = $finalPath;
+      $resortAdmin->save();
+
+      StorageHelper::delete($preview['temp_path']);
+      Cache::forget($cacheKey);
+
+      return response()->json([
+        'success' => true,
+        'message' => 'Signature saved',
+        'signature_url' => StorageHelper::temporaryUrl($finalPath, 30),
+      ]);
+    } catch (\Exception $e) {
+      \Log::emergency("File: " . $e->getFile());
+      \Log::emergency("Line: " . $e->getLine());
+      \Log::error($e->getMessage());
+      return response()->json(['success' => false, 'message' => 'Server error'], 500);
+    }
+  }
+
+  /** Current signature, or null if none uploaded yet — same shape the profile screen already uses for the profile photo. */
+  public function getSignature(Request $request)
+  {
+    $user = Auth::guard('api')->user();
+    if (!$user) {
+      return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+    }
+
+    $resortAdmin = ResortAdmin::find($user->id);
+    $signatureUrl = $resortAdmin->signature_img
+      ? StorageHelper::temporaryUrl($resortAdmin->signature_img, 30)
+      : null;
+
+    return response()->json(['success' => true, 'signature_url' => $signatureUrl]);
   }
 
   public function getVisaCategory()
