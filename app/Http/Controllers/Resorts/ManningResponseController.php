@@ -50,12 +50,21 @@ class ManningResponseController extends Controller
         $positionId = $request->input('position_id');
         $count = $request->input('count', 1); // Default to 1 if not provided
         $resort_id = Auth::guard('resort-admin')->user()->resort_id; // Authenticated resort ID
+        // Which category's grid this is — same 'Permanent' default as every
+        // other manning endpoint, so a caller that predates Casual/Intern
+        // manning (or simply doesn't send this) behaves exactly as before.
+        $employmentType = $request->input('employment_type', 'Permanent');
 
-        // Fetch active employees for the given position in the specific resort
+        // Fetch active employees for the given position in the specific
+        // resort AND category — without this, typing a headcount on the
+        // Casual tab could show Permanent employees (or vice versa)
+        // already filling that position title, since a position can be
+        // shared across categories.
         $employees = Employee::with('resortAdmin') // Eager load the resortAdmin relationship
                     ->where('Position_id', $positionId)
                     ->where('resort_id', $resort_id)
                     ->where('status', 'Active')
+                    ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType))
                     ->limit($count)
                     ->get();
 

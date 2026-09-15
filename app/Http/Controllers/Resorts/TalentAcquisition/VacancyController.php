@@ -1864,8 +1864,13 @@ class VacancyController extends Controller
         // Get salary data for the specific position (average of employees in that position)
         $manning_data = null;
         if ($result) {
+            // Same category scoping as everywhere else in this method's
+            // ManningResponse lookup — without it, a Casual vacancy's
+            // salary figure could average in Permanent employees'
+            // salaries for the same position, and vice versa.
             $positionEmpIds = Employee::where('resort_id', $resort_id)
                 ->where('Position_id', $positionId)
+                ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($manningCategory))
                 ->pluck('id')
                 ->toArray();
             $manning_data = StoreManningResponseChild::where('Parent_SMRP_id', $result->id)

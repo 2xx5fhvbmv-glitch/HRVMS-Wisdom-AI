@@ -753,6 +753,7 @@
                     position_id: positionId,
                     count: currentValue, // Use the updated count
                     "_token": "{{ csrf_token() }}",
+                    employment_type: $('input[name="employment_type"]:checked').val(),
                 },
                 success: function(response) {
                     let monthCell = document.querySelector(`#${monthName}-${positionId}`);
@@ -844,6 +845,7 @@
                                 position_id: positionId,
                                 count: targetInput.value,
                                 "_token": "{{ csrf_token() }}",
+                                employment_type: $('input[name="employment_type"]:checked').val(),
                             },
                             success: function(response) {
                                 filledCount = 0;
@@ -941,6 +943,7 @@
                         position_id: positionId,
                         count: input.value,
                         "_token": "{{ csrf_token() }}",
+                        employment_type: $('input[name="employment_type"]:checked').val(),
                     },
                     success: function(response) {
                         let monthCell = document.querySelector(`#${monthName}-${positionId}`);
@@ -1016,6 +1019,7 @@
                         position_id: positionId,
                         count: input.value,
                         "_token": "{{ csrf_token() }}",
+                        employment_type: $('input[name="employment_type"]:checked').val(),
                     },
                     success: function(response) {
                         let monthCell = document.querySelector(`#${monthName}-${positionId}`);
@@ -1211,6 +1215,7 @@
                     position_id: positionId,
                     count: currentValue,
                     "_token": "{{ csrf_token() }}",
+                    employment_type: $('input[name="employment_type"]:checked').val(),
                 },
                 success: function(response) {
                     let monthCell = document.querySelector(`#${monthName}-${positionId}`);
