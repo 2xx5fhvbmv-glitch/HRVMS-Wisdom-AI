@@ -707,9 +707,15 @@ class BudgetController extends Controller
             ->where('status', 'active')
             ->get();
 
+        // Scope employees by this manning budget's own category — without
+        // it, the AI recommendation's "current headcount/budget" context
+        // blended Permanent and Casual/Intern employees together for the
+        // same position regardless of which category's budget this is.
+        $employmentType = $manningResponse->employment_type ?? 'Permanent';
         foreach ($positions as $p) {
             $emps = Employee::where('Position_id', $p->id)
                 ->where('Dept_id', $deptID)
+                ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType))
                 ->whereIn('status', ['Active', 'Probationary'])
                 ->get(['id', 'basic_salary']);
             $p->headcount      = $emps->count();
@@ -1229,10 +1235,16 @@ class BudgetController extends Controller
                             }
 
                             $today = \Carbon\Carbon::today()->toDateString();
+                            // Scoped to this tab's own category — the budget
+                            // figure above already reads $employmentType
+                            // correctly, but this "how many already fill
+                            // it" count didn't, so the two numbers on the
+                            // same tab could disagree.
                             $activeFilled = \App\Models\Employee::where('resort_id', $resortId)
                                 ->where('Position_id', $position->id)
                                 ->where('Dept_id', $position->dept_id)
                                 ->where('status', 'Active')
+                                ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType))
                                 ->where(function ($q) use ($today) {
                                     $q->whereNull('last_working_day')
                                       ->orWhereDate('last_working_day', '>', $today);
