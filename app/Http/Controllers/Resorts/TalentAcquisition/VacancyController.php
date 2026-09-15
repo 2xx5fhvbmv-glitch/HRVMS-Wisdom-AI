@@ -232,6 +232,8 @@ class VacancyController extends Controller
             'amount_unit'=> 'nullable|string|in:MVR,USD',
             'is_required_local' => 'required|string|in:Yes,No',
             'justification' => 'nullable|string|max:2000',
+            'is_replacement' => 'nullable|boolean',
+            'replacement_employee_id' => 'nullable|integer|exists:employees,id',
         ]);
         $resort = Auth::guard('resort-admin')->user();
         $resort_id = $resort->resort_id;
@@ -295,6 +297,32 @@ class VacancyController extends Controller
                 ]);
             }
 
+            // Casual/Intern-only: a genuine replacement for someone leaving
+            // doesn't consume NEW approved headcount — the departing
+            // person's seat is what's being filled — so it must be
+            // validated (a real current Casual/Intern employee in this
+            // exact position, not just a trusted checkbox) and then
+            // short-circuit PAST the over-budget comparison below
+            // entirely, rather than computing it and overriding the
+            // result after.
+            $isReplacement = false;
+            $replacementEmployeeId = null;
+            if (!empty($validatedData['is_replacement']) && in_array($manningCategory, ['Casual', 'Intern'], true)) {
+                $replacementEmployeeId = $validatedData['replacement_employee_id'] ?? null;
+                $validReplacement = $replacementEmployeeId && Employee::where('id', $replacementEmployeeId)
+                    ->where('resort_id', $resort_id)
+                    ->where('Position_id', $positionId)
+                    ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($manningCategory))
+                    ->exists();
+                if (!$validReplacement) {
+                    return response()->json([
+                        'success' => false,
+                        'msg' => 'Select a current Casual/Intern employee in this position to record this as a replacement.',
+                    ]);
+                }
+                $isReplacement = true;
+            }
+
             // Approved budget exists, but the requested count itself may
             // still exceed what's actually vacant — previously purely
             // informational (the form just showed an "Out of Budget"
@@ -304,7 +332,7 @@ class VacancyController extends Controller
             // of silently proceeding as if it were within budget.
             $outOfBudgetStatus = null;
             $justification = null;
-            if (!$isDraft && $manningresponse) {
+            if (!$isDraft && $manningresponse && !$isReplacement) {
                 $availableSlots = $this->computeAvailableSlots($manningresponse, $positionId, $resort_id);
                 $requestedCount = (int) $validatedData['Total_position_required'];
                 if ($requestedCount > $availableSlots) {
@@ -413,6 +441,8 @@ class VacancyController extends Controller
             $vacancy->is_required_local = $request->is_required_local;
             $vacancy->justification = $justification;
             $vacancy->out_of_budget_status = $outOfBudgetStatus;
+            $vacancy->is_replacement = $isReplacement;
+            $vacancy->replacement_employee_id = $replacementEmployeeId;
             $vacancy->save();
 
             if ($outOfBudgetStatus === 'Pending') {
@@ -751,6 +781,8 @@ class VacancyController extends Controller
             'amount_unit' => 'nullable|string|in:MVR,USD',
             'is_required_local' => 'required|string|in:Yes,No',
             'justification' => 'nullable|string|max:2000',
+            'is_replacement' => 'nullable|boolean',
+            'replacement_employee_id' => 'nullable|integer|exists:employees,id',
         ]);
 
         $resort = Auth::guard('resort-admin')->user();
@@ -797,11 +829,31 @@ class VacancyController extends Controller
             ]);
         }
 
+        // Same replacement short-circuit as store() — see there for the
+        // full rationale.
+        $isReplacement = false;
+        $replacementEmployeeId = null;
+        if (!empty($validatedData['is_replacement']) && in_array($manningCategory, ['Casual', 'Intern'], true)) {
+            $replacementEmployeeId = $validatedData['replacement_employee_id'] ?? null;
+            $validReplacement = $replacementEmployeeId && Employee::where('id', $replacementEmployeeId)
+                ->where('resort_id', $resort_id)
+                ->where('Position_id', $positionId)
+                ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($manningCategory))
+                ->exists();
+            if (!$validReplacement) {
+                return response()->json([
+                    'success' => false,
+                    'msg' => 'Select a current Casual/Intern employee in this position to record this as a replacement.',
+                ]);
+            }
+            $isReplacement = true;
+        }
+
         // Same over-budget justification gate as store() — see there for
         // the full rationale.
         $outOfBudgetStatus = null;
         $justification = null;
-        if (!$isDraft && $manningresponse) {
+        if (!$isDraft && $manningresponse && !$isReplacement) {
             $availableSlots = $this->computeAvailableSlots($manningresponse, $positionId, $resort_id);
             $requestedCount = (int) $validatedData['Total_position_required'];
             if ($requestedCount > $availableSlots) {
@@ -899,6 +951,8 @@ class VacancyController extends Controller
         $vacancy->is_required_local = $request->is_required_local;
         $vacancy->justification = $justification;
         $vacancy->out_of_budget_status = $outOfBudgetStatus;
+        $vacancy->is_replacement = $isReplacement;
+        $vacancy->replacement_employee_id = $replacementEmployeeId;
         $vacancy->save();
 
         if ($outOfBudgetStatus === 'Pending') {
@@ -1073,6 +1127,38 @@ class VacancyController extends Controller
         } else {
             return response()->json(['rank' => null]);
         }
+    }
+
+    /**
+     * Powers the "Is this a replacement?" dropdown — current Casual/Intern
+     * employees actually in the requested position, so the selection is
+     * real (validated again server-side in store()/update(), never
+     * trusted from just this list).
+     */
+    public function getReplacementCandidates(Request $request)
+    {
+        $resort_id = Auth::guard('resort-admin')->user()->resort_id;
+        $positionId = $request->query('positionId');
+        $employeeType = $request->query('employeeType', '');
+        $manningCategory = Common::manningCategoryForVacancy($employeeType);
+
+        if (!in_array($manningCategory, ['Casual', 'Intern'], true) || !$positionId) {
+            return response()->json(['employees' => []]);
+        }
+
+        $employees = Employee::with('resortAdmin:id,first_name,last_name')
+            ->where('resort_id', $resort_id)
+            ->where('Position_id', $positionId)
+            ->where('status', 'Active')
+            ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($manningCategory))
+            ->get(['id', 'Admin_Parent_id'])
+            ->map(fn($e) => [
+                'id' => $e->id,
+                'name' => trim(($e->resortAdmin->first_name ?? '') . ' ' . ($e->resortAdmin->last_name ?? '')),
+            ])
+            ->values();
+
+        return response()->json(['employees' => $employees]);
     }
 
     public function GetViewVacancies()

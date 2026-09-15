@@ -50,6 +50,8 @@ class Vacancies extends Model
       'justification',
       'out_of_budget_status',
       'out_of_budget_comment',
+      'is_replacement',
+      'replacement_employee_id',
       'created_by',
       'modified_by',
       'Total_position_required'

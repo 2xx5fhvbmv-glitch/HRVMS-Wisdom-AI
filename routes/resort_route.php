@@ -386,6 +386,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/talent-acquisition/edit-vacancy/{id}', 'TalentAcquisition\VacancyController@edit')->name('resort.vacancies.edit');
     Route::put('/talent-acquisition/update-vacancy/{id}', 'TalentAcquisition\VacancyController@update')->name('resort.vacancies.update');
     Route::get('/talent-acquisition/get-rank', 'TalentAcquisition\VacancyController@getRank')->name('resort.getRank');
+    Route::get('/talent-acquisition/replacement-candidates', 'TalentAcquisition\VacancyController@getReplacementCandidates')->name('resort.vacancies.replacementCandidates');
     // Route::get('/talent-acquisition/FreshApplicant', 'TalentAcquisition\VacancyController@GetAllApplicatioWiseVacancies')->name('');
 
     Route::get('/talent-acquisition/vacancies-grid-view', 'TalentAcquisition\VacancyController@GridViewData')->name('ta.vacancies.GirdData');

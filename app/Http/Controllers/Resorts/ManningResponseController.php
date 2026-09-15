@@ -167,6 +167,29 @@ class ManningResponseController extends Controller
             // (predating Casual/Intern manning) behaves exactly as before.
             $validated['employment_type'] = $validated['employment_type'] ?? 'Permanent';
 
+            // Casual/Intern submissions need HR to have configured at
+            // least one active cost rate first — otherwise the budget
+            // this submission drives (Common::computeBudgetCostMonthlyValue()
+            // reading resort_nonpermanent_budget_costs) would compute as
+            // $0 for every cost line, silently. Permanent is unaffected —
+            // it already has its own long-established cost configuration.
+            if (in_array($validated['employment_type'], ['Casual', 'Intern'], true)) {
+                $hasCostConfig = \App\Models\ResortNonpermanentBudgetCost::where('resort_id', $validated['resort_id'])
+                    ->where('status', 'active')
+                    ->where(function ($q) use ($validated) {
+                        $q->where('applies_to', $validated['employment_type'])
+                          ->orWhere('applies_to', 'Both');
+                    })
+                    ->exists();
+                if (!$hasCostConfig) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'msg' => 'HR needs to configure Casual/Intern cost rates before this can be submitted — see Cost Configuration for Casuals & Interns.',
+                    ]);
+                }
+            }
+
             // Check if a ManningResponse already exists for the given resort, department, year AND category
             $manningResponse = ManningResponse::where('resort_id', $validated['resort_id'])
                 ->where('dept_id', $validated['dept_id'])
