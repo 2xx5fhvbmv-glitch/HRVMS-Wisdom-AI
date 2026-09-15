@@ -244,6 +244,28 @@
                                     </div>
                                 </div>
 
+                                {{-- Casual/Intern-only: a genuine replacement for someone
+                                     leaving doesn't consume new approved headcount, unlike
+                                     the plain "Replacement" employee type above (which is
+                                     Permanent-only and purely cosmetic). --}}
+                                <div id="casual-intern-replacement-block" style="display:none;">
+                                    <div class="av-f" style="max-width:400px; margin-top:18px;">
+                                        <label>Is this a replacement for someone leaving/who has left?</label>
+                                        <div class="av-seg">
+                                            <input class="av-seg-input" type="radio" name="is_replacement" value="1" id="is-replacement-yes">
+                                            <label for="is-replacement-yes">Yes</label>
+                                            <input class="av-seg-input" type="radio" name="is_replacement" value="0" id="is-replacement-no" checked>
+                                            <label for="is-replacement-no">No</label>
+                                        </div>
+                                    </div>
+                                    <div class="av-f" style="max-width:400px; margin-top:12px; display:none;" id="replacement-candidate-wrap">
+                                        <label for="replacement_employee_id">Who is being replaced?</label>
+                                        <select name="replacement_employee_id" id="replacement_employee_id" class="form-control form-select dd-native-select">
+                                            <option value="">Select position first</option>
+                                        </select>
+                                    </div>
+                                </div>
+
                                 <div class="av-sppanel" id="temp-div" style="display:none;">
                                     <div class="av-sph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Service provider &amp; details</div>
                                     <div class="av-subgrid">
@@ -503,11 +525,16 @@
                     const permanentDiv = document.getElementById('permanent-div');
                     const tempDiv = document.getElementById('temp-div');
                     const replacementEmployee = document.getElementById('replacement-employee');
+                    const casualInternReplacementBlock = document.getElementById('casual-intern-replacement-block');
 
                     // Reset visibility
                     permanentDiv.style.display = 'none';
                     tempDiv.style.display = 'none';
                     replacementEmployee.style.display = 'none';
+                    casualInternReplacementBlock.style.display = 'none';
+                    $('#is-replacement-no').prop('checked', true);
+                    $('#replacement-candidate-wrap').hide();
+                    $('#replacement_employee_id').val('');
 
                     // Show/hide based on selection
                     if (employmentType === 'Permanant' || employmentType === 'Replacement') {
@@ -520,8 +547,63 @@
                         tempDiv.style.display = 'block';
                         toggleInput();
                     }
+                    // Casual/Intern only — Temporary/Project isn't one of the
+                    // 3 manning categories itself (it maps to Casual for
+                    // budget purposes, but isn't the same UI toggle).
+                    if (employmentType === 'Casual/Agency' || employmentType === 'Trainee / Intern') {
+                        casualInternReplacementBlock.style.display = 'block';
+                    }
                 });
             });
+
+            $('input[name="is_replacement"]').on('change', function() {
+                if ($(this).val() === '1') {
+                    $('#replacement-candidate-wrap').show();
+                    avLoadReplacementCandidates();
+                } else {
+                    $('#replacement-candidate-wrap').hide();
+                    $('#replacement_employee_id').val('');
+                }
+            });
+
+            $('#position').on('change', function() {
+                if ($('input[name="is_replacement"]:checked').val() === '1') {
+                    avLoadReplacementCandidates();
+                }
+            });
+
+            function avLoadReplacementCandidates() {
+                const positionId = $('#position').val();
+                const employeeType = $('input[name="employee_type"]:checked').val();
+                const $select = $('#replacement_employee_id');
+                $select.html('<option value="">Loading…</option>');
+
+                if (!positionId) {
+                    $select.html('<option value="">Select position first</option>');
+                    return;
+                }
+
+                $.ajax({
+                    url: "{{ route('resort.vacancies.replacementCandidates') }}",
+                    type: 'GET',
+                    data: { positionId: positionId, employeeType: employeeType },
+                    success: function(response) {
+                        const employees = (response && response.employees) || [];
+                        if (!employees.length) {
+                            $select.html('<option value="">No current Casual/Intern employees in this position</option>');
+                            return;
+                        }
+                        let html = '<option value="">Select employee</option>';
+                        employees.forEach(function(emp) {
+                            html += '<option value="' + emp.id + '">' + emp.name + '</option>';
+                        });
+                        $select.html(html);
+                    },
+                    error: function() {
+                        $select.html('<option value="">Failed to load — try again</option>');
+                    }
+                });
+            }
 
             $('#add-new-vacancy').validate({
                 rules: {
@@ -539,6 +621,11 @@
                         required: function() {
                             return $("input[name='employee_type']:checked").val() === "Replacement";
                         }
+                    },
+                    "replacement_employee_id": {
+                        required: function() {
+                            return $("input[name='is_replacement']:checked").val() === "1";
+                        }
                     }
                 },
                 messages: {
@@ -551,7 +638,8 @@
                     "division": { required: "Division field is required." },
                     "section": { required: "Section field is required." },
                     "Total_position_required": { required: "Required no. of vacancy field is required." },
-                    "employee_name": { required: "Employee name is required when employee type is Replacement." }
+                    "employee_name": { required: "Employee name is required when employee type is Replacement." },
+                    "replacement_employee_id": { required: "Select who is being replaced." }
                 },
                 submitHandler: function(form) {
                     // Check if Save As Draft was clicked
