@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\ResortAdmin;
 use App\Models\ResortDepartment;
 use App\Models\ResortPosition;
+use App\Models\WorkPermit;
 use App\Helpers\Common;
 use DB;
 
@@ -69,6 +70,7 @@ class CasualInternEmployeeImport implements ToModel, WithHeadingRow
         $positionName = trim((string) ($row['position'] ?? ''));
         $reportingEmpCode = trim((string) ($row['reportingmanagerempid'] ?? ''));
         $employmentType = trim((string) ($row['employmenttype'] ?? ''));
+        $workPermitNumber = trim((string) ($row['workpermitnumber'] ?? ''));
 
         $missing = [];
         if ($firstName === '') $missing[] = 'FirstName';
@@ -170,12 +172,23 @@ class CasualInternEmployeeImport implements ToModel, WithHeadingRow
             'passport_number' => $idNumber,
         ];
 
-        DB::transaction(function () use ($ResortAdmindata, $employeeData) {
+        DB::transaction(function () use ($ResortAdmindata, $employeeData, $workPermitNumber) {
             $profile = Common::persistEmployeeProfile($ResortAdmindata, $employeeData, $this->resort->resort_id);
             if ($profile['employeeCreated']) {
                 $this->created++;
             } else {
                 $this->updated++;
+            }
+
+            // §25 — optional; work_permits is a one-to-many payment-tracking
+            // table (Status/PaymentType default to Unpaid/Installment), not
+            // an employees column, so this only seeds the permit number —
+            // the Visa module owns the rest of that record's lifecycle.
+            if ($workPermitNumber !== '') {
+                WorkPermit::updateOrCreate(
+                    ['employee_id' => $profile['employee']->id],
+                    ['resort_id' => $this->resort->resort_id, 'Work_Permit_Number' => $workPermitNumber]
+                );
             }
         });
 
