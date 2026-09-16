@@ -131,8 +131,14 @@
                                 <button type="submit" class="btn wfp-btn-primary SendToGM" id="SendToGMButton" >Send To GM</button>
                             @endif
                             @if($employeeRankPosition['position'] == 'GM')
-                                {{-- <button type="submit" class="btn btn-theme SendToCorporateOffice" >Send To Corporate Office</button> --}}
-                                <button type="submit" class="btn wfp-btn-celebrate SendToCorporateOffice" >Approve Budget</button>
+                                {{-- Was type="submit" inside the shared #SendToFinance form —
+                                     that posted to resort.SendToFinance.manning.notification,
+                                     which never correctly recorded 'Approved' for GM's branch
+                                     (see BudgetController::approveAllDepartmentBudgets()'s
+                                     docblock). This page shows every department at once with
+                                     no single-department context, so approval here is the bulk
+                                     resort+year action, not the single-department approveBudget(). --}}
+                                <button type="button" class="btn wfp-btn-celebrate approve-all-budgets-btn" id="ApproveAllBudgetsButton">Approve Budget</button>
                                 {{-- Revise Budget was removed from this page per explicit
                                      decision: revisions now happen only on View Budget. --}}
                             @endif
@@ -372,6 +378,38 @@
     $(document).on('click', '#cbCollapseAllBtn', function () {
         document.querySelectorAll('#accordionViewBudget .collapse').forEach(function (el) {
             bootstrap.Collapse.getOrCreateInstance(el).hide();
+        });
+    });
+
+    // GM's final approval — bulk (every department for this resort+year in
+    // one click, since this page has no single-department context). See
+    // BudgetController::approveAllDepartmentBudgets().
+    $(document).on('click', '#ApproveAllBudgetsButton', function () {
+        var $btn = $(this);
+        var year = $('#year').val();
+        if (!year) {
+            toastr.error('Select a year first.');
+            return;
+        }
+        $.ajax({
+            url: '{{ route("resort.budget.approveAll") }}',
+            method: 'POST',
+            data: { _token: '{{ csrf_token() }}', year: year },
+            beforeSend: function () { $btn.prop('disabled', true); },
+            success: function (response) {
+                if (response.success) {
+                    toastr.success(response.message || 'All department budgets approved successfully!');
+                    setTimeout(function () { fetchConsolidatedBudget(year); }, 800);
+                } else {
+                    toastr.error(response.message || 'Failed to approve budgets.');
+                }
+                $btn.prop('disabled', false);
+            },
+            error: function (xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) || 'Failed to approve budgets.';
+                toastr.error(msg);
+                $btn.prop('disabled', false);
+            }
         });
     });
 

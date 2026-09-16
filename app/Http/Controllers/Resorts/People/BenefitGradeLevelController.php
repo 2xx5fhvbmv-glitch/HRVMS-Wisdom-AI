@@ -12,6 +12,8 @@ use App\Models\ResortBenefitGradeLevel;
 use App\Models\ResortBenefitGradeLevelRank;
 use App\Models\ResortBenifitGrid;
 use App\Models\ResortBenifitGridChild;
+use App\Models\HousekeepingServiceCatalog;
+use App\Models\BenefitGradeHousekeepingService;
 
 class BenefitGradeLevelController extends Controller
 {
@@ -27,7 +29,11 @@ class BenefitGradeLevelController extends Controller
     {
         $page_title = 'Benefit Grade Levels';
         $rankConfig = config('settings.Position_Rank');
-        return view('resorts.people.config.benefit-grade-level', compact('page_title', 'rankConfig'));
+        $housekeepingServices = HousekeepingServiceCatalog::where('resort_id', $this->resort->resort_id)
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
+        return view('resorts.people.config.benefit-grade-level', compact('page_title', 'rankConfig', 'housekeepingServices'));
     }
 
     public function list(Request $request)
@@ -59,6 +65,9 @@ class BenefitGradeLevelController extends Controller
                         </a>
                         <a href="javascript:void(0)" class="btn btn-sm btn-outline-primary me-1 text-nowrap map-rank-btn" data-grade-id="' . e($id) . '">
                             Map Ranks
+                        </a>
+                        <a href="javascript:void(0)" class="btn btn-sm btn-outline-primary me-1 text-nowrap map-services-btn" data-grade-id="' . e($id) . '">
+                            Map Housekeeping Services
                         </a>
                         <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-grade-id="' . e($id) . '">
                             <img src="' . asset('resorts_assets/images/trash-red.svg') . '" alt="Delete" class="img-fluid">
@@ -250,6 +259,111 @@ class BenefitGradeLevelController extends Controller
             \Log::emergency("Line: " . $e->getLine());
             \Log::emergency("Message: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Failed to update rank mapping.'], 500);
+        }
+    }
+
+    /**
+     * Housekeeping Service Catalog CRUD — same resort-scoped catalog
+     * pattern as the grade levels above. Card 4 (Housekeeping Request)'s
+     * mobile eligibility check reads from benefit_grade_housekeeping_services,
+     * which is only ever populated by mapping catalog entries created here
+     * onto a grade level via updateHousekeepingServices() below.
+     */
+    public function storeHousekeepingService(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+        $validator = Validator::make($request->all(), [
+            'name' => [
+                'required',
+                'max:150',
+                Rule::unique('housekeeping_service_catalog')->where(fn ($q) => $q->where('resort_id', $resort_id)),
+            ],
+        ], [
+            'name.required' => 'The Service Name field is required.',
+            'name.unique' => 'This service already exists for this resort.',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $service = HousekeepingServiceCatalog::create([
+            'resort_id' => $resort_id,
+            'name' => $request->name,
+            'status' => 'active',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Housekeeping service added successfully.',
+            'id' => $service->id,
+            'name' => $service->name,
+        ]);
+    }
+
+    public function destroyHousekeepingService($id)
+    {
+        $id = (int) base64_decode($id);
+        $resort_id = $this->resort->resort_id;
+
+        $inUse = BenefitGradeHousekeepingService::where('resort_id', $resort_id)
+            ->where('housekeeping_service_id', $id)
+            ->exists();
+        if ($inUse) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This service is mapped to a grade level and cannot be deleted. Unmap it from every grade first.',
+            ], 422);
+        }
+
+        HousekeepingServiceCatalog::where('resort_id', $resort_id)->where('id', $id)->delete();
+        return response()->json(['success' => true, 'message' => 'Housekeeping service deleted successfully.']);
+    }
+
+    public function housekeepingServicesFor($id)
+    {
+        $id = (int) base64_decode($id);
+        $serviceIds = BenefitGradeHousekeepingService::where('resort_id', $this->resort->resort_id)
+            ->where('grade_level_id', $id)
+            ->pluck('housekeeping_service_id');
+
+        return response()->json(['success' => true, 'service_ids' => $serviceIds]);
+    }
+
+    /**
+     * "Map Housekeeping Services" — select which catalog services this
+     * grade level is eligible for. Mirrors updateRanks() above, minus the
+     * Benefit Grid resync (housekeeping eligibility isn't stored on
+     * resort_benifit_grid at all once mapped here).
+     */
+    public function updateHousekeepingServices(Request $request, $id)
+    {
+        $id = (int) base64_decode($id);
+        $resort_id = $this->resort->resort_id;
+
+        $validator = Validator::make($request->all(), [
+            'service_ids' => 'nullable|array',
+            'service_ids.*' => 'integer|exists:housekeeping_service_catalog,id',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $level = ResortBenefitGradeLevel::where('resort_id', $resort_id)->where('id', $id)->first();
+        if (!$level) {
+            return response()->json(['success' => false, 'message' => 'Grade level not found.'], 404);
+        }
+
+        DB::beginTransaction();
+        try {
+            BenefitGradeHousekeepingService::assignServicesToGrade($resort_id, $id, $request->input('service_ids', []));
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Housekeeping service mapping updated successfully.']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("Message: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to update service mapping.'], 500);
         }
     }
 }

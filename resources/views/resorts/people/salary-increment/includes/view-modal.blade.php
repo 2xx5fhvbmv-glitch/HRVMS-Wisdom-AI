@@ -165,5 +165,37 @@
     </div>
 </div>
 <div class="modal-footer">
+    @if($peopleSalaryIncrement->status === 'Approved')
+        <button type="button" class="btn btn-themeNeon send-increment-letter"
+                data-id="{{ $peopleSalaryIncrement->id }}">
+            <i class="fa-regular fa-envelope"></i>
+            {{ $peopleSalaryIncrement->letter_dispatched === 'Yes' ? 'Re-send Increment Letter' : 'Send Increment Letter' }}
+        </button>
+    @endif
     <button type="button" class="btn btn-themeDanger" data-bs-dismiss="modal">Close</button>
 </div>
+<script>
+    // Delegated (not $(document).ready-scoped) since this partial is
+    // injected via AJAX into the modal after the page has already loaded —
+    // same reason Promotion's equivalent .send-letter handler is delegated.
+    $(document).off('click', '.send-increment-letter').on('click', '.send-increment-letter', function () {
+        var $btn = $(this);
+        var id = $btn.data('id');
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: '{{ route("people.salary-increment.send-letter") }}',
+            method: 'POST',
+            data: { _token: '{{ csrf_token() }}', incrementId: id },
+            success: function (response) {
+                toastr.success(response.message || 'Letter sent successfully.');
+            },
+            error: function (xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) || 'Failed to send letter.';
+                toastr.error(msg);
+            },
+            complete: function () {
+                $btn.prop('disabled', false);
+            }
+        });
+    });
+</script>

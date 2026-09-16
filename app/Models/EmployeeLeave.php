@@ -74,6 +74,19 @@ class EmployeeLeave extends Model
       $employee = Employee::with('resortAdmin')->where('id',$leave->emp_id)->first();
 
       $employee->resortAdmin->notify(new AlternativeDateSuggestedNotification($leaveRecommend,$recipient,$leave,$from));
+
+      try {
+          Common::notifyEmployees(
+              $leave->resort_id,
+              [$leave->emp_id],
+              'Alternate Dates Suggested',
+              'An approver has suggested alternate dates for your leave request.',
+              'Leave',
+              $leave->id
+          );
+      } catch (\Exception $e) {
+          \Log::warning('Alternate date suggestion notification failed: ' . $e->getMessage());
+      }
     }
 
     public function employee()

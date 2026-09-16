@@ -41,7 +41,10 @@ class GrivanceSubmissionModel extends Model
                             'Identity_Disclosed_To',
                             'Gm_Decision',
                             'Rejection_reason',
-                            'RequestforStatment'
+                            'RequestforStatment',
+                            'resolved_signature_img',
+                            'resolved_signature_name',
+                            'resolved_signed_at',
                         ];
 
         protected $casts = [

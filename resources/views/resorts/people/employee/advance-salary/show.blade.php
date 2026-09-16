@@ -25,6 +25,12 @@
                         </div>
                     </div>
                     <!-- <div class="col-auto  ms-auto"><a class="btn btn-theme" href="#">Add New Employee</a></div> -->
+                    <div class="col-auto ms-auto">
+                        <a href="{{ route('people.advance-salary.downloadApprovalPdf', $advance_salary->id) }}"
+                           target="_blank" class="btn btn-theme btn-sm">
+                            <i class="fa-regular fa-file-pdf"></i> Download Approval Record
+                        </a>
+                    </div>
                 </div>
             </div>
             <div class="card card-salaryAdvanceReqPeopleEmpHr">

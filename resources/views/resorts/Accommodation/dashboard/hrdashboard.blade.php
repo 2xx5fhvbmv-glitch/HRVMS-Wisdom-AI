@@ -595,40 +595,6 @@
         </div>
     </div>
 </div>
-<div class="modal fade" id="ForwardToHOD-Model" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-small modal-assign">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Assign Task To HOD</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="ForwardToHODForm">
-                @csrf
-                <div class="modal-body">
-                    <div class="bg-themeGrayLight DetailsShow">
-
-                    </div>
-                    <div><label for="select_emp" class="form-label">SELECT EMPLOYEE</label>
-                        <select class="form-select select2t-none" name="HOD_id" id="select_emp" aria-label="Default select example">
-                            <option> </option>
-                            @if($Employee->isNotEmpty())
-
-                                @foreach ($Employee as $e)
-                                    <option value="{{ $e->id}}"> {{ $e->first_name}} {{ $e->last_name}}</option>
-                                @endforeach
-                            @endif
-                        </select>
-                    </div>
-                    <input type="hidden" name="task_id" id="task_id">
-                </div>
-                <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
-                    <button type='submit' class="btn eb-btn-primary">Submit</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 <div class="modal fade" id="ForwardToHOD-DetailsModel" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-small modal-assign">
         <div class="modal-content">
@@ -826,10 +792,6 @@
         //     scrollX: true,
         //     "iDisplayLength": 10,
         // });
-        $("#select_emp").select2({
-            placeholder: "Select Employee",
-            allowClear: true
-        });
 
         $(".ResortDepartment").on("change",function()
         {
@@ -872,54 +834,6 @@
                             form.reset();
                             PendingTaskList();
                             $("#RejectedRequest-Model").modal('hide');
-
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    },
-                    error: function(response) {
-                        var errors = response.responseJSON;
-                        var errs = '';
-                        $.each(errors.errors, function(key, error) {
-                            errs += error + '<br>';
-                        });
-                        toastr.error(errs, {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                });
-            }
-        });
-        $('#ForwardToHODForm').validate({
-            rules: {
-                HOD_id: {
-                    required: true,
-                }
-            },
-            messages: {
-                HOD_id: {
-                    required: "Please Select HOD.",
-                }
-            },
-            submitHandler: function(form) {
-                var formData = new FormData(form);
-
-                $.ajax({
-                    url: "{{ route('resort.accommodation.HrForwardToHODManitenanceRequest') }}", // Your route for file upload
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(response.message, "Success", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                            form.reset();
-                            PendingTaskList();
-                            $("#ForwardToHOD-Model").modal('hide');
 
                         } else {
                             toastr.error(response.message, "Error", {

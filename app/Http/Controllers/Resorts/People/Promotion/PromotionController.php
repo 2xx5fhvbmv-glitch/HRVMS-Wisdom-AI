@@ -857,11 +857,27 @@ class PromotionController extends Controller
             }
         }
 
+        // Signature snapshot — only an Approve represents this person
+        // actually signing off. Frozen HERE, at the moment the real
+        // logged-in actor ($this->resort — may differ from the approval
+        // slot's original assignee via the delegate/pool fallback above)
+        // approves — never re-derived later from the live
+        // ResortAdmin.signature_img, so the promotion letter keeps
+        // showing the exact signature used even if this admin later
+        // re-uploads a new one or leaves. Same pattern as Transfer.
+        $signatureFields = [];
+        if ($actionName === 'Approved') {
+            $signatureFields = Common::snapshotSignature($this->resort->id, 'promotion', $currentApproval->id);
+        }
+
         // Update current approval
         $currentApproval->update([
             'status' => $actionName,
             'remarks' => ($comments ?? '') . $delegateComment,
             'approved_at' => now(),
+            'signature_img' => $signatureFields['signature_img'] ?? null,
+            'signature_name' => $signatureFields['name'] ?? null,
+            'signed_at' => $signatureFields['timestamp'] ?? null,
         ]);
 
         // Actor descriptor for HR notifications — "Ankit (HOD of Finance)",
@@ -1075,6 +1091,43 @@ class PromotionController extends Controller
         return view('resorts.people.promotion.detail',compact('page_title','promotion'));
     }
     
+    /**
+     * Per-approver signature blocks for the Promotion letter PDF — one
+     * entry per approval-chain step that recorded a frozen signature
+     * (Common::snapshotSignature(), captured in handlePromotionApproval()
+     * at the moment each approver acted). Never re-derives from the live
+     * ResortAdmin.signature_img. Same pattern as
+     * TransferController::buildTransferSignatures().
+     *
+     * Falls back to a single letterhead-style entry (no image, typed name
+     * only) for promotions approved before this feature existed, so the
+     * letter's signature section is never silently blank.
+     */
+    private function buildPromotionSignatures(EmployeePromotion $promotion, array $letterhead): array
+    {
+        $signatures = $promotion->approvals
+            ->where('status', 'Approved')
+            ->whereNotNull('signature_name')
+            ->sortBy('approved_at')
+            ->map(fn ($approval) => [
+                'name'          => $approval->signature_name,
+                'signature_img' => $approval->signature_img,
+                'timestamp'     => $approval->signed_at,
+            ])
+            ->values()
+            ->all();
+
+        if (empty($signatures)) {
+            $signatures[] = [
+                'name'          => $letterhead['signatoryName'] ?: 'Human Resources Department',
+                'signature_img' => null,
+                'timestamp'     => null,
+            ];
+        }
+
+        return $signatures;
+    }
+
     public function sendPromotionLetter(Request $request)
     {
         // Was missing the resort_id filter — unscoped read let a foreign
@@ -1122,8 +1175,21 @@ class PromotionController extends Controller
 
         $letterContent = strtr($template->content, $placeholders);
 
-        // Optionally, generate PDF
-        $pdf = Pdf::loadHTML($letterContent);
+        // Wrap the HR-authored template content with the resort's
+        // letterhead (header/footer) and the promotion's own per-approver
+        // frozen signatures — same shared wrapper Exit Clearance/Probation/
+        // Employment Verification already use, instead of a bare
+        // Pdf::loadHTML() with no letterhead or signature at all.
+        $letterhead = Common::getLetterheadData($promotion->resort_id);
+        $pdf = Pdf::loadView('resorts.people.probation.probation_letter_pdf', [
+            'letterContent'  => $letterContent,
+            'letterhead'     => $letterhead,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($promotion->resort_id),
+            'signatures'     => $this->buildPromotionSignatures($promotion, $letterhead),
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
         $pdfPath = 'letters/promotion_' . $type . '_' . $promotion->employee->id . '.pdf';
         Storage::put($pdfPath, $pdf->output());
 

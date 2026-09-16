@@ -16,6 +16,7 @@ use App\Models\StoreManningResponseParent;
 use App\Models\Payroll;
 use App\Models\PayrollReview;
 use App\Models\PayrollReviewAllowances;
+use App\Models\LiabilityManualCost;
 use Auth;
 use Config;
 use DB;
@@ -1100,14 +1101,81 @@ class LiabilityEstimationController extends Controller
         ));
     }
 
+    // Fixed category buckets — same names index()/getLiabilityData() already
+    // classify resort_budget_costs into, so a manual entry logged here reads
+    // consistently with the rest of the Liability module.
+    public static $manualCostCategories = [
+        'OT', 'Service Charge', 'Insurance', 'Work Permit',
+        'Visa', 'Medical', 'Quota', 'Recruitment Fee', 'Other',
+    ];
+
     public function addCost()
     {
         $page_title = 'Add Liability Cost';
-        $resort_id = $this->resort->resort_id;  
+        $resort_id = $this->resort->resort_id;
+
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $employees = Employee::with('resortAdmin')
+            ->where('resort_id', $resort_id)
+            ->where('status', 'active')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->get();
+
+        $categories = self::$manualCostCategories;
+
         return view('resorts.people.liability.add-cost', compact(
-            'page_title', 
-            'resort_id', 
-        ));     
+            'page_title',
+            'resort_id',
+            'employees',
+            'categories',
+        ));
+    }
+
+    public function storeCost(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'employee_id' => 'required|integer',
+            'cost_date' => 'required|date',
+            'category' => 'required|string|in:' . implode(',', self::$manualCostCategories),
+            'amount' => 'required|numeric|min:0.01',
+            'description' => 'nullable|string|max:1000',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
+        }
+
+        $resort_id = $this->resort->resort_id;
+
+        // Tenant + department scope — same rule as index()'s employee list,
+        // so a non-HR/GM HOD can't log a cost against another department's
+        // employee by posting an arbitrary id.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $employee = Employee::where('id', $request->employee_id)
+            ->where('resort_id', $resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->first();
+
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
+        }
+
+        LiabilityManualCost::create([
+            'resort_id' => $resort_id,
+            'employee_id' => $employee->id,
+            'cost_date' => $request->cost_date,
+            'category' => $request->category,
+            'amount' => $request->amount,
+            'currency' => Common::getDisplayCurrency() === 'MVR' ? 'MVR' : 'USD',
+            'description' => $request->description,
+            'created_by' => $this->resort->id,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cost added successfully.',
+            'redirect_url' => route('people.liability.index'),
+        ]);
     }
 
     public function getLiabilityData(Request $request)

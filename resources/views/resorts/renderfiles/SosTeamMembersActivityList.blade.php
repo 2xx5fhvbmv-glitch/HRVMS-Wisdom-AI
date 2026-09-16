@@ -23,7 +23,15 @@
                 </div>
                 <div>
                     <ul>
-                        <li><i class="fa-regular fa-location-dot"></i>{{ $teamMember->address }}</li>
+                        <li><i class="fa-regular fa-location-dot"></i>
+                            @if(!empty($teamMember->address))
+                                {{ $teamMember->address }}
+                            @elseif($teamMember->latitude && $teamMember->longitude)
+                                <a href="https://www.google.com/maps?q={{ $teamMember->latitude }},{{ $teamMember->longitude }}" target="_blank">View on map</a>
+                            @else
+                                N/A
+                            @endif
+                        </li>
                         
                         @if($teamMember->status == 'Acknowledged')
                         <li class="text-themeSuccess">

@@ -57,6 +57,12 @@ use Illuminate\Support\Facades\Route;
 		Route::get('profile/visa-data/{visa_category}', [App\Http\Controllers\API\ProfileController::class, 'getVisaData']);
 		Route::get('resort/test-push-notification', [App\Http\Controllers\API\ProfileController::class, 'testPushNotification']);
 
+		// Job Description consent (Part 2.5)
+		Route::get('job-description', [App\Http\Controllers\API\JobDescriptionController::class, 'index']);
+		Route::get('job-description/{id}', [App\Http\Controllers\API\JobDescriptionController::class, 'show']);
+		Route::post('job-description/{id}/consent', [App\Http\Controllers\API\JobDescriptionController::class, 'consent']);
+		Route::post('job-description/{id}/decline', [App\Http\Controllers\API\JobDescriptionController::class, 'decline']);
+
 		//Employees Document
 		Route::post('resort/employees-docs', [App\Http\Controllers\API\EmployeeDocumentController::class, 'employeeDocument']);
 		Route::post('resort/get-employees-docs', [App\Http\Controllers\API\EmployeeDocumentController::class, 'getEmployeeDocument']);
@@ -256,6 +262,7 @@ use Illuminate\Support\Facades\Route;
 			Route::get('boarding/boarding-sm-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'boardingSecurityManagerDashboard']);
 			Route::get('boarding/so-employee-list', [App\Http\Controllers\API\BoardingPassController::class, 'SOEmployeeList']);
 			Route::post('boarding/so-pass-assign', [App\Http\Controllers\API\BoardingPassController::class, 'SOPassAssign']);
+			Route::post('boarding/manifest-so-assign', [App\Http\Controllers\API\BoardingPassController::class, 'manifestSOAssign']);
 
 			// Mobile calls this endpoint as 'security-officer-employee-list' (assignSecurityOfficerScreen),
 			// which never existed as a route — a plain 404, not a rank/permission gap. Alias, same pattern
@@ -461,6 +468,7 @@ use Illuminate\Support\Facades\Route;
 		Route::post('monthlycheckin/employee-approve-request', [App\Http\Controllers\API\MonthlyCheckInController::class, 'employeeApproveRequest']);
 		Route::post('monthlycheckin/employee-reject-request', [App\Http\Controllers\API\MonthlyCheckInController::class, 'employeeRejectRequest']);
 		Route::post('monthlycheckin/post-meeting-employee-comment', [App\Http\Controllers\API\MonthlyCheckInController::class, 'postMeetingEmployeeComment']);
+		Route::post('monthlycheckin/employee-review-response', [App\Http\Controllers\API\MonthlyCheckInController::class, 'employeeReviewResponse']);
 		Route::get('monthlycheckin/monthly-checkin-history', [App\Http\Controllers\API\MonthlyCheckInController::class, 'monthlyCheckInHistory']);
 
 		//Grievance

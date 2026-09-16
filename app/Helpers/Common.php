@@ -5144,6 +5144,36 @@ class Common
     }
 
     /**
+     * Active employees in the resort's Housekeeping department who are HOD
+     * or EXCOM (rank 1/2) — same access boundary buildModuleAccessPayload()
+     * already computes as module_access.housekeeping_hod_xcom. Used to
+     * notify the Housekeeping HOD/XCOM when HR raises a housekeeping
+     * request, mirroring getResortFinanceEmployeeIds/
+     * getResortSecurityEmployeeIds's department-scoped shape.
+     */
+    public static function getResortHousekeepingHodXcomEmployeeIds($resortId)
+    {
+        $hkDeptIds = \App\Models\ResortDepartment::where('resort_id', $resortId)
+            ->pluck('id')
+            ->filter(fn($id) => self::isHousekeepingDepartment($id))
+            ->all();
+
+        if (empty($hkDeptIds)) {
+            return [];
+        }
+
+        return \App\Models\Employee::where('resort_id', $resortId)
+            ->whereIn('Dept_id', $hkDeptIds)
+            ->whereIn('rank', [1, 2])
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->pluck('id')
+            ->map(fn($v) => (int) $v)
+            ->all();
+    }
+
+    /**
      * sos_history.status drifted across 3 migrations (Drill-active renamed
      * Drill-Active; Under-Control/Drill-Under-Control added then dropped
      * again) and several call sites were written against an earlier version
@@ -6996,6 +7026,36 @@ class Common
         return $settings ? (float) $settings->DollertoMVR : 15.42;
     }
 
+    // Month picker options for the advance-salary "move this installment"
+    // dropdown (AdvanceSalaryController::show and
+    // AdvanceSalaryRepaymentTrackerController::show, both feeding the same
+    // AdvanceSalaryRepaymentTrackerController::update endpoint). Always
+    // starts from today unless a still-Pending installment's repayment_date
+    // is already in the past — an overdue Pending row must stay selectable
+    // instead of falling outside a "today forward" window.
+    public static function advanceSalaryAvailableMonths($payrollAdvanceId, $futureMonths = 36)
+    {
+        $currentMonth = Carbon::now()->startOfMonth();
+
+        $earliestPending = \App\Models\PayrollRecoverySchedule::where('payroll_advance_id', $payrollAdvanceId)
+            ->where('status', 'Pending')
+            ->orderBy('repayment_date')
+            ->value('repayment_date');
+
+        $startMonth = $earliestPending ? Carbon::parse($earliestPending)->startOfMonth() : $currentMonth;
+        if ($startMonth->gt($currentMonth)) {
+            $startMonth = $currentMonth;
+        }
+
+        $totalMonths = $startMonth->diffInMonths($currentMonth) + $futureMonths;
+
+        $availableMonths = [];
+        for ($i = 0; $i < $totalMonths; $i++) {
+            $availableMonths[] = $startMonth->copy()->addMonths($i)->format('F Y');
+        }
+        return $availableMonths;
+    }
+
     /**
      * Overlay AI-written body + recommendation onto pre-computed dashboard
      * insight cards via the FastAPI /dashboard_insights endpoint. Numbers stay
@@ -7382,6 +7442,23 @@ class Common
                     return url('resort/payroll/run-payroll?resume=' . $requestId . '&viewonly=1');
                 }
                 return url('resort/payroll/hr-dashboard');
+
+            // These four modules fire real notifications (maintenance
+            // escalation, wallet transfers, offer/contract sends, survey
+            // reminders, and others already in production) but had no case
+            // here at all — every one of them silently fell through to the
+            // generic notification list instead of the module itself.
+            case 'accommodation':
+                return url('resort/accommodation/maintenance-request/list');
+
+            case 'visa':
+                return url('resort/visa/hr-dashboard');
+
+            case 'talent acquisition':
+                return url('resort/talent-acquisition/view-vacancies');
+
+            case 'survey':
+                return url('resort/survey/list');
 
             default:
                 return url('resort/mark/notification-list');
@@ -10411,6 +10488,109 @@ class Common
             return 'data:' . $mime . ';base64,' . base64_encode($contents);
         } catch (\Throwable $e) {
             \Log::warning('signatureImageDataUri failed for path ' . $path . ': ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Renders the per-employee Job Description PDF from a
+     * job_description_employee_records row and (re)saves it into the
+     * employee's File Management categorized folder — mirrors
+     * TransferController::saveTransferLetterToFileManagement()'s
+     * encrypted-upload pattern. Called both when HR first issues the JD
+     * (Pending, no employee signature yet) and again after the employee
+     * consents (Signed, both signatures present), so it always renders
+     * whatever is currently on the record's snapshot columns.
+     *
+     * The storage path is deterministic (keyed by record id), so a
+     * re-render overwrites the same object instead of piling up a new
+     * file per resend/consent — same for the ChildFileManagement row,
+     * looked up by File_Path and updated in place rather than duplicated.
+     */
+    public static function generateAndStoreJobDescriptionPdf(\App\Models\JobDescriptionEmployeeRecord $record): ?string
+    {
+        try {
+            $jobDescription = $record->jobDescription;
+            $employee = $record->employee;
+            if (!$jobDescription || !$employee) {
+                \Log::warning('generateAndStoreJobDescriptionPdf: missing job description or employee for record #' . $record->id);
+                return null;
+            }
+
+            $folder = \App\Models\FilemangementSystem::where('resort_id', $record->resort_id)
+                ->where('Folder_Name', $employee->Emp_id)
+                ->where('Folder_Type', 'categorized')
+                ->where('UnderON', 0)
+                ->first();
+
+            if (!$folder) {
+                \Log::warning('generateAndStoreJobDescriptionPdf: no File Management folder for employee ' . $employee->Emp_id);
+                return null;
+            }
+
+            $resortData = Resort::find($record->resort_id);
+            $sitesettings = ResortSiteSettings::where('resort_id', $record->resort_id)->first(['resort_id', 'header_img', 'footer_img', 'Footer']);
+
+            $signatures = [
+                ['name' => $record->employer_name, 'signature_img' => $record->employer_signature_path, 'timestamp' => $record->sent_at],
+            ];
+            if ($record->employee_signature_path) {
+                $signatures[] = ['name' => $record->employee_full_name, 'signature_img' => $record->employee_signature_path, 'timestamp' => $record->signed_at];
+            }
+
+            $pdf = \PDF::loadView('resorts.talentacquisition.jobdescription.employee_download', [
+                'record' => $record,
+                'j' => $jobDescription,
+                'sitesettings' => $sitesettings,
+                'ResortData' => $resortData,
+                'signatures' => $signatures,
+            ]);
+            $pdf->setPaper('a4', 'portrait');
+            $pdfBinary = $pdf->output();
+
+            $resortFolder = optional($resortData)->resort_id ?: $record->resort_id;
+            $path = $resortFolder . '/public/categorized/' . $folder->Folder_unique_id . '/jd_' . $record->id . '.pdf.enc';
+
+            $key = hash('sha256', env('ENCRYPTION_KEY'), true);
+            $iv  = random_bytes(16);
+            $encrypted = $iv . openssl_encrypt($pdfBinary, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+            if ($encrypted === false) {
+                throw new \Exception('Encryption failed: ' . openssl_error_string());
+            }
+
+            StorageHelper::disk()->put($path, $encrypted, [
+                'ContentType'        => 'application/octet-stream',
+                'ContentDisposition' => 'attachment; filename="Job Description.pdf"',
+            ]);
+
+            $existing = \App\Models\ChildFileManagement::where('resort_id', $record->resort_id)
+                ->where('Parent_File_ID', $folder->id)
+                ->where('File_Path', $path)
+                ->first();
+
+            if ($existing) {
+                $existing->File_Size = round(strlen($pdfBinary) / 1024, 2);
+                $existing->save();
+            } else {
+                \App\Models\ChildFileManagement::create([
+                    'resort_id'      => $record->resort_id,
+                    'unique_id'      => substr(md5(uniqid('jd-employee', true)), 0, 10),
+                    'Parent_File_ID' => $folder->id,
+                    'File_Name'      => 'Job Description',
+                    'NewFileName'    => 'Job Description',
+                    'File_Type'      => 'pdf',
+                    'File_Size'      => round(strlen($pdfBinary) / 1024, 2),
+                    'File_Path'      => $path,
+                    'File_Extension' => 'pdf',
+                ]);
+            }
+
+            $record->pdf_path = $path;
+            $record->save();
+
+            return $path;
+        } catch (\Throwable $e) {
+            \Log::error('generateAndStoreJobDescriptionPdf failed for record #' . $record->id . ': ' . $e->getMessage());
             return null;
         }
     }

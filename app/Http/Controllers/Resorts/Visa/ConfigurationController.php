@@ -488,6 +488,27 @@ class ConfigurationController extends Controller
                 }
                 $visaReminder->save();
                 DB::commit();
+
+                // Reminder thresholds affect every employee's visa/passport/fee
+                // reminder schedule resort-wide — HR (the role that configures
+                // and relies on these reminders) previously got no notice a
+                // change was made.
+                $hrIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+                if (!empty($hrIds)) {
+                    try {
+                        Common::notifyEmployees(
+                            $this->resort->resort_id,
+                            $hrIds,
+                            'Visa Reminder Settings Updated',
+                            'Visa/passport/fee reminder threshold settings were updated.',
+                            'Visa',
+                            $visaReminder->id
+                        );
+                    } catch (\Exception $e) {
+                        \Log::warning('Visa reminder-config notification failed: ' . $e->getMessage());
+                    }
+                }
+
                 return response()->json([
                     'success' => true,
                     'msg' => 'Expiry Date Updated Successfully.',
@@ -500,7 +521,7 @@ class ConfigurationController extends Controller
             \Log::emergency("Line: " . $e->getLine());
             \Log::emergency("Message: " . $e->getMessage());
             return response()->json(['error' => 'Failed to Update Expiry Date'], 500);
-        }    
+        }
     }
     public function DocumentTypeIndex(Request $request)
     {

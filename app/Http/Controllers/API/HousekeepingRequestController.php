@@ -157,6 +157,26 @@ class HousekeepingRequestController extends Controller
                 \Log::warning('HousekeepingRequestController::createRequest notify failed: ' . $e->getMessage());
             }
 
+            // The Housekeeping HOD/XCOM was never notified at all — the
+            // only notification this method sent was to the employee whose
+            // accommodation the request is about, not to whoever needs to
+            // actually action it.
+            try {
+                $hkHodXcomIds = Common::getResortHousekeepingHodXcomEmployeeIds($this->resort_id);
+                if (!empty($hkHodXcomIds)) {
+                    Common::notifyEmployees(
+                        $this->resort_id,
+                        $hkHodXcomIds,
+                        'New Housekeeping Request',
+                        $this->user->first_name . ' ' . $this->user->last_name . ' has raised a housekeeping request for ' . $employee->Emp_id . '.',
+                        'Housekeeping Request',
+                        $created[0]->id
+                    );
+                }
+            } catch (\Exception $e) {
+                \Log::warning('HousekeepingRequestController::createRequest HOD notify failed: ' . $e->getMessage());
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Housekeeping request(s) created successfully',

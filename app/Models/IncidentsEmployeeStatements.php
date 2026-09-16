@@ -18,7 +18,10 @@ class IncidentsEmployeeStatements extends Model
         'employee_id',
         'statement',
         'document_path',
-        'status'  
+        'status',
+        'signature_img',
+        'signature_name',
+        'signed_at',
     ];
     public static function boot(){
         parent::boot();

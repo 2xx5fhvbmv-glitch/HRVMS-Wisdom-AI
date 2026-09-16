@@ -1924,6 +1924,28 @@ class LeaveController extends Controller
                             'status'                    =>  'Pending',
                         ]);
                     }
+
+                    // Same "notify whichever stage is actioned first" pattern
+                    // as the standalone BoardingPassController::store — this
+                    // path (boarding pass created inline inside a leave
+                    // application) previously left approvers to find out only
+                    // by checking the list.
+                    $firstApprover = EmployeeTravelPassStatus::where('travel_pass_id', $boardingPass->id)
+                        ->where('status', 'Pending')->orderBy('id', 'desc')->first();
+                    if ($firstApprover && $firstApprover->approver_id) {
+                        try {
+                            Common::notifyEmployees(
+                                $resort_id,
+                                [$firstApprover->approver_id],
+                                'Boarding Pass Request',
+                                'A boarding pass request has been submitted as part of a leave application.',
+                                'Leave Management',
+                                $boardingPass->id
+                            );
+                        } catch (\Exception $e) {
+                            \Log::warning('Leave boarding pass submit notification failed: ' . $e->getMessage());
+                        }
+                    }
                 }
 
                 // Leave approval: only the applicant's reporting_to can approve (reporting_to is set in employee profile and can be changed there).

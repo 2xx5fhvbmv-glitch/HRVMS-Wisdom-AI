@@ -279,7 +279,7 @@
                                 type="button" role="tab" aria-controls="tabPane3" aria-selected="false">Estimation Vs
                                 Actual</button>
                         </li>
-                        <!-- <a href="{{route('people.liability.addCost')}}" class="btn btn-themeSkyblue btn-sm">+ Add Cost</a> -->
+                        <a href="{{route('people.liability.addCost')}}" class="btn btn-themeSkyblue btn-sm ms-auto">+ Add Cost</a>
                     </ul>
                     <div class="tab-content" id="myTabContent">
                         <div class="tab-pane fade show active" id="tabPane1" role="tabpanel" aria-labelledby="tab1" tabindex="0">

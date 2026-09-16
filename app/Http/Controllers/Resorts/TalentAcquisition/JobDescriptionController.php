@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Resorts\TalentAcquisition;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\JobDescription;
+use App\Models\JobDescriptionEmployeeRecord;
 use App\Models\ResortSiteSettings;
 use App\Models\Resort;
+use App\Models\Employee;
 use Illuminate\Support\Facades\Auth;
 use Validator;
 use Illuminate\Validation\Rule;
@@ -110,6 +112,15 @@ class JobDescriptionController extends Controller
                     $editUrl = asset('resorts_assets/images/edit.svg');
                     $deleteUrl = asset('resorts_assets/images/trash-red.svg');
                     $redirectToMe = route('resort.ta.jobdescription.download', $row->slug);
+                    // Per-employee issuance only makes sense once the template has
+                    // passed compliance (sections 3-7) — a Rejected JD has nothing
+                    // legally complete to issue to anyone yet.
+                    $issuanceButtons = '';
+                    if ($row->compliance === 'Approved') {
+                        $issuanceButtons = '
+                            <a href="javascript:void(0)" class="btn-tableIcon btnIcon-skyblue issue-jd-btn" title="Issue to employees" data-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '"><i class="fa-regular fa-paper-plane"></i></a>
+                            <a href="javascript:void(0)" class="btn-tableIcon btnIcon-orange view-jd-employees-btn" title="View employee sign-off" data-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '"><i class="fa-solid fa-users"></i></a>';
+                    }
                     return '
                             <a href="javascript:void(0)" class="btn-tableIcon btnIcon-orange viewJobDesc " data-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8').'"><i class="fa-regular fa-eye"></i></a>
                             <a target="_blank" href="'.$redirectToMe.'" class="btn-tableIcon btnIcon-skyblue"><i class="fa-regular fa-download"></i></a>
@@ -120,8 +131,7 @@ class JobDescriptionController extends Controller
                             <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn '.$delete_class.'"
                            data-id="'. htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '" >
                                 <img src="' . $deleteUrl . '" alt="Delete" class="img-fluid" />
-                            </a>
-                        ';
+                            </a>' . $issuanceButtons;
                 })
                 ->addColumn('Division', function ($row) {
                       return  $row->Division.'   '.'<span class="badge badge-themeLight">'. htmlspecialchars($row->Division_Code, ENT_QUOTES, 'UTF-8') . '</span>';
@@ -285,9 +295,10 @@ class JobDescriptionController extends Controller
             // (PDF) — /check_agreement_compliance only accepts .docx and would
             // 422 on a JD PDF. Failures are logged and surfaced as a reason so
             // the column is never a blank "-".
+            // Employer/employee identity (sections 1-2) isn't filled in at the
+            // template stage — no employee exists on a job_descriptions row yet —
+            // so only gate on sections 3-7 here.
             $requiredElements = [
-                'employer_details'    => 'Employer details',
-                'employee_details'    => 'Employee details',
                 'job_title_duties'    => 'Job title and duties',
                 'place_of_employment' => 'Place of employment',
                 'working_hours'       => 'Working hours',
@@ -513,6 +524,204 @@ class JobDescriptionController extends Controller
 
         $resort_id = $ResortData->resort_id;
         return view('resorts.talentacquisition.jobdescription.download',compact('sitesettings','j','ResortData',));
+    }
+
+    /**
+     * No fixed "HR Director" role exists anywhere in this app (checked
+     * ResortAdmin/roles) — the employer signature is snapshotted from
+     * whichever resort-admin actually clicks Issue, same identity the JD
+     * template itself was authored/approved under.
+     */
+    private const EMPLOYER_TYPE_OF_WORK = 'Resort & Hospitality Operations';
+    private const EMPLOYER_NATIONALITY = 'Maldivian';
+
+    /**
+     * Part 2.2-2.4: find every employee currently in this JD's Division/
+     * Department/Position/Section who doesn't already have a record for
+     * this template, snapshot employer+employee identity and the
+     * employer's signature, generate the per-employee PDF, save it to
+     * File Management, and notify the employee. Re-running this for an
+     * already-issued JD only picks up employees who joined the position
+     * since — this is also 2.7's "send to new employees" action, same
+     * endpoint, no separate code path needed.
+     */
+    public function issueToEmployees($id)
+    {
+        $jd = JobDescription::where('Resort_id', $this->resort->resort_id)->find($id);
+        if (!$jd) {
+            return response()->json(['success' => false, 'message' => 'Job description not found.'], 404);
+        }
+        if ($jd->compliance !== 'Approved') {
+            return response()->json(['success' => false, 'message' => 'This job description has not passed compliance yet.'], 422);
+        }
+
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (is_array($scopedDeptIds) && !in_array($jd->Department_id, $scopedDeptIds)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access to this department.'], 403);
+        }
+
+        $resortData = Resort::find($jd->Resort_id);
+
+        $employeeQuery = Employee::where('resort_id', $jd->Resort_id)
+            ->where('division_id', $jd->Division_id)
+            ->where('Dept_id', $jd->Department_id);
+        if (!empty($jd->Position_id)) {
+            $employeeQuery->where('Position_id', $jd->Position_id);
+        }
+        if (!empty($jd->Section_id)) {
+            $employeeQuery->where('Section_id', $jd->Section_id);
+        }
+
+        $existingEmpIds = JobDescriptionEmployeeRecord::where('job_description_id', $jd->id)->pluck('employee_id')->all();
+        $newEmployees = $employeeQuery->whereNotIn('id', $existingEmpIds)->get();
+
+        if ($newEmployees->isEmpty()) {
+            return response()->json(['success' => true, 'message' => 'No new employees to issue this job description to.', 'issued_count' => 0]);
+        }
+
+        $employerAddress = implode(', ', array_filter([
+            optional($resortData)->address1,
+            optional($resortData)->address2,
+            optional($resortData)->city,
+            optional($resortData)->state,
+            optional($resortData)->zip,
+            optional($resortData)->country,
+        ]));
+
+        $issuedCount = 0;
+        foreach ($newEmployees as $employee) {
+            try {
+                // employees has no first_name/last_name of its own — that
+                // identity lives on the linked resort_admins row.
+                $admin = $employee->resortAdmin;
+                $fullName = trim(collect([optional($admin)->first_name, optional($admin)->middle_name, optional($admin)->last_name])->filter()->implode(' ')) ?: $employee->Emp_id;
+
+                $record = JobDescriptionEmployeeRecord::create([
+                    'resort_id'                  => $jd->Resort_id,
+                    'job_description_id'         => $jd->id,
+                    'employee_id'                => $employee->id,
+                    'employer_name'               => optional($resortData)->resort_name,
+                    'employer_address'            => $employerAddress ?: null,
+                    'employer_nationality'        => self::EMPLOYER_NATIONALITY,
+                    'employer_type_of_work'       => self::EMPLOYER_TYPE_OF_WORK,
+                    'employee_full_name'          => $fullName,
+                    'employee_permanent_address'  => $employee->permanent_address ?: $employee->present_address,
+                    'employee_current_address'    => $employee->current_address ?: $employee->present_address,
+                    'employee_id_card_number'     => $employee->nid ?: $employee->passport_number,
+                    'employee_dob'                => $employee->dob ?: null,
+                    'employee_nationality'        => $employee->nationality,
+                    'status'                      => 'Pending',
+                    'sent_at'                     => now(),
+                ]);
+
+                $signature = Common::snapshotSignature($this->resort->id, 'job_description', $record->id);
+                $record->employer_signature_path = $signature['signature_img'];
+                $record->save();
+
+                Common::generateAndStoreJobDescriptionPdf($record);
+
+                Common::notifyEmployees(
+                    $jd->Resort_id,
+                    [$employee->id],
+                    'Job Description Ready for Review',
+                    'A job description for your position is ready for your review and consent.',
+                    'TalentAcquisition',
+                    $record->id,
+                    'job-description-employee-record'
+                );
+
+                $issuedCount++;
+            } catch (\Throwable $e) {
+                \Log::error('issueToEmployees failed for employee #' . $employee->id . ' / jd #' . $jd->id . ': ' . $e->getMessage());
+            }
+        }
+
+        return response()->json(['success' => true, 'message' => "Issued to {$issuedCount} employee(s).", 'issued_count' => $issuedCount]);
+    }
+
+    /**
+     * Part 2.6: per-employee sign-off breakdown for one JD template, shown
+     * in a modal on the existing JD list page rather than a new dashboard.
+     */
+    public function GetEmployeeRecordsList(Request $request, $id)
+    {
+        $jd = JobDescription::where('Resort_id', $this->resort->resort_id)->find($id);
+        if (!$jd) {
+            return response()->json(['success' => false, 'message' => 'Job description not found.'], 404);
+        }
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (is_array($scopedDeptIds) && !in_array($jd->Department_id, $scopedDeptIds)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access to this department.'], 403);
+        }
+
+        // employee_full_name is already snapshotted on the record itself —
+        // only need Emp_id from the live employee for the badge.
+        $records = JobDescriptionEmployeeRecord::with('employee:id,Emp_id')
+            ->where('job_description_id', $jd->id)
+            ->orderBy('id', 'DESC');
+
+        return datatables()->of($records)
+            ->addColumn('EmployeeName', function ($row) {
+                return $row->employee_full_name . ' <span class="badge badge-themeLight">' . htmlspecialchars(optional($row->employee)->Emp_id, ENT_QUOTES, 'UTF-8') . '</span>';
+            })
+            ->addColumn('Status', function ($row) {
+                $map = [
+                    'Pending'  => 'text-warning',
+                    'Signed'   => 'text-successTheme',
+                    'Declined' => 'text-danger',
+                ];
+                $class = $map[$row->status] ?? '';
+                return '<span class="' . $class . '">' . htmlspecialchars($row->status, ENT_QUOTES, 'UTF-8') . '</span>';
+            })
+            ->addColumn('DeclineReason', function ($row) {
+                return $row->status === 'Declined' ? htmlspecialchars($row->decline_reason ?? '-', ENT_QUOTES, 'UTF-8') : '-';
+            })
+            ->addColumn('action', function ($row) {
+                if ($row->status !== 'Declined') {
+                    return '';
+                }
+                return '<a href="javascript:void(0)" class="btn btn-sm btn-themeBlue resend-jd-btn" data-id="' . $row->id . '">Resend</a>';
+            })
+            ->rawColumns(['EmployeeName', 'Status', 'action'])
+            ->make(true);
+    }
+
+    /**
+     * Part 2.5 step 3: HR's resend action on a Declined record — resets
+     * the SAME record to Pending rather than creating a new one, so this
+     * stays a loop on one row instead of a growing list of attempts.
+     */
+    public function resendDeclined($id)
+    {
+        $record = JobDescriptionEmployeeRecord::with('jobDescription')->where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$record) {
+            return response()->json(['success' => false, 'message' => 'Record not found.'], 404);
+        }
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (is_array($scopedDeptIds) && !in_array(optional($record->jobDescription)->Department_id, $scopedDeptIds)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access to this department.'], 403);
+        }
+        if ($record->status !== 'Declined') {
+            return response()->json(['success' => false, 'message' => 'Only declined records can be resent.'], 422);
+        }
+
+        $record->status = 'Pending';
+        $record->decline_reason = null;
+        $record->resend_count = $record->resend_count + 1;
+        $record->sent_at = now();
+        $record->save();
+
+        Common::notifyEmployees(
+            $record->resort_id,
+            [$record->employee_id],
+            'Job Description Ready for Review',
+            'A job description for your position is ready for your review and consent.',
+            'TalentAcquisition',
+            $record->id,
+            'job-description-employee-record'
+        );
+
+        return response()->json(['success' => true, 'message' => 'Resent to employee.']);
     }
 
 }

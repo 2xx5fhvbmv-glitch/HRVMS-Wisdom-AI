@@ -31,6 +31,7 @@ use App\Events\ResortNotificationEvent;
 use App\Helpers\Common;
 use Carbon\Carbon;
 use URL;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class VacancyController extends Controller
 {
@@ -45,18 +46,14 @@ class VacancyController extends Controller
         if(!$this->resort) return;
     }
 
+    // Every in-app link to "View Vacancies" (dashboard cards, sidebar) goes
+    // to GetViewVacancies()'s hrAllBacancies view, which already has real
+    // department/position/search filtering wired through GridViewData().
+    // This route was a separate, never-linked page still rendering static
+    // mock rows — delegate to the real one instead of maintaining two.
     public function index()
     {
-        try {
-            $page_title ='View Vacancies';
-            
-            return view('resorts.talentacquisition.vacancies.index', compact('page_title'));
-        } catch( \Exception $e ) {
-            \Log::emergency("File: ".$e->getFile());
-            \Log::emergency("Line: ".$e->getLine());
-            \Log::emergency("Message: ".$e->getMessage());
-            return view('resorts.talentacquisition.vacancies.index');
-        }
+        return $this->GetViewVacancies();
     }
 
     public function create()
@@ -3047,6 +3044,104 @@ class VacancyController extends Controller
         }
 
         return response()->json(['success' => true, 'msg' => 'Forwarded to ' . $nextStage . '.']);
+    }
+
+    /**
+     * Per-stage signature blocks for the hiring approval letter — one
+     * entry per approval-chain stage that recorded a frozen signature
+     * (Common::snapshotSignature(), captured in
+     * ConfigController::TaApprovedVcanciesNotification() at the moment
+     * each rank approved). Never re-derives from the live
+     * ResortAdmin.signature_img. Same pattern as
+     * TransferController::buildTransferSignatures().
+     *
+     * $vacancy->children() joins on the wrong key (parent_ta_id compared
+     * directly against vacancies.id, which is never correct — it should
+     * go through t_anotification_parents.V_id first) so this queries the
+     * correct path directly instead of relying on that relation.
+     *
+     * Falls back to a single letterhead-style entry (no image, typed name
+     * only) so the letter's signature section is never silently blank.
+     */
+    private function buildVacancySignatures(Vacancies $vacancy, array $letterhead): array
+    {
+        // vacancies.Resort_id — capital R, unlike most other tables in
+        // this app. $vacancy->resort_id (lowercase) silently reads as
+        // null instead of erroring, so this is easy to get wrong.
+        $parentIds = TAnotificationParent::where('V_id', $vacancy->id)
+            ->where('Resort_id', $vacancy->Resort_id)
+            ->pluck('id');
+
+        $signatures = TAnotificationChild::whereIn('Parent_ta_id', $parentIds)
+            ->whereNotNull('signature_name')
+            ->orderBy('Approved_By')
+            ->get()
+            ->map(fn ($child) => [
+                'name'          => $child->signature_name,
+                'signature_img' => $child->signature_img,
+                'timestamp'     => $child->signed_at,
+            ])
+            ->values()
+            ->all();
+
+        if (empty($signatures)) {
+            $signatures[] = [
+                'name'          => $letterhead['signatoryName'] ?: 'Human Resources Department',
+                'signature_img' => null,
+                'timestamp'     => null,
+            ];
+        }
+
+        return $signatures;
+    }
+
+    /**
+     * Download the hiring request's approval letter — only once the
+     * request has completed its full approval chain (the final-rank child
+     * row was actually forwarded, i.e. Common::TaFinalApproval() was
+     * reached — same condition ConfigController::
+     * TaApprovedVcanciesNotification() uses to decide "isFinalApproval").
+     */
+    public function downloadHiringApprovalLetter($id)
+    {
+        // vacancies.Resort_id — capital R (see buildVacancySignatures()).
+        $vacancy = Vacancies::with(['Getposition', 'Getdepartment', 'resortAdmin'])
+            ->where('Resort_id', $this->resort->resort_id)
+            ->find($id);
+
+        if (!$vacancy) {
+            abort(404);
+        }
+
+        $resortId = $vacancy->Resort_id;
+
+        $parentIds = TAnotificationParent::where('V_id', $vacancy->id)
+            ->where('Resort_id', $resortId)
+            ->pluck('id');
+
+        $finalRank = Common::TaFinalApproval($resortId);
+        $fullyApproved = TAnotificationChild::whereIn('Parent_ta_id', $parentIds)
+            ->where('Approved_By', $finalRank)
+            ->where('status', 'ForwardedToNext')
+            ->exists();
+
+        if (!$fullyApproved) {
+            abort(403, 'This hiring request has not completed its approval chain yet.');
+        }
+
+        $resort = Resort::find($resortId);
+        $letterhead = Common::getLetterheadData($resortId);
+
+        $pdf = Pdf::loadView('resorts.talentacquisition.vacancies.hiring_approval_pdf', [
+            'vacancy'        => $vacancy,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($resortId),
+            'letterhead'     => $letterhead,
+            'signatures'     => $this->buildVacancySignatures($vacancy, $letterhead),
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        return $pdf->download('Hiring_Approval_' . $vacancy->id . '.pdf');
     }
 
 }

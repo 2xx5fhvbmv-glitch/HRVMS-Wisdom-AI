@@ -13,6 +13,11 @@
                     </div>
                 </div>
                 <div class="col-auto">
+                    @if($plan->submitted_at)
+                        <a href="{{ route('Performance.' . $kind . '.downloadPdf', $plan->id) }}" target="_blank" class="btn btn-theme btn-sm">
+                            <i class="fa-regular fa-file-pdf"></i> Download {{ strtoupper($kind) }} Report
+                        </a>
+                    @endif
                     <a href="{{ route('Performance.' . $kind . '.index') }}" class="btn perf-btn-secondary btn-sm">
                         <i class="fa-solid fa-arrow-left"></i> Back
                     </a>

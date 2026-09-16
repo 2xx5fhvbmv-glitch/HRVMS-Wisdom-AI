@@ -633,6 +633,24 @@ if (!function_exists('safeParseDate')) {
                                                                           required>{{ $employee->present_address ?? "" }}</textarea>
                                                             </td>
                                                         </tr>
+                                                        <tr>
+                                                            <th>Permanent Address:</th>
+                                                            <td>
+                                                                <span class="view-mode">{{$employee->permanent_address ?? "Not Available"}}</span>
+                                                                <textarea class="form-control edit-mode d-none" name="permanent_address"
+                                                                          maxlength="255"
+                                                                          placeholder="Permanent Address">{{ $employee->permanent_address ?? "" }}</textarea>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th>Current Address:</th>
+                                                            <td>
+                                                                <span class="view-mode">{{$employee->current_address ?? "Not Available"}}</span>
+                                                                <textarea class="form-control edit-mode d-none" name="current_address"
+                                                                          maxlength="255"
+                                                                          placeholder="Current Address">{{ $employee->current_address ?? "" }}</textarea>
+                                                            </td>
+                                                        </tr>
                                                         </tbody>
                                                     </table>
 
@@ -3097,6 +3115,8 @@ if (!function_exists('safeParseDate')) {
                 country: $('[name="country"]').val(),
                 zip: $('[name="zip"]').val(),
                 present_address: $('[name="present_address"]').val(),
+                permanent_address: $('[name="permanent_address"]').val(),
+                current_address: $('[name="current_address"]').val(),
             };
 
             $.ajax({

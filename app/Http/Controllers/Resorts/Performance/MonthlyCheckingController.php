@@ -16,6 +16,7 @@ use App\Models\ResortPosition;
 use App\Models\LearningRequest;
 use App\Models\LearningProgram;
 use App\Models\MonthlyCheckingModel;
+use App\Models\MonthlyCheckinReview;
 use App\Models\LearningRequestEmployee;
 
 use App\Events\ResortNotificationEvent;
@@ -425,8 +426,9 @@ class MonthlyCheckingController extends Controller
             abort(403, 'You do not have access to this check-in.');
         }
         $monthly->profileImg = Common::getResortUserPicture($monthly->ParentId);
+        $reviewRounds = MonthlyCheckinReview::where('monthly_checkin_id', $id)->orderBy('round')->get();
         $page_title="Monthly Check In Details";
-        return view("resorts.Performance.MonthlyCheckIn.Details", compact('page_title','monthly'));
+        return view("resorts.Performance.MonthlyCheckIn.Details", compact('page_title','monthly','reviewRounds'));
     }
     public function MonltyCheckInDetailsPageList(Request $request)
     {
@@ -787,6 +789,18 @@ class MonthlyCheckingController extends Controller
                 'finalized_at'        => now(),
             ]);
 
+            // Round 1 of the employee acknowledge/decline flow — this is the
+            // first point Area_of_Improvement is ever set on this check-in.
+            MonthlyCheckinReview::create([
+                'resort_id'           => $this->resort->resort_id,
+                'monthly_checkin_id'  => $checkin->id,
+                'round'               => 1,
+                'area_of_improvement' => $request->Area_of_Improvement,
+                'hod_comment'         => $request->comment,
+                'initiated_by'        => $this->resort->id,
+                'initiated_at'        => now(),
+            ]);
+
             if (!empty($request->tranining_id) && !empty($request->learning_manager_id)) {
                 $l = LearningRequest::create([
                     'resort_id'           => $this->resort->resort_id,
@@ -823,6 +837,75 @@ class MonthlyCheckingController extends Controller
             \Log::emergency('finalize Line: '.$e->getLine());
             \Log::emergency('finalize Message: '.$e->getMessage());
             return response()->json(['success' => false, 'message' => 'Failed to submit check-in.'], 500);
+        }
+    }
+
+    /**
+     * HOD re-initiates the Area of Improvement review after the employee
+     * declined the latest round — starts a new round, previous rounds stay
+     * untouched/read-only.
+     */
+    public function reinitiate(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'area_of_improvement' => 'required',
+            'comment'             => 'nullable',
+        ], [
+            'area_of_improvement.required' => 'Please enter the updated area of improvement.',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $checkin = MonthlyCheckingModel::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$checkin) {
+            return response()->json(['success' => false, 'message' => 'Check-in not found'], 404);
+        }
+        $scopedIds = Common::getPerformanceScopedEmpIds();
+        if (is_array($scopedIds) && !in_array($checkin->emp_id, $scopedIds, true)) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to re-initiate this check-in.'], 403);
+        }
+
+        $latestRound = MonthlyCheckinReview::where('monthly_checkin_id', $checkin->id)->orderBy('round', 'desc')->first();
+        if (!$latestRound || $latestRound->employee_response !== 'Declined') {
+            return response()->json(['success' => false, 'message' => 'Can only re-initiate after the employee has declined the current round.'], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $review = MonthlyCheckinReview::create([
+                'resort_id'           => $this->resort->resort_id,
+                'monthly_checkin_id'  => $checkin->id,
+                'round'               => $latestRound->round + 1,
+                'area_of_improvement' => $request->area_of_improvement,
+                'hod_comment'         => $request->comment,
+                'initiated_by'        => $this->resort->id,
+                'initiated_at'        => now(),
+            ]);
+
+            DB::commit();
+
+            try {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    [$checkin->emp_id],
+                    'Monthly Check-In Updated',
+                    'Your Area of Improvement has been updated for round '.$review->round.'. Please review and respond.',
+                    'Performance',
+                    $checkin->id,
+                    'monthly-checkin-review'
+                );
+            } catch (\Throwable $e) {
+                \Log::warning('reinitiate notify failed: '.$e->getMessage());
+            }
+
+            return response()->json(['success' => true, 'message' => 'Review re-initiated successfully.']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency('reinitiate File: '.$e->getFile());
+            \Log::emergency('reinitiate Line: '.$e->getLine());
+            \Log::emergency('reinitiate Message: '.$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to re-initiate review.'], 500);
         }
     }
 

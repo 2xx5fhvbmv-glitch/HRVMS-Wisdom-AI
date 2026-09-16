@@ -283,6 +283,12 @@
                                                                         </li>
                                                                     @endif
                                                                 </ul>
+                                                                @if($overallStatus === 'Approved')
+                                                                    <a href="{{ route('resort.vacancies.downloadApprovalLetter', $request->id) }}"
+                                                                       target="_blank" class="a-link">
+                                                                        <i class="fa-regular fa-file-pdf"></i> Download Approval Letter
+                                                                    </a>
+                                                                @endif
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -414,6 +420,12 @@
                                                                         </li>
                                                                     @endif
                                                                 </ul>
+                                                                @if($overallStatus === 'Approved')
+                                                                    <a href="{{ route('resort.vacancies.downloadApprovalLetter', $request->id) }}"
+                                                                       target="_blank" class="a-link">
+                                                                        <i class="fa-regular fa-file-pdf"></i> Download Approval Letter
+                                                                    </a>
+                                                                @endif
                                                             </div>
                                                         </td>
                                                     </tr>

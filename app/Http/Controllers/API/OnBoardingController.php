@@ -18,6 +18,7 @@ use App\Models\AssingAccommodation;
 use App\Models\EmployeeOnboardingAcknowledgements;
 use App\Models\CulturalInsights;
 use App\Models\Employee;
+use App\Models\ResortAdmin;
 use App\Models\ChildFileManagement;
 use App\Models\FilemangementSystem;
 use App\Models\FacilityTourCategories;
@@ -795,6 +796,17 @@ class OnBoardingController extends Controller
 
         try {
             $employee                                   =   $this->user->GetEmployee;
+
+            // Gate — checked once for the whole batch (same actor, same
+            // moment). For many employees this is their FIRST-ever
+            // signature upload (pre-hire → hired transition), so this
+            // message is doing real work, not just a formality. Same
+            // pattern as JobDescriptionController::consent().
+            $admin = $employee->Admin_Parent_id ? ResortAdmin::find($employee->Admin_Parent_id) : null;
+            if (!$admin || empty($admin->signature_img)) {
+                return response()->json(['success' => false, 'message' => 'Authorized signature is missing. Please upload it first from your profile page.'], 422);
+            }
+
             $saved                                      =   [];
             $duplicates                                 =   [];
 
@@ -809,12 +821,28 @@ class OnBoardingController extends Controller
                     continue;
                 }
 
+                // Frozen HERE, at the moment this specific document is
+                // acknowledged — never re-derived later from the live
+                // ResortAdmin.signature_img. recordId scoped per employee
+                // + document type (not also per date) — a re-submission of
+                // the same document type just refreshes that same slot's
+                // frozen copy, which is fine: it's still this employee's
+                // own latest signature for that document.
+                $signatureFields                        =   Common::snapshotSignature(
+                    $employee->Admin_Parent_id,
+                    'onboarding-acknowledgement',
+                    $employee->id . '-' . $ack['acknowledgement_type']
+                );
+
                 $saved[]                                =   EmployeeOnboardingAcknowledgements::create([
                     'resort_id'                         =>  $this->resort_id,
                     'employee_id'                       =>  $employee->id,
                     'acknowledgement_type'              =>  $ack['acknowledgement_type'],
                     'acknowledged_date'                 =>  Carbon::parse($ack['acknowledged_date']),
                     'status'                            =>  $ack['status'],
+                    'signature_img'                     =>  $signatureFields['signature_img'],
+                    'signature_name'                    =>  $signatureFields['name'] ?? null,
+                    'signed_at'                         =>  $signatureFields['timestamp'] ?? null,
                 ]);
             }
 

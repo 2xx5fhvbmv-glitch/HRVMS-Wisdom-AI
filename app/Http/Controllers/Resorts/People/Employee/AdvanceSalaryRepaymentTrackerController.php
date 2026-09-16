@@ -135,11 +135,7 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
         $resort_id = $this->resort->resort_id;
         $page_title ='Salary Advance/Loan Request Approval';
 
-        $availableMonths = [];
-        $currentMonth = Carbon::now();
-        for ($i = 0; $i < 36; $i++) {
-            $availableMonths[] = $currentMonth->copy()->addMonths($i)->format('F Y');
-        }
+        $availableMonths = Common::advanceSalaryAvailableMonths($id);
         $payrollAdvance =  PayrollAdvance::where('resort_id',$resort_id)->where('id',$id)->with(['employee.resortAdmin','employee.position','employee.department','payrollRecoverySchedule','hrApprover','financeApprover','gmApprover'])
                             ->whereHas('employee.resortAdmin')->first();
                             

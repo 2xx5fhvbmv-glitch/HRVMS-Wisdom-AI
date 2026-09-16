@@ -13,6 +13,7 @@ use DB;
 use App\Models\IncidentCategory;
 use Illuminate\Support\Facades\File;
 use App\Models\Employee;
+use App\Models\ResortAdmin;
 use App\Models\IncidentsMeeting;
 use App\Models\IncidentsEmployeeStatements;
 use App\Models\IncidentCommitteeMember;
@@ -981,7 +982,12 @@ class IncidentController extends Controller
             if (!$isInvolved && !$isWitness) {
                 return response()->json(['success' => false, 'message' => 'You are not authorized to submit a statement for this incident.'], 200);
             }
-             
+
+            $admin = $employee->Admin_Parent_id ? ResortAdmin::find($employee->Admin_Parent_id) : null;
+            if (!$admin || empty($admin->signature_img)) {
+                return response()->json(['success' => false, 'message' => 'Authorized signature is missing. Please upload it first from your profile page.'], 422);
+            }
+
               $imagePaths = [];
 
                 // Was public_path()/mkdir()/Common::uploadFile() — a raw
@@ -1002,23 +1008,44 @@ class IncidentController extends Controller
                 }
 
                 if ($isWitness) {
+                    // Frozen HERE, at the moment the witness statement is
+                    // submitted — never re-derived later from the live
+                    // ResortAdmin.signature_img.
+                    $witnessSignature       =   Common::snapshotSignature(
+                        $employee->Admin_Parent_id,
+                        'incident-witness-statement',
+                        $data['incident_id'] . '-' . $emp_id
+                    );
+
                     $witness_statement      =   IncidentsWitness::where('id', $witness->id)
                                                                     ->update([
                                                                         'witness_statements'      => $data['statement'],
                                                                         'witness_statement_file'  =>  json_encode($imagePaths),
                                                                         'witness_status'          => 'Acknowledged',
+                                                                        'witness_signature_img'   => $witnessSignature['signature_img'] ?? null,
+                                                                        'witness_signature_name'  => $witnessSignature['name'] ?? null,
+                                                                        'witness_signed_at'       => $witnessSignature['timestamp'] ?? null,
                                                                     ]);
-                    
+
                         $incidentData['witness_statement']             =   'Witness statement given successfully';
-                 }                       
-            
+                 }
+
             if($isInvolved){
+                $employeeSignature      =   Common::snapshotSignature(
+                    $employee->Admin_Parent_id,
+                    'incident-employee-statement',
+                    $data['incident_id'] . '-' . $emp_id
+                );
+
                 $employee_statement     =       IncidentsEmployeeStatements::create([
                     'incident_id'       =>$data['incident_id'],
                     'employee_id'       =>$emp_id,
                     'statement'         => $data['statement'],
                     'document_path'     =>  json_encode($imagePaths),
                     'status'            =>'submitted',
+                    'signature_img'     => $employeeSignature['signature_img'] ?? null,
+                    'signature_name'    => $employeeSignature['name'] ?? null,
+                    'signed_at'         => $employeeSignature['timestamp'] ?? null,
                 ]);
                 $incidentData['employee_statement']             =   'Employee statement given successfully';
              }

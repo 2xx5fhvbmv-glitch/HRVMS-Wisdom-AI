@@ -12,6 +12,12 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
+                <div class="col-auto">
+                    <a href="{{ route('interview-assessment.downloadResponsePdf', [base64_encode($response->form_id), base64_encode($response->id)]) }}"
+                       target="_blank" class="btn btn-themeNeon btn-sm">
+                        <i class="fa-regular fa-file-pdf"></i> Download PDF
+                    </a>
+                </div>
             </div>
         </div>
 

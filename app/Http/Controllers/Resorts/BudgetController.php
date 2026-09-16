@@ -35,6 +35,8 @@ use App\Models\ResortVacantBudgetCost;
 use App\Models\ResortVacantBudgetCostConfiguration;
 use App\Models\ResortSiteSettings;
 use App\Models\PublicHoliday;
+use App\Models\Resort;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 
 class BudgetController extends Controller
@@ -2849,6 +2851,13 @@ class BudgetController extends Controller
                 $manningResponse->save();
 
                 $userId = Auth::guard('resort-admin')->user()->id ?? null;
+
+                // Signature snapshot — GM's final approval click IS the
+                // consent/approval moment for this department's budget.
+                // Frozen HERE (Common::snapshotSignature()) — never
+                // re-derived later from the live ResortAdmin.signature_img.
+                $signatureFields = $userId ? Common::snapshotSignature($userId, 'budget-approval', $budgetId . '-' . $departmentId . '-GM') : [];
+
                 BudgetStatus::create([
                     'resort_id'      => $manningResponse->resort_id,
                     'Department_id'  => $departmentId,
@@ -2859,6 +2868,9 @@ class BudgetController extends Controller
                     'OtherComments'  => 'Budget approved by GM.',
                     'created_by'     => $userId,
                     'modified_by'    => $userId,
+                    'signature_img'  => $signatureFields['signature_img'] ?? null,
+                    'signature_name' => $signatureFields['name'] ?? null,
+                    'signed_at'      => $signatureFields['timestamp'] ?? null,
                 ]);
                 DB::commit();
             } catch (\Throwable $e) {
@@ -2891,6 +2903,142 @@ class BudgetController extends Controller
             \Log::emergency("File: " . $e->getFile(). " | Line: " . $e->getLine() . " | Message: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'An error occurred while approving the budget.'], 500);
         }
+    }
+
+    /**
+     * GM's "Approve Budget" on the Consolidated Budget page — unlike
+     * approveBudget() above (one department at a time, from View Manning/
+     * View Budget), this page shows every department's budget for the
+     * whole resort+year at once with no single-department context, so
+     * approval here is bulk: every ManningResponse for this resort+year
+     * gets approved in one action. Same underlying per-row writes as
+     * approveBudget(), just looped, with ONE signature snapshot for the
+     * whole batch (same actor, same moment — matches
+     * ResortAllNotificationController::SendToFinance()'s identical
+     * per-request-not-per-row snapshot pattern).
+     */
+    public function approveAllDepartmentBudgets(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'year' => 'required|integer',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 400);
+        }
+
+        $year = $request->input('year');
+        $resortId = $this->resort->resort_id;
+        $userId = Auth::guard('resort-admin')->user()->id ?? null;
+
+        $budgets = ManningResponse::where('resort_id', $resortId)
+            ->where('year', $year)
+            ->get();
+
+        if ($budgets->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No budgets found for this year.'], 404);
+        }
+
+        $signatureFields = $userId ? Common::snapshotSignature($userId, 'budget-approval', $resortId . '-' . $year . '-GM-all') : [];
+
+        DB::beginTransaction();
+        try {
+            foreach ($budgets as $budget) {
+                $budget->budget_process_status = 'Approved';
+                $budget->save();
+
+                BudgetStatus::create([
+                    'resort_id'      => $resortId,
+                    'Department_id'  => $budget->dept_id,
+                    'message_id'     => $budget->message_id ?? ('BUDGET_' . $budget->id),
+                    'Budget_id'      => $budget->id,
+                    'status'         => 'Approved',
+                    'comments'       => 'Budget approved by GM.',
+                    'OtherComments'  => 'Budget approved by GM.',
+                    'created_by'     => $userId,
+                    'modified_by'    => $userId,
+                    'signature_img'  => $signatureFields['signature_img'] ?? null,
+                    'signature_name' => $signatureFields['name'] ?? null,
+                    'signed_at'      => $signatureFields['timestamp'] ?? null,
+                ]);
+            }
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::emergency("File: " . $e->getFile() . " | Line: " . $e->getLine() . " | Message: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'An error occurred while approving the budget.'], 500);
+        }
+
+        try {
+            $notifyIds = Common::getResortHrEmployeeIds($resortId);
+            Common::notifyEmployees(
+                $resortId,
+                $notifyIds,
+                'Budget Approved',
+                "All departments' budgets for year {$year} have been approved by GM.",
+                'WorkForce Planning',
+                null
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Bulk budget approval notification failed: ' . $e->getMessage());
+        }
+
+        return response()->json(['success' => true, 'message' => 'All department budgets approved successfully!']);
+    }
+
+    /**
+     * Minimal budget approval PDF — per the e-signature spec's own note,
+     * exact layout is a later requirement; this is the plumbing (per-stage
+     * approval trail + frozen signatures), reusing budget_statuses rows
+     * rather than a new table.
+     */
+    public function downloadBudgetApprovalPdf($budgetId)
+    {
+        $manningResponse = ManningResponse::where('id', $budgetId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->firstOrFail();
+
+        $department = ResortDepartment::where('id', $manningResponse->dept_id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+
+        $statusRows = BudgetStatus::where('Budget_id', $budgetId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->orderBy('created_at')
+            ->get();
+
+        $signatures = $statusRows
+            ->whereNotNull('signature_name')
+            ->map(fn ($row) => [
+                'name'          => $row->signature_name,
+                'signature_img' => $row->signature_img,
+                'timestamp'     => $row->signed_at,
+            ])
+            ->values()
+            ->all();
+
+        $letterhead = Common::getLetterheadData($this->resort->resort_id);
+        if (empty($signatures)) {
+            $signatures[] = [
+                'name'          => $letterhead['signatoryName'] ?: 'Human Resources Department',
+                'signature_img' => null,
+                'timestamp'     => null,
+            ];
+        }
+
+        $resort = Resort::find($this->resort->resort_id);
+
+        $pdf = Pdf::loadView('resorts.budget.budget_approval_pdf', [
+            'manningResponse' => $manningResponse,
+            'department'      => $department,
+            'statusRows'      => $statusRows,
+            'resort'          => $resort,
+            'resortLogo'      => Common::GetResortLogo($this->resort->resort_id),
+            'letterhead'      => $letterhead,
+            'signatures'      => $signatures,
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        return $pdf->download('Budget_Approval_' . $budgetId . '.pdf');
     }
 
     /**
@@ -3140,6 +3288,19 @@ class BudgetController extends Controller
             }
 
             DB::commit();
+
+            try {
+                Common::notifyEmployees(
+                    $resortId,
+                    Common::getResortHrEmployeeIds($resortId),
+                    'Budget Cost Configuration Updated',
+                    "Budget cost configuration for year {$selectedYear} was updated.",
+                    'WorkForce Planning',
+                    $employeeId ?? $positionId
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Budget cost configuration notification failed: ' . $ne->getMessage());
+            }
 
             return response()->json([
                 'success' => true,

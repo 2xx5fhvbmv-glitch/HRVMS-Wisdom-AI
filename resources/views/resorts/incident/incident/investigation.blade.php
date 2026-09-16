@@ -78,6 +78,14 @@
                             <h1>{{ $page_title }}</h1>
                         </div>
                     </div>
+                    @if($incident->status === 'Approved')
+                        <div class="col-auto ms-auto">
+                            <a href="{{ route('incident.downloadReportPdf', base64_encode($incident->id)) }}"
+                               target="_blank" class="btn btn-theme btn-sm">
+                                <i class="fa-regular fa-file-pdf"></i> Download Incident Report
+                            </a>
+                        </div>
+                    @endif
                 </div>
             </div>
 

@@ -908,11 +908,27 @@ class TransferController extends Controller
             }
         }
 
+        // Signature snapshot — only an Approve represents this person
+        // actually signing off (a Reject/On-Hold isn't a consent being
+        // signed). Frozen HERE, at the moment $this->resort (the real
+        // logged-in actor — may differ from the approval slot's original
+        // assignee via the role-pool/delegate fallback above) approves —
+        // never re-derived later from the live ResortAdmin.signature_img,
+        // so the transfer letter keeps showing the exact signature used
+        // even if this admin later re-uploads a new one or leaves.
+        $signatureFields = [];
+        if ($actionName === 'Approved') {
+            $signatureFields = Common::snapshotSignature($this->resort->id, 'transfer', $currentApproval->id);
+        }
+
         // Update current approval
         $currentApproval->update([
             'status' => $actionName,
             'remarks' => ($comments ?? '') . $delegateComment,
             'approved_at' => now(),
+            'signature_img' => $signatureFields['signature_img'] ?? null,
+            'signature_name' => $signatureFields['name'] ?? null,
+            'signed_at' => $signatureFields['timestamp'] ?? null,
         ]);
 
         $hr = Employee::where('resort_id',$this->resort->resort_id)->where('Admin_Parent_id',$transfer->created_by)->first();
@@ -1012,7 +1028,7 @@ class TransferController extends Controller
 
                 // 📄 Item 7 — Generate & email the Transfer Letter.
                 try {
-                    $this->generateAndSendTransferLetter($transfer->fresh(['employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition']));
+                    $this->generateAndSendTransferLetter($transfer->fresh(['employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition', 'approvals']));
                 } catch (\Throwable $e) {
                     \Log::error('Transfer letter generation failed for transfer #' . $transfer->id . ': ' . $e->getMessage());
                 }
@@ -1825,6 +1841,43 @@ class TransferController extends Controller
      * The PDF uses the resort logo + name as an approximated letterhead and
      * a typed signatory block. See transfer_letter_pdf.blade.php.
      */
+    /**
+     * Per-approver signature blocks for the Transfer Letter PDF — one
+     * entry per approval-chain step that actually recorded a frozen
+     * signature (Common::snapshotSignature(), captured in handleApproval()
+     * at the moment each approver acted). Never re-derives from the live
+     * ResortAdmin.signature_img — a transfer approved years ago must keep
+     * showing the exact signature used at the time.
+     *
+     * Falls back to a single letterhead-style entry (no image, typed name
+     * only) for transfers approved before this feature existed, so the
+     * PDF's signature section is never silently blank.
+     */
+    private function buildTransferSignatures(EmployeeTransfer $transfer, array $letterhead): array
+    {
+        $signatures = $transfer->approvals
+            ->where('status', 'Approved')
+            ->whereNotNull('signature_name')
+            ->sortBy('approved_at')
+            ->map(fn ($approval) => [
+                'name'          => $approval->signature_name,
+                'signature_img' => $approval->signature_img,
+                'timestamp'     => $approval->signed_at,
+            ])
+            ->values()
+            ->all();
+
+        if (empty($signatures)) {
+            $signatures[] = [
+                'name'          => $letterhead['signatoryName'] ?: 'Human Resources Department',
+                'signature_img' => null,
+                'timestamp'     => null,
+            ];
+        }
+
+        return $signatures;
+    }
+
     private function generateAndSendTransferLetter(EmployeeTransfer $transfer): void
     {
         $employee = $transfer->employee;
@@ -1847,11 +1900,9 @@ class TransferController extends Controller
             'resortLogo'     => Common::GetResortLogo($transfer->resort_id),
             'employeeName'   => $employeeName,
             'letterhead'     => $letterhead,
-            // Signatory block — prefer configured values, fall back to defaults.
-            'signatureImage' => $letterhead['signatureImage'],
-            'signatoryName'  => $letterhead['signatoryName'] ?: 'Human Resources Department',
-            'signatoryTitle' => $letterhead['signatoryTitle']
-                ?: 'For and on behalf of ' . ($resort->resort_name ?? 'the Management'),
+            // Per-approver frozen signatures — not the static, resort-wide
+            // letterhead signature (see buildTransferSignatures()).
+            'signatures'     => $this->buildTransferSignatures($transfer, $letterhead),
         ])->setPaper('a4', 'portrait');
 
         // Allow DomPDF to load local letterhead image files.
@@ -2019,19 +2070,19 @@ class TransferController extends Controller
     public function downloadTransferLetter($id)
     {
         $transfer = EmployeeTransfer::with([
-            'employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition'
+            'employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition', 'approvals'
         ])->where('resort_id', $this->resort->resort_id)->findOrFail($id);
 
         $resort = Resort::find($transfer->resort_id);
+        $letterhead = Common::getLetterheadData($transfer->resort_id);
 
         $pdf = Pdf::loadView('resorts.people.transfer.transfer_letter_pdf', [
             'transfer'       => $transfer,
             'resort'         => $resort,
             'resortLogo'     => Common::GetResortLogo($transfer->resort_id),
             'employeeName'   => optional($transfer->employee->resortAdmin)->full_name ?? 'Employee',
-            'signatureImage' => null,
-            'signatoryName'  => 'Human Resources Department',
-            'signatoryTitle' => 'For and on behalf of ' . ($resort->resort_name ?? 'the Management'),
+            'letterhead'     => $letterhead,
+            'signatures'     => $this->buildTransferSignatures($transfer, $letterhead),
         ])->setPaper('a4', 'portrait');
 
         return $pdf->download('Transfer_Letter_' . ($transfer->employee->Emp_id ?? $transfer->id) . '.pdf');
@@ -2047,7 +2098,7 @@ class TransferController extends Controller
     public function previewTransferLetter($id)
     {
         $transfer = EmployeeTransfer::with([
-            'employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition'
+            'employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition', 'approvals'
         ])->where('resort_id', $this->resort->resort_id)->findOrFail($id);
 
         $resort = Resort::find($transfer->resort_id);
@@ -2059,10 +2110,7 @@ class TransferController extends Controller
             'resortLogo'     => Common::GetResortLogo($transfer->resort_id),
             'employeeName'   => optional($transfer->employee->resortAdmin)->full_name ?? 'Employee',
             'letterhead'     => $letterhead,
-            'signatureImage' => $letterhead['signatureImage'],
-            'signatoryName'  => $letterhead['signatoryName'] ?: 'Human Resources Department',
-            'signatoryTitle' => $letterhead['signatoryTitle']
-                ?: 'For and on behalf of ' . ($resort->resort_name ?? 'the Management'),
+            'signatures'     => $this->buildTransferSignatures($transfer, $letterhead),
         ])->setPaper('a4', 'portrait');
         $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
 
@@ -2079,7 +2127,7 @@ class TransferController extends Controller
     public function sendTransferLetter($id)
     {
         $transfer = EmployeeTransfer::with([
-            'employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition'
+            'employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition', 'approvals'
         ])->where('resort_id', $this->resort->resort_id)->findOrFail($id);
 
         if ($transfer->status !== 'Approved') {

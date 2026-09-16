@@ -22,6 +22,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('learning:update-status')->dailyAt("00:00");
         $schedule->command('links:JobAdvertisment-disable-expired')->dailyAt("00:00");
         $schedule->command('links:survey-change-status')->dailyAt("00:00");
+        $schedule->command('links:survey-reminder-notification')->dailyAt('09:00');
         $schedule->command('incident:send-meeting-reminders')->dailyAt('09:00');
         $schedule->command('announcements:publish-scheduled')->daily(); // or hourly()
         $schedule->command('monthly-check-in:update-status')->hourly();
@@ -35,6 +36,7 @@ class Kernel extends ConsoleKernel
         // wrong-id-domain recipients) that otherwise just sit in the log.
         $schedule->command('notifications:failure-digest')->dailyAt('08:00');
         $schedule->command('Daily:CheckDepositRefundReminders')->dailyAt('09:15');
+        $schedule->command('accommodation:escalation-reminder')->dailyAt('09:30');
         // Command is named CheckHourly — was wired to everyMinute(), spawning
         // 60 extra cron PHP processes (each a new DB connection) per hour to
         // redundantly re-run the same 48h compliance check. Matches the

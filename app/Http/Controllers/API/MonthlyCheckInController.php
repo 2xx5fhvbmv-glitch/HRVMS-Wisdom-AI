@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use App\Models\Resort;
 use App\Models\Employee;
 use App\Models\MonthlyCheckingModel;
+use App\Models\MonthlyCheckinReview;
 use App\Models\LearningProgram;
 use App\Models\LearningRequest;
 use App\Models\LearningRequestEmployee;
@@ -571,6 +572,12 @@ class MonthlyCheckInController extends Controller
             $monthly->manager_name                          =   $createdByName ? $createdByName->first_name . ' ' . $createdByName->last_name : '';
             $monthly->position                              =   $createdByName ? $createdByName->position_title : '';
 
+            $reviewRounds                                    =   MonthlyCheckinReview::where('monthly_checkin_id', $monthly->Parent_m_id)
+                                                                    ->orderBy('round')
+                                                                    ->get();
+            $monthly->review_rounds                          =   $reviewRounds;
+            $monthly->latest_review                          =   $reviewRounds->last();
+
             $response['status']                             =   true;
             $response['message']                            =   'Monthly Check-In Details fetched successfully';
             $response['monthly_check_detail']               =   $monthly;
@@ -700,6 +707,89 @@ class MonthlyCheckInController extends Controller
             return response()->json($response);
 
         } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Employee's Acknowledge/Decline response to the current Area of
+     * Improvement round. Only the latest round can be responded to —
+     * earlier rounds are locked/read-only once a later round exists.
+     */
+    public function employeeReviewResponse(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        $validator = Validator::make($request->all(), [
+            'monthly_checkin_id'                            =>  'required',
+            'action'                                        =>  'required|in:Acknowledged,Declined',
+            'comment'                                        =>  'required',
+            'reason'                                         =>  'required_if:action,Declined',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $employee_id                                        =   $this->user->GetEmployee->id;
+
+        try {
+            $monthly                                        =   MonthlyCheckingModel::where('id', $request->monthly_checkin_id)
+                                                                    ->where('resort_id', $this->resort_id)
+                                                                    ->where('emp_id', $employee_id)
+                                                                    ->first();
+            if (!$monthly) {
+                return response()->json(['success' => false, 'message' => 'Check-in not found'], 200);
+            }
+
+            $latestRound                                    =   MonthlyCheckinReview::where('monthly_checkin_id', $monthly->id)
+                                                                    ->orderBy('round', 'desc')
+                                                                    ->first();
+            if (!$latestRound || $latestRound->employee_response !== 'Pending') {
+                return response()->json(['success' => false, 'message' => 'No review is currently awaiting your response'], 200);
+            }
+
+            DB::beginTransaction();
+            $latestRound->update([
+                'employee_comment'                          =>  $request->comment,
+                'employee_response'                         =>  $request->action,
+                'decline_reason'                             =>  $request->action === 'Declined' ? $request->reason : null,
+                'responded_at'                               =>  now(),
+            ]);
+            DB::commit();
+
+            // Same "notify the check-in's initiating HOD" pattern as
+            // postMeetingEmployeeComment() above — created_by is
+            // resort_admins.id, resolve to the employees.id notifyEmployees()
+            // requires before sending.
+            try {
+                $hodEmployee                                =   Employee::where('Admin_Parent_id', $monthly->created_by)->first();
+                if ($hodEmployee) {
+                    Common::notifyEmployees(
+                        $this->resort_id,
+                        [$hodEmployee->id],
+                        'Monthly Check-In Review '.$request->action,
+                        $this->user->first_name.' '.$this->user->last_name.' has '.strtolower($request->action).' the Area of Improvement review'.($request->action === 'Declined' ? ': '.$request->reason : '.'),
+                        'Performance',
+                        $monthly->id,
+                        'monthly-checkin-review'
+                    );
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('employeeReviewResponse notify failed: '.$e->getMessage());
+            }
+
+            $response['status']                             =   true;
+            $response['message']                            =   'Response submitted successfully';
+
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::error($e->getMessage());

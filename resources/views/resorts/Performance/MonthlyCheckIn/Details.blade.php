@@ -86,11 +86,74 @@
                     </tbody>
                 </table>
             </div>
-           
+
         </div>
+
+        @if($reviewRounds->isNotEmpty())
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">Employee Acknowledgement History</h5>
+            </div>
+            <div class="card-body">
+                @foreach($reviewRounds as $round)
+                <div class="border rounded p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <strong>History {{ $round->round }}</strong>
+                        @if($round->employee_response === 'Acknowledged')
+                            <span class="badge badge-themeGreen">Acknowledged &amp; Approved</span>
+                        @elseif($round->employee_response === 'Declined')
+                            <span class="badge badge-themeRed">Employee Declined</span>
+                        @else
+                            <span class="badge badge-themeWarning">Pending Employee Response</span>
+                        @endif
+                    </div>
+                    <div class="mb-2"><strong>Area of Improvement:</strong> {{ $round->area_of_improvement }}</div>
+                    @if($round->hod_comment)
+                        <div class="mb-2"><strong>HOD Comment:</strong> {{ $round->hod_comment }}</div>
+                    @endif
+                    @if($round->employee_response !== 'Pending')
+                        <div class="mb-2"><strong>Employee Comment:</strong> {{ $round->employee_comment }}</div>
+                    @endif
+                    @if($round->employee_response === 'Declined' && $round->decline_reason)
+                        <div class="mb-2"><strong>Decline Reason:</strong> {{ $round->decline_reason }}</div>
+                    @endif
+                </div>
+                @endforeach
+
+                @if($reviewRounds->last()->employee_response === 'Declined')
+                <button type="button" class="btn perf-btn-positive btn-sm" id="reinitiateBtn">Re-initiate Area of Improvement</button>
+                @endif
+            </div>
+        </div>
+        @endif
 
     </div>
 </div>
+
+<div class="modal fade" id="reinitiateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form id="reinitiateForm">
+            @csrf
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Re-initiate Area of Improvement</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">Area of Improvement <span class="text-danger">*</span></label>
+                    <textarea name="area_of_improvement" class="form-control mb-3" rows="3" required></textarea>
+                    <label class="form-label">Comment</label>
+                    <textarea name="comment" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn perf-btn-neutral btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn perf-btn-positive btn-sm">Send to Employee</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -145,5 +208,35 @@ function tablemonthlyCheck()
     });
 }
 
+$(document).on('click', '#reinitiateBtn', function() {
+    $('#reinitiateForm')[0].reset();
+    $('#reinitiateModal').modal('show');
+});
+
+$(document).on('submit', '#reinitiateForm', function(e) {
+    e.preventDefault();
+    $.ajax({
+        url: "{{ route('Performance.MonltyCheckIn.reinitiate', $monthly->Parent_m_id) }}",
+        type: 'POST',
+        data: $(this).serialize(),
+        success: function(res) {
+            if (res.success) {
+                $('#reinitiateModal').modal('hide');
+                toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                setTimeout(() => location.reload(), 600);
+            }
+        },
+        error: function(xhr) {
+            const errs = xhr.responseJSON?.errors;
+            if (errs) {
+                let msg = '';
+                $.each(errs, function(k, v) { msg += v + '<br>'; });
+                toastr.error(msg, 'Validation Error', { positionClass: 'toast-bottom-right' });
+            } else {
+                toastr.error(xhr.responseJSON?.message || 'Failed to re-initiate', 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        }
+    });
+});
 </script>
 @endsection

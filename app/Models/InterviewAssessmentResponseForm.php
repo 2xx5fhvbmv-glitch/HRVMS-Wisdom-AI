@@ -9,7 +9,7 @@ class InterviewAssessmentResponseForm extends Model
 {
     use HasFactory;
     protected $table="interview_assessment_responses";
-    public  $fillable = ['form_id','interviewer_id','interviewee_id', 'interviewer_signature','responses'];
+    public  $fillable = ['form_id','interviewer_id','interviewee_id', 'interviewer_signature','signature_name','signed_at','responses'];
 
     public function form()
     {

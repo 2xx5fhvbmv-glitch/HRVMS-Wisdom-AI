@@ -25,6 +25,7 @@ use App\Models\GrivanceInvestigationModel;
 use App\Models\GrivanceKeyPerson;
 use App\Http\Controllers\Controller;
 use App\Events\ResortNotificationEvent;
+use Barryvdh\DomPDF\Facade\Pdf;
 class GrivanceController extends Controller
 {    public $resort;
     public $reporting_to;
@@ -605,10 +606,17 @@ class GrivanceController extends Controller
             if($request->outcome_type == "DeliverToHr") {
                 GrivanceSubmissionModel::where('id', $request->Grievant_form_id)->update(['Assigned' => "DeliverToHr"]);
             } elseif($request->outcome_type == "Resolved") {
+                // Frozen HERE, at the moment the case is marked resolved —
+                // never re-derived later from the live ResortAdmin.signature_img.
+                $resolutionSignature = Common::snapshotSignature($this->resort->id, 'grievance-resolution', $request->Grievant_form_id);
+
                 GrivanceSubmissionModel::where('id', $request->Grievant_form_id)->update([
                     'status' => "resolved",
                     'action_taken' => base64_decode($request->action_taken),
-                    'outcome_type' => $request->outcome_type
+                    'outcome_type' => $request->outcome_type,
+                    'resolved_signature_img' => $resolutionSignature['signature_img'] ?? null,
+                    'resolved_signature_name' => $resolutionSignature['name'] ?? null,
+                    'resolved_signed_at' => $resolutionSignature['timestamp'] ?? null,
                 ]);
 
                 try {
@@ -1067,5 +1075,40 @@ class GrivanceController extends Controller
                 \Log::emergency("Message: " . $e->getMessage());
                 return response()->json(['error' => 'Failed to Delete Grievance '], 500);
             }
+    }
+
+    public function downloadGrievanceReportPdf($id)
+    {
+        $id = base64_decode($id);
+        $grievance = GrivanceSubmissionModel::with(['category', 'GetEmployee.resortAdmin'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->findOrFail($id);
+
+        if ($grievance->status !== 'resolved') {
+            abort(403, 'The grievance case is not yet resolved.');
+        }
+
+        $signatures = [];
+        if (!empty($grievance->resolved_signature_name)) {
+            $signatures[] = [
+                'name'          => $grievance->resolved_signature_name,
+                'signature_img' => $grievance->resolved_signature_img,
+                'timestamp'     => $grievance->resolved_signed_at,
+            ];
+        }
+
+        $letterhead = Common::getLetterheadData($this->resort->resort_id);
+        $resort = Resort::find($this->resort->resort_id);
+
+        $pdf = Pdf::loadView('resorts.GrievanceAndDisciplinery.grivance.report_pdf', [
+            'grievance'  => $grievance,
+            'resort'     => $resort,
+            'resortLogo' => Common::GetResortLogo($this->resort->resort_id),
+            'letterhead' => $letterhead,
+            'signatures' => $signatures,
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        return $pdf->download('Grievance_Report_' . $grievance->id . '.pdf');
     }
 }

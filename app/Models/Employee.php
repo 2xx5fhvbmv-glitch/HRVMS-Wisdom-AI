@@ -62,6 +62,8 @@ class Employee extends Model
         'employment_type',
         'nid',
         'present_address',
+        'permanent_address',
+        'current_address',
         'biometric_file',
         'tin',
         'contract_type',

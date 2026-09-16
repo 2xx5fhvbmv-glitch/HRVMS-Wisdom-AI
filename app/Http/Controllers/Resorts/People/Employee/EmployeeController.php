@@ -1910,6 +1910,8 @@ class EmployeeController extends Controller
         ];
 
         $employee->present_address = $request->present_address;
+        $employee->permanent_address = $request->permanent_address;
+        $employee->current_address = $request->current_address;
         $employee->save();
         // Update name and gender in resortAdmin
         $employee->resortAdmin->personal_phone = $request->personal_phone;

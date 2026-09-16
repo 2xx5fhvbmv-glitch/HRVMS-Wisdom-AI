@@ -13,6 +13,11 @@
                     </div>
                 </div>
                 <div class="col-auto">
+                    @if($childCycle->manager_review_status === 'completed')
+                        <a href="{{ route('Performance.Review.downloadPdf', base64_encode($childCycle->id)) }}" target="_blank" class="btn btn-theme">
+                            <i class="fa-regular fa-file-pdf"></i> Download Review Report
+                        </a>
+                    @endif
                     <a href="{{ route('Performance.Review.mySelf') }}" class="btn perf-btn-secondary">
                         <i class="fa-solid fa-arrow-left me-1"></i> Back
                     </a>

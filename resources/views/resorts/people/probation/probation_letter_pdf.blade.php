@@ -67,15 +67,24 @@
         {!! $letterContent !!}
     </div>
 
-    {{-- ── Signature block — configured e-signature image + signatory. --}}
+    {{-- ── Signature block ───────────────────────────────────────────────
+         Exit Clearance passes `$signatures` — the frozen per-person
+         signature captured at approval time (see
+         ExitClearanceController::employementCertificate()). Probation and
+         the Employment Verification letter don't pass it yet and keep
+         their existing static letterhead signature/signatory, unchanged. --}}
     <div class="signature">
-        @if(!empty($signatureImage))
-            <img src="{{ $signatureImage }}" style="height:55px;" alt="signature"><br>
+        @if(isset($signatures))
+            @include('resorts.pdf_partials._signature_block', ['signatures' => $signatures])
+        @else
+            @if(!empty($signatureImage))
+                <img src="{{ $signatureImage }}" style="height:55px;" alt="signature"><br>
+            @endif
+            <div class="sig-line">
+                <strong>{{ $signatoryName ?? 'Human Resources Department' }}</strong><br>
+                {{ $signatoryTitle ?? 'For and on behalf of ' . ($resort->resort_name ?? 'the Management') }}
+            </div>
         @endif
-        <div class="sig-line">
-            <strong>{{ $signatoryName ?? 'Human Resources Department' }}</strong><br>
-            {{ $signatoryTitle ?? 'For and on behalf of ' . ($resort->resort_name ?? 'the Management') }}
-        </div>
     </div>
 
     {{-- ── Optional branded footer image. --}}

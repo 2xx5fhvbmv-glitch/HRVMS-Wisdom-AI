@@ -327,6 +327,10 @@ class ResortAllNotificationController extends Controller
         $resort_id = $resort->resort_id;
         $notificationsType = config('settings.Notifications');
         $typeofCommets = config('settings.manningRequestLifeCycle');
+        // Always defined now (was left unset on the GM/else branches,
+        // relying on PHP's undefined-variable-is-null fallback — harmless
+        // as a value but threw a notice, and read again further down).
+        $budgetProcessStatus = null;
         if($employeeRankPosition['position'] == 'HR') {
             $Message_id = $notificationsType[4];
             $typeofCommet = $typeofCommets[1];
@@ -338,12 +342,25 @@ class ResortAllNotificationController extends Controller
         }elseif($employeeRankPosition['position'] == 'GM') {
             $Message_id = $notificationsType[9];
             $typeofCommet = $typeofCommets[3];
-            // $budgetProcessStatus = 'GM';
+            // GM has no "forward to next stage" here — GM IS the final
+            // stage. Final approval is a separate, dedicated action
+            // (BudgetController::approveBudget()), not this method.
         }else{
             $Message_id = "";
             $typeofCommet = "";
         }
-       
+
+        // Signature snapshot — HR sending to Finance, and Finance sending
+        // to GM, are each themselves a real sign-off (this person reviewed
+        // this department's budget and is forwarding it). Frozen ONCE for
+        // the whole batch (same actor, same moment) — never re-derived
+        // later from the live ResortAdmin.signature_img. GM's own final
+        // approval is a separate action (BudgetController::approveBudget())
+        // and isn't signed here.
+        $signatureFields = in_array($employeeRankPosition['position'], ['HR', 'Finance'], true)
+            ? Common::snapshotSignature($resort->id, 'budget-approval', $resort_id . '-' . $request->year . '-' . $employeeRankPosition['position'])
+            : [];
+
         DB::beginTransaction();
         try{
             $budgets = ManningResponse::where('resort_id', $resort_id)
@@ -351,9 +368,17 @@ class ResortAllNotificationController extends Controller
                                     ->get();
 
                 foreach ($budgets as $key => $budget) {
-                    $budget->update([
-                        'budget_process_status' => $budgetProcessStatus,
-                    ]);
+                    // $budgetProcessStatus is only ever set for the HR/
+                    // Finance branches above — GM has no "forward to next
+                    // stage" here (GM IS the final stage; that's
+                    // approveBudget()), so this used to unconditionally
+                    // write the GM branch's undefined variable (null),
+                    // silently blanking an already-set status.
+                    if ($budgetProcessStatus !== null) {
+                        $budget->update([
+                            'budget_process_status' => $budgetProcessStatus,
+                        ]);
+                    }
 
                     $BudgetStatus =BudgetStatus::create([
                         'message_id'=>$Message_id,
@@ -361,6 +386,9 @@ class ResortAllNotificationController extends Controller
                         'Budget_id'=>$budget->id,
                         'resort_id'=>$resort_id,
                         'comments'=>$typeofCommet,
+                        'signature_img' => $signatureFields['signature_img'] ?? null,
+                        'signature_name' => $signatureFields['name'] ?? null,
+                        'signed_at' => $signatureFields['timestamp'] ?? null,
                     ]);
 
                     // Was commented out — the old call only ever hit

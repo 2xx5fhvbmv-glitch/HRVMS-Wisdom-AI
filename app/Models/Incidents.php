@@ -44,6 +44,9 @@ class Incidents extends Model
         'modified_by',
         'resolved_by',
         'resolved_at',
+        'gm_signature_img',
+        'gm_signature_name',
+        'gm_signed_at',
     ];
     public static function boot(){
         parent::boot();

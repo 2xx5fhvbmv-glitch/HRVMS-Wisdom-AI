@@ -13,6 +13,7 @@ class EmployeePromotionApproval extends Model
 
     protected $fillable = [
         'promotion_id','status','approval_rank','approved_by','remarks','approved_at',
+        'signature_img','signature_name','signed_at',
     ];
 
     protected $casts = [

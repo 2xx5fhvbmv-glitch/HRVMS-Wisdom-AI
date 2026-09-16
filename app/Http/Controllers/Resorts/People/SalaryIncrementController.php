@@ -15,6 +15,8 @@ use App\Models\TrainingSchedule;
 use App\Models\PeopleSalaryIncrement;
 use App\Models\PeopleSalaryIncrementStatus;
 use App\Models\ResortDepartment;
+use App\Models\ProbationLetterTemplate;
+use App\Models\Resort;
 use App\Events\ResortNotificationEvent;
 use App\Helpers\Common;
 use Carbon\Carbon;
@@ -1422,12 +1424,29 @@ class SalaryIncrementController extends Controller
                         }
                         
                         if ($update_key == true) {
+                            // Signature snapshot — only an Approve represents
+                            // this person actually signing off. Frozen HERE,
+                            // at the moment $this->resort (the real logged-in
+                            // actor) approves — never re-derived later from
+                            // the live ResortAdmin.signature_img, so the
+                            // increment letter keeps showing the exact
+                            // signature used even if this admin later
+                            // re-uploads a new one or leaves. Same pattern
+                            // as Transfer/Promotion.
+                            $signatureFields = [];
+                            if ($status === 'Approved') {
+                                $signatureFields = Common::snapshotSignature($this->resort->id, 'salary-increment', $increment->id . '-' . $incrementData['approval_rank']);
+                            }
+
                             $peopleSalaryIncrementStatus->update([
                                 'status' => $status,
                                 'approved_by' => $incrementData['approver']->id,
                                 'action_date' => now(),
                                 'remarks' => $request->remarks,
                                 'reject_reason' => $request->rejected_reason,
+                                'signature_img' => $signatureFields['signature_img'] ?? null,
+                                'signature_name' => $signatureFields['name'] ?? null,
+                                'signed_at' => $signatureFields['timestamp'] ?? null,
                             ]);
 
 
@@ -1755,6 +1774,129 @@ class SalaryIncrementController extends Controller
             'status' => 'error',
             'message' => 'try agin successfully.'
         ]);
+    }
+
+    /**
+     * Per-approver signature blocks for one employee's Salary Increment
+     * letter — one entry per Finance/GM approval that recorded a frozen
+     * signature (Common::snapshotSignature(), captured in updateStatus()
+     * at the moment each approver acted). Never re-derives from the live
+     * ResortAdmin.signature_img. Same pattern as
+     * TransferController::buildTransferSignatures().
+     *
+     * Falls back to a single letterhead-style entry (no image, typed name
+     * only) so the letter's signature section is never silently blank.
+     */
+    private function buildSalaryIncrementSignatures(PeopleSalaryIncrement $increment, array $letterhead): array
+    {
+        $signatures = PeopleSalaryIncrementStatus::where('people_salary_increment_id', $increment->id)
+            ->where('status', 'Approved')
+            ->whereNotNull('signature_name')
+            ->orderBy('action_date')
+            ->get()
+            ->map(fn ($approval) => [
+                'name'          => $approval->signature_name,
+                'signature_img' => $approval->signature_img,
+                'timestamp'     => $approval->signed_at,
+            ])
+            ->values()
+            ->all();
+
+        if (empty($signatures)) {
+            $signatures[] = [
+                'name'          => $letterhead['signatoryName'] ?: 'Human Resources Department',
+                'signature_img' => null,
+                'timestamp'     => null,
+            ];
+        }
+
+        return $signatures;
+    }
+
+    /**
+     * Send the individual employee's Salary Increment letter — separate
+     * from downloadByFormate()'s bulk multi-employee summary export, which
+     * has no per-person signature (many different employees/approvers on
+     * one table, nothing to sign). HR authors the letter content via the
+     * Letter Template config (People > Configuration > Letter Templates),
+     * type = 'salary_increment' — same free-text `type` mechanism already
+     * used for Promotion/Probation/Experience letters.
+     */
+    public function sendSalaryIncrementLetter(Request $request)
+    {
+        $increment = PeopleSalaryIncrement::with(['employee.resortAdmin', 'employee.position', 'employee.department'])
+            ->where('id', $request->incrementId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+
+        if (!$increment) {
+            return response()->json(['success' => false, 'message' => 'Salary increment not found.'], 404);
+        }
+
+        if ($increment->status !== 'Approved') {
+            return response()->json(['success' => false, 'message' => 'Letter can only be sent once the increment is fully approved.'], 422);
+        }
+
+        $template = ProbationLetterTemplate::where('resort_id', $this->resort->resort_id)
+            ->where('type', 'salary_increment')
+            ->first();
+
+        if (!$template) {
+            return response()->json(['success' => false, 'message' => 'Salary Increment letter template not found for this resort. Please create one in Letter Templates (type: salary_increment).'], 404);
+        }
+
+        $resort = Resort::findOrFail($increment->resort_id);
+
+        $placeholders = [
+            '{{employee_name}}'    => (string) optional($increment->employee->resortAdmin)->full_name,
+            '{{employee_code}}'    => (string) $increment->employee->Emp_id,
+            '{{position_title}}'   => (string) optional($increment->employee->position)->position_title,
+            '{{department_name}}'  => (string) optional($increment->employee->department)->name,
+            '{{resort_name}}'      => (string) $resort->resort_name,
+            '{{date}}'             => now()->format('d M Y'),
+            '{{previous_salary}}'  => (string) $increment->previous_salary,
+            '{{new_salary}}'       => (string) $increment->new_salary,
+            '{{increment_amount}}' => (string) $increment->increment_amount,
+            '{{increment_type}}'   => (string) $increment->increment_type,
+            '{{effective_date}}'   => $increment->effective_date
+                ? Carbon::parse($increment->effective_date)->format('d M Y')
+                : '',
+        ];
+
+        $letterContent = strtr($template->content, $placeholders);
+
+        // Same shared letterhead + per-approver-signature wrapper Exit
+        // Clearance/Promotion/Probation/Employment Verification already
+        // use, instead of a bare unwrapped PDF.
+        $letterhead = Common::getLetterheadData($increment->resort_id);
+        $pdf = \PDF::loadView('resorts.people.probation.probation_letter_pdf', [
+            'letterContent'  => $letterContent,
+            'letterhead'     => $letterhead,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($increment->resort_id),
+            'signatures'     => $this->buildSalaryIncrementSignatures($increment, $letterhead),
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        $pdfPath = 'letters/salary-increment_' . $increment->id . '.pdf';
+        \Illuminate\Support\Facades\Storage::put($pdfPath, $pdf->output());
+
+        $increment->letter_dispatched = 'Yes';
+        $increment->save();
+
+        $email = optional($increment->employee->resortAdmin)->email;
+        if (empty($email)) {
+            return response()->json(['success' => false, 'message' => "Cannot send — the employee doesn't have an email on file."], 422);
+        }
+
+        try {
+            \Illuminate\Support\Facades\Mail::to($email)->send(new \App\Mail\SalaryIncrementLetterMail($increment, $pdfPath, $resort));
+        } catch (\Throwable $e) {
+            \Log::error('Salary increment letter email failed for increment #' . $increment->id . ': ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Letter generated but the email failed to send.'], 500);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Salary increment letter sent successfully.']);
     }
 
     public function incrementHistory (Request $request){

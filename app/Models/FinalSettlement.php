@@ -16,7 +16,12 @@ class FinalSettlement extends Model
         'employee_id','pension','tax','leave_balance','leave_encashment',
         'loan_payment','basic_salary','worked_days','service_charge','total_earnings',
         'total_deductions','net_pay','payment_mode','last_working_date',
-        'doc_date','reference_no','status'
+        'doc_date','reference_no','status',
+        // Were missing here — submit() has been passing these to update()
+        // since finalize existed, but Eloquent's mass-assignment guard
+        // silently dropped both every time (confirmed: no other code path
+        // sets them either).
+        'finalized_at','finalized_by',
     ];
 
     public static function boot(){
@@ -60,6 +65,11 @@ class FinalSettlement extends Model
     public function earnings()
     {
         return $this->hasMany(FinalSettlementEarnings::class, 'final_settlement_id');
+    }
+
+    public function approvals()
+    {
+        return $this->hasMany(FinalSettlementApproval::class, 'final_settlement_id')->orderBy('step_order');
     }
 }
 ?>

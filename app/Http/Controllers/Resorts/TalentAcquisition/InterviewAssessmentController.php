@@ -13,6 +13,7 @@ use DB;
 use App\Helpers\Common;
 use Carbon\Carbon;
 use URL;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class InterviewAssessmentController extends Controller
 {
@@ -349,7 +350,14 @@ class InterviewAssessmentController extends Controller
                 }
                 return redirect()->back()->with('error', 'Authorized signature is missing. Please upload it first from your profile page.');
             }
-            $signature = $this->resort->signature_img;
+            // Frozen HERE, at the moment this interviewer submits — never
+            // re-derived later from the live ResortAdmin.signature_img, so
+            // the response PDF keeps showing the exact signature used even
+            // if this admin later re-uploads a new one or leaves. Was
+            // previously just re-reading the live signature_img path on
+            // every render instead of freezing a copy.
+            $signatureFields = Common::snapshotSignature($this->resort->id, 'interview-assessment', $formId . '-' . $interviewer . '-' . $validated['interviewee_id']);
+            $signature = $signatureFields['signature_img'] ?? null;
 
             // Initialize an empty responses array
             $responses = [];
@@ -445,6 +453,8 @@ class InterviewAssessmentController extends Controller
             if ($existing) {
                 $existing->update([
                     'interviewer_signature' => $signature,
+                    'signature_name' => $signatureFields['name'] ?? null,
+                    'signed_at' => $signatureFields['timestamp'] ?? null,
                     'responses' => json_encode($responses),
                 ]);
                 $message = 'Response updated successfully!';
@@ -454,6 +464,8 @@ class InterviewAssessmentController extends Controller
                     'interviewer_id' => $interviewer,
                     'interviewee_id' => $validated['interviewee_id'],
                     'interviewer_signature' => $signature,
+                    'signature_name' => $signatureFields['name'] ?? null,
+                    'signed_at' => $signatureFields['timestamp'] ?? null,
                     'responses' => json_encode($responses),
                 ]);
                 $message = 'Response saved successfully!';
@@ -505,6 +517,60 @@ class InterviewAssessmentController extends Controller
 
             // return redirect()->back()->withErrors(['error' => 'Failed to load the response. ' . $e->getMessage()]);
         }
+    }
+
+    /**
+     * Download the submitted response as a PDF — the interviewer's frozen
+     * signature (Common::snapshotSignature(), captured in saveResponse()
+     * at the moment they submitted) is read straight off the response
+     * row, never re-derived from the live ResortAdmin.signature_img.
+     * Falls back to a typed-name-only entry for responses submitted
+     * before this feature existed.
+     */
+    public function downloadResponsePdf($formId, $responseId)
+    {
+        $formId = base64_decode($formId);
+        $responseId = base64_decode($responseId);
+
+        $response = InterviewAssessmentResponseForm::with(['interviewer', 'interviewee', 'form'])
+            ->where('id', $responseId)
+            ->where('form_id', $formId)
+            ->whereHas('form', function ($q) {
+                $q->where('resort_id', $this->resort->resort_id);
+            })
+            ->firstOrFail();
+
+        $responses = json_decode($response->responses, true) ?: [];
+        $form = InterviewAssessmentForm::where('resort_id', $this->resort->resort_id)->findOrFail($formId);
+        $formStructure = json_decode($form->form_structure, true) ?: [];
+
+        $resort = Resort::find($this->resort->resort_id);
+        $letterhead = Common::getLetterheadData($this->resort->resort_id);
+
+        $signatures = !empty($response->signature_name)
+            ? [[
+                'name'          => $response->signature_name,
+                'signature_img' => $response->interviewer_signature,
+                'timestamp'     => $response->signed_at,
+            ]]
+            : [[
+                'name'          => $letterhead['signatoryName'] ?: 'Human Resources Department',
+                'signature_img' => null,
+                'timestamp'     => null,
+            ]];
+
+        $pdf = Pdf::loadView('resorts.talentacquisition.interview-assessment.response_pdf', [
+            'response'       => $response,
+            'responses'      => $responses,
+            'formStructure'  => $formStructure,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($this->resort->resort_id),
+            'letterhead'     => $letterhead,
+            'signatures'     => $signatures,
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        return $pdf->download('Interview_Assessment_' . $response->id . '.pdf');
     }
 
 }
