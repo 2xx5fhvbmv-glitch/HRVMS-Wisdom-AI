@@ -123,6 +123,31 @@
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                            {{-- §24 — People Management category badge/filter: same
+                                 Permanent/Casual/Intern bucket as Manning/Budget/
+                                 Workforce Planning (Common::manningCategory()). --}}
+                            <select class="form-select dd-native-select" id="categoryFilter">
+                                <option value="">Category</option>
+                                <option value="Permanent">Permanent</option>
+                                <option value="Casual">Casual</option>
+                                <option value="Intern">Intern</option>
+                            </select>
+                            <div class="dd" data-target="#categoryFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Category</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Category">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Category</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Permanent"><span class="dd-nm">Permanent</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Casual"><span class="dd-nm">Casual</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Intern"><span class="dd-nm">Intern</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select class="form-select dd-native-select" id="locationFilter">
                                 <option value="">Location</option>
                                 <option value="Malé">Malé</option>
@@ -405,7 +430,7 @@
             $('.btn-grid').hasClass('active') ? loadGridView() : getEmpTable();
         });
 
-        $('#deptFilter, #positionFilter, #statusFilter, #locationFilter').on('change', function () {
+        $('#deptFilter, #positionFilter, #statusFilter, #locationFilter, #categoryFilter').on('change', function () {
             $('.btn-grid').hasClass('active') ? loadGridView() : getEmpTable();
         });
 
@@ -445,6 +470,7 @@
                         position_id: $('#positionFilter').val(),
                         status: $('#statusFilter').val(),
                         location: $('#locationFilter').val(),
+                        category: $('#categoryFilter').val(),
                         searchTerm: $('#search-input').val()
                     },
                     success: function (response) {
@@ -651,6 +677,7 @@
             $('#statusFilter').val('').trigger('change');
             $('#positionFilter').val('').trigger('change');
             $('#locationFilter').val('').trigger('change');
+            $('#categoryFilter').val('').trigger('change');
             loadGridView();
             getEmpTable();
         });
@@ -665,6 +692,7 @@
                 position_id: $('#positionFilter').val(),
                 status: $('#statusFilter').val(),
                 location: $('#locationFilter').val(),
+                category: $('#categoryFilter').val(),
                 searchTerm: $('#search-input').val(),
             },
             success: function (res) {
@@ -715,6 +743,7 @@
                     d.searchTerm = $('#search-input').val();
                     d.status = $('#statusFilter').val();
                     d.location = $('#locationFilter').val();
+                    d.category = $('#categoryFilter').val();
                 }
             },
             columns: [
