@@ -104,6 +104,9 @@ class Employee extends Model
         'longitude',
         'main_rank',
         'benefit_grid_level',
+        'vacancy_id',
+        'college_institute_name',
+        'service_provider_name',
     ];
 
     public static function boot(){

@@ -1188,6 +1188,189 @@ class VacancyController extends Controller
         return view("resorts.talentacquisition.vacancies.hrAllBacancies",compact('page_title','casualInternOnly'));
     }
 
+    /**
+     * §23 — same approval-status computation as the inline block inside
+     * getAllVacancies()'s $query branch above (not extracted from there to
+     * avoid touching working code outside this change's scope).
+     */
+    private function isVacancyApproved(Vacancies $vacancy): bool
+    {
+        $parent = $vacancy->TAnotificationParent->first();
+        if (!$parent) {
+            return false;
+        }
+        $gmSt = null;
+        foreach ($parent->TAnotificationChildren as $ch) {
+            if ($ch->Approved_By == 8) $gmSt = $ch->status;
+        }
+        return $gmSt === 'Approved' || $gmSt === 'ForwardedToNext';
+    }
+
+    /**
+     * §23 — options to populate the "Mark as Recruited/Hired" modal for one
+     * Casual/Intern vacancy: read-only prefill (department/position/rank/
+     * employee type) plus the two pickers the modal needs live data for
+     * (reporting manager, vendor). Reporting-manager query mirrors create()
+     * above exactly (same SUP/HOD-own-department, MGR/EXCOM/GM-any-department
+     * rule), scoped to the vacancy's own department instead of the logged-in
+     * admin's.
+     */
+    public function getRecruitFormOptions($id)
+    {
+        $vacancy = Vacancies::with(['Getdepartment', 'Getposition'])
+            ->where('Resort_id', $this->resort->resort_id)
+            ->findOrFail($id);
+
+        if (!in_array($vacancy->employee_type, ['Casual/Agency', 'Trainee / Intern'], true)) {
+            return response()->json(['success' => false, 'message' => 'Not a Casual/Intern vacancy.'], 422);
+        }
+        if (!$this->isVacancyApproved($vacancy)) {
+            return response()->json(['success' => false, 'message' => 'This vacancy has not completed its approval chain yet.'], 422);
+        }
+
+        $targetRanks = [
+            array_search('SUP', config('settings.Position_Rank')),
+            array_search('HOD', config('settings.Position_Rank')),
+            array_search('MGR', config('settings.Position_Rank')),
+            array_search('EXCOM', config('settings.Position_Rank')),
+            array_search('GM', config('settings.Position_Rank')),
+        ];
+        $deptRanks = [
+            array_search('SUP', config('settings.Position_Rank')),
+            array_search('HOD', config('settings.Position_Rank')),
+        ];
+        $reportingEmployees = DB::table('employees')
+            ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
+            ->where('employees.resort_id', $this->resort->resort_id)
+            ->where('employees.status', 'Active')
+            ->whereIn('employees.rank', $targetRanks)
+            ->where(function ($query) use ($vacancy, $deptRanks) {
+                $query->whereIn('employees.rank', $deptRanks)
+                      ->where('employees.Dept_id', $vacancy->department)
+                      ->orWhereNotIn('employees.rank', $deptRanks);
+            })
+            ->select('employees.id', 'resort_admins.first_name', 'resort_admins.last_name')
+            ->get();
+
+        $serviceProviders = ServiceProvider::where('resort_id', $this->resort->resort_id)
+            ->orderBy('name')->pluck('name');
+
+        return response()->json([
+            'success' => true,
+            'vacancy' => [
+                'id' => $vacancy->id,
+                'department_name' => $vacancy->Getdepartment->name ?? '',
+                'position_title' => $vacancy->Getposition->position_title ?? '',
+                'employee_type' => $vacancy->employee_type,
+                'is_intern' => $vacancy->employee_type === 'Trainee / Intern',
+                'reporting_to' => $vacancy->reporting_to,
+                'service_provider_name' => $vacancy->service_provider_name,
+            ],
+            'reporting_managers' => $reportingEmployees,
+            'service_providers' => $serviceProviders,
+        ]);
+    }
+
+    /**
+     * §23 — creates the Employee (+ login-less ResortAdmin identity record,
+     * since employees.Admin_Parent_id is how every name display in this app
+     * resolves an employee's name) for a Casual/Intern vacancy, the same way
+     * OfflineInterviewController::convertToEmployee() does for the offline-
+     * interview hiring path. No email/password is collected or set here —
+     * this hire gets no portal login, matching §24's "visibility only"
+     * scope for Casual/Intern staff.
+     *
+     * No separate "close vacancy" step: filled-vs-vacant counts everywhere
+     * already read live off employees.Dept_id + employment_type (the §13
+     * category-scoping fix), so this Employee row alone is what moves a
+     * position from vacant to filled.
+     */
+    public function markAsRecruited(Request $request, $id)
+    {
+        $vacancy = Vacancies::where('Resort_id', $this->resort->resort_id)->findOrFail($id);
+
+        if (!in_array($vacancy->employee_type, ['Casual/Agency', 'Trainee / Intern'], true)) {
+            return response()->json(['success' => false, 'message' => 'Not a Casual/Intern vacancy.'], 422);
+        }
+        if (!$this->isVacancyApproved($vacancy)) {
+            return response()->json(['success' => false, 'message' => 'This vacancy has not completed its approval chain yet.'], 422);
+        }
+
+        $isIntern = $vacancy->employee_type === 'Trainee / Intern';
+
+        $validated = $request->validate([
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'passport_number' => 'required|string|max:255',
+            'nationality' => 'required|string|max:255',
+            'reporting_to' => 'required|integer|exists:employees,id',
+            'college_institute_name' => $isIntern ? 'required|string|max:255' : 'nullable|string|max:255',
+            'service_provider' => 'nullable|string|max:255',
+            'new_service_provider' => 'nullable|string|max:255',
+        ]);
+
+        $limitError = Common::employeeLimitError($this->resort->resort_id);
+        if ($limitError) {
+            return response()->json(['success' => false, 'message' => $limitError], 422);
+        }
+
+        $serviceProviderName = null;
+        if (!empty($validated['new_service_provider'])) {
+            ServiceProvider::firstOrCreate([
+                'name' => $validated['new_service_provider'],
+                'resort_id' => $this->resort->resort_id,
+            ]);
+            $serviceProviderName = $validated['new_service_provider'];
+        } elseif (!empty($validated['service_provider'])) {
+            $serviceProviderName = $validated['service_provider'];
+        }
+
+        DB::beginTransaction();
+        try {
+            $resortAdmin = ResortAdmin::create([
+                'resort_id' => $this->resort->resort_id,
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'is_employee' => 1,
+                'status' => 'active',
+            ]);
+
+            // Same enum mapping OfflineInterviewController::convertToEmployee()
+            // uses — must stay consistent with Common::manningCategoryForVacancy().
+            $employmentType = $isIntern ? 'Internship' : 'Casual';
+
+            $employee = Employee::create([
+                'resort_id' => $this->resort->resort_id,
+                'Emp_id' => Common::nextEmployeeId($this->resort->resort_id),
+                'Admin_Parent_id' => $resortAdmin->id,
+                'Dept_id' => $vacancy->department,
+                'Position_id' => $vacancy->position,
+                'division_id' => $vacancy->division ?: 0,
+                'Section_id' => $vacancy->section ?: null,
+                'reporting_to' => $validated['reporting_to'],
+                'rank' => $vacancy->rank,
+                'is_employee' => 1,
+                'status' => 'Onboarding',
+                'employment_type' => $employmentType,
+                'passport_number' => $validated['passport_number'],
+                'nationality' => $validated['nationality'],
+                'college_institute_name' => $isIntern ? $validated['college_institute_name'] : null,
+                'service_provider_name' => $serviceProviderName,
+                'basic_salary' => $vacancy->propsed_salary ?: $vacancy->budgeted_salary,
+                'basic_salary_currency' => 'USD',
+                'vacancy_id' => $vacancy->id,
+            ]);
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('markAsRecruited failed: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Could not create the employee record.'], 500);
+        }
+
+        return response()->json(['success' => true, 'employee_id' => $employee->id]);
+    }
+
     public function getAllVacancies()
     {
 
@@ -1335,7 +1518,19 @@ class VacancyController extends Controller
                     $badgeClass = $colors[$status] ?? 'bg-secondary';
                     return '<span class="badge ' . $badgeClass . '">' . htmlspecialchars($status, ENT_QUOTES, 'UTF-8') . '</span>';
                 })
-          ->rawColumns(['Department', 'Position', 'EmployeeType','Required','Budget','ReportingTo','rank_name','approval_status'])
+                ->addColumn('recruit_action', function ($row) {
+                    // §23 — only Casual/Intern vacancies that have cleared
+                    // approval get the button; the CasualInternVacancies
+                    // page is the only caller that renders this column.
+                    $status = $row->approval_status ?? '';
+                    $type = $row->employee_type ?? ($row->EmployeeType ?? '');
+                    if ($status !== 'Approved' || !in_array($type, ['Casual/Agency', 'Trainee / Intern'], true)) {
+                        return '';
+                    }
+                    return '<button type="button" class="btn ta-btn-primary btn-sm mark-recruited-btn" data-vacancy-id="'
+                        . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '">Mark as Recruited</button>';
+                })
+          ->rawColumns(['Department', 'Position', 'EmployeeType','Required','Budget','ReportingTo','rank_name','approval_status','recruit_action'])
           ->make(true);
 
 
