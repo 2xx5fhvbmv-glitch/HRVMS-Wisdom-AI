@@ -26,6 +26,13 @@
             </div>
         </div>
 
+        <div class="fp-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
+            @foreach (['Permanent' => 'Permanent', 'Casual' => 'Casual', 'Intern' => 'Intern'] as $catValue => $catLabel)
+                <button type="button" class="btn btn-sm fp-tab-btn {{ $catValue === 'Permanent' ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}"
+                        data-category="{{ $catValue }}" onclick="fpSwitchCategory('{{ $catValue }}', this)">{{ $catLabel }}</button>
+            @endforeach
+        </div>
+
         <div>
             <div class="card">
 
@@ -139,6 +146,9 @@
         order: [[3, 'desc']],
         ajax: {
             url: '{{ route("workforceplan.filledpositions.data") }}',
+            data: function(d) {
+                d.employment_type = window.fpCurrentCategory || 'Permanent';
+            },
             dataSrc: function(json) {
                 // ✅ Calculate headcount for current page only
                 let total = 0;
@@ -161,8 +171,19 @@
         ]
     });
 
+    window.fpCurrentCategory = 'Permanent';
+    window.fpFilledPositionTable = FilledPositionTable;
 
 });
+
+    function fpSwitchCategory(category, btn) {
+        window.fpCurrentCategory = category;
+        document.querySelectorAll('.fp-tab-btn').forEach(b => { b.classList.remove('wfp-btn-primary'); b.classList.add('wfp-btn-secondary'); });
+        btn.classList.remove('wfp-btn-secondary');
+        btn.classList.add('wfp-btn-primary');
+        window.fpFilledPositionTable.ajax.reload();
+    }
+
     function loadEmployeeNames(positionId) {
         // Clear previous content
         $('#employee-names-list').html('');
@@ -171,7 +192,7 @@
         $.ajax({
             url: '{{ route("workforceplan.employee.names") }}', // Adjust the route if needed
             type: 'GET',
-            data: { position_id: positionId },
+            data: { position_id: positionId, employment_type: window.fpCurrentCategory || 'Permanent' },
             success: function(data) {
                 let employeeContent = '';
                 if (data.length > 0) {

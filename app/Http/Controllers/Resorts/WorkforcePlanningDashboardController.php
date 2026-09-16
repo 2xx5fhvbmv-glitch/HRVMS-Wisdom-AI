@@ -742,11 +742,32 @@ class WorkforcePlanningDashboardController extends Controller
         // department only. Was previously returning every position in the
         // resort to non-HR HOD/EXCOM users.
         $scopedDeptIds = Common::getScopedDepartmentIds();
+        // Same 3-way category as every other Manning/Budget page — this
+        // page gets the same tab treatment for consistency rather than
+        // staying Permanent-only while everything else in the module
+        // already split. Defaults to 'Permanent' so an existing caller
+        // that doesn't send this behaves exactly as before.
+        $employmentType = $request->input('employment_type', 'Permanent');
+        $employmentTypeValues = Common::manningCategoryEmploymentTypes($employmentType);
 
         if ($request->ajax())
         {
+            // Was a raw correlated subquery with $resort_id string-
+            // interpolated directly into the SQL — worked only because
+            // that value is a cast int from the authenticated user, never
+            // user input, but still not bound. Rebuilt as a LEFT JOIN +
+            // COUNT + GROUP BY: real bindings throughout (no DB::raw with
+            // an interpolated value), and it's what let the category
+            // filter join in cleanly in the first place. Count itself is
+            // unchanged otherwise — still every employee row for the
+            // position regardless of status, matching the original.
             $resort_positions = DB::table('resort_positions as p')
                 ->leftJoin('resort_departments as rd', 'p.dept_id', '=', 'rd.id')
+                ->leftJoin('employees as e', function ($join) use ($resort_id, $employmentTypeValues) {
+                    $join->on('e.Position_id', '=', 'p.id')
+                        ->where('e.resort_id', '=', $resort_id)
+                        ->whereIn('e.employment_type', $employmentTypeValues);
+                })
                 ->where('p.resort_id', '=', $resort_id)
                 ->when(is_array($scopedDeptIds), fn ($q) => $q->whereIn('p.dept_id', $scopedDeptIds))
                 ->select(
@@ -754,8 +775,9 @@ class WorkforcePlanningDashboardController extends Controller
                     'p.position_title',
                     'rd.name as department',
                     'p.created_at',
-                    DB::raw("(SELECT COUNT(*) FROM employees e WHERE e.Position_id = p.id AND e.resort_id = {$resort_id}) as no_of_employees")
+                    DB::raw('COUNT(e.id) as no_of_employees')
                 )
+                ->groupBy('p.id', 'p.position_title', 'rd.name', 'p.created_at')
                 ->orderBy('p.created_at', 'desc');
 
             return datatables()
@@ -775,11 +797,16 @@ class WorkforcePlanningDashboardController extends Controller
         // non-HR/HOD user can't surface employees for a position that
         // belongs to another dept by passing a different position_id.
         $scopedDeptIds = Common::getScopedDepartmentIds();
+        // Same category as get_filledpositions()'s count above — the
+        // drill-down name list must match whichever tab's count the user
+        // clicked through from.
+        $employmentType = $request->input('employment_type', 'Permanent');
 
         $employees = Employee::where('Position_id', $positionId)
             ->with('resortAdmin:id,first_name,last_name')
             ->where('resort_id', $resortId)
             ->where('status', 'Active')
+            ->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType))
             ->when(is_array($scopedDeptIds), fn ($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->get('Admin_Parent_id');
 
