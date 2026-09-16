@@ -32,7 +32,7 @@
                             <div class="ie-badge">1</div>
                             <div class="ie-body">
                                 <div class="ie-t">Download Template</div>
-                                <div class="ie-d">For Casual/Agency and Intern/Trainee staff already on-site — a lighter template than the Master Employee Import (name, ID, nationality, mobile, department, position, reporting manager, employment type).</div>
+                                <div class="ie-d">For Casual/Agency and Intern/Trainee staff already on-site — a lighter template than the Master Employee Import (name, ID, nationality, mobile, department, position, reporting manager, employment type, and an optional work permit number).</div>
                                 <div class="ie-controls">
                                     <a href="{{ route('resort.employee.downloadCasualInternTemplate') }}" class="ie-btn ie-ghost">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>

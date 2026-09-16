@@ -41,6 +41,7 @@ class CasualInternEmployeeTemplateExport implements FromCollection, WithHeadings
             'EmploymentType',
             'Email',
             'Gender',
+            'WorkPermitNumber',
         ];
     }
 
@@ -49,7 +50,7 @@ class CasualInternEmployeeTemplateExport implements FromCollection, WithHeadings
         return collect([[
             'firstname' => '', 'lastname' => '', 'passportidnumber' => '', 'nationality' => '',
             'mobilenumber' => '', 'department' => '', 'position' => '', 'reportingmanagerempid' => '',
-            'employmenttype' => '', 'email' => '', 'gender' => '',
+            'employmenttype' => '', 'email' => '', 'gender' => '', 'workpermitnumber' => '',
         ]]);
     }
 
