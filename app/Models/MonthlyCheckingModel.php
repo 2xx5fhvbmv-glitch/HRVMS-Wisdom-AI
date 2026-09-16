@@ -34,4 +34,14 @@ class MonthlyCheckingModel extends Model
         return $this->belongsTo(Employee::class, 'emp_id');
     }
 
+    public function reviews()
+    {
+        return $this->hasMany(MonthlyCheckinReview::class, 'monthly_checkin_id')->orderBy('round');
+    }
+
+    public function latestReview()
+    {
+        return $this->hasOne(MonthlyCheckinReview::class, 'monthly_checkin_id')->latestOfMany('round');
+    }
+
 }

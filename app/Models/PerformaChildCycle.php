@@ -14,6 +14,8 @@ class PerformaChildCycle extends Model
         'self_review_status', 'manager_review_status',
         'self_review_data', 'manager_review_data',
         'Self_review_date', 'Manager_review_date',
+        'self_signature_img', 'self_signature_name', 'self_signed_at',
+        'manager_signature_img', 'manager_signature_name', 'manager_signed_at',
     ];
 
 }

@@ -24,6 +24,7 @@ use App\Events\ResortNotificationEvent;
 use App\Models\DisciplinaryInvestigationChild;
 use App\Models\DisciplinaryInvestigationParent;
 use App\Models\DisciplinaryEmailmodel;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class DisciplinaryController extends Controller
 {
@@ -683,8 +684,17 @@ class DisciplinaryController extends Controller
             $disciplinary_investigation->resolution_date = $request->resolution_date;
             $disciplinary_investigation->investigation_file = $Files;
             $disciplinary_investigation->outcome_type = $request->outcome_type;
+
+            // Frozen HERE, at the moment this committee member submits
+            // their investigation entry — never re-derived later from the
+            // live ResortAdmin.signature_img.
+            $investigationSignature = Common::snapshotSignature($this->resort->id, 'disciplinary-investigation', $id . '-' . $committee_member_id . '-' . now()->timestamp);
+            $disciplinary_investigation->signature_img = $investigationSignature['signature_img'] ?? null;
+            $disciplinary_investigation->signature_name = $investigationSignature['name'] ?? null;
+            $disciplinary_investigation->signed_at = $investigationSignature['timestamp'] ?? null;
+
             $disciplinary_investigation->save();
-            
+
             if($request->outcome_type == "DeliverToHr") {
                 disciplinarySubmit::where("resort_id", $this->resort->resort_id)
                     ->where("Disciplinary_id", $id)
@@ -786,9 +796,53 @@ class DisciplinaryController extends Controller
         }
     }
 
+    public function downloadDisciplinaryReportPdf($id)
+    {
+        $id = base64_decode($id);
+        $case = disciplinarySubmit::with(['category', 'offence', 'action', 'GetEmployee.resortAdmin'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->findOrFail($id);
 
-  
+        if ($case->status !== 'resolved') {
+            abort(403, 'The disciplinary case is not yet resolved.');
+        }
 
+        $investigations = DisciplinaryInvestigationParent::where('resort_id', $this->resort->resort_id)
+            ->where('Disciplinary_id', $case->Disciplinary_id)
+            ->orderBy('created_at')
+            ->get();
+
+        // One frozen signature per committee member — the latest entry
+        // they submitted, not every intermediate one.
+        $signatures = $investigations
+            ->filter(fn($row) => !empty($row->signature_name))
+            ->unique('Committee_member_id')
+            ->map(fn($row) => [
+                'name'          => $row->signature_name,
+                'signature_img' => $row->signature_img,
+                'timestamp'     => $row->signed_at,
+            ])
+            ->values()
+            ->all();
+
+        $children = DisciplinaryInvestigationChild::whereIn('Disciplinary_P_id', $investigations->pluck('id'))->get();
+
+        $letterhead = Common::getLetterheadData($this->resort->resort_id);
+        $resort = Resort::find($this->resort->resort_id);
+
+        $pdf = Pdf::loadView('resorts.GrievanceAndDisciplinery.diciplinary.report_pdf', [
+            'case'         => $case,
+            'investigations' => $investigations,
+            'children'     => $children,
+            'resort'       => $resort,
+            'resortLogo'   => Common::GetResortLogo($this->resort->resort_id),
+            'letterhead'   => $letterhead,
+            'signatures'   => $signatures,
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        return $pdf->download('Disciplinary_Report_' . $case->id . '.pdf');
+    }
 
 }
 

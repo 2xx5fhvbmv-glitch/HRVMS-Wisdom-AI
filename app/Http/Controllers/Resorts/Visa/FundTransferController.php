@@ -98,6 +98,26 @@ class FundTransferController extends Controller
                                                                         ]);
             VisaTransectionHistory::where("id", $VisaTransectionHistory->id)->update(['to_wallet' => $to_wallet, 'from_wallet' => $from_wallet,]);
             DB::commit();
+
+            // Wallets aren't tied to an employee, so notify HR (the role
+            // that oversees visa fund movement, same recipient as the rest
+            // of the Visa module's audit-trail notifications) — real money
+            // moved between wallets with previously zero notification.
+            $hrIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+            if (!empty($hrIds)) {
+                try {
+                    Common::notifyEmployees(
+                        $this->resort->resort_id,
+                        $hrIds,
+                        'Wallet Fund Transfer',
+                        'MVR ' . number_format($Amt, 2) . ' transferred from ' . $from_wallet_Amt->WalletName . ' to ' . $to_wallet_Amt->WalletName . '.',
+                        'Visa',
+                        $VisaTransectionHistory->id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('Wallet transfer notification failed: ' . $e->getMessage());
+                }
+            }
             return response()->json([
                                         'success' => true,
                                         'msg' => 'Fund Transferred  successfully',

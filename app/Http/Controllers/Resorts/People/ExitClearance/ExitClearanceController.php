@@ -1160,8 +1160,19 @@ class ExitClearanceController extends Controller
             ->get();
 
         if (!$exitClearanceFormAssignments) {
+            // Signature snapshot — HR marking exit clearance complete IS the
+            // consent/approval moment for this record. Frozen HERE
+            // (Common::snapshotSignature()) so the Experience Certificate
+            // keeps showing the exact signature this HR admin had on file
+            // at completion time, even if they later re-upload a new one
+            // or leave — never re-derived from the live signature_img.
+            $signatureFields = Common::snapshotSignature($this->resort->id, 'exit-clearance', $employeeResignation->id);
+
             $employeeResignation->update([
                 'status' => 'Completed',
+                'signature_img' => $signatureFields['signature_img'] ?? null,
+                'signature_name' => $signatureFields['name'] ?? null,
+                'signed_at' => $signatureFields['timestamp'] ?? null,
             ]);
 
             // Now that exit clearance is signed off, transition the
@@ -1182,7 +1193,13 @@ class ExitClearanceController extends Controller
             // from the view-details page.
             try {
                 if ($employeeResignation->certificate_issue !== 'yes') {
-                    $this->experienceCertificate(new Request(), base64_encode($employeeResignation->id));
+                    // Was calling a method that doesn't exist on this
+                    // controller (experienceCertificate vs the real
+                    // employementCertificate) — silently swallowed by this
+                    // try/catch, so the cert never actually auto-generated
+                    // and this signature snapshot never got used until
+                    // someone clicked "Issue Certificate" manually.
+                    $this->employementCertificate(new Request(), base64_encode($employeeResignation->id));
                 }
             } catch (\Throwable $certErr) {
                 \Log::warning('Auto-generate experience certificate failed: ' . $certErr->getMessage(), [
@@ -1321,15 +1338,32 @@ class ExitClearanceController extends Controller
         // when no letterhead is configured — letter generation never
         // breaks for a fresh resort.
         $letterhead = Common::getLetterheadData($resort_id);
+
+        // Exit Clearance signs this document with the HR admin who marked
+        // clearance Complete (frozen on $employeeResignation by
+        // markAsComplete() at that moment) — not the resort's static
+        // letterhead signature. Falls back to the letterhead signatory
+        // (no image) for certificates generated before this feature
+        // existed, or when generated directly without going through
+        // markAsComplete, so the signature section is never blank.
+        $signatures = !empty($employeeResignation->signature_name)
+            ? [[
+                'name'          => $employeeResignation->signature_name,
+                'signature_img' => $employeeResignation->signature_img,
+                'timestamp'     => $employeeResignation->signed_at,
+            ]]
+            : [[
+                'name'          => ($letterhead['signatoryName'] ?? null) ?: 'Human Resources Department',
+                'signature_img' => null,
+                'timestamp'     => null,
+            ]];
+
         $pdf = Pdf::loadView('resorts.people.probation.probation_letter_pdf', [
             'letterContent'  => $letterContent,
             'letterhead'     => $letterhead,
             'resort'         => $resort,
             'resortLogo'     => Common::GetResortLogo($resort_id),
-            'signatureImage' => $letterhead['signatureImage'] ?? null,
-            'signatoryName'  => ($letterhead['signatoryName'] ?? null) ?: 'Human Resources Department',
-            'signatoryTitle' => ($letterhead['signatoryTitle'] ?? null)
-                ?: 'For and on behalf of ' . ($resort->resort_name ?? 'the Management'),
+            'signatures'     => $signatures,
         ])->setPaper('a4', 'portrait');
         // Allow DomPDF to load the local letterhead image files
         // (resort-uploaded headers/footers/signatures live on disk).

@@ -460,11 +460,48 @@
                                     </span>
                                 </div>
                                 <a href="{{ route('final.settlement.list') }}" class="fsr-nh-back">Back to list <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+                            @elseif($finalSettlement->status === 'review')
+                                {{-- §6.2 e-signature spec: per-stage HR → Finance → GM
+                                     approval chain (final_settlement_approvals), same
+                                     shape as Payroll's own 3-step chain. Buttons/labels
+                                     filled in by loadFinalSettlementApprovalStatus() below. --}}
+                                <div class="fsr-nh-fin" id="fsApprovalBanner">Awaiting approval…</div>
                             @else
                                 <button type="submit" class="fsr-nh-submit">Submit <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
                             @endif
                         </div>
                     </div>
+
+                    @if($finalSettlement->status !== 'draft')
+                        <div class="fsr-block" id="fsApprovalTimelineWrap">
+                            <h6 class="fw-600 mb-3">Approval Status</h6>
+                            <ul class="manning-timeline text-start" id="fsApprovalTimeline">
+                                <li id="fs-approval-step-1"><span>HR EXCOM</span><small class="d-block text-muted" id="fs-approval-step-1-info"></small></li>
+                                <li id="fs-approval-step-2"><span>Finance EXCOM</span><small class="d-block text-muted" id="fs-approval-step-2-info"></small></li>
+                                <li id="fs-approval-step-3"><span>GM</span><small class="d-block text-muted" id="fs-approval-step-3-info"></small></li>
+                            </ul>
+                            <div id="fsApprovalActions" class="d-none">
+                                <textarea id="fsApprovalRemarks" class="form-control mb-2" rows="2" placeholder="Remarks (required to reject)"></textarea>
+                                <button type="button" class="fsr-nh-submit" id="fsApproveBtn">Approve</button>
+                                <button type="button" class="btn btn-sm btn-danger ms-2" id="fsRejectBtn">Reject</button>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if($finalSettlement->status === 'finalized')
+                        {{-- Per-approver frozen signatures — see approveFinalSettlement()/
+                             Common::snapshotSignature(). Never re-derived from the live
+                             ResortAdmin.signature_img. --}}
+                        <div class="fsr-block">
+                            @include('resorts.pdf_partials._signature_block', [
+                                'signatures' => $finalSettlement->approvals()
+                                    ->whereNotNull('signature_name')
+                                    ->get()
+                                    ->map(fn ($a) => ['name' => $a->signature_name, 'signature_img' => $a->signature_img, 'timestamp' => $a->signed_at])
+                                    ->all(),
+                            ])
+                        </div>
+                    @endif
                 </div>
             </form>
 
@@ -475,6 +512,10 @@
 @section('import-css')
 @include('resorts.payroll._payroll_buttons_v2_styles')
 <style>
+    /* §6.2 e-signature spec — minimal plumbing style for the approval
+       timeline + signature block, matching this page's existing card
+       spacing rather than a bespoke design. */
+    .fsr-block { background: #fff; border: 1px solid #EEF2F2; border-radius: 14px; padding: 18px; margin-top: 16px; }
     @media print {
     body * {
         visibility: hidden;
@@ -646,6 +687,88 @@
             }
         });
     });
+
+    // §6.2 e-signature spec — HR → Finance → GM approval chain, same
+    // pattern as Payroll's own approval timeline (resources/views/resorts/
+    // payroll/run/index.blade.php's loadApprovalStatus()).
+    var fsSettlementId = $("#final_settlement_id").val();
+    function loadFinalSettlementApprovalStatus() {
+        if (!fsSettlementId) return;
+        $.ajax({
+            url: "{{ route('final.settlement.approval.status') }}",
+            type: "POST",
+            data: { _token: "{{ csrf_token() }}", final_settlement_id: fsSettlementId },
+            success: function (res) {
+                if (!res.success) return;
+                var approvals = res.approvals || [];
+                approvals.forEach(function (a) {
+                    var $li = $('#fs-approval-step-' + a.step_order);
+                    var $info = $('#fs-approval-step-' + a.step_order + '-info');
+                    $li.removeClass('active');
+                    if (a.status === 'approved') {
+                        $li.addClass('active');
+                        $info.text('Approved by ' + (a.approver_name || '') + (a.approved_at ? ' on ' + a.approved_at : ''));
+                    } else if (a.status === 'rejected') {
+                        $info.text('Rejected by ' + (a.approver_name || ''));
+                    } else {
+                        $info.text('Pending');
+                    }
+                });
+
+                var $banner = $('#fsApprovalBanner');
+                var $actions = $('#fsApprovalActions');
+                $actions.addClass('d-none');
+                if (res.settlement_status === 'review' && res.user_approval_step) {
+                    var pendingStep = approvals.find(function (a) { return a.step_order == res.user_approval_step && a.status === 'pending'; });
+                    var prevApproved = approvals.filter(function (a) { return a.step_order < res.user_approval_step; })
+                        .every(function (a) { return a.status === 'approved'; });
+                    if (pendingStep && prevApproved) {
+                        $banner.text('Awaiting your approval.');
+                        $actions.removeClass('d-none');
+                    } else {
+                        $banner.text('Awaiting approval from an earlier stage.');
+                    }
+                } else if (res.settlement_status === 'review') {
+                    $banner.text('Awaiting approval — you are not a stage in this chain.');
+                }
+            }
+        });
+    }
+    loadFinalSettlementApprovalStatus();
+
+    $(document).on('click', '#fsApproveBtn, #fsRejectBtn', function () {
+        var isReject = $(this).attr('id') === 'fsRejectBtn';
+        var remarks = $('#fsApprovalRemarks').val();
+        if (isReject && !remarks) {
+            toastr.error('Remarks are required to reject.');
+            return;
+        }
+        var $btns = $('#fsApproveBtn, #fsRejectBtn').prop('disabled', true);
+        $.ajax({
+            url: "{{ route('final.settlement.approve') }}",
+            type: "POST",
+            data: {
+                _token: "{{ csrf_token() }}",
+                final_settlement_id: fsSettlementId,
+                action: isReject ? 'reject' : 'approve',
+                remarks: remarks
+            },
+            success: function (response) {
+                if (response.success) {
+                    toastr.success(response.message);
+                    setTimeout(function () { window.location.reload(); }, 1200);
+                } else {
+                    toastr.error(response.message || 'Failed.');
+                    $btns.prop('disabled', false);
+                }
+            },
+            error: function (xhr) {
+                toastr.error((xhr.responseJSON && xhr.responseJSON.message) || 'Failed.');
+                $btns.prop('disabled', false);
+            }
+        });
+    });
+
     $('#downloadPdf').on('click', function (e) {
     e.preventDefault();
 

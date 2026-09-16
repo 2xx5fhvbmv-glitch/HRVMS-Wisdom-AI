@@ -276,6 +276,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     // New route for approving the budget
     Route::post('/budget/approve', 'BudgetController@approveBudget')->name('resort.budget.approve');
+    Route::post('/budget/approve-all', 'BudgetController@approveAllDepartmentBudgets')->name('resort.budget.approveAll');
+    Route::get('/budget/{budgetId}/approval-pdf', 'BudgetController@downloadBudgetApprovalPdf')->name('resort.budget.downloadApprovalPdf');
 
     Route::get('/budget/cost/', 'BudgetCostController@index')->name('resort.budget.index');
     Route::get( '/budget/cost/list','BudgetCostController@costlist')->name('resort.budget.costlist');
@@ -398,6 +400,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get( 'talent-acquisition/all-vacancies', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','GetAllVacancies'])->name('resort.ta.GetAllVacancies');
     Route::post( '/talent-acquisition/get-vacancy-status', 'TalentAcquisition\VacancyController@getVacancyStatus')->name('resort.vacancies.getstatus');
     Route::post( '/talent-acquisition/vacancy/out-of-budget-review', 'TalentAcquisition\VacancyController@processOutOfBudgetReview')->name('resort.vacancies.outOfBudgetReview');
+    Route::get( '/talent-acquisition/vacancy/{id}/approval-letter', 'TalentAcquisition\VacancyController@downloadHiringApprovalLetter')->name('resort.vacancies.downloadApprovalLetter');
     Route::get( '/talent-acquisition/vacancy/{id}/recruit-form-options', 'TalentAcquisition\VacancyController@getRecruitFormOptions')->name('resort.vacancies.recruitFormOptions');
     Route::post( '/talent-acquisition/vacancy/{id}/mark-recruited', 'TalentAcquisition\VacancyController@markAsRecruited')->name('resort.vacancies.markRecruited');
 
@@ -457,6 +460,11 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::delete( '/talent-acquisition/job-description/destroy/{id}/', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','destroy'])->name('resort.ta.jobdescription.destroy');
     Route::get( '/talent-acquisition/job-description/show/{id}/', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','show'])->name('resort.ta.jobdescription.show');
     Route::get( '/talent-acquisition/job-description/download/{slug}/', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','download'])->name('resort.ta.jobdescription.download');
+
+    // Per-employee JD issuance / e-signature consent tracking
+    Route::post('/talent-acquisition/job-description/{id}/issue', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','issueToEmployees'])->name('resort.ta.jobdescription.issue');
+    Route::get('/talent-acquisition/job-description/{id}/employee-records', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','GetEmployeeRecordsList'])->name('resort.ta.jobdescription.employeeRecords');
+    Route::post('/talent-acquisition/job-description-employee-record/{id}/resend', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','resendDeclined'])->name('resort.ta.jobdescription.resend');
     // Job Advertisement
     Route::get('/talent-acquisition/job-advertisement', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','index'])->name('resort.ta.jobadvertisment.index');
     Route::get('/talent-acquisition/job-advertisement/list', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','getList'])->name('resort.ta.jobadvertisment.getList');
@@ -553,6 +561,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/interview-assessment/{position_id}/{applicant_id}','TalentAcquisition\InterviewAssessmentController@show')->name('interview-assessment.show');
     Route::post('/interview-assessment/{id}/response', 'TalentAcquisition\InterviewAssessmentController@saveResponse')->name('interview-assessment.saveResponse');
     Route::get('/interview-assessment/view/{formId}/{responseId}', 'TalentAcquisition\InterviewAssessmentController@viewResponse')->name('interview-assessment.viewResponse');
+    Route::get('/interview-assessment/download/{formId}/{responseId}', 'TalentAcquisition\InterviewAssessmentController@downloadResponsePdf')->name('interview-assessment.downloadResponsePdf');
 
     //offline interview
     Route::get('/get-departments-by-divisions/{divid}','TalentAcquisition\OfflineInterviewController@getDepartmentsByDivision')->name('departments.get');
@@ -918,6 +927,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/final-settlement/store','Payroll\PayslipController@store')->name('final.settlement.store');
     Route::get('/final-settlement/review/{finalsettlementID}', 'Payroll\PayslipController@review')->name('final.settlement.review');
     Route::post('/final-settlement/submit', 'Payroll\PayslipController@submit')->name('final.settlement.submit');
+    Route::post('/final-settlement/approve', 'Payroll\PayslipController@approveFinalSettlement')->name('final.settlement.approve');
+    Route::post('/final-settlement/approval-status', 'Payroll\PayslipController@getFinalSettlementApprovalStatus')->name('final.settlement.approval.status');
     Route::get('/final-settlement/list', 'Payroll\PayslipController@settlementList')->name('final.settlement.list');
     Route::get('/final-settlement/getdata', 'Payroll\PayslipController@getSettlements')->name('final.settlement.getdata');
 
@@ -988,6 +999,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('performance/review/manager/{id}', 'Performance\ReviewController@showManagerReview')->name('Performance.Review.showManager');
     Route::post('performance/review/manager/{id}/submit', 'Performance\ReviewController@submitManagerReview')->name('Performance.Review.submitManager');
     Route::get('performance/review/gm-export/{id}', 'Performance\ReviewController@exportGmReview')->name('Performance.Review.gmExport');
+    Route::get('performance/review/{id}/download-pdf', 'Performance\ReviewController@downloadCycleReviewPdf')->name('Performance.Review.downloadPdf');
     Route::get('performance/meetings-list', 'Performance\PerformanceMeetingController@meetingsList')->name('Performance.Meeting.list');
     Route::get('performance/meetings-list/data', 'Performance\PerformanceMeetingController@meetingsListData')->name('Performance.Meeting.listData');
     Route::get('performance/meetings-list/view/{id}', 'Performance\PerformanceMeetingController@meetingDetailPage')->name('Performance.Meeting.view');
@@ -1027,6 +1039,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('performance/pip/{id}/view', 'Performance\PipPdpController@pipView')->name('Performance.pip.view');
     Route::post('performance/pip/{id}/submit', 'Performance\PipPdpController@pipSubmit')->name('Performance.pip.submit');
     Route::get('performance/pip/{id}/file/{field}', 'Performance\PipPdpController@pipFile')->name('Performance.pip.file');
+    Route::get('performance/pip/{id}/download-pdf', 'Performance\PipPdpController@pipDownloadPdf')->name('Performance.pip.downloadPdf');
     Route::get('performance/pdp', 'Performance\PipPdpController@pdpIndex')->name('Performance.pdp.index');
     Route::post('performance/pdp/store', 'Performance\PipPdpController@pdpStore')->name('Performance.pdp.store');
     Route::delete('performance/pdp/{id}', 'Performance\PipPdpController@pdpDestroy')->name('Performance.pdp.destroy');
@@ -1035,6 +1048,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('performance/pdp/{id}/view', 'Performance\PipPdpController@pdpView')->name('Performance.pdp.view');
     Route::post('performance/pdp/{id}/submit', 'Performance\PipPdpController@pdpSubmit')->name('Performance.pdp.submit');
     Route::get('performance/pdp/{id}/file/{field}', 'Performance\PipPdpController@pdpFile')->name('Performance.pdp.file');
+    Route::get('performance/pdp/{id}/download-pdf', 'Performance\PipPdpController@pdpDownloadPdf')->name('Performance.pdp.downloadPdf');
     Route::get('performance/create', 'Performance\CycleController@create')->name('Performance.create');
 
     Route::get('performance-cycle/fetch-employees', 'Performance\CycleController@CycleFetchEmployees')->name('Performance.cycle.FetchEmployees');
@@ -1054,6 +1068,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('performance/monthly-check-in/employee-approve/{id}', 'Performance\MonthlyCheckingController@employeeApprove')->name('Performance.MonltyCheckIn.employeeApprove');
     Route::post('performance/monthly-check-in/employee-reject/{id}', 'Performance\MonthlyCheckingController@employeeReject')->name('Performance.MonltyCheckIn.employeeReject');
     Route::post('performance/monthly-check-in/finalize/{id}', 'Performance\MonthlyCheckingController@finalize')->name('Performance.MonltyCheckIn.finalize');
+    Route::post('performance/monthly-check-in/reinitiate/{id}', 'Performance\MonthlyCheckingController@reinitiate')->name('Performance.MonltyCheckIn.reinitiate');
     Route::get('performance/monthly-check-in/history', 'Performance\MonthlyCheckingController@history')->name('Performance.MonltyCheckIn.history');
     Route::get('performance/monthly-check-in/history-data', 'Performance\MonthlyCheckingController@historyData')->name('Performance.MonltyCheckIn.historyData');
     Route::get('performance/monthly-check-in/employee-pending', 'Performance\MonthlyCheckingController@employeePending')->name('Performance.MonltyCheckIn.employeePending');
@@ -1179,6 +1194,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('grievance-and-disciplinary/request-for-statement', 'GrievanceAndDisciplinery\GrivanceController@RequestForStatement')->name('GrievanceAndDisciplinery.grivance.RequestForStatement');
     Route::get('grievance-and-disciplinary/get-grivance-sub-cat', 'GrievanceAndDisciplinery\GrivanceController@GetGrivanceSubCat')->name('GrievanceAndDisciplinery.grivance.GetGrivanceSubCat');
     Route::delete('grievance-and-disciplinary/get-grivance/{id}', 'GrievanceAndDisciplinery\GrivanceController@GrivnanceDestory')->name('GrievanceAndDisciplinery.grivance.DeleteGrivance');
+    Route::get('grievance-and-disciplinary/{id}/download-report-pdf', 'GrievanceAndDisciplinery\GrivanceController@downloadGrievanceReportPdf')->name('GrievanceAndDisciplinery.grivance.downloadReportPdf');
 
 
     Route::post('mark/as-read', 'SitesettignsController@NotificationMark')->name('resort.Mark.Notification');
@@ -1209,6 +1225,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::get('grievance-and-disciplinary/disciplinery/open-offence', 'GrievanceAndDisciplinery\DisciplinaryController@DisciplineryOpenOffence')->name('GrievanceAndDisciplinery.DisciplineryOpenOffence');
       Route::post('grievance-and-disciplinary/disciplinery/investigation-report/store', 'GrievanceAndDisciplinery\DisciplinaryController@InvestigationReportStore')->name('GrievanceAndDisciplinery.Disciplinary.InvestigationReportStore');
       Route::post('grievance-and-disciplinary/disciplinery/requestForStatement', 'GrievanceAndDisciplinery\DisciplinaryController@RequestForStatement')->name('GrievanceAndDisciplinery.Disciplinary.RequestForStatement');
+      Route::get('grievance-and-disciplinary/disciplinery/{id}/download-report-pdf', 'GrievanceAndDisciplinery\DisciplinaryController@downloadDisciplinaryReportPdf')->name('GrievanceAndDisciplinery.Disciplinary.downloadReportPdf');
 
 
       Route::post('grievance-and-disciplinary/disciplinary/email-template', 'GrievanceAndDisciplinery\ConfigurationController@DisciplineryEmailTamplate')->name('GrievanceAndDisciplinery.Disciplinary.DisciplineryEmailTamplate');
@@ -1615,6 +1632,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
    Route::get('/incidents/hod-pending-approvals', 'Incident\DashboardController@getPendingResolutionApprovalsforHOD')->name('incident.hod-pending-approvals');
    Route::post('/incidents/approve', 'Incident\IncidentController@approve')->name('incident.investigation.approve');
    Route::post('/incidents/approve-or-reject', 'Incident\IncidentController@approveOrReject')->name('incident.investigation.approvedorreject');
+   Route::get('/incidents/{id}/download-report-pdf', 'Incident\IncidentController@downloadIncidentReportPdf')->name('incident.downloadReportPdf');
 
        //People module start
        Route::get('/division-department-data/{id?}', 'People\DashboardController@getDepartmentCounts')->name('get.division-by-dept');
@@ -1640,6 +1658,23 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
        Route::get('people/job-description/by-position/{posId}', 'TalentAcquisition\JobDescriptionController@fetchByPosition')->name('job.description.by.position');
        Route::get('people/benefit-grid/view/{level}', 'BenifitGridController@viewByLevel')
        ->name('benefit.grid.view');
+
+       // Benefit Grade Levels config screen (People\BenefitGradeLevelController)
+       // — the controller and its blade view already existed but had no
+       // routes registered anywhere, so the page was unreachable. Needed
+       // now as the home for mapping Housekeeping Service Catalog
+       // eligibility per grade level.
+       Route::get('people/benefit-grade-level', 'People\BenefitGradeLevelController@index')->name('resort.benefitgradelevel.index');
+       Route::get('people/benefit-grade-level/list', 'People\BenefitGradeLevelController@list')->name('resort.benefitgradelevel.list');
+       Route::post('people/benefit-grade-level/store', 'People\BenefitGradeLevelController@store')->name('resort.benefitgradelevel.store');
+       Route::put('people/benefit-grade-level/{id}', 'People\BenefitGradeLevelController@inlineUpdate')->name('resort.benefitgradelevel.inlineUpdate');
+       Route::delete('people/benefit-grade-level/{id}', 'People\BenefitGradeLevelController@destroy')->name('resort.benefitgradelevel.destroy');
+       Route::get('people/benefit-grade-level/{id}/ranks', 'People\BenefitGradeLevelController@ranksFor')->name('resort.benefitgradelevel.ranksFor');
+       Route::post('people/benefit-grade-level/{id}/ranks', 'People\BenefitGradeLevelController@updateRanks')->name('resort.benefitgradelevel.updateRanks');
+       Route::get('people/benefit-grade-level/{id}/housekeeping-services', 'People\BenefitGradeLevelController@housekeepingServicesFor')->name('resort.benefitgradelevel.housekeepingServicesFor');
+       Route::post('people/benefit-grade-level/{id}/housekeeping-services', 'People\BenefitGradeLevelController@updateHousekeepingServices')->name('resort.benefitgradelevel.updateHousekeepingServices');
+       Route::post('people/housekeeping-service/store', 'People\BenefitGradeLevelController@storeHousekeepingService')->name('resort.housekeepingservice.store');
+       Route::delete('people/housekeeping-service/{id}', 'People\BenefitGradeLevelController@destroyHousekeepingService')->name('resort.housekeepingservice.destroy');
        Route::post('people/promotion/submit', 'People\Promotion\PromotionController@submitPromotion')->name('promotion.submit');
        Route::get('/people/promotion/list', 'People\Promotion\PromotionController@list')->name('people.promotion.list');
        Route::get('/people/promotion/filter', 'People\Promotion\DashboardController@filter')->name('people.promotion.filter');
@@ -1728,6 +1763,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::post('people/salary-increment/request-change', 'People\SalaryIncrementController@requestChange')->name('people.salary-increment.request-change');
       Route::post('people/salary-increment/request-hold', 'People\SalaryIncrementController@holdRequest')->name('people.salary-increment.hold-request');
       Route::get('people/salary-increment/download', 'People\SalaryIncrementController@downloadByFormate')->name('people.salary-increment.download');
+      Route::post('people/salary-increment/send-letter', 'People\SalaryIncrementController@sendSalaryIncrementLetter')->name('people.salary-increment.send-letter');
 
       Route::get('people/salary-increment-history', 'People\SalaryIncrementController@incrementHistory')->name('people.salary-increment.history-list');
 
@@ -1739,6 +1775,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::post('people/advance-salary/payment-interest-calculate','People\Employee\AdvanceSalaryController@paymentRescheduleCalculate')->name('people.advance-salary.payment-interest-calculate');
       Route::post('people/advance-salary/payment-reschedule-store','People\Employee\AdvanceSalaryController@paymentRescheduleStore')->name('people.advance-salary.payment-reschedule-store');
       Route::post('people/advance-salary/update-status','People\Employee\AdvanceSalaryController@updateStatus')->name('people.advance-salary.update-status');
+Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\AdvanceSalaryController@downloadApprovalPdf')->name('people.advance-salary.downloadApprovalPdf');
 
 
       // Employee Advance Salary Repayment Schedule  Module
@@ -1925,6 +1962,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::get('/people/employee-resignation', 'People\Employee\EmployeeResignationController@index')->name('people.employee-resignation.index');
       Route::get('/people/employee-resignation/show/{id}', 'People\Employee\EmployeeResignationController@show')->name('people.employee-resignation.show');
       Route::post('people/employee-resignation/status-update', 'People\Employee\EmployeeResignationController@updateStatus')->name('people.employee-resignation.status-update');
+      Route::get('people/employee-resignation/{id}/download-approval-pdf', 'People\Employee\EmployeeResignationController@downloadApprovalPdf')->name('people.employee-resignation.downloadApprovalPdf');
       Route::post('/people/employee-resignation/schedule-meeting', 'People\Employee\EmployeeResignationController@scheduleMeeting')->name('people.employee-resignation.schedule-meeting');
 
 
@@ -1956,6 +1994,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::get('/people/initial-liability-estimation', 'People\Liability\LiabilityEstimationController@index')->name('people.liability.index');
 
       Route::get('/people/initial-liability-estimation/add-cost', 'People\Liability\LiabilityEstimationController@addCost')->name('people.liability.addCost');
+      Route::post('/people/initial-liability-estimation/add-cost', 'People\Liability\LiabilityEstimationController@storeCost')->name('people.liability.storeCost');
       Route::get('/people/initial-liability-estimation/get-data', 'People\Liability\LiabilityEstimationController@getLiabilityData')->name('people.liabilities.data');
 
       Route::get('/people/initial-liability-estimation/get-employee-data/{empId}', 'People\Liability\LiabilityEstimationController@getLiabilityEmployeeData')->name('people.liabilities.emp-data');

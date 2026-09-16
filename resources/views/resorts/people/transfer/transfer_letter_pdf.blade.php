@@ -116,16 +116,12 @@
     </p>
 
     {{-- ── Signature block ───────────────────────────────────────────────
-         Uses the configured e-signature image when available; otherwise
-         the signatory name/title are rendered as a typed block. --}}
+         Per-approver frozen signatures (see TransferController::
+         buildTransferSignatures()) — the exact signature each approver had
+         on file at the moment THEY approved, not the resort's static
+         letterhead signature. --}}
     <div class="signature">
-        @if(!empty($signatureImage))
-            <img src="{{ $signatureImage }}" style="height:55px;" alt="signature"><br>
-        @endif
-        <div class="sig-line">
-            <strong>{{ $signatoryName ?? 'Human Resources Department' }}</strong><br>
-            {{ $signatoryTitle ?? 'For and on behalf of ' . ($resort->resort_name ?? 'the Management') }}
-        </div>
+        @include('resorts.pdf_partials._signature_block', ['signatures' => $signatures ?? []])
     </div>
 
     <p class="footer-note">

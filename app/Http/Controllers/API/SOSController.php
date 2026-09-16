@@ -606,7 +606,15 @@ class SOSController extends Controller
         $rank                                           =   config('settings.Position_Rank');
         $current_rank                                   =   $employee->rank ?? null;
         $available_rank                                 =   $rank[$current_rank] ?? '';
-        $isHOD                                          =   ($available_rank === "HOD");
+        // The generic rank->"HOD" mapping (rank 2) doesn't distinguish a
+        // regular department HOD from the Security Manager — both happen to
+        // share rank 2 — so this was quietly scoping the Security Manager
+        // down to only their own department's subordinates for every SOS
+        // incident, when SOS safety data is resort-wide by nature, not
+        // department-scoped.
+        $positionTitle                                  =   optional($employee->position)->position_title;
+        $isSecurityManager                              =   $positionTitle === 'Security Manager';
+        $isHOD                                          =   ($available_rank === "HOD") && !$isSecurityManager;
 
         try {
             // No resort ownership check at all — any authenticated user,
@@ -634,6 +642,7 @@ class SOSController extends Controller
 
             $sosHistoryEmployeeStatus                   =   SosHistoryEmployeeStatus::join('employees as e', 'sos_history_employee_status.emp_id', '=', 'e.id')
                                                                 ->join('resort_admins as ra', 'e.Admin_Parent_id', '=', 'ra.id')
+                                                                ->leftJoin('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                                                                 ->where('sos_history_employee_status.sos_history_id', $sosId)
                                                                 // ->where('sos_history_employee_status.status', '!=', 'Unknown')
                                                                 ->select(
@@ -644,10 +653,12 @@ class SOSController extends Controller
                                                                     'sos_history_employee_status.address',
                                                                     'sos_history_employee_status.latitude',
                                                                     'sos_history_employee_status.longitude',
+                                                                    'sos_history_employee_status.updated_at as location_updated_at',
                                                                     'ra.first_name',
                                                                     'ra.last_name',
                                                                     'ra.profile_picture',
                                                                     'e.Admin_Parent_id',
+                                                                    'rd.name as department',
                                                                 );
                                                                 if($isHOD) {
                                                                     $sosHistoryEmployeeStatus->whereIn('e.id', $this->underEmp_id);
@@ -661,23 +672,27 @@ class SOSController extends Controller
 
             $sosTeamMemberActivity                      =   SosTeamMemberActivity::join('resort_admins as ra', 'sos_team_member_activity.emp_id', '=', 'ra.id')
                                                                 ->join('sos_teams as st', 'sos_team_member_activity.team_id', '=', 'st.id')
+                                                                ->leftJoin('employees as e', 'e.Admin_Parent_id', '=', 'ra.id')
+                                                                ->leftJoin('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                                                                 ->where('sos_team_member_activity.sos_history_id', $sosId)
                                                                 ->where('sos_team_member_activity.status','!=', 'Unacknowledged')
                                                                 ->select(
                                                                     // 'sos_team_member_activity.*',
                                                                     'sos_team_member_activity.id as team_member_id',
-                                                                    'sos_team_member_activity.emp_id', 
+                                                                    'sos_team_member_activity.emp_id',
                                                                     'sos_team_member_activity.status',
                                                                     'sos_team_member_activity.address',
                                                                     'sos_team_member_activity.latitude',
                                                                     'sos_team_member_activity.longitude',
                                                                     'sos_team_member_activity.team_id',
                                                                     'sos_team_member_activity.sos_history_id',
+                                                                    'sos_team_member_activity.updated_at as location_updated_at',
                                                                     'ra.id as resort_admin_id',
                                                                     'ra.first_name',
                                                                     'ra.last_name',
                                                                     'ra.profile_picture',
                                                                     'st.name as team_name',
+                                                                    'rd.name as department',
                                                                 )
                                                                 ->get()->map(function ($item) {
                                                                     $item->profile_picture = Common::getResortUserPicture($item->resort_admin_id);
@@ -709,11 +724,24 @@ class SOSController extends Controller
         }
         $sosId                                          =   base64_decode($sosId);
         try {
-            $sosData                                    =   SOSHistoryModel::join('sos_team_member_activity as stma', 'sos_history.id', '=', 'stma.sos_history_id')
+            // Security Manager must be able to open ANY incident for their
+            // resort, not only ones they personally happen to be dispatched
+            // to — the inner join below used to require
+            // stma.emp_id === caller, which is correct for a regular
+            // dispatched team member checking their own assignment, but
+            // wrongly 404'd the Security Manager for every incident they
+            // weren't personally on a response team for.
+            $employee                                   =   $this->user->GetEmployee ?? null;
+            $positionTitle                              =   $employee ? optional($employee->position)->position_title : null;
+            $isSecurityManager                          =   $positionTitle === 'Security Manager' || (int) ($this->user->is_master_admin ?? 0) === 1;
+
+            $sosData                                    =   SOSHistoryModel::leftJoin('sos_team_member_activity as stma', function ($join) {
+                                                                    $join->on('sos_history.id', '=', 'stma.sos_history_id')
+                                                                        ->where('stma.emp_id', $this->user->id);
+                                                                })
                                                                 ->join('sos_emergency_types as set', 'sos_history.emergency_id', '=', 'set.id')
                                                                 ->where('sos_history.id', $sosId)
                                                                 ->where('sos_history.resort_id', $this->resort_id)
-                                                                ->where('stma.emp_id', $this->user->id)
                                                                 // 'Real-Active' (a genuine, non-drill emergency — see
                                                                 // drillRealSOS()) was missing from this list, so live
                                                                 // location tracking silently refused to show anyone's
@@ -728,6 +756,18 @@ class SOSController extends Controller
                     'success'                           =>  false,
                     'message'                           =>  'SOS Details not found.',
                      'data'                             =>  (object)[],
+                ], 200);
+            }
+
+            // Not the Security Manager and not a dispatched team member on
+            // this specific incident (the left join above found no matching
+            // row) — same access boundary the old inner join enforced for
+            // everyone else.
+            if (!$isSecurityManager && !$sosData->team_member_emp_id) {
+                return response()->json([
+                    'success'                           =>  false,
+                    'message'                           =>  'SOS Details not found.',
+                    'data'                              =>  (object)[],
                 ], 200);
             }
 
@@ -896,10 +936,37 @@ class SOSController extends Controller
         }
     }
 
+    /**
+     * SOS History exposes who raised every past incident, their live
+     * location trail, and the full response-team roster for the resort —
+     * unlike "raise your own SOS" or "acknowledge your own team
+     * assignment", this was never meant to be an any-employee action. It
+     * sat in this file's "any authenticated employee" route group with no
+     * role check at all, so e.g. a Housekeeping HOD could pull every other
+     * department's SOS history. Restricted to the same Security
+     * Manager/Security-staff boundary the manager-dashboard/
+     * security-staff-dashboard routes already enforce.
+     */
+    private function isAuthorizedForSOSHistory(): bool
+    {
+        if ((int) ($this->user->is_master_admin ?? 0) === 1) {
+            return true;
+        }
+        $employee = $this->user->GetEmployee ?? null;
+        if (!$employee) {
+            return false;
+        }
+        $positionTitle = optional($employee->position)->position_title;
+        return $positionTitle === 'Security Manager' || Common::isSecurityDepartment($employee->Dept_id);
+    }
+
     public function SOSHistoryListing()
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!$this->isAuthorizedForSOSHistory()) {
+            return response()->json(['success' => false, 'message' => 'Forbidden: Security access only'], 403);
         }
 
         try {
@@ -943,6 +1010,9 @@ class SOSController extends Controller
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!$this->isAuthorizedForSOSHistory()) {
+            return response()->json(['success' => false, 'message' => 'Forbidden: Security access only'], 403);
         }
         $sosId                                          =   base64_decode($sosId);
         try {
@@ -1505,6 +1575,9 @@ class SOSController extends Controller
                                                                 ->join('resort_admins as ra', 'e.Admin_Parent_id', '=', 'ra.id')
                                                                 ->leftJoin('resort_positions as rp', 'e.position_id', '=', 'rp.id')
                                                                 ->where('sos_history.resort_id', $this->resort_id)
+                                                                // Deliberately excludes Drill-Active — a drill shouldn't inflate the
+                                                                // "active emergency" count a manager sees. Confirmed with product.
+                                                                // Do not swap this to Common::sosOpenStatuses().
                                                                 ->whereIn('sos_history.status', ['Active', 'Real-Active', 'In-Progress'])
                                                                 ->orderBy('sos_history.created_at', 'desc')
                                                                 ->select(

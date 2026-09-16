@@ -15,6 +15,9 @@ class EmployeeOnboardingAcknowledgements extends Model
         'acknowledgement_type',
         'acknowledged_date',
         'status',
+        'signature_img',
+        'signature_name',
+        'signed_at',
         'created_at',
         'updated_at'
     ];

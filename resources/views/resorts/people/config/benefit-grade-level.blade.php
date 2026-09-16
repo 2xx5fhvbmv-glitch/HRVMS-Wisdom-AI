@@ -54,6 +54,43 @@
                 </div>
             </div>
         </div>
+
+        <div class="row g-30 mt-1">
+            <div class="col-xxl-12 col-xl-12 col-lg-12">
+                <div class="card">
+                    <div class="card-title">
+                        <div class="row g-3 align-items-center justify-content-between">
+                            <div class="col-auto">
+                                <h3>Housekeeping Service Catalog</h3>
+                                <p class="text-muted mb-0">Services HR can select from when raising a housekeeping request. Map which grade levels are eligible for which service via "Map Housekeeping Services" above.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <form id="housekeeping-service-form" class="row g-2 align-items-end mb-4">
+                        <div class="col-sm-6">
+                            <label class="form-label">Service Name <span class="red-mark">*</span></label>
+                            <input type="text" class="form-control" name="name" id="housekeeping-service-name-input" placeholder="e.g. Room Cleaning" required>
+                        </div>
+                        <div class="col-sm-3">
+                            <button type="submit" class="btn btn-theme">Add</button>
+                        </div>
+                    </form>
+
+                    <ul class="list-group" id="housekeeping-service-list">
+                        @forelse($housekeepingServices as $service)
+                            <li class="list-group-item d-flex justify-content-between align-items-center" data-service-id="{{ base64_encode($service->id) }}">
+                                {{ $service->name }}
+                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-service-btn">
+                                    <img src="{{ asset('resorts_assets/images/trash-red.svg') }}" alt="Delete" class="img-fluid">
+                                </a>
+                            </li>
+                        @empty
+                            <li class="list-group-item text-muted" id="no-services-row">No housekeeping services added yet.</li>
+                        @endforelse
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -73,6 +110,34 @@
                             <option value="{{ $rankValue }}">{{ $rankLabel }}</option>
                         @endforeach
                     </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-theme">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mapServicesModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select eligible housekeeping services for this grade</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="map-services-form">
+                <div class="modal-body">
+                    <label class="form-label">Housekeeping Service(s)</label>
+                    <select id="map-services-select" class="form-select select2-modal" multiple>
+                        @foreach($housekeepingServices as $service)
+                            <option value="{{ $service->id }}">{{ $service->name }}</option>
+                        @endforeach
+                    </select>
+                    @if($housekeepingServices->isEmpty())
+                        <p class="text-muted mt-2">Add a service in the Housekeeping Service Catalog below first.</p>
+                    @endif
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -243,6 +308,103 @@
             },
             error: function (jqXHR) {
                 toastr.error(jqXHR.responseJSON?.message || 'An unexpected error occurred.', 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
+
+    $(document).on('click', '.map-services-btn', function () {
+        currentGradeId = $(this).data('grade-id');
+        $('#map-services-select').val(null);
+        $.get("{{ route('resort.benefitgradelevel.housekeepingServicesFor', '') }}/" + currentGradeId, function (response) {
+            $('#map-services-select').val((response.service_ids || []).map(String));
+        }).always(function () {
+            $('#mapServicesModal').modal('show');
+        });
+    });
+
+    $('#map-services-form').on('submit', function (e) {
+        e.preventDefault();
+        var serviceIds = $('#map-services-select').val() || [];
+        $.ajax({
+            url: "{{ route('resort.benefitgradelevel.updateHousekeepingServices', '') }}/" + currentGradeId,
+            type: 'POST',
+            data: { service_ids: serviceIds, "_token": "{{ csrf_token() }}" },
+            success: function (response) {
+                if (response.success) {
+                    toastr.success(response.message, 'Success', { positionClass: 'toast-bottom-right' });
+                    $('#mapServicesModal').modal('hide');
+                } else {
+                    toastr.error(response.message, 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            },
+            error: function (jqXHR) {
+                toastr.error(jqXHR.responseJSON?.message || 'An unexpected error occurred.', 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
+
+    $('#housekeeping-service-form').on('submit', function (e) {
+        e.preventDefault();
+        var $input = $('#housekeeping-service-name-input');
+        $.ajax({
+            url: '{{ route("resort.housekeepingservice.store") }}',
+            type: 'POST',
+            data: { name: $input.val(), "_token": "{{ csrf_token() }}" },
+            success: function (response) {
+                if (response.success) {
+                    toastr.success(response.message, 'Success', { positionClass: 'toast-bottom-right' });
+                    $('#no-services-row').remove();
+                    var encodedId = window.btoa(String(response.id));
+                    $('#housekeeping-service-list').append(
+                        '<li class="list-group-item d-flex justify-content-between align-items-center" data-service-id="' + encodedId + '">' +
+                        $('<div>').text(response.name).html() +
+                        '<a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-service-btn">' +
+                        '<img src="{{ asset('resorts_assets/images/trash-red.svg') }}" alt="Delete" class="img-fluid"></a></li>'
+                    );
+                    $('#map-services-select').append(new Option(response.name, response.id, false, false));
+                    $input.val('');
+                } else {
+                    toastr.error(response.message, 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            },
+            error: function (xhr) {
+                var msg = 'An unexpected error occurred.';
+                if (xhr.responseJSON && xhr.responseJSON.errors) {
+                    msg = Object.values(xhr.responseJSON.errors).map(e => e[0] || e).join('<br>');
+                }
+                toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
+
+    $(document).on('click', '.delete-service-btn', function () {
+        var $row = $(this).closest('li');
+        var serviceId = $row.data('service-id');
+        wisdomConfirm({
+            role: 'destructive',
+            title: 'Sure want to delete?',
+            text: 'This cannot be undone',
+            confirmText: 'Yes',
+            cancelText: 'No'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: "{{ route('resort.housekeepingservice.destroy', ':id') }}".replace(':id', serviceId),
+                    type: 'DELETE',
+                    data: { "_token": "{{ csrf_token() }}" },
+                    success: function (response) {
+                        if (response.success) {
+                            toastr.success(response.message, 'Success', { positionClass: 'toast-bottom-right' });
+                            $row.remove();
+                            $('#map-services-select option[value="' + parseInt(window.atob(String(serviceId)), 10) + '"]').remove();
+                        } else {
+                            toastr.error(response.message, 'Error', { positionClass: 'toast-bottom-right' });
+                        }
+                    },
+                    error: function (jqXHR) {
+                        toastr.error(jqXHR.responseJSON?.message || 'An unexpected error occurred.', 'Error', { positionClass: 'toast-bottom-right' });
+                    }
+                });
             }
         });
     });

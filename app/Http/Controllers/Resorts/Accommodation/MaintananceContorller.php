@@ -696,11 +696,23 @@ class MaintananceContorller extends Controller
 
     public function HrRejeactedRequest(Request $request)
     {
+        // Was never required — a reject submitted with no reason silently
+        // stored RejactionReason as null, leaving the requester and every
+        // later detail/listing view with nothing to show for why it was
+        // rejected.
+        $validator = Validator::make($request->all(), [
+            'reason' => 'required|string',
+        ], [
+            'reason.required' => 'Please provide a reason for rejecting this request.',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
 
         $reason = $request->reason;
         $id = base64_decode($request->task_id);
-       
-       
+
+
         DB::beginTransaction();
         try
         {
@@ -742,6 +754,20 @@ class MaintananceContorller extends Controller
         $mainRequest = MaintanaceRequest::where('id', $task_id)->where('resort_id', $this->resort->resort_id)->first();
         if (!$mainRequest) {
             return response()->json(['success' => false, 'message' => 'Maintenance request not found'], 404);
+        }
+
+        // Same gap as HrRejeactedRequest() — On-Hold stored ReasonOnHold as
+        // whatever was sent, including nothing, with no requirement that a
+        // reason actually be provided.
+        if ($flag == 'On-Hold') {
+            $validator = Validator::make($request->all(), [
+                'reason' => 'required|string',
+            ], [
+                'reason.required' => 'Please provide a reason for placing this request on hold.',
+            ]);
+            if ($validator->fails()) {
+                return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+            }
         }
 
         if($flag=='On-Hold')

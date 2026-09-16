@@ -781,6 +781,11 @@ class IncidentController extends Controller
 
         if ($request->status === 'approved') {
             $incident->status = 'Approved';
+
+            $gmSignature = Common::snapshotSignature($this->resort->id, 'incident-gm-approval', $incident->id);
+            $incident->gm_signature_img = $gmSignature['signature_img'] ?? null;
+            $incident->gm_signature_name = $gmSignature['name'] ?? null;
+            $incident->gm_signed_at = $gmSignature['timestamp'] ?? null;
         } elseif ($request->status === 'rejected') {
             $incident->status = 'Rejected';
         }
@@ -809,6 +814,64 @@ class IncidentController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    public function downloadIncidentReportPdf($id)
+    {
+        $id = base64_decode($id);
+        $incident = Incidents::with(['reporter.resortAdmin', 'reporter.position'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->findOrFail($id);
+
+        if ($incident->status !== 'Approved') {
+            abort(403, 'The incident report is not yet finalized (GM-approved).');
+        }
+
+        $employeeStatements = IncidentsEmployeeStatements::with('employee.resortAdmin')->where('incident_id', $id)->get();
+        $witnessStatements = IncidentsWitness::with('employee.resortAdmin')->where('incident_id', $id)->get();
+
+        $signatures = [];
+        foreach ($employeeStatements as $statement) {
+            if (!empty($statement->signature_name)) {
+                $signatures[] = [
+                    'name'          => $statement->signature_name,
+                    'signature_img' => $statement->signature_img,
+                    'timestamp'     => $statement->signed_at,
+                ];
+            }
+        }
+        foreach ($witnessStatements as $witness) {
+            if (!empty($witness->witness_signature_name)) {
+                $signatures[] = [
+                    'name'          => $witness->witness_signature_name . ' (Witness)',
+                    'signature_img' => $witness->witness_signature_img,
+                    'timestamp'     => $witness->witness_signed_at,
+                ];
+            }
+        }
+        if (!empty($incident->gm_signature_name)) {
+            $signatures[] = [
+                'name'          => $incident->gm_signature_name . ' (GM)',
+                'signature_img' => $incident->gm_signature_img,
+                'timestamp'     => $incident->gm_signed_at,
+            ];
+        }
+
+        $letterhead = Common::getLetterheadData($this->resort->resort_id);
+        $resort = \App\Models\Resort::find($this->resort->resort_id);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('resorts.incident.incident.report_pdf', [
+            'incident'            => $incident,
+            'employeeStatements'  => $employeeStatements,
+            'witnessStatements'   => $witnessStatements,
+            'resort'              => $resort,
+            'resortLogo'          => Common::GetResortLogo($this->resort->resort_id),
+            'letterhead'          => $letterhead,
+            'signatures'          => $signatures,
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        return $pdf->download('Incident_Report_' . $incident->id . '.pdf');
     }
 
     public function destroy(Request $request)

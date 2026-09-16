@@ -24,6 +24,14 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
+                @if($Disciplinary_parent->status === 'resolved')
+                    <div class="col-auto ms-auto">
+                        <a href="{{ route('GrievanceAndDisciplinery.Disciplinary.downloadReportPdf', base64_encode($Disciplinary_parent->id)) }}"
+                           target="_blank" class="btn btn-theme btn-sm">
+                            <i class="fa-regular fa-file-pdf"></i> Download Case Report
+                        </a>
+                    </div>
+                @endif
                 <!-- <div class="col-xxl-2 col-auto ms-auto">
                     <select class="form-select select2t-none" id="select-budgeted"
                         aria-label="Default select example">

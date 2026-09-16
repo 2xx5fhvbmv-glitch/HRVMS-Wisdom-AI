@@ -405,6 +405,19 @@ class EmployeeResignationController extends Controller
                 $employeeResignation->hod_status = $status;
                 $employeeResignation->hod_meeting_status = 'Completed';
                 $employeeResignation->hod_comments = $request->meeting_comment;
+
+                // Signature snapshot — only an Approve represents this
+                // person actually signing off. Frozen HERE
+                // (Common::snapshotSignature()) — never re-derived later
+                // from the live ResortAdmin.signature_img. Separate
+                // columns from the exit-clearance stage's own snapshot
+                // (same table, later lifecycle stage).
+                if ($status === 'Approved') {
+                    $hodSignature = Common::snapshotSignature($this->resort->id, 'resignation-approval', $employeeResignation->id . '-hod');
+                    $employeeResignation->hod_signature_img = $hodSignature['signature_img'] ?? null;
+                    $employeeResignation->hod_signature_name = $hodSignature['name'] ?? null;
+                    $employeeResignation->hod_signed_at = $hodSignature['timestamp'] ?? null;
+                }
                 // Clear any prior On Hold state on a fresh decision.
                 // Approve unfreezes the row back to 'Pending' so HR can
                 // take over; Reject is handled below by the terminal
@@ -453,6 +466,15 @@ class EmployeeResignationController extends Controller
                     $employeeResignation->hr_meeting_status = 'Completed';
                     $employeeResignation->hr_comments = $request->meeting_comment;
                     $employeeResignation->status = $status;
+
+                    // Signature snapshot — same reasoning as the HOD
+                    // branch above.
+                    if ($status === 'Approved') {
+                        $hrSignature = Common::snapshotSignature($this->resort->id, 'resignation-approval', $employeeResignation->id . '-hr');
+                        $employeeResignation->hr_signature_img = $hrSignature['signature_img'] ?? null;
+                        $employeeResignation->hr_signature_name = $hrSignature['name'] ?? null;
+                        $employeeResignation->hr_signed_at = $hrSignature['timestamp'] ?? null;
+                    }
                     // Approve or Reject is a terminal decision — clear
                     // any lingering On Hold reason so the row reads
                     // consistently if queried later.
@@ -534,7 +556,54 @@ class EmployeeResignationController extends Controller
             return response()->json(['success' => false, 'message' => 'Employee not found or invalid resignation ID.'], 404);
         }
 
-        
+
+    }
+
+    /**
+     * Resignation approval record PDF — §6.10 of the e-signature spec.
+     * Available at any point (shows whichever of HOD/HR have signed so
+     * far), not gated to fully-approved only.
+     */
+    public function downloadApprovalPdf($id)
+    {
+        $id = base64_decode($id);
+        $employeeResignation = EmployeeResignation::with(['employee.resortAdmin', 'employee.department'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->findOrFail($id);
+
+        $signatures = [];
+        foreach (['hod' => 'HOD', 'hr' => 'HR'] as $prefix => $label) {
+            $name = $employeeResignation->{$prefix . '_signature_name'} ?? null;
+            if ($name) {
+                $signatures[] = [
+                    'name'          => $name,
+                    'signature_img' => $employeeResignation->{$prefix . '_signature_img'} ?? null,
+                    'timestamp'     => $employeeResignation->{$prefix . '_signed_at'} ?? null,
+                ];
+            }
+        }
+
+        $letterhead = Common::getLetterheadData($this->resort->resort_id);
+        if (empty($signatures)) {
+            $signatures[] = [
+                'name'          => $letterhead['signatoryName'] ?: 'Human Resources Department',
+                'signature_img' => null,
+                'timestamp'     => null,
+            ];
+        }
+
+        $resort = Resort::find($this->resort->resort_id);
+
+        $pdf = Pdf::loadView('resorts.people.employee-resignation.approval_pdf', [
+            'employeeResignation' => $employeeResignation,
+            'resort'              => $resort,
+            'resortLogo'          => Common::GetResortLogo($this->resort->resort_id),
+            'letterhead'          => $letterhead,
+            'signatures'          => $signatures,
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        return $pdf->download('Resignation_Approval_' . $employeeResignation->id . '.pdf');
     }
 
     public function scheduleMeeting(Request $request)

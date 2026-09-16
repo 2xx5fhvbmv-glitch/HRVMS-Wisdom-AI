@@ -21,6 +21,9 @@ class TAnotificationChild extends Model
         'modified_by',
         'reason',
         'Approved_By',
+        'signature_img',
+        'signature_name',
+        'signed_at',
 
     ];
 

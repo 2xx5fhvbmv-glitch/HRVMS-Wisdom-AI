@@ -29,6 +29,7 @@ use App\Models\PayrollReview;
 use App\Models\PayrollServiceCharge;
 use App\Models\PayrollTimeAndAttendance;
 use App\Models\FinalSettlement;
+use App\Models\FinalSettlementApproval;
 use App\Models\FinalSettlementDeductions;
 use App\Models\EmployeeResignation;
 use App\Models\FinalSettlementEarnings;
@@ -847,6 +848,15 @@ class PayslipController extends Controller
     /**
      * Final submission of settlement data.
      */
+    /**
+     * §6.2 of the e-signature spec — was a single one-shot finalize.
+     * Now sends the settlement through a per-stage HR → Finance → GM
+     * approval chain (final_settlement_approvals, shaped like the
+     * existing PayrollApproval 3-step chain — see
+     * PayrollController::sendForApproval()/approvePayroll()) before it
+     * actually finalizes. Re-sendable after a rejection (updateOrCreate
+     * resets all 3 rows to pending), same as sendForApproval()'s pattern.
+     */
     public function submit(Request $request)
     {
         $finalSettlement = FinalSettlement::whereHas('employee', function ($q) {
@@ -859,12 +869,18 @@ class PayslipController extends Controller
         }
 
         // Idempotency: once a settlement is finalized it can't be
-        // re-finalized. Without this, hitting Submit twice would re-
-        // mark loan installments and re-fire the F&F email.
+        // re-submitted, and a settlement already mid-chain shouldn't have
+        // its approval rows reset by a stray double-click.
         if ($finalSettlement->status === 'finalized') {
             return response()->json([
                 'success' => false,
                 'message' => 'This settlement is already finalized and cannot be re-submitted.',
+            ], 422);
+        }
+        if ($finalSettlement->status === 'review') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This settlement is already awaiting approval.',
             ], 422);
         }
 
@@ -872,18 +888,11 @@ class PayslipController extends Controller
         try {
             // The review page recomputes Total Earnings/Deductions/Net Pay
             // live (leave breakdown, custom earnings/deductions rows, etc.)
-            // and posts the final numbers here via hidden fields — this
-            // was previously being silently dropped and the row stayed on
-            // whatever total_earnings/net_pay had been saved at store()
-            // time, which drifts once leave breakdown or attendance-backed
-            // figures change. Persist whatever the page showed HR right
-            // before they clicked Submit, so the list page can never show
-            // a different number than what was actually finalized.
-            $updateData = [
-                'status'       => 'finalized',
-                'finalized_at' => now(),
-                'finalized_by' => Auth::guard('resort-admin')->user()->id ?? null,
-            ];
+            // and posts the final numbers here via hidden fields — persist
+            // whatever the page showed HR right before they clicked
+            // Submit, so the approval chain reviews the same numbers that
+            // get finalized later.
+            $updateData = ['status' => 'review'];
             foreach (['total_earnings', 'total_deductions', 'net_pay', 'worked_days'] as $field) {
                 if ($request->filled($field) && is_numeric($request->input($field))) {
                     $updateData[$field] = $request->input($field);
@@ -891,12 +900,236 @@ class PayslipController extends Controller
             }
             $finalSettlement->update($updateData);
 
-            // ─── Mark outstanding loan / salary-advance installments as
+            $resortId = $this->resort->resort_id;
+            $approvalChain = [
+                ['step_order' => 1, 'role_title' => 'HR EXCOM'],
+                ['step_order' => 2, 'role_title' => 'Finance EXCOM'],
+                ['step_order' => 3, 'role_title' => 'GM'],
+            ];
+            foreach ($approvalChain as $step) {
+                FinalSettlementApproval::updateOrCreate(
+                    ['final_settlement_id' => $finalSettlement->id, 'step_order' => $step['step_order']],
+                    [
+                        'resort_id' => $resortId,
+                        'role_title' => $step['role_title'],
+                        'status' => 'pending',
+                        'approver_id' => null,
+                        'approver_name' => null,
+                        'remarks' => null,
+                        'approved_at' => null,
+                        'signature_img' => null,
+                        'signature_name' => null,
+                        'signed_at' => null,
+                    ]
+                );
+            }
+
+            \DB::commit();
+        } catch (\Throwable $e) {
+            \DB::rollBack();
+            \Log::error('F&F submit failed', [
+                'final_settlement_id' => $finalSettlement->id,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send settlement for approval: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        // Notify the first approver (HR EXCOM) — mirrors
+        // PayrollController::sendForApproval()'s notifyApprover() call.
+        try {
+            $hrIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+            if (!empty($hrIds)) {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    $hrIds,
+                    'Final Settlement Awaiting Approval',
+                    'A full and final settlement (Ref: ' . ($finalSettlement->reference_no ?? '-') . ') is awaiting your approval.',
+                    'Payroll',
+                    $finalSettlement->id
+                );
+            }
+        } catch (\Exception $e) {
+            \Log::warning('F&F send-for-approval notification failed: ' . $e->getMessage());
+        }
+
+        return response()->json(['success' => true, 'message' => 'Final settlement sent for approval (HR → Finance → GM).']);
+    }
+
+    /**
+     * Determine which approval step a user can approve based on their
+     * role — same rank/department mapping as
+     * PayrollController::getApprovalStepForUser(), just HR-first instead
+     * of Finance-first (step order here is HR → Finance → GM, matching
+     * the sequence Budget/Vacancy approvals already use elsewhere in
+     * this app, vs Payroll's own Finance → HR → GM).
+     */
+    private function getFinalSettlementApprovalStep($rankPosition)
+    {
+        if (!$rankPosition) return null;
+        $rank = $rankPosition['rank'];
+        $position = $rankPosition['position'];
+
+        if ($rank === 'EXCOM' && $position === 'HR') return 1;
+        if ($rank === 'EXCOM' && $position === 'Finance') return 2;
+        if ($rank === 'GM') return 3;
+
+        return null;
+    }
+
+    /**
+     * Approve or reject the final settlement at the current step —
+     * mirrors PayrollController::approvePayroll() exactly (sequential
+     * gate, single shared action resolving the step from the caller's own
+     * rank/department), plus a per-stage frozen signature snapshot
+     * (Common::snapshotSignature()) that Payroll's own chain doesn't
+     * capture. Once all 3 steps are approved, this is what actually
+     * finalizes the settlement (loan-recovery marking + PDF/email
+     * dispatch) — submit() above only starts the chain.
+     */
+    public function approveFinalSettlement(Request $request)
+    {
+        $finalSettlementId = $request->final_settlement_id;
+        $resortId = $this->resort->resort_id;
+
+        $finalSettlement = FinalSettlement::whereHas('employee', function ($q) use ($resortId) {
+                $q->where('resort_id', $resortId);
+            })
+            ->find($finalSettlementId);
+
+        if (!$finalSettlement) {
+            return response()->json(['success' => false, 'message' => 'No settlement record found.'], 404);
+        }
+
+        $currentAdmin = Auth::guard('resort-admin')->user();
+        $employee = $currentAdmin->GetEmployee ?? null;
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee not found.'], 403);
+        }
+
+        $rankPosition = Common::getEmployeeRankPosition($employee);
+        $approvalStep = $this->getFinalSettlementApprovalStep($rankPosition);
+        if (!$approvalStep) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to approve this settlement.'], 403);
+        }
+
+        // resort_id scoped so a HR/Finance/GM whose rank matches the step
+        // can't act on another resort's pending row by guessing the id.
+        $approval = FinalSettlementApproval::where('final_settlement_id', $finalSettlementId)
+            ->where('resort_id', $resortId)
+            ->where('step_order', $approvalStep)
+            ->where('status', 'pending')
+            ->first();
+
+        if (!$approval) {
+            return response()->json(['success' => false, 'message' => 'This step is not pending your approval.'], 400);
+        }
+
+        $previousPending = FinalSettlementApproval::where('final_settlement_id', $finalSettlementId)
+            ->where('step_order', '<', $approvalStep)
+            ->where('status', '!=', 'approved')
+            ->exists();
+        if ($previousPending) {
+            return response()->json(['success' => false, 'message' => 'Previous approval steps must be completed first.'], 400);
+        }
+
+        $isReject = $request->action === 'reject';
+
+        // Signature snapshot — only an Approve represents this person
+        // actually signing off. Frozen HERE, at the moment they act —
+        // never re-derived later from the live ResortAdmin.signature_img.
+        $signatureFields = [];
+        if (!$isReject) {
+            $signatureFields = Common::snapshotSignature($currentAdmin->id, 'final-settlement', $approval->id);
+        }
+
+        $approval->update([
+            'status' => $isReject ? 'rejected' : 'approved',
+            'approver_id' => $employee->id,
+            'approver_name' => trim($currentAdmin->first_name . ' ' . $currentAdmin->last_name),
+            'remarks' => $request->remarks,
+            'approved_at' => now(),
+            'signature_img' => $signatureFields['signature_img'] ?? null,
+            'signature_name' => $signatureFields['name'] ?? null,
+            'signed_at' => $signatureFields['timestamp'] ?? null,
+        ]);
+
+        $approverName = trim($currentAdmin->first_name . ' ' . $currentAdmin->last_name);
+
+        if ($isReject) {
+            $finalSettlement->update(['status' => 'draft']);
+            try {
+                $preparer = Employee::where('resort_id', $resortId)->where('rank', 5)->first();
+                if ($preparer) {
+                    Common::notifyEmployees(
+                        $resortId,
+                        [$preparer->id],
+                        'Final Settlement Rejected',
+                        "Settlement (Ref: {$finalSettlement->reference_no}) was rejected by {$approverName}. Reason: " . ($request->remarks ?? 'No reason provided'),
+                        'Payroll',
+                        $finalSettlement->id
+                    );
+                }
+            } catch (\Exception $e) {
+                \Log::warning('F&F rejection notification failed: ' . $e->getMessage());
+            }
+            return response()->json(['success' => true, 'message' => 'Final settlement has been rejected.']);
+        }
+
+        $allApproved = FinalSettlementApproval::where('final_settlement_id', $finalSettlementId)
+            ->where('status', '!=', 'approved')
+            ->doesntExist();
+
+        if ($allApproved) {
+            $this->completeFinalSettlement($finalSettlement, $employee->id);
+        } else {
+            $stepTitles = [1 => 'HR EXCOM', 2 => 'Finance EXCOM', 3 => 'GM'];
+            try {
+                $nextRecipients = match ($approvalStep + 1) {
+                    2 => Common::getResortFinanceEmployeeIds($resortId),
+                    3 => Common::getResortGmEmployeeIds($resortId),
+                    default => [],
+                };
+                if (!empty($nextRecipients)) {
+                    Common::notifyEmployees(
+                        $resortId,
+                        $nextRecipients,
+                        'Final Settlement Approval Progress',
+                        "Settlement (Ref: {$finalSettlement->reference_no}) approved by {$approverName} (" . ($stepTitles[$approvalStep] ?? '') . "). Awaiting your approval.",
+                        'Payroll',
+                        $finalSettlement->id
+                    );
+                }
+            } catch (\Exception $e) {
+                \Log::warning('F&F approval-progress notification failed: ' . $e->getMessage());
+            }
+        }
+
+        return response()->json(['success' => true, 'message' => 'Final settlement approved successfully.']);
+    }
+
+    /**
+     * The actual finalize step — everything submit() used to do
+     * immediately, now gated behind all 3 approval stages. Kept as its
+     * own method so approveFinalSettlement() reads as "gate, then
+     * finalize" rather than duplicating this inline.
+     */
+    private function completeFinalSettlement(FinalSettlement $finalSettlement, ?int $finalizedByEmployeeId): void
+    {
+        \DB::beginTransaction();
+        try {
+            $finalSettlement->update([
+                'status' => 'finalized',
+                'finalized_at' => now(),
+                'finalized_by' => Auth::guard('resort-admin')->user()->id ?? null,
+            ]);
+
+            // Mark outstanding loan / salary-advance installments as
             // Recovered so the next payroll run doesn't double-deduct
-            // them. We only flip rows whose summed amount was actually
-            // included in the F&F payout (loan_payment > 0). The DB
-            // column update is wrapped in the same transaction as the
-            // finalize, so a partial failure rolls both back.
+            // them. Only rows whose summed amount was actually included
+            // in the F&F payout (loan_payment > 0).
             $loanInPayout = (float) ($finalSettlement->loan_payment ?? 0);
             if ($loanInPayout > 0 && $finalSettlement->employee_id) {
                 $now = now();
@@ -913,33 +1146,27 @@ class PayslipController extends Controller
                     ]);
             }
 
-            // Dispatch the F&F PDF email to the employee and Finance.
-            // Wrapped in try/catch so an SMTP outage doesn't roll back
-            // the finalize (the settlement is still valid even if the
-            // email fails — Finance can resend from the list page).
-            try {
-                $this->dispatchFinalSettlementEmail($finalSettlement);
-            } catch (\Throwable $emailErr) {
-                \Log::warning('F&F email dispatch failed: ' . $emailErr->getMessage(), [
-                    'final_settlement_id' => $finalSettlement->id,
-                ]);
-            }
-
             \DB::commit();
         } catch (\Throwable $e) {
             \DB::rollBack();
-            \Log::error('F&F submit failed', [
+            \Log::error('F&F finalize (post-approval) failed', [
                 'final_settlement_id' => $finalSettlement->id,
                 'error' => $e->getMessage(),
             ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to finalize settlement: ' . $e->getMessage(),
-            ], 500);
+            return;
         }
 
-        // The employee only ever heard about this via email (dispatchFinalSettlementEmail
-        // above) — no in-app/push notification of any kind.
+        // Dispatch the F&F PDF email to the employee and Finance. Outside
+        // the transaction above (same as the original submit() did) so an
+        // SMTP outage never rolls back the finalize.
+        try {
+            $this->dispatchFinalSettlementEmail($finalSettlement);
+        } catch (\Throwable $emailErr) {
+            \Log::warning('F&F email dispatch failed: ' . $emailErr->getMessage(), [
+                'final_settlement_id' => $finalSettlement->id,
+            ]);
+        }
+
         if ($finalSettlement->employee_id) {
             try {
                 Common::notifyEmployees(
@@ -954,8 +1181,41 @@ class PayslipController extends Controller
                 \Log::warning('F&F finalize notification failed: ' . $e->getMessage());
             }
         }
+    }
 
-        return response()->json(['success' => true, 'message' => 'Final settlement submitted successfully.']);
+    /**
+     * Approval-chain status for the review page's timeline UI — mirrors
+     * PayrollController::getApprovalStatus().
+     */
+    public function getFinalSettlementApprovalStatus(Request $request)
+    {
+        $finalSettlementId = $request->final_settlement_id;
+        $resortId = $this->resort->resort_id;
+
+        $finalSettlement = FinalSettlement::whereHas('employee', function ($q) use ($resortId) {
+                $q->where('resort_id', $resortId);
+            })
+            ->find($finalSettlementId);
+
+        if (!$finalSettlement) {
+            return response()->json(['success' => false, 'message' => 'No settlement record found.'], 404);
+        }
+
+        $approvals = FinalSettlementApproval::where('final_settlement_id', $finalSettlementId)
+            ->orderBy('step_order')
+            ->get();
+
+        $currentAdmin = Auth::guard('resort-admin')->user();
+        $employee = $currentAdmin->GetEmployee ?? null;
+        $rankPosition = $employee ? Common::getEmployeeRankPosition($employee) : null;
+        $userApprovalStep = $this->getFinalSettlementApprovalStep($rankPosition);
+
+        return response()->json([
+            'success' => true,
+            'approvals' => $approvals,
+            'settlement_status' => $finalSettlement->status,
+            'user_approval_step' => $userApprovalStep,
+        ]);
     }
 
     /**

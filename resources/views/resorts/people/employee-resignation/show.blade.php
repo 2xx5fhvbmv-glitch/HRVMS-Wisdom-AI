@@ -18,6 +18,12 @@
                             <h1>{{ $page_title }}</h1>
                         </div>
                     </div>
+                    <div class="col-auto ms-auto">
+                        <a href="{{ route('people.employee-resignation.downloadApprovalPdf', base64_encode($employeeResignation->id)) }}"
+                           target="_blank" class="btn btn-theme btn-sm">
+                            <i class="fa-regular fa-file-pdf"></i> Download Approval Record
+                        </a>
+                    </div>
                 </div>
             </div>
             <div class="card card-exitProfilePeopleEmp">

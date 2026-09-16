@@ -28,6 +28,29 @@ class EmployeeChatController extends Controller
         }
     }
 
+    public function checkConnection($user_id){
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employee   = $this->user->GetEmployee;
+        $sender_id  = $employee->id;
+        $restrictedRanks = [1, 2, 4, 8];
+
+        $sender     = Employee::where('id', $sender_id)->where('resort_id', $this->resort_id)->first();
+        $receiver   = Employee::where('id', $user_id)->where('resort_id', $this->resort_id)->first();
+
+        if (!$receiver) {
+            return response()->json(['success' => false, 'message' => 'User not found'], 404);
+        }
+
+        if (in_array($sender->rank, $restrictedRanks) || in_array($receiver->rank, $restrictedRanks)) {
+            return response()->json(['success' => false, 'message' => 'Conversation between these ranks is not allowed.'], 200);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Connection allowed']);
+    }
+
     public function sendMessage(Request $request){
 
         // retusrn response()->json(['success' => true, 'message' => 'Stopped']);

@@ -141,6 +141,34 @@
             </div>
         </div>
     </div>
+
+    {{-- Per-employee sign-off breakdown (Part 2.6) --}}
+    <div class="modal fade" id="jdEmployeeRecords-modal" tabindex="-1" aria-labelledby="jdEmployeeRecordsLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="jdEmployeeRecordsLabel">Employee Sign-off Status</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-jd-employee-records w-100">
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Status</th>
+                                <th>Decline Reason</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Close</a>
+                </div>
+            </div>
+        </div>
+    </div>
     @endsection
 
     @section('import-css')
@@ -386,6 +414,99 @@
         });
         $('.search').on('keyup', function() {
             viewJobDes.ajax.reload();
+        });
+
+        // Part 2.2-2.4 + 2.7: Issue this JD to every matching employee who
+        // doesn't already have a record — same button/endpoint whether this
+        // is the first batch or picking up new hires later.
+        $(document).on('click', '.issue-jd-btn', function() {
+            let id = $(this).data('id');
+            let url = "{{ route('resort.ta.jobdescription.issue', ':id') }}";
+            url = url.replace(':id', id);
+
+            wisdomConfirm({
+                role: 'default',
+                title: 'Issue Job Description?',
+                text: 'Every employee currently in this position without a record will be sent this job description to review and sign.',
+                confirmText: 'Yes, Issue',
+                cancelText: 'Cancel'
+            }).then((result) => {
+                if (!result.isConfirmed) return;
+                $.ajax({
+                    url: url,
+                    method: "POST",
+                    data: { "_token": "{{ csrf_token() }}" },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                        } else {
+                            toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
+                        }
+                    },
+                    error: function() {
+                        toastr.error('An unexpected error occurred. Please try again.', "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                });
+            });
+        });
+
+        // Part 2.6: per-employee sign-off breakdown modal.
+        var jdEmployeeRecordsTable = null;
+        var currentJdIdForEmployeeRecords = null;
+        $(document).on('click', '.view-jd-employees-btn', function() {
+            currentJdIdForEmployeeRecords = $(this).data('id');
+            $('#jdEmployeeRecords-modal').modal('show');
+
+            let url = "{{ route('resort.ta.jobdescription.employeeRecords', ':id') }}";
+            url = url.replace(':id', currentJdIdForEmployeeRecords);
+
+            if (jdEmployeeRecordsTable) {
+                jdEmployeeRecordsTable.ajax.url(url).load();
+                return;
+            }
+
+            jdEmployeeRecordsTable = $('.table-jd-employee-records').DataTable({
+                searching: false,
+                bLengthChange: false,
+                bInfo: true,
+                bAutoWidth: false,
+                processing: true,
+                serverSide: true,
+                ajax: { url: url, type: 'GET' },
+                columns: [
+                    { data: 'EmployeeName', name: 'EmployeeName' },
+                    { data: 'Status', name: 'Status' },
+                    { data: 'DeclineReason', name: 'DeclineReason', orderable: false, searchable: false },
+                    { data: 'action', name: 'action', orderable: false, searchable: false },
+                ]
+            });
+        });
+
+        // Part 2.5 step 3: HR resend on a Declined record — resets the same
+        // row to Pending, doesn't create a new one.
+        $(document).on('click', '.resend-jd-btn', function() {
+            let id = $(this).data('id');
+            let url = "{{ route('resort.ta.jobdescription.resend', ':id') }}";
+            url = url.replace(':id', id);
+
+            $.ajax({
+                url: url,
+                method: "POST",
+                data: { "_token": "{{ csrf_token() }}" },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                        if (jdEmployeeRecordsTable) jdEmployeeRecordsTable.ajax.reload();
+                    } else {
+                        toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function() {
+                    toastr.error('An unexpected error occurred. Please try again.', "Error", { positionClass: 'toast-bottom-right' });
+                }
+            });
         });
 
     });

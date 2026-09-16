@@ -12,7 +12,9 @@ use App\Models\ResortPosition;
 use App\Models\Professionalform;
 use App\Models\EmployeePipPlan;
 use App\Models\EmployeePdpPlan;
+use App\Models\Resort;
 use App\Helpers\Common;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class PipPdpController extends Controller
 {
@@ -124,6 +126,11 @@ class PipPdpController extends Controller
         return $this->streamPlanFile('pip', $id, $field);
     }
 
+    public function pipDownloadPdf($id)
+    {
+        return $this->downloadPlanPdf('pip', $id);
+    }
+
     // ==================== PDP ====================
 
     public function pdpIndex(Request $request)
@@ -225,6 +232,11 @@ class PipPdpController extends Controller
         return $this->streamPlanFile('pdp', $id, $field);
     }
 
+    public function pdpDownloadPdf($id)
+    {
+        return $this->downloadPlanPdf('pdp', $id);
+    }
+
     // ==================== SHARED ====================
 
     private function planModel($kind)
@@ -269,6 +281,62 @@ class PipPdpController extends Controller
         return view('resorts.Performance.PipPdp.view', compact(
             'page_title', 'plan', 'structure', 'existingData', 'canEdit', 'kind'
         ));
+    }
+
+    /**
+     * PDF export of a submitted (locked) PIP/PDP plan, with the assigned
+     * employee's frozen signature captured at submission time.
+     */
+    private function downloadPlanPdf($kind, $id)
+    {
+        $model = $this->planModel($kind);
+        $plan = $model::with('employee.resortAdmin', 'employee.position', 'position', 'template')
+            ->where('resort_id', $this->resort->resort_id)
+            ->find($id);
+
+        if (!$plan) abort(404, ucfirst($kind) . ' plan not found.');
+        if (!$this->canAccessPlan($plan)) {
+            abort(403, 'You are not authorized to view this plan.');
+        }
+        if (!$plan->submitted_at) {
+            abort(403, 'This plan has not been submitted yet.');
+        }
+
+        $structure = [];
+        if ($plan->template && $plan->template->form_structure) {
+            $decoded = json_decode($plan->template->form_structure, true);
+            if (is_string($decoded)) $decoded = json_decode($decoded, true);
+            $structure = is_array($decoded) ? $decoded : [];
+        }
+
+        $responseData = $plan->response_data ? json_decode($plan->response_data, true) : [];
+        if (!is_array($responseData)) $responseData = [];
+
+        $signatures = [];
+        if (!empty($plan->signature_name)) {
+            $signatures[] = [
+                'name'          => $plan->signature_name,
+                'signature_img' => $plan->signature_img,
+                'timestamp'     => $plan->signed_at,
+            ];
+        }
+
+        $letterhead = Common::getLetterheadData($this->resort->resort_id);
+        $resort = Resort::find($this->resort->resort_id);
+
+        $pdf = Pdf::loadView('resorts.Performance.PipPdp.plan_pdf', [
+            'kind'         => $kind,
+            'plan'         => $plan,
+            'structure'    => $structure,
+            'responseData' => $responseData,
+            'resort'       => $resort,
+            'resortLogo'   => Common::GetResortLogo($this->resort->resort_id),
+            'letterhead'   => $letterhead,
+            'signatures'   => $signatures,
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        return $pdf->download(strtoupper($kind) . '_Plan_' . $plan->id . '.pdf');
     }
 
     /**
@@ -327,10 +395,17 @@ class PipPdpController extends Controller
             return response()->json(['success' => false, 'message' => 'Please fill all required fields', 'errors' => $errors], 422);
         }
 
+        // Frozen HERE, at the moment the plan is submitted (which locks it
+        // read-only) — never re-derived later from the live signature_img.
+        $signature = Common::snapshotSignature($this->resort->id, $kind . '-plan-submission', $plan->id);
+
         $plan->update([
             'response_data' => json_encode($payload),
             'submitted_at'  => now(),
             'submitted_by'  => $currentEmpId,
+            'signature_img'  => $signature['signature_img'] ?? null,
+            'signature_name' => $signature['name'] ?? null,
+            'signed_at'      => $signature['timestamp'] ?? null,
         ]);
 
         // Notify the creator / managers that the plan was submitted.

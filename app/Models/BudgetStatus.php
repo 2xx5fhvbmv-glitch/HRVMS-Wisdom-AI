@@ -15,7 +15,7 @@ class BudgetStatus extends Model
 
     protected $table = 'budget_statuses';
 
-    public $fillable = ['resort_id','message_id','Budget_id','status','comments','Department_id','OtherComments'];
+    public $fillable = ['resort_id','message_id','Budget_id','status','comments','Department_id','OtherComments','signature_img','signature_name','signed_at'];
 
 
 

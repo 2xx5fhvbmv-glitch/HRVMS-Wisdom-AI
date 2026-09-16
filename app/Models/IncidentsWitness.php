@@ -18,7 +18,10 @@ class IncidentsWitness extends Model
         'witness_id',
         'witness_statements',
         'witness_status',
-        'witness_statement_file'  
+        'witness_statement_file',
+        'witness_signature_img',
+        'witness_signature_name',
+        'witness_signed_at',
     ];
     public static function boot(){
         parent::boot();

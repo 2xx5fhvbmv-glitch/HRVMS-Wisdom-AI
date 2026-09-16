@@ -4165,40 +4165,18 @@ class LeaveController extends Controller
                 ], Common::buildLeaveApprovalFlow($leaveId, $currentApproverId)), 200);
             }
 
-            // Signature gate — same pattern already proven on web
-            // (InterviewAssessmentController et al.): an Approve can't
-            // complete with no signature on file, since the resulting PDF
-            // would otherwise show a blank space where the approver's
-            // signature belongs, with no error anyone would notice until
-            // someone downloads the document later. Rejections don't
-            // represent a consent/approval being signed, so they're not
-            // gated — only Approved is. (Island Pass shares this same
-            // handler/code path but has no PDF needing a signature; the
-            // gate applies to it too as an accepted side effect, per the
-            // web doc's module survey.)
-            $signatureSnapshot = null;
-            if ($action === 'Approved') {
-                if (empty($user->signature_img)) {
-                    return response()->json([
-                        'status'  => false,
-                        'message' => 'Authorized signature is missing. Please upload it first from your profile page.',
-                    ], 422);
-                }
-                // Snapshot taken HERE, at the exact moment this approval is
-                // recorded — never re-derived later from the live
-                // ResortAdmin.signature_img (Common::snapshotSignature()).
-                $signatureSnapshot = Common::snapshotSignature($user->id, 'leave', $leave->id);
-            }
-
+            // Leave requests are never downloaded/emailed as a PDF, so
+            // there's nowhere for a signature to appear — no gate here.
+            // (Island Pass shares this same handler/code path and was
+            // never in scope either.) employees_leaves_status's
+            // signature_img/signature_name/signed_at columns stay
+            // unused/nullable — not written to from this path anymore.
             EmployeeLeaveStatus::where('leave_request_id', $leave->id)->where('approver_id', $currentApproverId)->update(array_filter([
                 'leave_request_id'                      =>  $leave->id,
                 'approver_id'                           =>  $currentApproverId,
                 'status'                                =>  $action,
                 'comments'                              =>  $comments, // Save comments if provided
                 'approved_at'                           =>  now(),
-                'signature_img'                         =>  $signatureSnapshot['signature_img'] ?? null,
-                'signature_name'                        =>  $signatureSnapshot['name'] ?? null,
-                'signed_at'                              =>  $signatureSnapshot['timestamp'] ?? null,
             ], fn($v) => $v !== null));
 
                 $empName            =   Employee::join('resort_admins as ra','ra.id','=','employees.Admin_Parent_id')

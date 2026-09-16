@@ -41,7 +41,16 @@ class EmployeeResignation extends Model
         'updated_at',
         'Deposit_withdraw',
         'Deposit_Amt',
-        'deposit_refund_snooze_until'
+        'deposit_refund_snooze_until',
+        'signature_img',
+        'signature_name',
+        'signed_at',
+        'hod_signature_img',
+        'hod_signature_name',
+        'hod_signed_at',
+        'hr_signature_img',
+        'hr_signature_name',
+        'hr_signed_at',
     ];
 
     

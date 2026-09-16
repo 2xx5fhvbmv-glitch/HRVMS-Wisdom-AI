@@ -1963,21 +1963,26 @@ class BoardingPassController extends Controller
                         'employee_id'      => $employeeId,
                     ]);
                 }
-
-                Common::sendMobileNotification(
-                    $this->resort_id,
-                    2,
-                    null,
-                    null,
-                    'Boarding Pass Request',
-                    'A boarding pass assigned to you by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
-                    'Boarding Pass',
-                    $request->employee_ids,
-                    null,
-                    false,
-                    'security-officer-details',
-                );
             }
+
+            // Was inside the loop, sending the full employee_ids[] to every
+            // officer once per officer in the list — 3 officers meant each
+            // one got 3 duplicate pushes for the same assignment. Same
+            // "notify once, not once per iteration" fix already applied to
+            // manifestStore() above.
+            Common::sendMobileNotification(
+                $this->resort_id,
+                2,
+                null,
+                null,
+                'Boarding Pass Request',
+                'A boarding pass assigned to you by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                'Boarding Pass',
+                $request->employee_ids,
+                null,
+                false,
+                'security-officer-details',
+            );
 
             DB::commit();
 
@@ -1994,6 +1999,97 @@ class BoardingPassController extends Controller
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
 
+    }
+
+    /**
+     * Assign one or more Security Officers to every travel pass on a
+     * confirmed manifest in one call, instead of the caller having to
+     * discover each pass_id on the manifest and call SOPassAssign() once
+     * per employee. Reuses the same employee_travel_pass_assign table and
+     * idempotency rule SOPassAssign() already established (resort + pass +
+     * officer), so an officer already assigned to one of the manifest's
+     * passes is skipped, not duplicated.
+     */
+    public function manifestSOAssign(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage manifests.'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'manifest_id'                       => 'required',
+            'employee_ids'                      => 'required|array',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $manifest = Manifest::where('resort_id', $this->resort_id)->find($request->manifest_id);
+        if (!$manifest) {
+            return response()->json(['success' => false, 'message' => 'Manifest not found'], 200);
+        }
+
+        $passIds = EmployeeTravelPass::where('resort_id', $this->resort_id)
+            ->where('manifest_id', $manifest->id)
+            ->pluck('id');
+
+        if ($passIds->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No travel passes found on this manifest'], 200);
+        }
+
+        DB::beginTransaction();
+        try {
+
+            foreach ($passIds as $passId) {
+                foreach ($request->employee_ids as $employeeId) {
+                    $exists = EmployeeTravelPassAssign::where([
+                        ['resort_id', $this->resort_id],
+                        ['travel_pass_id', $passId],
+                        ['employee_id', $employeeId]
+                    ])->exists();
+
+                    if (!$exists) {
+                        EmployeeTravelPassAssign::create([
+                            'resort_id'        => $this->resort_id,
+                            'travel_pass_id'   => $passId,
+                            'employee_id'      => $employeeId,
+                        ]);
+                    }
+                }
+            }
+
+            Common::sendMobileNotification(
+                $this->resort_id,
+                2,
+                null,
+                null,
+                ucfirst($manifest->manifest_type) . ' Manifest Assigned',
+                'You have been assigned to the ' . $manifest->manifest_type . ' manifest for ' . $manifest->transportation_name . ' on ' . Common::formatDate($manifest->date) . ' by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                'Boarding Pass',
+                $request->employee_ids,
+                $manifest->id,
+                false,
+                'security-officer-manifest-details',
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'success'                       =>  true,
+                'message'                       =>  'The manifest has been successfully assigned to the selected Security Officers.',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
     }
 
     public function SODashboard(Request $request)
@@ -2038,9 +2134,14 @@ class BoardingPassController extends Controller
                                                             $query->whereBetween('departure_date', [$startDate, $endDate])
                                                                     ->orWhereBetween('arrival_date', [$startDate, $endDate]);
                                                             })->with([
-                                                                'employeeTravelPasses:id,status,departure_date,departure_time,arrival_date,arrival_time,employee_id,employee_departure_status,employee_arrival_status',
+                                                                // manifest_id added so the mobile app can group an
+                                                                // officer's assigned passes by the manifest they came
+                                                                // from (Arrival/Departure Manifest screen), instead of
+                                                                // only ever seeing a flat per-employee pass list.
+                                                                'employeeTravelPasses:id,status,departure_date,departure_time,arrival_date,arrival_time,employee_id,employee_departure_status,employee_arrival_status,manifest_id',
                                                                 'employeeTravelPasses.employee:id,Admin_Parent_id',
                                                                 'employeeTravelPasses.employee.resortAdmin:id,first_name,last_name,profile_picture',
+                                                                'employeeTravelPasses.manifest:id,manifest_type,transportation_mode,transportation_name,date,time',
                                                             ])->where('employee_id',$SOId)->get()->map( function($row){
                                                                 $row->employeeTravelPasses->employee->resortAdmin->profile_picture = Common::getResortUserPicture($row->employeeTravelPasses->employee->Admin_Parent_id);
                                                                 return $row;
@@ -2410,9 +2511,16 @@ class BoardingPassController extends Controller
 
         try {
 
+            // Was hard-filtered to status='saved' only — a confirmed
+            // (arrival) or closed (departure) manifest permanently
+            // disappeared from this listing the moment it was confirmed,
+            // with no other endpoint to find it again. HR/Security need it
+            // to stay visible as a locked/archived record, distinguished by
+            // its status field, not removed.
             $ManifestListing                            =   Manifest::where('resort_id',$this->resort_id)
                                                             ->where('manifest_type',$request->manifest_type)
-                                                            ->where('status','saved')
+                                                            ->orderBy('date', 'desc')
+                                                            ->orderBy('id', 'desc')
                                                             ->get();
 
             return response()->json([
@@ -2682,10 +2790,16 @@ class BoardingPassController extends Controller
 
         try {
             $assignment                              =   \App\Models\EmployeeTravelPassAssign::with([
-                                                                'employeeTravelPasses:id,status,departure_date,departure_time,arrival_date,arrival_time,employee_id,employee_departure_status,employee_arrival_status',
+                                                                // manifest_id + the manifest relation itself, so the
+                                                                // officer's assignment detail screen can show which
+                                                                // Arrival/Departure Manifest this pass belongs to
+                                                                // (transportation, date), not just the one employee's
+                                                                // pass in isolation.
+                                                                'employeeTravelPasses:id,status,departure_date,departure_time,arrival_date,arrival_time,employee_id,employee_departure_status,employee_arrival_status,manifest_id',
                                                                 'employeeTravelPasses.employee:id,Admin_Parent_id,Position_id',
                                                                 'employeeTravelPasses.employee.resortAdmin:id,first_name,last_name,profile_picture',
                                                                 'employeeTravelPasses.employee.position:id,position_title',
+                                                                'employeeTravelPasses.manifest:id,manifest_type,transportation_mode,transportation_name,date,time',
                                                             ])
                                                             ->where('resort_id', $this->resort_id)
                                                             ->where('id', $assignId)

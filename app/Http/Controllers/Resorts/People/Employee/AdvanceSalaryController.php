@@ -11,12 +11,14 @@ use App\Models\PayrollAdvance;
 use App\Models\PayrollAdvanceGuarantor;
 use App\Models\PayrollRecoverySchedule;
 use App\Models\ResortPosition;
+use App\Models\Resort;
 use App\Events\ResortNotificationEvent;
 use Auth;
 use Config;
 use Common;
 use DB;
 use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class AdvanceSalaryController extends Controller
 {
@@ -255,11 +257,7 @@ class AdvanceSalaryController extends Controller
         // Finance move a still-Pending installment to a different upcoming
         // month (e.g. April instead of March) via the same shared
         // AdvanceSalaryRepaymentTrackerController::update() endpoint.
-        $availableMonths = [];
-        $currentMonth = Carbon::now();
-        for ($i = 0; $i < 36; $i++) {
-            $availableMonths[] = $currentMonth->copy()->addMonths($i)->format('F Y');
-        }
+        $availableMonths = Common::advanceSalaryAvailableMonths($id);
 
         return view('resorts.people.employee.advance-salary.show',compact('page_title','advance_salary','guarantors','recovery_schedule','total_interest','actual_amount','total_recovery','resolvedAttachments','isHR','isFinance','isGM','availableMonths'));
     }
@@ -600,11 +598,21 @@ class AdvanceSalaryController extends Controller
                                 'message' => 'Guarantor is not Approved.',
                             ]);
                     }
+                    // Signature snapshot — frozen HERE, at the moment this
+                    // HR approver acts ($this->resort — the real logged-in
+                    // actor, may differ from $hr via the delegation path
+                    // above) — never re-derived later from the live
+                    // ResortAdmin.signature_img.
+                    $hrSignature = Common::snapshotSignature($this->resort->id, 'salary-advance', $payrollAdvance->id . '-hr');
+
                     $payrollAdvance->update([
                     'hr_status' => 'Approved',
                     'hr_approved_by' => $hr->id,
                     'hr_action_date' => Carbon::now(),
                     'status' => 'In-Progress',
+                    'hr_signature_img' => $hrSignature['signature_img'] ?? null,
+                    'hr_signature_name' => $hrSignature['name'] ?? null,
+                    'hr_signed_at' => $hrSignature['timestamp'] ?? null,
                     ]);
 
                     
@@ -673,11 +681,16 @@ class AdvanceSalaryController extends Controller
                 }
 
                 if($request->status == 'Approved'){
+                    $financeSignature = Common::snapshotSignature($this->resort->id, 'salary-advance', $payrollAdvance->id . '-finance');
+
                     $payrollAdvance->update([
                     'finance_status' => 'Approved',
                     'finance_approved_by' => $financeApprover->id,
                     'finance_action_date' => Carbon::now(),
                     'status' => 'In-Progress',
+                    'finance_signature_img' => $financeSignature['signature_img'] ?? null,
+                    'finance_signature_name' => $financeSignature['name'] ?? null,
+                    'finance_signed_at' => $financeSignature['timestamp'] ?? null,
                     ]);
 
                     event(new ResortNotificationEvent(Common::nofitication(
@@ -742,11 +755,16 @@ class AdvanceSalaryController extends Controller
                     ->update(['status' => 'Pending']);
 
                 if($request->status == 'Approved'){
+                    $gmSignature = Common::snapshotSignature($this->resort->id, 'salary-advance', $payrollAdvance->id . '-gm');
+
                     $payrollAdvance->update([
                         'gm_status' => 'Approved',
                         'gm_approved_by' => $gmApprover->id,
                         'status' => 'Approved',
                         'gm_action_date' => Carbon::now(),
+                        'gm_signature_img' => $gmSignature['signature_img'] ?? null,
+                        'gm_signature_name' => $gmSignature['name'] ?? null,
+                        'gm_signed_at' => $gmSignature['timestamp'] ?? null,
                     ]);
 
                     event(new ResortNotificationEvent(Common::nofitication(
@@ -801,6 +819,54 @@ class AdvanceSalaryController extends Controller
             'redirect_url' => route('people.advance-salary.index'),
         ]);
 
+    }
+
+    /**
+     * Approval record PDF — §6.9 of the e-signature spec. Available at
+     * any point in the chain (shows whichever stages have signed so far),
+     * not gated to fully-approved only, since HR/Finance/GM may each want
+     * a record of their own stage.
+     */
+    public function downloadApprovalPdf($id)
+    {
+        $payrollAdvance = PayrollAdvance::with(['employee.resortAdmin', 'employee.department', 'employee.position'])
+            ->where('id', $id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->firstOrFail();
+
+        $signatures = [];
+        foreach (['hr' => 'HR', 'finance' => 'Finance', 'gm' => 'GM'] as $prefix => $label) {
+            $name = $payrollAdvance->{$prefix . '_signature_name'} ?? null;
+            if ($name) {
+                $signatures[] = [
+                    'name'          => $name,
+                    'signature_img' => $payrollAdvance->{$prefix . '_signature_img'} ?? null,
+                    'timestamp'     => $payrollAdvance->{$prefix . '_signed_at'} ?? null,
+                ];
+            }
+        }
+
+        $letterhead = Common::getLetterheadData($this->resort->resort_id);
+        if (empty($signatures)) {
+            $signatures[] = [
+                'name'          => $letterhead['signatoryName'] ?: 'Human Resources Department',
+                'signature_img' => null,
+                'timestamp'     => null,
+            ];
+        }
+
+        $resort = Resort::find($this->resort->resort_id);
+
+        $pdf = Pdf::loadView('resorts.people.employee.advance-salary.approval_pdf', [
+            'payrollAdvance' => $payrollAdvance,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($this->resort->resort_id),
+            'letterhead'     => $letterhead,
+            'signatures'     => $signatures,
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        return $pdf->download('Salary_Advance_Approval_' . $payrollAdvance->id . '.pdf');
     }
 
 }

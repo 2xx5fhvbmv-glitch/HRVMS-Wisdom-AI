@@ -3182,6 +3182,20 @@ class ApplicantsController extends Controller
             });
 
             DB::commit();
+
+            try {
+                Common::notifyEmployees(
+                    $resort_id,
+                    Common::getResortHrEmployeeIds($resort_id),
+                    'Offer Letter Sent',
+                    "Offer letter sent to {$candidateName} for {$positionTitle}.",
+                    'Talent Acquisition',
+                    $applicant_id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Offer letter sent notification failed: ' . $ne->getMessage());
+            }
+
             return response()->json(['success' => true, 'message' => 'Offer letter sent successfully!']);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -3308,6 +3322,20 @@ class ApplicantsController extends Controller
             });
 
             DB::commit();
+
+            try {
+                Common::notifyEmployees(
+                    $resort_id,
+                    Common::getResortHrEmployeeIds($resort_id),
+                    'Contract Sent',
+                    "Employment contract sent to {$candidateName} for {$positionTitle}.",
+                    'Talent Acquisition',
+                    $applicant_id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Contract sent notification failed: ' . $ne->getMessage());
+            }
+
             return response()->json(['success' => true, 'message' => 'Contract sent successfully!']);
         } catch (\Exception $e) {
             DB::rollBack();

@@ -108,39 +108,6 @@
 
     </div>
 </div>
-<div class="modal fade" id="ForwardToHOD-Model" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-small modal-assign">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Assign Task To HOD</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="ForwardToHODForm">
-                @csrf
-                <div class="modal-body">
-                    <div class="bg-themeGrayLight DetailsShow">
-
-                    </div>
-                    <div><label for="select_emp" class="form-label">SELECT EMPLOYEE</label>
-                        <select class="form-select select2t-none" name="HOD_id" id="select_emp" aria-label="Default select example">
-                            <option> </option>
-                            @if($Employee->isNotEmpty())
-                                @foreach ($Employee as $e)
-                                    <option value="{{ $e->id}}"> {{ $e->resortAdmin->first_name}} {{ $e->resortAdmin->last_name}}</option>
-                                @endforeach
-                            @endif
-                        </select>
-                    </div>
-                    <input type="hidden" name="task_id" id="task_id">
-                </div>
-                <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
-                    <button type='submit' class="btn eb-btn-primary">Submit</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 <div class="modal fade" id="ForwardToHOD-DetailsModel" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-small modal-assign">
         <div class="modal-content">
@@ -173,14 +140,6 @@
 
 @section('import-scripts')
 <script>
-    $(document).ready(function () {
-        $("#select_emp").select2({
-            placeholder: "Select Employee",
-            allowClear: true
-        });
-
-        // ForwardToHOD now uses SweetAlert auto-approve flow (see below)
-    });
 
     PendingTaskList()
 

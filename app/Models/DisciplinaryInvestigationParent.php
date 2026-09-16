@@ -18,6 +18,9 @@ class DisciplinaryInvestigationParent extends Model
                             'invesigation_date',
                             'resolution_date',
                             'investigation_file',
-                            'outcome_type'
+                            'outcome_type',
+                            'signature_img',
+                            'signature_name',
+                            'signed_at',
                         ];
 }

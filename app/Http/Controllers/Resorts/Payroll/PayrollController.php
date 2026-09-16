@@ -1323,17 +1323,18 @@ class PayrollController extends Controller
             // Notify supervisor (rank 5) about rejection
             $supervisor = Employee::where('resort_id', $resortId)->where('rank', 5)->first();
             if ($supervisor) {
-                \DB::table('resort_notifications')->insert([
-                    'resort_id' => $resortId,
-                    'user_id' => $supervisor->id,
-                    'module' => 'Payroll Approval',
-                    'type' => 'Payroll Rejected',
-                    'message' => "Payroll for period {$period} was rejected by {$approverName}. Reason: " . ($request->remarks ?? 'No reason provided'),
-                    'status' => 'unread',
-                    'request_id' => $payrollId,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                try {
+                    Common::notifyEmployees(
+                        $resortId,
+                        [$supervisor->id],
+                        'Payroll Rejected',
+                        "Payroll for period {$period} was rejected by {$approverName}. Reason: " . ($request->remarks ?? 'No reason provided'),
+                        'Payroll Approval',
+                        $payrollId
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('Payroll rejection notification failed: ' . $e->getMessage());
+                }
             }
 
             return response()->json(['success' => true, 'message' => 'Payroll has been rejected.']);
@@ -1350,17 +1351,18 @@ class PayrollController extends Controller
             // Notify supervisor that all approvals are done
             $supervisor = Employee::where('resort_id', $resortId)->where('rank', 5)->first();
             if ($supervisor) {
-                \DB::table('resort_notifications')->insert([
-                    'resort_id' => $resortId,
-                    'user_id' => $supervisor->id,
-                    'module' => 'Payroll Approval',
-                    'type' => 'Payroll Fully Approved',
-                    'message' => "Payroll for period {$period} has been fully approved by all approvers. You can now lock the payroll.",
-                    'status' => 'unread',
-                    'request_id' => $payrollId,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                try {
+                    Common::notifyEmployees(
+                        $resortId,
+                        [$supervisor->id],
+                        'Payroll Fully Approved',
+                        "Payroll for period {$period} has been fully approved by all approvers. You can now lock the payroll.",
+                        'Payroll Approval',
+                        $payrollId
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('Payroll fully-approved notification failed: ' . $e->getMessage());
+                }
             }
         } else {
             // Notify next approver
@@ -1370,17 +1372,18 @@ class PayrollController extends Controller
             $supervisor = Employee::where('resort_id', $resortId)->where('rank', 5)->first();
             if ($supervisor) {
                 $stepTitles = [1 => 'Finance EXCOM', 2 => 'HR EXCOM', 3 => 'GM'];
-                \DB::table('resort_notifications')->insert([
-                    'resort_id' => $resortId,
-                    'user_id' => $supervisor->id,
-                    'module' => 'Payroll Approval',
-                    'type' => 'Payroll Approval Progress',
-                    'message' => "Payroll for period {$period} has been approved by {$approverName} (" . ($stepTitles[$approvalStep] ?? '') . ").",
-                    'status' => 'unread',
-                    'request_id' => $payrollId,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                try {
+                    Common::notifyEmployees(
+                        $resortId,
+                        [$supervisor->id],
+                        'Payroll Approval Progress',
+                        "Payroll for period {$period} has been approved by {$approverName} (" . ($stepTitles[$approvalStep] ?? '') . ").",
+                        'Payroll Approval',
+                        $payrollId
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('Payroll approval-progress notification failed: ' . $e->getMessage());
+                }
             }
         }
 
@@ -1474,17 +1477,18 @@ class PayrollController extends Controller
         }
 
         if ($approver) {
-            \DB::table('resort_notifications')->insert([
-                'resort_id' => $resortId,
-                'user_id' => $approver->id, // employee.id, not Admin_Parent_id
-                'module' => 'Payroll Approval',
-                'type' => 'Payroll Approval Required',
-                'message' => "Payroll for period {$period} requires your approval as {$roleTitle}.",
-                'status' => 'unread',
-                'request_id' => $payrollId,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            try {
+                Common::notifyEmployees(
+                    $resortId,
+                    [$approver->id], // employee.id, not Admin_Parent_id
+                    'Payroll Approval Required',
+                    "Payroll for period {$period} requires your approval as {$roleTitle}.",
+                    'Payroll Approval',
+                    $payrollId
+                );
+            } catch (\Exception $e) {
+                \Log::warning('Payroll approver notification failed: ' . $e->getMessage());
+            }
         }
     }
 

@@ -11,7 +11,9 @@ use App\Models\PerformanceCycle;
 use App\Models\PerformaChildCycle;
 use App\Models\PerformanceTemplateForm;
 use App\Models\NintyDayPeformanceForm;
+use App\Models\Resort;
 use App\Helpers\Common;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ReviewController extends Controller
 {
@@ -207,6 +209,14 @@ class ReviewController extends Controller
         $realChild->self_review_data = json_encode($payload);
         $realChild->self_review_status = 'completed';
         $realChild->Self_review_date = now()->format('Y-m-d');
+
+        // Frozen HERE, at the moment self review is submitted — never
+        // re-derived later from the live signature_img.
+        $selfSignature = Common::snapshotSignature($this->resort->id, 'performance-self-review', $realChild->id);
+        $realChild->self_signature_img = $selfSignature['signature_img'] ?? null;
+        $realChild->self_signature_name = $selfSignature['name'] ?? null;
+        $realChild->self_signed_at = $selfSignature['timestamp'] ?? null;
+
         $saved = $realChild->save();
         if (!$saved) {
             \Log::warning("Self review save failed for child_id {$id}");
@@ -399,6 +409,14 @@ class ReviewController extends Controller
         $realChild->manager_review_data = json_encode($payload);
         $realChild->manager_review_status = 'completed';
         $realChild->Manager_review_date = now()->format('Y-m-d');
+
+        // Frozen HERE, at the moment manager review is submitted — never
+        // re-derived later from the live signature_img.
+        $managerSignature = Common::snapshotSignature($this->resort->id, 'performance-manager-review', $realChild->id);
+        $realChild->manager_signature_img = $managerSignature['signature_img'] ?? null;
+        $realChild->manager_signature_name = $managerSignature['name'] ?? null;
+        $realChild->manager_signed_at = $managerSignature['timestamp'] ?? null;
+
         $saved = $realChild->save();
         if (!$saved) {
             \Log::warning("Manager review save failed for child_id {$id}");
@@ -448,6 +466,87 @@ class ReviewController extends Controller
         }
 
         return response()->json(['success' => true, 'message' => 'Manager review submitted successfully']);
+    }
+
+    /**
+     * PDF export of a completed performance review, with the employee's
+     * and manager's frozen signatures captured at the moment each
+     * submitted their part. Gated on the manager review being done —
+     * the terminal state of the standard two-stage cycle.
+     */
+    public function downloadCycleReviewPdf($id)
+    {
+        $id = base64_decode($id);
+        $childCycle = PerformaChildCycle::join('performance_cycles as pc', 'pc.id', '=', 'performa_child_cycles.Parent_cycle_id')
+            ->where('performa_child_cycles.id', $id)
+            ->where('pc.resort_id', $this->resort->resort_id)
+            ->first(['performa_child_cycles.*', 'pc.Cycle_Name', 'pc.Self_Review_Templete', 'pc.Manager_Review_Templete']);
+
+        if (!$childCycle) {
+            abort(404, 'Review not found');
+        }
+
+        $currentEmpId = $this->resort->GetEmployee->id ?? null;
+        $participantId = Common::resolveEmpMainIdToNumeric($childCycle->Emp_main_id, $this->resort->resort_id);
+        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $isAuthorized = ($currentEmpId == $participantId)
+            || ($currentEmpId == $childCycle->Manager_id)
+            || $scopedIds === null
+            || (is_array($scopedIds) && in_array($participantId, $scopedIds));
+        if (!$isAuthorized) {
+            abort(403, 'You are not authorized to view this review.');
+        }
+
+        if ($childCycle->manager_review_status !== 'completed') {
+            abort(403, 'The manager review has not been completed yet.');
+        }
+
+        $employee = Employee::with(['resortAdmin', 'position'])->find($participantId);
+        $manager = $childCycle->Manager_id ? Employee::with('resortAdmin')->find($childCycle->Manager_id) : null;
+
+        $selfTemplateId = $childCycle->template_id ?: $childCycle->Self_Review_Templete;
+        $managerTemplateId = $childCycle->template_id ?: $childCycle->Manager_Review_Templete;
+        $selfTemplate = $this->getTemplate($selfTemplateId);
+        $managerTemplate = $this->getTemplate($managerTemplateId);
+
+        $selfData = $childCycle->self_review_data ? (json_decode($childCycle->self_review_data, true) ?: []) : [];
+        $managerData = $childCycle->manager_review_data ? (json_decode($childCycle->manager_review_data, true) ?: []) : [];
+
+        $signatures = [];
+        if (!empty($childCycle->self_signature_name)) {
+            $signatures[] = [
+                'name'          => $childCycle->self_signature_name,
+                'signature_img' => $childCycle->self_signature_img,
+                'timestamp'     => $childCycle->self_signed_at,
+            ];
+        }
+        if (!empty($childCycle->manager_signature_name)) {
+            $signatures[] = [
+                'name'          => $childCycle->manager_signature_name . ' (Manager)',
+                'signature_img' => $childCycle->manager_signature_img,
+                'timestamp'     => $childCycle->manager_signed_at,
+            ];
+        }
+
+        $letterhead = Common::getLetterheadData($this->resort->resort_id);
+        $resort = Resort::find($this->resort->resort_id);
+
+        $pdf = Pdf::loadView('resorts.Performance.Review.review_pdf', [
+            'childCycle'      => $childCycle,
+            'employee'        => $employee,
+            'manager'         => $manager,
+            'selfStructure'   => $selfTemplate['structure'] ?? [],
+            'managerStructure'=> $managerTemplate['structure'] ?? [],
+            'selfData'        => $selfData,
+            'managerData'     => $managerData,
+            'resort'          => $resort,
+            'resortLogo'      => Common::GetResortLogo($this->resort->resort_id),
+            'letterhead'      => $letterhead,
+            'signatures'      => $signatures,
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        return $pdf->download('Performance_Review_' . $childCycle->id . '.pdf');
     }
 
     /**

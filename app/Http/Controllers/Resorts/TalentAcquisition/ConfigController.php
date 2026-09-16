@@ -661,14 +661,30 @@ class ConfigController extends Controller
             if ($childstatus->Approved_By == $effectiveRank) {
                 $childstatus->update(["status"=>"ForwardedToNext"]);
             }
+
+            // Signature snapshot — this call always represents the current
+            // acting rank's approval (whether it forwards to the next
+            // stage or is the final one), frozen HERE at the moment
+            // $this->resort approves. t_anotification_children.Approved_By
+            // only ever stores a RANK CODE (3/7/8), never an individual
+            // person's id, so signature_name is the only per-person record
+            // of who actually acted at this stage — never re-derived later
+            // from the live ResortAdmin.signature_img.
+            $signatureFields = Common::snapshotSignature($this->resort->id, 'vacancy-approval', $taupdaet->id);
+            $signatureUpdate = [
+                'signature_img' => $signatureFields['signature_img'] ?? null,
+                'signature_name' => $signatureFields['name'] ?? null,
+                'signed_at' => $signatureFields['timestamp'] ?? null,
+            ];
+
             if( $effectiveRank == Common::TaFinalApproval($this->resort->resort_id))
             {
-                $taupdaet->update(["status"=>"ForwardedToNext"]);
+                $taupdaet->update(array_merge(["status"=>"ForwardedToNext"], $signatureUpdate));
                 $ApplicationLink = ApplicationLink::updateOrCreate(["ta_child_id"=> $taupdaet->id,"Resort_id"=>$this->resort->resort_id],["ta_child_id"=> $taupdaet->id,"Resort_id"=>$this->resort->resort_id]);
             }
             else
             {
-                $taupdaet->update(["status"=>"Approved" ,"Approved_By"=>$effectiveRank]);
+                $taupdaet->update(array_merge(["status"=>"Approved" ,"Approved_By"=>$effectiveRank], $signatureUpdate));
             }
             if($taupdaet->Approved_By == 3 )
             {

@@ -75,6 +75,14 @@ class ResortModulePagesSeeder extends Seeder
               "place_order"     => "0"
             ],
            [
+              "page_name"       => "Benefit Grade Levels",
+              "Module_Id"       => "1",
+              "internal_route"  => "resort.benefitgradelevel.index",
+              "TypeOfPage"      => "InsideOfPage",
+              "type"            => "normal",
+              "place_order"     => "0"
+            ],
+           [
               "page_name"       => "Settings",
               "Module_Id"       => "22",
               "internal_route"  => "resort.sitesettings",

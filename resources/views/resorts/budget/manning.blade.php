@@ -46,10 +46,20 @@
                                 <button type="submit" class="btn btn-theme SendToGM" {{ $isBudgetCompleted ? '' : 'disabled' }}>Send To GM</button>
                             @endif
                             @if($employeeRankPosition['position'] == 'GM')
-                                {{-- <button type="submit" class="btn btn-theme SendToCorporateOffice" >Send To Corporate Office</button> --}}
-                                <button type="submit" class="btn btn-theme SendToCorporateOffice" >Approve Budget</button>
+                                {{-- Was type="submit" inside this shared form —
+                                     that posted to resort.SendToFinance.manning.notification
+                                     (the HR→Finance / Finance→GM "forward" endpoint), which
+                                     for the GM branch left budget_process_status
+                                     unset/blanked instead of 'Approved' and never wrote a real
+                                     'Approved' BudgetStatus row. approveBudget() (below) is the
+                                     endpoint that actually does this correctly and captures the
+                                     GM's signature — it just had no button calling it. --}}
+                                <button type="button" class="btn btn-theme approve-budget-btn"
+                                        data-budget_id="{{ $deptData->Budget_id }}"
+                                        data-dept_id="{{ $deptData->department->id }}"
+                                        data-year="{{ $year }}">Approve Budget</button>
 
-                                <a href="#revise-budgetmodal" 
+                                <a href="#revise-budgetmodal"
                                     class="open-revise-modal btn btn-white ms-3"
                                     style="background: var(--teal-soft);"
                                     data-budget_id="{{ $deptData->Budget_id }}"
@@ -58,6 +68,12 @@
                                         <span class="badge badge-danger">
                                             <i class="fa-solid fa-clock-rotate-left"></i> Revise Budget
                                         </span>
+                                </a>
+                            @endif
+                            @if(!empty($deptData->Budget_id))
+                                <a href="{{ route('resort.budget.downloadApprovalPdf', $deptData->Budget_id) }}"
+                                   target="_blank" class="btn btn-white ms-3">
+                                    <i class="fa-regular fa-file-pdf"></i> Download Approval Record
                                 </a>
                             @endif
                             {{-- @if($employeeRankPosition['position'] == 'Corporate Office')
@@ -393,6 +409,38 @@ $(document).on('click', '.open-revise-modal', function () {
 
     $("#budget_id").val(budgetId);
     $("#department_id").val(deptId);
+});
+
+// GM's final approval — dedicated endpoint (not the shared #SendToFinance
+// form/handler, which only ever forwards HR→Finance/Finance→GM and, for
+// the GM branch, never correctly recorded 'Approved').
+$(document).on('click', '.approve-budget-btn', function () {
+    var $btn = $(this);
+    $.ajax({
+        url: '{{ route("resort.budget.approve") }}',
+        method: 'POST',
+        data: {
+            _token: '{{ csrf_token() }}',
+            budget_id: $btn.data('budget_id'),
+            department_id: $btn.data('dept_id'),
+            year: $btn.data('year')
+        },
+        beforeSend: function () { $btn.prop('disabled', true); },
+        success: function (response) {
+            if (response.success) {
+                toastr.success(response.message || 'Budget approved successfully!');
+                setTimeout(function () { location.reload(); }, 1200);
+            } else {
+                toastr.error(response.message || 'Failed to approve budget.');
+                $btn.prop('disabled', false);
+            }
+        },
+        error: function (xhr) {
+            var msg = (xhr.responseJSON && xhr.responseJSON.message) || 'Failed to approve budget.';
+            toastr.error(msg);
+            $btn.prop('disabled', false);
+        }
+    });
 });
 </script>
 @endsection

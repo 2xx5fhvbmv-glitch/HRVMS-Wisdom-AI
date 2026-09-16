@@ -658,16 +658,25 @@ class AccommodationController extends Controller
                                                                     ->where('maintanace_requests.resort_id', $this->resort_id)
                                                                     ->where("maintanace_requests.id", $id)
                                                                     ->first(['maintanace_requests.*','t1.id as Parentid', 't1.first_name', 't1.last_name', 'rp.position_title', 't3.Emp_id']);
-            
+
+            // The join above drops the row (returns null) whenever the
+            // request id doesn't exist, was deleted, or belongs to a
+            // different resort than the caller — every property write
+            // below used to run unconditionally before this check, so a
+            // stale/invalid id threw "Attempt to assign property on null"
+            // instead of a clean not-found response.
+            if (!$MaintanaceRequest) {
+                return response()->json(['success' => false, 'message' => 'Maintenance request not found.'], 200);
+            }
 
             $childApprMaintReq                              =   ChildMaintananceRequest::join('child_approved_maintanace_requests as camr','camr.child_maintanance_request_id', '=','child_maintanance_requests.id')
                                                                     ->where('camr.maintanance_request_id',$id)
                                                                     ->get(['camr.id as child_appr_maint_req_id','camr.Status as child_appr_maint_req_status']);
-            
+
             $childMaintReq                                  =   ChildMaintananceRequest::where('maintanance_request_id',$id)->where('rank',6)->where('Status','In-Progress')
                                                                     ->first();
-            
-           
+
+
             $MaintanaceRequest->child_approved_data         =   $childApprMaintReq;
             $MaintanaceRequest->child_accept_status_data    =   $childMaintReq;
 
@@ -701,8 +710,14 @@ class AccommodationController extends Controller
                 $InventoryModule                            =   InventoryModule::where('resort_id', $this->resort_id)
                                                                     ->where("id", $MaintanaceRequest->item_id)
                                                                     ->first('ItemName');
-                                                                    
-                $MaintanaceRequest->EffectedAmenity         =   ucfirst($InventoryModule->ItemName);
+
+                // item_id is nullable on maintanace_requests (a request isn't
+                // always raised against a specific inventory item) — every
+                // other EffectedAmenity assignment in this codebase already
+                // null-guards $InventoryModule, this one didn't, and threw
+                // "Attempt to read property on null" (caught as a generic
+                // 500) whenever item_id was null.
+                $MaintanaceRequest->EffectedAmenity         =   $InventoryModule ? ucfirst($InventoryModule->ItemName) : '';
             }
 
             $childMaintCompleteComment                       =   ChildMaintananceRequest::where('maintanance_request_id',$id)->where('rank',6)->where('Status','Resolvedawaiting')
@@ -1913,7 +1928,11 @@ class AccommodationController extends Controller
         $validator = Validator::make($request->all(), [
             'request_id'                                    =>  'required',
             'action'                                        =>  'required|in:Approved,Rejected,On-Hold',
-            'reason'                                        =>  'required_if:action,On-Hold',
+            // Rejected didn't require a reason either, and the branch below
+            // never stored one even when the caller sent it — every
+            // rejected request lost its reason, which the detail/listing
+            // screens then had nothing to display.
+            'reason'                                        =>  'required_if:action,On-Hold,Rejected',
         ]);
 
         if ($validator->fails()) {
@@ -1950,11 +1969,23 @@ class AccommodationController extends Controller
                 ], 200);
             }
 
+            // Approval assigns the request to the resort's Engineering Dept
+            // HOD (rank 11) — without one configured for this resort,
+            // $engineeringDepHOD->id below threw on null and this whole
+            // action 500'd instead of telling HR what to fix.
+            if ($action == 'Approved' && !$engineeringDepHOD) {
+                return response()->json([
+                    'status'                                =>  false,
+                    'message'                               =>  'No Engineering Department Head is configured for this resort. Please assign an employee with the Engineering Department Head rank before approving maintenance requests.',
+                ], 200);
+            }
+
             if ($action == 'Approved') {
                 $maintanance->status                        =   "Open";
                 $maintanance->Assigned_To                   =   $engineeringDepHOD->id;
             } elseif ($action === 'Rejected') {
                 $maintanance->status                        =   "Rejected";
+                $maintanance->RejactionReason                =   $reason;
             } elseif ($action === 'On-Hold') {
                 $maintanance->status                        =   "On-Hold";
                 $maintanance->ReasonOnHold                  =   $reason;
