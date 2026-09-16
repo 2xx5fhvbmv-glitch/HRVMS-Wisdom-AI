@@ -437,6 +437,42 @@
         </div>
     </div>
 
+    {{-- Review-before-submit — an HOD should never be unsure whether they
+         just submitted Permanent, Casual, or Intern, or which department/
+         year. Submit on the form above no longer fires the save directly;
+         it populates and opens this recap, and only "Confirm & Submit"
+         here actually calls manning.responses.store. --}}
+    <div class="modal fade" id="manningReviewModal" tabindex="-1" aria-labelledby="manningReviewLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="manningReviewLabel">Review before submitting</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-sm">
+                        <tbody>
+                            <tr><th>Category</th><td id="mrv-category"></td></tr>
+                            <tr><th>Department</th><td id="mrv-department"></td></tr>
+                            <tr><th>Year</th><td id="mrv-year"></td></tr>
+                            <tr><th>Total Headcount</th><td id="mrv-headcount"></td></tr>
+                            <tr><th>Filled Positions</th><td id="mrv-filled"></td></tr>
+                            <tr><th>Vacant Positions</th><td id="mrv-vacant"></td></tr>
+                        </tbody>
+                    </table>
+                    <p class="text-muted mb-0" style="font-size:13px;">
+                        This submits the <strong id="mrv-category-inline"></strong> manning request only —
+                        Casual and Intern (if applicable) are separate submissions, not included here.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm wfp-btn-secondary" data-bs-dismiss="modal">Back, let me check</button>
+                    <button type="button" class="btn wfp-btn-primary" id="manningReviewConfirmBtn">Confirm &amp; Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- modal -->
 
     <div class="modal fade" id="Manning-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
@@ -656,8 +692,34 @@
         let overallVacantCount = 0;
         const currentYear = new Date().getFullYear(); // e.g., 2024
         const nextYear = currentYear + 1; // e.g., 2025
+        // Submit no longer fires the save directly — it populates and opens
+        // the review recap; only #manningReviewConfirmBtn (below) calls
+        // doManningSubmit(). An HOD should never be unsure whether they
+        // just submitted Permanent, Casual, or Intern, or which
+        // department/year.
         $('#manningResponseForm').submit(function(e) {
             e.preventDefault();
+
+            const categoryVal = $('input[name="employment_type"]:checked').val() || 'Permanent';
+            const categoryLabel = $('label[for="employment_type-' + categoryVal.toLowerCase() + '"]').text().trim() || categoryVal;
+
+            $('#mrv-category').text(categoryLabel);
+            $('#mrv-category-inline').text(categoryLabel);
+            $('#mrv-department').text(@json($department_details[0]->name ?? ''));
+            $('#mrv-year').text($('#year').val());
+            $('#mrv-headcount').text($('#total_headcount').val() || 0);
+            $('#mrv-filled').text($('#total_filled_headcount').val() || 0);
+            $('#mrv-vacant').text($('#total_vacant_headcount').val() || 0);
+
+            $('#manningReviewModal').modal('show');
+        });
+
+        $('#manningReviewConfirmBtn').on('click', function() {
+            $('#manningReviewModal').modal('hide');
+            doManningSubmit();
+        });
+
+        function doManningSubmit() {
             $("#Budget_id").val($("#Budget_id").val());
 
             let BudgetRejacted_message_id = $("#BudgetRejacted_message_id").val();
@@ -676,7 +738,7 @@
 
 
             // Serialize form data
-            let formData = $(this).serialize();
+            let formData = $('#manningResponseForm').serialize();
             $.ajax({
                 url: "{{ route('manning.responses.store') }}",
                 type: "POST",
@@ -718,7 +780,7 @@
                     });
                 }
             });
-        });
+        }
 
         // Call this function on page load if needed to set initial state of minus button
         document.addEventListener("DOMContentLoaded", function() {
