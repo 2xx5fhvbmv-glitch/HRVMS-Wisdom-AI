@@ -105,6 +105,9 @@ $(document).ready(function() {
         ajax: {
             url: '{{ route("resort.ta.GetAllVacancies") }}',
             type: 'GET',
+            data: function(d) {
+                d.casual_intern_only = {{ !empty($casualInternOnly) ? 'true' : 'false' }};
+            },
         },
         columns: [
             { data: 'Department', name: 'Department', className: 'text-nowrap' },

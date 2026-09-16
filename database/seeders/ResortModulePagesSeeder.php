@@ -195,6 +195,14 @@ class ResortModulePagesSeeder extends Seeder
               "place_order"     => "5"
             ],
            [
+              "page_name"       => "Casual & Interns",
+              "Module_Id"       => "3",
+              "internal_route"  => "resort.ta.CasualInternVacancies",
+              "TypeOfPage"      => "InsideOfMenu",
+              "type"            => "normal",
+              "place_order"     => "7"
+            ],
+           [
               "page_name"       => "Dashboard",
               "Module_Id"       => "5",
               "internal_route"  => "resort.timeandattendance.dashboard",

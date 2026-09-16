@@ -1170,6 +1170,24 @@ class VacancyController extends Controller
         $page_title = 'View All Vacancies';
         return view("resorts.talentacquisition.vacancies.hrAllBacancies",compact('page_title'));
     }
+
+    /**
+     * §22 — dedicated Casual/Interns submenu. Same list/columns/permission/
+     * department-scoping as GetViewVacancies() above (reuses the exact
+     * same view and DataTable), just pre-filtered to Casual/Agency and
+     * Trainee/Intern via the casual_intern_only flag getAllVacancies()
+     * already reads.
+     */
+    public function CasualInternVacancies()
+    {
+        if(Common::checkRouteWisePermission('resort.vacancies.index',config('settings.resort_permissions.view')) == false){
+            return abort(403, 'Unauthorized action.');
+        }
+        $page_title = 'Casual & Intern Vacancies';
+        $casualInternOnly = true;
+        return view("resorts.talentacquisition.vacancies.hrAllBacancies",compact('page_title','casualInternOnly'));
+    }
+
     public function getAllVacancies()
     {
 
@@ -1255,6 +1273,16 @@ class VacancyController extends Controller
         }
         else{
             $Vacancies = Common::GetTheFreshVacancies($this->resort->resort_id,"Active",$rank);
+        }
+
+        // §22: dedicated Casual/Interns submenu — same list, same columns,
+        // pre-filtered. Post-filters the already-built collection instead
+        // of threading a new parameter through Common::GetTheFreshVacancies()
+        // (a widely-shared helper with several other callers) — every row
+        // here already carries EmployeeType regardless of which branch
+        // built it, so this one filter covers both.
+        if (request()->boolean('casual_intern_only')) {
+            $Vacancies = $Vacancies->whereIn('EmployeeType', ['Casual/Agency', 'Trainee / Intern'])->values();
         }
 
         return datatables()->of($Vacancies)
