@@ -20,7 +20,7 @@ return new class extends Migration
     {
         Schema::create('final_settlement_approvals', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('final_settlement_id');
+            $table->unsignedInteger('final_settlement_id');
             $table->unsignedInteger('resort_id');
             $table->unsignedTinyInteger('step_order');
             $table->string('role_title');
