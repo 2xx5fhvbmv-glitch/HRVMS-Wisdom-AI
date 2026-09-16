@@ -48,7 +48,10 @@
                                 <span class="badge badge-themeDanger">{{ $employee->status }}</span>
                             @endif
                         </td></tr>
-                        <tr><td>Employment Type:</td><td>{{$employee->employment_type}}</td></tr>
+                        @php $_category = \App\Helpers\Common::manningCategory($employee->employment_type); @endphp
+                        <tr><td>Employment Type:</td><td>
+                            <span class="badge {{ ['Casual' => 'badge-themeWarning', 'Intern' => 'badge-themeSkyblue'][$_category] ?? 'badge-themeSuccess' }}">{{ $_category }}</span>
+                        </td></tr>
                         {{-- Email + phone surfaced on the card so HR can dial / mail
                              without clicking into the profile. Email truncates when
                              long; full address sits in the title attribute on hover. --}}

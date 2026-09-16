@@ -131,6 +131,10 @@ class EmployeeController extends Controller
             $query->where('employees.location', $request->location);
         }
 
+        if ($request->filled('category') && $request->category !== 'All') {
+            $query->whereIn('employment_type', Common::manningCategoryEmploymentTypes($request->category));
+        }
+
         $pageSize = $request->input('pageSize', 10); // default to 10 if not sent
         $employees = $query->orderBy('created_by', 'desc')->paginate($pageSize);
 
@@ -190,6 +194,12 @@ class EmployeeController extends Controller
             $query->where('employees.location', $request->location);
         }
 
+        // §24 — People Management category badge/filter: Permanent/Casual/Intern,
+        // same 3-bucket grouping as Manning/Budget/Workforce Planning.
+        if ($request->filled('category') && $request->category !== 'All') {
+            $query->whereIn('employment_type', Common::manningCategoryEmploymentTypes($request->category));
+        }
+
          // ✅ Sorting manually if needed (optional)
         if ($request->has('order')) {
             $columns = $request->input('columns');
@@ -221,7 +231,14 @@ class EmployeeController extends Controller
             ->addColumn('position', fn($row) => $row->position->position_title ?? '')
             ->addColumn('department', fn($row) => $row->department->name ?? '')
             ->addColumn('status', fn($row) => '<span class="badge badge-themeSuccess">'.$row->status.'</span>')
-            ->addColumn('employment_type', fn($row) => $row->employment_type) // Optional dynamic
+            ->addColumn('employment_type', function ($row) {
+                $category = Common::manningCategory($row->employment_type);
+                $badgeClass = [
+                    'Casual' => 'badge-themeWarning',
+                    'Intern' => 'badge-themeSkyblue',
+                ][$category] ?? 'badge-themeSuccess';
+                return '<span class="badge '.$badgeClass.'">'.$category.'</span>';
+            })
             ->addColumn('action', function ($row) {
                 return '
                     <div class="dropdown table-dropdown">
@@ -243,7 +260,7 @@ class EmployeeController extends Controller
                     </div>';
             })
             ->addColumn('created_at', fn($row) => $row->created_at) // Hidden column used for sorting
-            ->rawColumns(['checkbox', 'applicant', 'status', 'action'])
+            ->rawColumns(['checkbox', 'applicant', 'status', 'employment_type', 'action'])
             ->make(true);
     }
 
@@ -269,6 +286,10 @@ class EmployeeController extends Controller
 
         if ($request->filled('location')) {
             $query->where('location', $request->location);
+        }
+
+        if ($request->filled('category') && $request->category !== 'All') {
+            $query->whereIn('employment_type', Common::manningCategoryEmploymentTypes($request->category));
         }
 
         if ($request->searchTerm) {
