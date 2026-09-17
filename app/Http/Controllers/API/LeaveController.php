@@ -3615,6 +3615,43 @@ class LeaveController extends Controller
                                                                         ->select('id', 'from_date', 'to_date', 'total_days', 'status')
                                                                         ->first()
                                                                     : null;
+
+                    // Combined submission (2 leave categories submitted together
+                    // via the combine feature) — an approver opening this exact
+                    // detail screen needs to see and act on BOTH categories, not
+                    // just whichever one they happened to tap into. `flag` holds
+                    // the PAIRED category's leave_category_id (see
+                    // Common::groupCombinedLeaves()); the sibling could be on
+                    // either side of that relationship depending on which half
+                    // of the pair was opened.
+                    $combinedSiblingQuery = DB::table('employees_leaves as cl')
+                        ->join('leave_categories as clc', 'clc.id', '=', 'cl.leave_category_id')
+                        ->where('cl.emp_id', $leaveDetail->emp_id)
+                        ->where('cl.resort_id', $resortId)
+                        ->where('cl.id', '!=', $leaveDetail->id)
+                        ->select('cl.id', 'cl.from_date', 'cl.to_date', 'cl.total_days', 'cl.status', 'clc.leave_type', 'clc.color');
+                    $combinedSibling = !empty($leaveDetail->flag)
+                        ? (clone $combinedSiblingQuery)->where('cl.leave_category_id', $leaveDetail->flag)->first()
+                        : (clone $combinedSiblingQuery)->where('cl.flag', $leaveDetail->leave_category_id)->first();
+
+                    $leaveDetail->is_combined = (bool) $combinedSibling;
+                    if ($combinedSibling) {
+                        $leaveDetail->components = [
+                            [
+                                'leave_type' => $leaveDetail->leave_type,
+                                'from_date'  => $leaveDetail->from_date,
+                                'to_date'    => $leaveDetail->to_date,
+                                'total_days' => $leaveDetail->total_days,
+                            ],
+                            [
+                                'leave_type' => $combinedSibling->leave_type,
+                                'from_date'  => $combinedSibling->from_date,
+                                'to_date'    => $combinedSibling->to_date,
+                                'total_days' => $combinedSibling->total_days,
+                            ],
+                        ];
+                        $leaveDetail->combined_total_days = (int) $leaveDetail->total_days + (int) $combinedSibling->total_days;
+                    }
                     // $role                                   = ucfirst(strtolower($leaveDetail->approver_rank ?? ''));
                     // $rank                                   = config('settings.Position_Rank');
                     // $role                                   = $rank[$role] ?? '';
