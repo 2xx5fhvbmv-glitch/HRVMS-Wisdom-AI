@@ -408,8 +408,9 @@ class BoardingPassController extends Controller
             ], 404);
         }
         $employeeTravelPassStatus               =   EmployeeTravelPassStatus::where('travel_pass_id', $passId)
+                                                        ->where('approver_id', $currentApproverId)
                                                         ->where('status', 'Pending')
-                                                        ->orderBy('created_at', 'desc')
+                                                        ->orderBy('id', 'desc')
 
                                                         ->first();
                                       
@@ -445,11 +446,21 @@ class BoardingPassController extends Controller
             }
         }
 
-        EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)->where('approver_id', $effectiveApproverId)->update([
-            'status'                            =>  $action,
-            'comments'                          =>  ($comments ?? '') . $delegateComment,
-            'approved_at'                       =>  now(),
-        ]);
+        if ($effectiveApproverId !== $currentApproverId) {
+            $employeeTravelPassStatus            =   EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)
+                                                        ->where('approver_id', $effectiveApproverId)
+                                                        ->where('status', 'Pending')
+                                                        ->orderBy('id', 'desc')
+                                                        ->first();
+        }
+
+        if ($employeeTravelPassStatus) {
+            EmployeeTravelPassStatus::where('id', $employeeTravelPassStatus->id)->update([
+                'status'                        =>  $action,
+                'comments'                      =>  ($comments ?? '') . $delegateComment,
+                'approved_at'                   =>  now(),
+            ]);
+        }
 
         $allApproved                            =   EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)
                                                         ->where('status', '!=', 'Approved')

@@ -282,9 +282,16 @@ class SOSController extends Controller
                 \Log::warning('SosTriggered broadcast failed on handleSOSActionWithTeam: ' . $e->getMessage());
             }
 
-            // Get initiator details
+            // Get initiator details. Was filtered to status='Active' — the
+            // person who raised THIS specific SOS is looked up by their own
+            // id, not as part of a broad employee list, so their current
+            // employment status shouldn't decide whether they're found at
+            // all. An Inactive/Onboarding initiator (5 such employees exist
+            // for at least one real resort) made this resolve to null, and
+            // every usage below did array-offset access on it with no
+            // guard — "Trying to access array offset on value of type
+            // null", caught as the generic 500.
             $empInitiatedDeviceToken                    =   Employee::where('resort_id', $this->resort_id)
-                                                                ->where('status', 'Active')
                                                                 ->where('id', $sosHistory->emp_initiated_by)
                                                                 ->first();
 
@@ -298,8 +305,10 @@ class SOSController extends Controller
             if (in_array($request->action, ['Rejected', 'Drill-Rejected'])) {
                 $sosStatus                              = 'Rejected';
                 $body                                   = "{$empName->first_name} {$empName->last_name} SOS {$sosStatus}";
-                Common::sendPushNotificationForMobile([$empInitiatedDeviceToken['device_token']], $title, $body, $moduleName, $sosStatus, null, null,NULL);
-                Common::sendMobileNotification($this->resort_id,2,null, null, $title, $body, $moduleName, [$empInitiatedDeviceToken['id']], $sosHistory->id,false,'sos-status-update');
+                if ($empInitiatedDeviceToken) {
+                    Common::sendPushNotificationForMobile([$empInitiatedDeviceToken['device_token']], $title, $body, $moduleName, $sosStatus, null, null,NULL);
+                    Common::sendMobileNotification($this->resort_id,2,null, null, $title, $body, $moduleName, [$empInitiatedDeviceToken['id']], $sosHistory->id,false,'sos-status-update');
+                }
                 return response()->json([
                     'success'                           =>  true, 
                     'message'                           =>  "SOS {$request->action} successfully.", 
@@ -392,8 +401,10 @@ class SOSController extends Controller
             Common::sendMobileNotification($this->resort_id,2,null,null, $title,$request->team_message,$moduleName,$empIds,$sosHistory->id,false,'sos-team-alert');
 
             //Send in app and push notification to the who initiated the SOS
-            Common::sendPushNotificationForMobile([$empInitiatedDeviceToken['device_token']], $title, $body, $moduleName,'Active',$sound,$custom_sound_channel,NULL);
-            Common::sendMobileNotification($this->resort_id,2,null,null,$title, $body,$moduleName,[$empInitiatedDeviceToken['id']],$sosHistory->id,false,'sos-status-update');
+            if ($empInitiatedDeviceToken) {
+                Common::sendPushNotificationForMobile([$empInitiatedDeviceToken['device_token']], $title, $body, $moduleName,'Active',$sound,$custom_sound_channel,NULL);
+                Common::sendMobileNotification($this->resort_id,2,null,null,$title, $body,$moduleName,[$empInitiatedDeviceToken['id']],$sosHistory->id,false,'sos-status-update');
+            }
 
             //Send push notification to the employee same resort
             $allEmpDeviceId                             =   Employee::where('resort_id',$this->resort_id)->where('status','Active')
@@ -408,7 +419,13 @@ class SOSController extends Controller
                                                                 ->pluck('id');
 
             Common::sendPushNotificationForMobile($allEmpDeviceId->toArray(), $title, $request->employee_message ?? 'Please help us, SOS Alert has been raised.', $moduleName,'Active',$sound,$custom_sound_channel,NULL);
-            Common::sendMobileNotification($this->resort_id,2,null,null,$title, $request->employee_message ?? 'Please help us, SOS Alert has been raised.',$moduleName,$allEmpId,$sosHistory->id,false,'sos-team-alert');
+            // Was a raw Collection, not ->toArray() — unlike $allEmpDeviceId
+            // just above. sendMobileNotification() casts $sendto with
+            // (array), which on a Collection object mangles its protected
+            // $items property into a single nested-array element instead of
+            // a flat id list, corrupting the downstream whereIn() binding
+            // ("SQLSTATE[HY093]: Invalid parameter number").
+            Common::sendMobileNotification($this->resort_id,2,null,null,$title, $request->employee_message ?? 'Please help us, SOS Alert has been raised.',$moduleName,$allEmpId->toArray(),$sosHistory->id,false,'sos-team-alert');
 
             ChildSOSHistoryStatus::create([
                 'sos_history_id'                        =>  $sosHistory->id,

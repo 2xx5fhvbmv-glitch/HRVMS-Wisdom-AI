@@ -1121,8 +1121,18 @@ $(document).on("click",".RequestForStatement",function() {
             },
             error: function(response)
             {
-                var errors = response.responseJSON;
-                if (errors.error)
+                var errors = response.responseJSON || {};
+                // RequestIdentity always replies {success:false, message:...} on
+                // 4xx (no `error`/`errors` keys), so fall through to that first —
+                // else this fires $.each on undefined and throws silently.
+                if (errors.message)
+                {
+                    toastr.error(errors.message, "Error",
+                    {
+                        positionClass: 'toast-bottom-right'
+                    });
+                }
+                else if (errors.error)
                 {
                     toastr.error(errors.error, "Error",
                     {

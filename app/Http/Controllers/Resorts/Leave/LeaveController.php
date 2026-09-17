@@ -460,7 +460,6 @@ class LeaveController extends Controller
                 ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                 ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
                 ->where('el.resort_id', $resort_id)
-                ->whereNull('el.flag')
                 ->where(function ($q) use ($yearStart, $yearEnd) {
                     $q->where('el.from_date', '<=', $yearEnd)->where('el.to_date', '>=', $yearStart);
                 });
@@ -605,59 +604,27 @@ class LeaveController extends Controller
                     return $leaveRequest;
                 });
 
-                $mergecollection=array();
-                $currentYearStart = Carbon::now()->startOfYear()->format('Y-m-d');
-                $currentYearEnd = Carbon::now()->endOfYear()->format('Y-m-d');
-
-                foreach($leaveRequests as $k => $leaveRequest)
-                {
-                    if (isset($leaveRequest->flag))
-                    {
-                        $matchLeaveCheck = DB::table('employees_leaves')->join('leave_categories as t1','t1.id',"=",'employees_leaves.leave_category_id')
-                            ->where('employees_leaves.emp_id', $leaveRequest->emp_id)
-                            ->where('employees_leaves.leave_category_id', $leaveRequest->leave_category_id)
-                            ->where('t1.leave_category', $leaveRequest->leave_category)
-                            ->where('employees_leaves.status', 'Pending')
-                            ->where('employees_leaves.id',$leaveRequest->id)
-                            ->where(function ($query) use ($currentYearStart, $currentYearEnd) {
-                                $query->whereBetween('employees_leaves.from_date', [$currentYearStart, $currentYearEnd])
-                                        ->orWhereBetween('employees_leaves.to_date', [$currentYearStart, $currentYearEnd]);
-                            })
-                        ->get(['t1.leave_type','t1.leave_category','total_days','from_date','to_date','t1.color'])->toArray();
-                        $mergecollection[$leaveRequest->flag][] = $matchLeaveCheck;
-                    }
-                }
-                foreach ($leaveRequests as $k => $leaveRequest)
-                {
-                    if (array_key_exists($leaveRequest->id, $mergecollection)) {
-                        $leaveRequest->CombineLeave = $mergecollection[$leaveRequest->id];
-                    }
-                }
-                $combinedLeaveRequests = $leaveRequests->filter(function ($leaveRequest) {
-                    return $leaveRequest->combine_with_other == 1;
-                });
-                $separateLeaveRequests = $leaveRequests->filter(function ($leaveRequest) {
-                    return $leaveRequest->combine_with_other == 0;
-                });
-
-                $finalLeaveRequests = collect();
-
-                // Step 1: Loop through each item in the combined leave requests
-                foreach ($combinedLeaveRequests as $combinedLeave)
-                {
-                    $flag = $combinedLeave->flag;
-                    if( $flag == null)
-                    {
-                        $existsInSeparate = $separateLeaveRequests->first(function ($separateLeave) use ($flag) {
-                            return $separateLeave->id == $flag;
-                        });
-
-                        if (!$existsInSeparate) {
-                            $finalLeaveRequests->push($combinedLeave);
-                        }
-                    }
-                }
-                $finalLeaveRequests = $finalLeaveRequests->merge($separateLeaveRequests);
+                // Combined submissions (2 leave categories submitted together via
+                // the combine feature) store the pairing only via
+                // employees_leaves.flag -> the sibling's leave_category_id — see
+                // Common::groupCombinedLeaves(). Group here instead of hiding the
+                // flagged half at the SQL level, so every combined leave renders
+                // as one entry (with CombineLeave carrying the sibling's details)
+                // rather than one visible category and one silently missing.
+                $finalLeaveRequests = Common::groupCombinedLeaves($leaveRequests->getCollection())
+                    ->each(function ($leaveRequest) {
+                        $leaveRequest->CombineLeave = collect($leaveRequest->combined_siblings)
+                            ->map(function ($sibling) {
+                                return [(object) [
+                                    'leave_type' => $sibling->leave_type,
+                                    'leave_category' => $sibling->leave_category,
+                                    'total_days' => $sibling->total_days,
+                                    'from_date' => $sibling->from_date,
+                                    'to_date' => $sibling->to_date,
+                                    'color' => $sibling->color,
+                                ]];
+                            })->all();
+                    });
 
                 // can_approve: only if current user has a Pending row in the approval chain
                 $finalLeaveIds = $finalLeaveRequests->pluck('id')->toArray();
@@ -727,7 +694,6 @@ class LeaveController extends Controller
                 ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                 ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
                 ->where('el.resort_id', $resort_id)
-                ->whereNull('el.flag')
                 ->where(function ($q) use ($yearStart, $yearEnd) {
                     $q->where('el.from_date', '<=', $yearEnd)->where('el.to_date', '>=', $yearStart);
                 });
@@ -877,59 +843,23 @@ class LeaveController extends Controller
                 return $leaveRequest;
             });
 
-            $mergecollection=array();
-            $currentYearStart = Carbon::now()->startOfYear()->format('Y-m-d');
-            $currentYearEnd = Carbon::now()->endOfYear()->format('Y-m-d');
-
-            foreach($leaveRequests as $k => $leaveRequest)
-            {
-                if (isset($leaveRequest->flag))
-                {
-                    $matchLeaveCheck = DB::table('employees_leaves')->join('leave_categories as t1','t1.id',"=",'employees_leaves.leave_category_id')
-                        ->where('employees_leaves.emp_id', $leaveRequest->emp_id)
-                        ->where('employees_leaves.leave_category_id', $leaveRequest->leave_category_id)
-                        ->where('t1.leave_category', $leaveRequest->leave_category)
-                        ->where('employees_leaves.status', 'Pending')
-                        ->where('employees_leaves.id',$leaveRequest->id)
-                        ->where(function ($query) use ($currentYearStart, $currentYearEnd) {
-                            $query->whereBetween('employees_leaves.from_date', [$currentYearStart, $currentYearEnd])
-                                    ->orWhereBetween('employees_leaves.to_date', [$currentYearStart, $currentYearEnd]);
-                        })
-                    ->get(['t1.leave_type','t1.leave_category','total_days','from_date','to_date','t1.color'])->toArray();
-                    $mergecollection[$leaveRequest->flag][] = $matchLeaveCheck;
-                }
-            }
-            foreach ($leaveRequests as $k => $leaveRequest)
-            {
-                if (array_key_exists($leaveRequest->id, $mergecollection)) {
-                    $leaveRequest->CombineLeave = $mergecollection[$leaveRequest->id];
-                }
-            }
-            $combinedLeaveRequests = $leaveRequests->filter(function ($leaveRequest) {
-                return $leaveRequest->combine_with_other == 1;
-            });
-            $separateLeaveRequests = $leaveRequests->filter(function ($leaveRequest) {
-                return $leaveRequest->combine_with_other == 0;
-            });
-
-            $finalLeaveRequests = collect();
-
-            // Step 1: Loop through each item in the combined leave requests
-            foreach ($combinedLeaveRequests as $combinedLeave)
-            {
-                $flag = $combinedLeave->flag;
-                if( $flag == null)
-                {
-                    $existsInSeparate = $separateLeaveRequests->first(function ($separateLeave) use ($flag) {
-                        return $separateLeave->id == $flag;
-                    });
-
-                    if (!$existsInSeparate) {
-                        $finalLeaveRequests->push($combinedLeave);
-                    }
-                }
-            }
-            $finalLeaveRequests = $finalLeaveRequests->merge($separateLeaveRequests);
+            // See LeaveController::request() / Common::groupCombinedLeaves() —
+            // group the combined-submission pair here instead of hiding the
+            // flagged half at the SQL level.
+            $finalLeaveRequests = Common::groupCombinedLeaves($leaveRequests->getCollection())
+                ->each(function ($leaveRequest) {
+                    $leaveRequest->CombineLeave = collect($leaveRequest->combined_siblings)
+                        ->map(function ($sibling) {
+                            return [(object) [
+                                'leave_type' => $sibling->leave_type,
+                                'leave_category' => $sibling->leave_category,
+                                'total_days' => $sibling->total_days,
+                                'from_date' => $sibling->from_date,
+                                'to_date' => $sibling->to_date,
+                                'color' => $sibling->color,
+                            ]];
+                        })->all();
+                });
 
              // Render the view with the filtered data
             $html = view('resorts.renderfiles.leave-requests-grid', ['finalLeaveRequests' => $finalLeaveRequests])->render();
@@ -1127,6 +1057,15 @@ class LeaveController extends Controller
 
             // Update profile picture dynamically
             $leaveDetail->employee_profile_picture = Common::getResortUserPicture($leaveDetail->Admin_Parent_id);
+
+            // Same enrichment as the mobile approver view (API\LeaveController::leaveRequestViewHRHOD)
+            // and employee view (viewLeaveRequest) — surface the leave this one extends, if any.
+            $leaveDetail->original_leave = $leaveDetail->extends_leave_id
+                ? DB::table('employees_leaves')
+                    ->where('id', $leaveDetail->extends_leave_id)
+                    ->select('id', 'from_date', 'to_date', 'total_days', 'status')
+                    ->first()
+                : null;
         }
 
         if (!$leaveDetail) 
@@ -1251,7 +1190,23 @@ class LeaveController extends Controller
             )
             ->first();
 
-        return view('resorts.leaves.leave.details', compact('page_title', 'empID', 'available_rank', 'leaveDetail', 'leaveBalances', 'leaveUsage', 'leave_categories', 'employee', 'canApproveThisLeave', 'departurePass'));
+        // Local/domestic transportation legs (e.g. resort <-> Male speedboat) —
+        // zero or more rows per leave, one per transportation mode the employee
+        // selected when applying. Not the same thing as $departurePass above.
+        $localTransportation = DB::table('employees_leave_transportation as elt')
+            ->leftJoin('resort_transportations as rt', 'rt.id', '=', 'elt.transportation')
+            ->where('elt.leave_request_id', $decodedId)
+            ->select(
+                'elt.id',
+                'elt.transportation as transportation_id',
+                'rt.transportation_option as transportation_label',
+                'elt.trans_arrival_date',
+                'elt.trans_departure_date'
+            )
+            ->orderBy('elt.id')
+            ->get();
+
+        return view('resorts.leaves.leave.details', compact('page_title', 'empID', 'available_rank', 'leaveDetail', 'leaveBalances', 'leaveUsage', 'leave_categories', 'employee', 'canApproveThisLeave', 'departurePass', 'localTransportation'));
     }
 
     public function getLeaveHistory(Request $request)
@@ -1283,6 +1238,7 @@ class LeaveController extends Controller
         // Select required columns
         $leaveUsageQuery->select(
             'employees_leaves.id',
+            'employees_leaves.leave_category_id',
             'leave_categories.leave_type as leave_category',
             'employees_leaves.reason',
             DB::raw('DATE_FORMAT(employees_leaves.from_date, "%Y-%m-%d") as from_date'),
@@ -1322,10 +1278,15 @@ class LeaveController extends Controller
             $usage->from_date = $fromDate ? Carbon::parse($fromDate)->format('d M') : '—';
             $usage->to_date = $toDate ? Carbon::parse($toDate)->format('d M') : '—';
 
+            // `flag` holds the PAIRED category's leave_category_id, not this
+            // row's own id — matching against $usage->id (as this previously
+            // did) meant combinedLeave was always null in practice, so the
+            // Birthday-leg total_days/to_date never merged into the Annual
+            // row (see Common::groupCombinedLeaves() for the flag contract).
             // Scoped to the same employee/resort — see LeaveController::details()
             // for why an unscoped `flag` match can pull in an unrelated
             // employee's leave row.
-            $combinedLeave = EmployeeLeave::where('flag', $usage->id)
+            $combinedLeave = EmployeeLeave::where('flag', $usage->leave_category_id)
                 ->where('employees_leaves.emp_id', $empID)
                 ->where('employees_leaves.resort_id', $this->resort->resort_id)
                 ->where('employees_leaves.id', '!=', $usage->id)
@@ -2449,12 +2410,16 @@ class LeaveController extends Controller
             return redirect()->back()->with('error', 'Employee not found.');
         }
 
-        // Fetch leave data for this employee in this resort (main leaves only, same as history table)
+        // Fetch leave data for this employee in this resort. Every row the
+        // employee has, including the flagged half of a combined submission
+        // — excluding it here (as this used to) meant a printed/downloaded
+        // history quietly omitted half of a combined leave. Each category
+        // still lists as its own line item; leave-balance math below is
+        // untouched.
         $leaveUsage = DB::table('employees_leaves as el')
             ->join('leave_categories', 'el.leave_category_id', '=', 'leave_categories.id')
             ->where('el.emp_id', $empIdInt)
             ->where('el.resort_id', $resort_id)
-            ->whereNull('el.flag')
             ->select(
                 'el.*',
                 'leave_categories.leave_type as leave_category',

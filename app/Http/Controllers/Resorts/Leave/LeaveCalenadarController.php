@@ -62,8 +62,13 @@ class LeaveCalenadarController extends Controller
             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
             ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
-            ->where('el.resort_id', $this->resort->resort_id)
-            ->whereNull('el.flag');
+            ->where('el.resort_id', $this->resort->resort_id);
+            // Combined submissions (2 leave categories via the combine
+            // feature) store one row per category, linked only via
+            // employees_leaves.flag (see Common::groupCombinedLeaves()).
+            // The calendar shows each category as its own colored event,
+            // so both rows of a combined pair belong here — no flag
+            // filtering (that used to hide one of the two categories).
 
         if (!$isHR) {
             if ($isHOD) {
@@ -149,9 +154,9 @@ class LeaveCalenadarController extends Controller
             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
             ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
-            ->where('el.resort_id', $this->resort->resort_id)
-            ->whereNull('el.flag');
-            
+            ->where('el.resort_id', $this->resort->resort_id);
+            // No flag filtering — see index() above; each category of a
+            // combined submission shows as its own event here.
 
         // if ($isHR) {
         //     $leave_requests_query->where('e.id', '!=', $loggedInEmployee->id); // Exclude HR's own requests
