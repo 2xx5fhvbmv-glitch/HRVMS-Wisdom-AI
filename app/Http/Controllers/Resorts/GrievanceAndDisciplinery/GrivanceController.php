@@ -850,6 +850,11 @@ class GrivanceController extends Controller
             return response()->json(['success' => false, 'message' => 'You already have access to this identity.'], 400);
         }
 
+        if ($grievance->Request_Identity_Disclosure === 'Requested'
+            && (int) $grievance->Identity_Disclosure_Requested_By !== (int) $requesterId) {
+            return response()->json(['success' => false, 'message' => 'Another key person already has a pending identity disclosure request for this grievance.'], 400);
+        }
+
         $grievance->update([
             'Request_Identity_Disclosure'          => 'Requested',
             'Identity_Disclosure_Requested_By'     => $requesterId,

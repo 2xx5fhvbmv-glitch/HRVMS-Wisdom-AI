@@ -1762,9 +1762,22 @@ class Common
             if (empty($admin->signature_img)) {
                 return $defaultPicture;
             }
-            $aws = Self::GetApplicantAWSFile($admin->signature_img);
-            if ($aws['success'] == true) {
-                return $aws['NewURLshow'];
+            // signature_img is encrypted at rest — GetApplicantAWSFile()
+            // just streams/presigns whatever bytes are at the given path,
+            // so pointed at the encrypted path directly it would serve
+            // ciphertext as an "image". Decrypt to a short-lived plaintext
+            // temp object first (same pattern as
+            // FileManageController::ShareFile()) and resolve that instead.
+            try {
+                $decrypted = self::decryptFileBytes(StorageHelper::get($admin->signature_img));
+                $tempPath = 'temp/sig_view_' . $admin->id . '_' . time() . '.png';
+                StorageHelper::put($tempPath, $decrypted);
+                $aws = Self::GetApplicantAWSFile($tempPath);
+                if ($aws['success'] == true) {
+                    return $aws['NewURLshow'];
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('getResortUserPicture: failed to decrypt signature for admin ' . $admin->id . ': ' . $e->getMessage());
             }
             return $defaultPicture;
         }
@@ -1839,14 +1852,28 @@ class Common
                 continue;
             }
 
+            // Same encrypted-at-rest handling as getResortUserPicture()'s
+            // type==1 branch — sibling duplicate of that same lookup, must
+            // stay in sync with it.
+            if ($type == 1) {
+                try {
+                    $decrypted = self::decryptFileBytes(StorageHelper::get($sourcePath));
+                    $tempPath = 'temp/sig_view_' . $admin->id . '_' . time() . '.png';
+                    StorageHelper::put($tempPath, $decrypted);
+                    $aws = Self::GetApplicantAWSFile($tempPath);
+                    if ($aws['success'] == true) {
+                        $result[$admin->id] = $aws['NewURLshow'];
+                    }
+                } catch (\Throwable $e) {
+                    \Log::warning('getResortUserPicturesBatch: failed to decrypt signature for admin ' . $admin->id . ': ' . $e->getMessage());
+                }
+                continue; // signature has no public-path fallback in the single-id version either
+            }
+
             $aws = Self::GetApplicantAWSFile($sourcePath);
             if ($aws['success'] == true) {
                 $result[$admin->id] = $aws['NewURLshow'];
                 continue;
-            }
-
-            if ($type == 1) {
-                continue; // signature has no public-path fallback in the single-id version either
             }
 
             if (strpos($sourcePath, 'http') === 0) {
@@ -5819,6 +5846,62 @@ class Common
         $prorated = round(($allocatedDays / 12) * $monthsWorked, 1);
 
         return $prorated;
+    }
+
+    /**
+     * Groups combined-leave submissions (2 leave categories submitted
+     * together via the combine feature, see API\LeaveController::leaveAdd())
+     * so the "flagged" half of the pair renders attached to its sibling
+     * instead of being silently dropped or shown as a disconnected row.
+     *
+     * `employees_leaves.flag`, when set, holds the PAIRED category's
+     * `leave_category_id` — the only signal anywhere in the schema that two
+     * rows belong to the same combined submission (no shared submission id).
+     *
+     * Pass in every leave row the caller is otherwise entitled to see for
+     * its list (build the query with no `flag` filtering at all). Does not
+     * touch total_days/available_balance — each row keeps its own,
+     * already-computed values.
+     *
+     * Returns the same collection, but:
+     *  - a row keeps (or gains) ->combined_siblings: an array of the other
+     *    row(s) from the same combined submission (empty for a standalone
+     *    leave).
+     *  - a row that is itself the "flagged half" of a pair already attached
+     *    to its sibling is dropped from the top-level collection — it's
+     *    only reachable via its sibling's combined_siblings, not duplicated
+     *    as its own entry.
+     */
+    public static function groupCombinedLeaves($leaves)
+    {
+        $leaves = collect($leaves);
+        $mergedIds = [];
+
+        foreach ($leaves as $leave) {
+            if (empty($leave->flag)) {
+                continue;
+            }
+            $sibling = $leaves->first(function ($candidate) use ($leave) {
+                return $candidate->id != $leave->id
+                    && $candidate->leave_category_id == $leave->flag
+                    && $candidate->emp_id == $leave->emp_id
+                    && $candidate->resort_id == $leave->resort_id;
+            });
+            if (!$sibling) {
+                continue;
+            }
+            $sibling->combined_siblings = array_merge($sibling->combined_siblings ?? [], [$leave]);
+            $mergedIds[] = $leave->id;
+        }
+
+        return $leaves->reject(function ($leave) use ($mergedIds) {
+            return in_array($leave->id, $mergedIds, true);
+        })->map(function ($leave) {
+            if (!isset($leave->combined_siblings)) {
+                $leave->combined_siblings = [];
+            }
+            return $leave;
+        })->values();
     }
 
     public static function getBenefitGrid($emp_grade,$resort_id){
@@ -10419,6 +10502,75 @@ class Common
     }
 
     /**
+     * AES-256-CBC encrypt raw bytes before they're written to storage —
+     * same scheme FileManageController::StoreFolderFiles() already uses
+     * for regular document uploads (IV prepended to the ciphertext, same
+     * key derivation). Centralized here because the e-signature feature
+     * needs this exact block at 4 write sites; a copy-pasted crypto
+     * primitive is the wrong kind of duplication to carry across 4 files.
+     */
+    public static function encryptFileBytes(string $plaintext): string
+    {
+        $key = hash('sha256', env('ENCRYPTION_KEY'), true);
+        $iv = random_bytes(16);
+        $encrypted = $iv . openssl_encrypt($plaintext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        if ($encrypted === false) {
+            throw new \Exception('Encryption failed: ' . openssl_error_string());
+        }
+        return $encrypted;
+    }
+
+    /**
+     * Reverses encryptFileBytes() — same IV-prefix convention as
+     * FileManageController::ShareFile()'s decrypt block.
+     */
+    public static function decryptFileBytes(string $encryptedData): string
+    {
+        if (empty($encryptedData) || strlen($encryptedData) < 16) {
+            throw new \Exception('Invalid or corrupted encrypted data');
+        }
+        $key = hash('sha256', env('ENCRYPTION_KEY'), true);
+        $iv = substr($encryptedData, 0, 16);
+        $cipherText = substr($encryptedData, 16);
+        $decryptedData = openssl_decrypt($cipherText, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        if ($decryptedData === false) {
+            throw new \Exception('Decryption failed: ' . openssl_error_string());
+        }
+        return $decryptedData;
+    }
+
+    /**
+     * True if $bytes decrypts to something that looks like a real image
+     * (PNG/JPEG/GIF magic header) under encryptFileBytes()'s scheme. Used
+     * by the signature backfill command to make itself safely re-runnable
+     * — already-encrypted rows/files must not be re-encrypted.
+     */
+    public static function looksLikeEncryptedImage(string $bytes): bool
+    {
+        try {
+            $decrypted = self::decryptFileBytes($bytes);
+        } catch (\Throwable $e) {
+            return false;
+        }
+        return self::looksLikeImageBytes($decrypted);
+    }
+
+    public static function looksLikeImageBytes(string $bytes): bool
+    {
+        if (strlen($bytes) < 8) {
+            return false;
+        }
+        $png = "\x89PNG\r\n\x1a\n";
+        $jpg = "\xFF\xD8\xFF";
+        $gif87 = 'GIF87a';
+        $gif89 = 'GIF89a';
+        return str_starts_with($bytes, $png)
+            || str_starts_with($bytes, $jpg)
+            || str_starts_with($bytes, $gif87)
+            || str_starts_with($bytes, $gif89);
+    }
+
+    /**
      * Copies whatever signature is CURRENTLY on an approver's profile into
      * a permanent, immutable location tied to one specific approval/
      * consent record, and returns the frozen name/path/timestamp for the
@@ -10483,9 +10635,11 @@ class Common
             if (!StorageHelper::disk()->exists($path)) {
                 return null;
             }
-            $contents = StorageHelper::get($path);
-            $mime = StorageHelper::disk()->mimeType($path) ?: 'image/png';
-            return 'data:' . $mime . ';base64,' . base64_encode($contents);
+            $contents = self::decryptFileBytes(StorageHelper::get($path));
+            // Not StorageHelper::disk()->mimeType($path) — that sniffs the
+            // on-disk (encrypted) bytes, which no longer have a real image
+            // header to detect. Every signature write path saves a .png.
+            return 'data:image/png;base64,' . base64_encode($contents);
         } catch (\Throwable $e) {
             \Log::warning('signatureImageDataUri failed for path ' . $path . ': ' . $e->getMessage());
             return null;

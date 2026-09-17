@@ -1260,8 +1260,7 @@ class BoardingPassController extends Controller
                 ]);
             }
 
-            EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)->where('approver_id', $currentApproverId)->update([
-                'approver_id'                       =>  $currentApproverId,
+            EmployeeTravelPassStatus::where('id', $employeeTravelPassStatus->id)->update([
                 'status'                            =>  $action,
                 'comments'                          =>  $comments, // Save comments if provided
                 'approved_at'                       =>  now(),

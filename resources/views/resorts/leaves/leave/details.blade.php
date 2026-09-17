@@ -150,6 +150,17 @@
                             </div>
                         </div>
 
+                        @if(!empty($leaveDetail->original_leave))
+                            <div class="alert alert-info d-flex align-items-center gap-2 mb-4" role="alert">
+                                <i class="fa fa-info-circle"></i>
+                                <span>
+                                    This request extends an approved leave:
+                                    <strong>{{ \Carbon\Carbon::parse($leaveDetail->original_leave->from_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($leaveDetail->original_leave->to_date)->format('d M Y') }}</strong>
+                                    ({{ $leaveDetail->original_leave->total_days }} days, {{ $leaveDetail->original_leave->status }})
+                                </span>
+                            </div>
+                        @endif
+
                         {{-- Form details grid (col-6) --}}
                         <h6 class="text-uppercase letter-spacing text-muted mb-3">Application details</h6>
                         <div class="row g-3">
@@ -279,6 +290,32 @@
                                         <span class="detail-value">{{ $departurePass->reason ?? $departurePass->departure_reason ?? $departurePass->arrival_reason ?? '—' }}</span>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                        @endif
+
+                        @if(isset($localTransportation) && $localTransportation->count())
+                        <div class="mt-4 pt-4 border-top">
+                            <h6 class="text-uppercase letter-spacing text-muted mb-3">Local transportation</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Transportation</th>
+                                            <th>Arrival date</th>
+                                            <th>Departure date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($localTransportation as $leg)
+                                        <tr>
+                                            <td>{{ $leg->transportation_label ?? '—' }}</td>
+                                            <td>{{ $leg->trans_arrival_date && $leg->trans_arrival_date !== '0000-00-00' ? \Carbon\Carbon::parse($leg->trans_arrival_date)->format('d M Y') : '—' }}</td>
+                                            <td>{{ $leg->trans_departure_date && $leg->trans_departure_date !== '0000-00-00' ? \Carbon\Carbon::parse($leg->trans_departure_date)->format('d M Y') : '—' }}</td>
+                                        </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                         @endif

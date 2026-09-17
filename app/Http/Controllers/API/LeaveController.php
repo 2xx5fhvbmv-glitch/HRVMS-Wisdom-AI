@@ -2707,6 +2707,10 @@ class LeaveController extends Controller
                                                                 ->select(
                                                                     'el.id',
                                                                     'el.emp_id',
+                                                                    'el.resort_id',
+                                                                    'el.leave_category_id',
+                                                                    'el.flag',
+                                                                    'el.total_days',
                                                                     'el.from_date',
                                                                     'el.to_date',
                                                                     'el.status',
@@ -2755,6 +2759,10 @@ class LeaveController extends Controller
                                                             ->select(
                                                                 'el.id',
                                                                 'el.emp_id',
+                                                                'el.resort_id',
+                                                                'el.leave_category_id',
+                                                                'el.flag',
+                                                                'el.total_days',
                                                                 'el.from_date',
                                                                 'el.to_date',
                                                                 'el.status',
@@ -2817,6 +2825,10 @@ class LeaveController extends Controller
 
             return $base;
         })->values();
+
+        // Group combined-submission pairs into one entry — see
+        // Common::groupCombinedLeaves() / markCombinedLeaves() below.
+        $finalData = self::markCombinedLeaves($finalData);
 
         return $finalData;
     }
@@ -3379,6 +3391,12 @@ class LeaveController extends Controller
                     return $base;
                 })->values(); // Re-index the collection
 
+                // Combined submissions (2 leave categories submitted together
+                // via the combine feature) previously showed here as two
+                // disconnected cards with no indication they belong together.
+                // Group them into one entry — see Common::groupCombinedLeaves().
+                $leaveDetails = self::markCombinedLeaves($leaveDetails);
+
                 // Group the leave records by 'created_at' date (Access 'created_at' correctly as an object property)
                 $groupedByDate = $leaveDetails->groupBy(function ($item) {
                     return \Carbon\Carbon::parse($item->created_at)->format('Y-m-d');
@@ -3586,6 +3604,17 @@ class LeaveController extends Controller
                     // $leaveDetail->island_pass               = json_decode($leaveDetail->island_pass, true);
                     $baseUrl                                = url('/');
                     $leaveDetail->attachments               = self::resolveLeaveAttachmentUrl($leaveDetail->attachments);
+
+                    // Give the approver context in one call instead of
+                    // requiring a second lookup for the leave this one
+                    // extends — same enrichment viewLeaveRequest() already
+                    // has for the employee's own view.
+                    $leaveDetail->original_leave             = $leaveDetail->extends_leave_id
+                                                                    ? DB::table('employees_leaves')
+                                                                        ->where('id', $leaveDetail->extends_leave_id)
+                                                                        ->select('id', 'from_date', 'to_date', 'total_days', 'status')
+                                                                        ->first()
+                                                                    : null;
                     // $role                                   = ucfirst(strtolower($leaveDetail->approver_rank ?? ''));
                     // $rank                                   = config('settings.Position_Rank');
                     // $role                                   = $rank[$role] ?? '';
@@ -4376,6 +4405,37 @@ class LeaveController extends Controller
             \Log::error("Error in processLeaveWithHolidayCheck: " . $e->getMessage());
             return null;
         }
+    }
+
+    /**
+     * Marks each item in a leave-list collection with is_combined/components/
+     * combined_total_days for the mobile approver views (list, dashboard),
+     * grouping the flagged half of a combined submission into its sibling
+     * instead of leaving it as a second, disconnected card. See
+     * Common::groupCombinedLeaves() for the flag contract; each row here
+     * must already carry id, flag, leave_category_id, emp_id, resort_id and
+     * total_days.
+     */
+    private static function markCombinedLeaves($leaves)
+    {
+        return Common::groupCombinedLeaves($leaves)->map(function ($leave) {
+            $siblings = $leave->combined_siblings ?? [];
+            $leave->is_combined = !empty($siblings);
+            if ($leave->is_combined) {
+                $components = collect($siblings)->push($leave)->map(function ($row) {
+                    return [
+                        'leave_type' => $row->leave_category ?? $row->leave_type ?? null,
+                        'from_date'  => $row->from_date,
+                        'to_date'    => $row->to_date,
+                        'total_days' => $row->total_days,
+                    ];
+                })->values()->all();
+                $leave->components = $components;
+                $leave->combined_total_days = collect($components)->sum('total_days');
+            }
+            unset($leave->combined_siblings);
+            return $leave;
+        })->values();
     }
 
     /**

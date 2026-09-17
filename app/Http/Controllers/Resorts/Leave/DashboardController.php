@@ -1015,10 +1015,15 @@ class DashboardController extends Controller
             $leaveRequest->to_date = Carbon::parse($leaveRequest->to_date)->format('d M');
             $leaveRequest->profile_picture = Common::getResortUserPicture($leaveRequest->Admin_Parent_id);
 
+            // `flag` holds the PAIRED category's leave_category_id, not this
+            // row's own id — matching against $leaveRequest->id (as this
+            // previously did) meant combinedLeave was always null in
+            // practice, so the second leg's total_days/to_date never merged
+            // in (see Common::groupCombinedLeaves() for the flag contract).
             // Scoped to the same employee/resort — see LeaveController::details()
             // for why an unscoped `flag` match can pull in an unrelated
             // employee's leave row.
-            $leaveRequest->combinedLeave = EmployeeLeave::where('flag', $leaveRequest->id)
+            $leaveRequest->combinedLeave = EmployeeLeave::where('flag', $leaveRequest->leave_category_id)
                 ->where('employees_leaves.emp_id', $leaveRequest->emp_id)
                 ->where('employees_leaves.resort_id', $leaveRequest->resort_id)
                 ->where('employees_leaves.id', '!=', $leaveRequest->id)

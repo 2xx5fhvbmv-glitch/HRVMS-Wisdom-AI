@@ -513,7 +513,7 @@ class ProfileController extends Controller
       $token = Str::random(40);
       $mainFolder = $resortAdmin->resort->resort_id;
       $tempPath = $mainFolder . '/public/categorized/' . $emp->Emp_id . '/SignaturePreview/' . $token . '.png';
-      StorageHelper::put($tempPath, $processed);
+      StorageHelper::put($tempPath, Common::encryptFileBytes($processed));
 
       // 10-minute window to confirm — same "temp file, cleaned up whether
       // confirmed or abandoned" shape the spec calls for. Scoped to this
@@ -524,9 +524,16 @@ class ProfileController extends Controller
         'temp_path' => $tempPath,
       ], now()->addMinutes(10));
 
+      // $tempPath now holds encrypted bytes — a presigned URL straight to
+      // it would serve ciphertext. Decrypt to a separate, short-lived
+      // plaintext object just for this response, same pattern
+      // FileManageController::ShareFile() uses.
+      $viewPath = $mainFolder . '/public/categorized/' . $emp->Emp_id . '/SignaturePreview/view_' . $token . '.png';
+      StorageHelper::put($viewPath, $processed);
+
       return response()->json([
         'success' => true,
-        'preview_url' => StorageHelper::temporaryUrl($tempPath, 15),
+        'preview_url' => StorageHelper::temporaryUrl($viewPath, 15),
         'preview_token' => $token,
       ]);
     } catch (\Exception $e) {
@@ -574,18 +581,29 @@ class ProfileController extends Controller
 
       $mainFolder = $resortAdmin->resort->resort_id;
       $finalPath = $mainFolder . '/public/categorized/' . $emp->Emp_id . '/Signature/signature.png';
-      StorageHelper::put($finalPath, StorageHelper::get($preview['temp_path']));
+      // temp_path already holds encrypted bytes (see signaturePreview()) —
+      // straight copy, no decrypt/re-encrypt round trip needed since both
+      // ends use the same key.
+      $encryptedBytes = StorageHelper::get($preview['temp_path']);
+      StorageHelper::put($finalPath, $encryptedBytes);
 
       $resortAdmin->signature_img = $finalPath;
       $resortAdmin->save();
 
       StorageHelper::delete($preview['temp_path']);
+      $viewPath = $mainFolder . '/public/categorized/' . $emp->Emp_id . '/SignaturePreview/view_' . $request->preview_token . '.png';
+      StorageHelper::delete($viewPath);
       Cache::forget($cacheKey);
+
+      // Decrypt once for this response's URL — same reasoning as
+      // signaturePreview()'s viewPath.
+      $viewFinalPath = $mainFolder . '/public/categorized/' . $emp->Emp_id . '/Signature/view_signature.png';
+      StorageHelper::put($viewFinalPath, Common::decryptFileBytes($encryptedBytes));
 
       return response()->json([
         'success' => true,
         'message' => 'Signature saved',
-        'signature_url' => StorageHelper::temporaryUrl($finalPath, 30),
+        'signature_url' => StorageHelper::temporaryUrl($viewFinalPath, 30),
       ]);
     } catch (\Exception $e) {
       \Log::emergency("File: " . $e->getFile());
@@ -604,9 +622,20 @@ class ProfileController extends Controller
     }
 
     $resortAdmin = ResortAdmin::find($user->id);
-    $signatureUrl = $resortAdmin->signature_img
-      ? StorageHelper::temporaryUrl($resortAdmin->signature_img, 30)
-      : null;
+    $signatureUrl = null;
+    if ($resortAdmin->signature_img) {
+      try {
+        // signature_img is encrypted at rest — decrypt to a short-lived
+        // plaintext temp object before presigning, same pattern as
+        // FileManageController::ShareFile().
+        $decrypted = Common::decryptFileBytes(StorageHelper::get($resortAdmin->signature_img));
+        $viewPath = 'temp/sig_view_' . $resortAdmin->id . '_' . time() . '.png';
+        StorageHelper::put($viewPath, $decrypted);
+        $signatureUrl = StorageHelper::temporaryUrl($viewPath, 30);
+      } catch (\Exception $e) {
+        \Log::warning('getSignature: failed to decrypt signature for admin ' . $resortAdmin->id . ': ' . $e->getMessage());
+      }
+    }
 
     return response()->json(['success' => true, 'signature_url' => $signatureUrl]);
   }

@@ -756,6 +756,30 @@ class IncidentController extends Controller
      * screen after a partial submit shows what was already sent instead of
      * a blank form.
      */
+    /**
+     * Shared "is this employee authorized on this incident, and how" check
+     * for getStatementRequest() and provideStatement() — these two used to
+     * carry independent copies of this logic and drifted apart (provideStatement
+     * required incidents.isWitness = 'Yes', getStatementRequest didn't), so a
+     * witness could be shown the statement form and then rejected on submit.
+     * Route both through here so they can't diverge again.
+     */
+    private function resolveIncidentAuthorization($incident, $emp_id)
+    {
+        $witness = null;
+        if ($incident->isWitness === 'Yes') {
+            $witness = IncidentsWitness::where('incident_id', $incident->id)
+                ->where('witness_id', $emp_id)
+                ->first();
+        }
+
+        $involvedEmployeeIds = array_filter(explode(',', (string) $incident->involved_employees));
+        $isInvolved = in_array((string) $emp_id, $involvedEmployeeIds, true);
+        $isWitness  = (bool) $witness;
+
+        return [$isInvolved, $isWitness, $witness];
+    }
+
     public function getStatementRequest($incidentId)
     {
         if (!Auth::guard('api')->check()) {
@@ -778,13 +802,7 @@ class IncidentController extends Controller
                 return response()->json(['success' => false, 'message' => 'No such incident found'], 200);
             }
 
-            $witness = IncidentsWitness::where('incident_id', $incident->id)
-                ->where('witness_id', $emp_id)
-                ->first();
-
-            $involvedEmployeeIds = array_filter(explode(',', (string) $incident->involved_employees));
-            $isInvolved = in_array((string) $emp_id, $involvedEmployeeIds, true);
-            $isWitness  = (bool) $witness;
+            [$isInvolved, $isWitness, $witness] = $this->resolveIncidentAuthorization($incident, $emp_id);
 
             if (!$isInvolved && !$isWitness) {
                 return response()->json(['success' => false, 'message' => 'You are not authorized to view this incident.'], 200);
@@ -965,19 +983,10 @@ class IncidentController extends Controller
 
             $incident           =       Incidents::where("resort_id", $this->resort_id)
                                                     ->where('id',$data['incident_id'])
-                                                    ->select(['id','incident_name','incident_date','involved_employees','incident_id','assigned_to'])
+                                                    ->select(['id','incident_name','incident_date','involved_employees','incident_id','assigned_to','isWitness'])
                                                     ->first();
 
-            $witness            =       IncidentsWitness::join('incidents as i','i.id','=','incidents_witness.incident_id')
-                                                            ->where('i.resort_id',$this->resort_id)
-                                                            ->where('i.id',$data['incident_id'])                          
-                                                            ->where('i.isWitness','=','Yes')
-                                                            ->select(['incidents_witness.id','incidents_witness.witness_id'])
-                                                            ->first();
-
-            $involvedEmployeeIds        = explode(',', $incident->involved_employees);
-            $isInvolved                 = in_array($emp_id, $involvedEmployeeIds);
-            $isWitness                  = $witness && $witness->witness_id == $emp_id;
+            [$isInvolved, $isWitness, $witness] = $this->resolveIncidentAuthorization($incident, $emp_id);
 
             if (!$isInvolved && !$isWitness) {
                 return response()->json(['success' => false, 'message' => 'You are not authorized to submit a statement for this incident.'], 200);
