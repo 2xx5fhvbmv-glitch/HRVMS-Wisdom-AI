@@ -361,7 +361,7 @@
                                             @endforeach
                                         </tr>
                                     </thead>
-                                    <tbody>
+                                    <tbody id="grid-tbody">
                                         @if(isset($positions) && $positions->count() > 0)
                                             @foreach($positions as $pos)
                                                 <input type="hidden" name="positions[]" id="pos-{{ $pos->id }}" value="{{ $pos->id }}">
@@ -433,41 +433,36 @@
                         <button type="submit" class="btn wfp-btn-primary">Submit</button>
                     </div>
                 </form>
-            </div>
-        </div>
-    </div>
 
-    {{-- Review-before-submit — an HOD should never be unsure whether they
-         just submitted Permanent, Casual, or Intern, or which department/
-         year. Submit on the form above no longer fires the save directly;
-         it populates and opens this recap, and only "Confirm & Submit"
-         here actually calls manning.responses.store. --}}
-    <div class="modal fade" id="manningReviewModal" tabindex="-1" aria-labelledby="manningReviewLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="manningReviewLabel">Review before submitting</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <table class="table table-sm">
-                        <tbody>
-                            <tr><th>Category</th><td id="mrv-category"></td></tr>
-                            <tr><th>Department</th><td id="mrv-department"></td></tr>
-                            <tr><th>Year</th><td id="mrv-year"></td></tr>
-                            <tr><th>Total Headcount</th><td id="mrv-headcount"></td></tr>
-                            <tr><th>Filled Positions</th><td id="mrv-filled"></td></tr>
-                            <tr><th>Vacant Positions</th><td id="mrv-vacant"></td></tr>
-                        </tbody>
-                    </table>
-                    <p class="text-muted mb-0" style="font-size:13px;">
-                        This submits the <strong id="mrv-category-inline"></strong> manning request only —
-                        Casual and Intern (if applicable) are separate submissions, not included here.
-                    </p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-sm wfp-btn-secondary" data-bs-dismiss="modal">Back, let me check</button>
-                    <button type="button" class="btn wfp-btn-primary" id="manningReviewConfirmBtn">Confirm &amp; Submit</button>
+                {{-- Review-before-submit — an HOD should never be unsure whether
+                     they just submitted Permanent, Casual, or Intern, or which
+                     department/year. Submit on the form above no longer fires the
+                     save directly; it hides the form and shows this step, and only
+                     "Confirm & Submit" here actually calls manning.responses.store.
+                     This is a second step INSIDE the same modal (toggled with
+                     show()/hide()), not a second Bootstrap modal — two stacked
+                     modals broke the backdrop and made this button unclickable. --}}
+                <div id="manning-review-step" style="display:none;">
+                    <div class="modal-body">
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr><th>Category</th><td id="mrv-category"></td></tr>
+                                <tr><th>Department</th><td id="mrv-department"></td></tr>
+                                <tr><th>Year</th><td id="mrv-year"></td></tr>
+                                <tr><th>Total Headcount</th><td id="mrv-headcount"></td></tr>
+                                <tr><th>Filled Positions</th><td id="mrv-filled"></td></tr>
+                                <tr><th>Vacant Positions</th><td id="mrv-vacant"></td></tr>
+                            </tbody>
+                        </table>
+                        <p class="text-muted mb-0" style="font-size:13px;">
+                            This submits the <strong id="mrv-category-inline"></strong> manning request only —
+                            Casual and Intern (if applicable) are separate submissions, not included here.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm wfp-btn-secondary" id="manningReviewBackBtn">Back, let me check</button>
+                        <button type="button" class="btn wfp-btn-primary" id="manningReviewConfirmBtn">Confirm &amp; Submit</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -554,6 +549,12 @@
 
 
             $('#sendRespond-modal').on('show.bs.modal', function (e) {
+                // Always reopen on the form step, never mid-review (the
+                // modal can be dismissed via backdrop/Esc while on the
+                // review step, without going through the Back button).
+                $('#manning-review-step').hide();
+                $('#manningResponseForm').show();
+
                 // Get the necessary data attributes or values to pass to fetchDraftData
 
 
@@ -568,17 +569,34 @@
 
             // Switching Permanent/Casual/Intern must not leak one category's
             // numbers into another's submission (see build spec item 1.3).
-            // Reset the grid to zero first (same lightweight reset the
-            // "Same As This Year" checkbox already uses when unchecked —
-            // no per-cell AJAX storm), then load whatever draft/submission
-            // actually exists for the newly-selected category, reusing
-            // fetchDraftData() rather than a second reload path.
+            // headcounts is keyed by position id only — Casual/Intern
+            // positions are entirely different rows from Permanent ones, so
+            // clearing it here (not just zeroing the visible cells) is what
+            // actually stops stale totals reappearing on switch-back.
+            // Each category also has its own position list (§27), so the
+            // grid's rows themselves get rebuilt from the server, not just
+            // reset to zero — then whatever draft/submission actually
+            // exists for the newly-selected category loads via the
+            // existing fetchDraftData(), once the new rows exist to fill.
             $(document).on('change', 'input[name="employment_type"]', function () {
-                $('.input-number').val(0);
-                $('[id^="filled_positions_"]').val(0);
-                $('[id^="vacant_positions_"]').val(0);
-                updateTotalHeadcount();
-                fetchDraftData(resort_id, Dept_id, year, $(this).val());
+                headcounts = {};
+                var category = $(this).val();
+                $.ajax({
+                    url: `{{ route('manning.responses.getPositionsByCategory', ['deptId' => ':Dept_id', 'employmentType' => ':employment_type']) }}`
+                        .replace(':Dept_id', Dept_id)
+                        .replace(':employment_type', category || 'Permanent'),
+                    type: 'GET',
+                    success: function (response) {
+                        renderPositionRows((response && response.positions) || []);
+                        updateTotalHeadcount();
+                        fetchDraftData(resort_id, Dept_id, year, category);
+                    },
+                    error: function () {
+                        toastr.error('Error loading positions for this category.', 'Error', {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    }
+                });
             });
 
 
@@ -711,11 +729,16 @@
             $('#mrv-filled').text($('#total_filled_headcount').val() || 0);
             $('#mrv-vacant').text($('#total_vacant_headcount').val() || 0);
 
-            $('#manningReviewModal').modal('show');
+            $('#manningResponseForm').hide();
+            $('#manning-review-step').show();
+        });
+
+        $('#manningReviewBackBtn').on('click', function() {
+            $('#manning-review-step').hide();
+            $('#manningResponseForm').show();
         });
 
         $('#manningReviewConfirmBtn').on('click', function() {
-            $('#manningReviewModal').modal('hide');
             doManningSubmit();
         });
 
@@ -1423,6 +1446,75 @@
                 });
             }
         });
+
+        // Rebuilds #grid-tbody from a category's own position list (§27) —
+        // replaces the old "one static shared grid, tabs just relabel it"
+        // setup, which is what let stale values leak between categories.
+        // Mirrors the server-rendered markup exactly (same ids/names) so
+        // fetchDraftData()'s `#count-${positionId}-${month}` lookups and
+        // incrementValue/decrementValue's inline onclick keep working
+        // unchanged on these dynamically-inserted rows.
+        function renderPositionRows(positions) {
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'];
+
+            if (!positions || positions.length === 0) {
+                $('#grid-tbody').html('<tr><td colspan="13">No positions available.</td></tr>');
+                return;
+            }
+
+            let html = '';
+            positions.forEach(function (pos) {
+                html += `<input type="hidden" name="positions[]" id="pos-${pos.id}" value="${pos.id}">`;
+                html += `<tr><td>${$('<div>').text(pos.position_title).html()} (${pos.no_of_positions || 0})
+                    <button type="button" class="table-icon collapsed ms-2" data-bs-toggle="collapse" data-bs-target="#collapse-${pos.id}" aria-expanded="false" aria-controls="collapse-${pos.id}" data-position-id="${pos.id}">
+                        <i class="fa-solid fa-angle-down"></i>
+                    </button>
+                </td>`;
+
+                for (let i = 0; i < 12; i++) {
+                    const monthName = monthNames[i];
+                    html += `<td>
+                        <div class="input-group inputCounter-group">
+                            <span class="input-group-btn">
+                                <button type="button" class="btn btn-number" data-type="minus" disabled="disabled" onclick="decrementValue(this)">
+                                    <i class="fa-solid fa-minus"></i>
+                                </button>
+                            </span>
+                            <input type="hidden" id="filled_positions_${pos.id}_${i}" name="filled_positions[${pos.id}][${i}]" value="0">
+                            <input type="hidden" id="vacant_positions_${pos.id}_${i}" name="vacant_positions[${pos.id}][${i}]" value="0">
+                            <input type="text" class="form-control input-number" name="monthly_data[${pos.id}][${i}]" id="count-${pos.id}-${i}" value="0" min="0" max="10" data-month="${monthName}" data-month-index="${i}" data-position-id="${pos.id}">
+                            <span class="input-group-btn">
+                                <button type="button" class="btn btn-number" data-type="plus" onclick="incrementValue(this)">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </span>
+                        </div>
+                    </td>`;
+                }
+                html += '</tr>';
+
+                html += `<tr class="collapse" id="collapse-${pos.id}">
+                    <td><span class="badge-headcount" id="head-count">2024 HEADCOUNT = 00 <br/> 2025 HEADCOUNT <br/> 2025 Filled COUNT <br/> 2025 Vacant COUNT </span></td>`;
+                monthNames.forEach(function (m) {
+                    html += `<td id="${m.toLowerCase()}-${pos.id}" data-month="${m}"></td>`;
+                });
+                html += '</tr>';
+            });
+
+            $('#grid-tbody').html(html);
+
+            // Direct typing (not the +/- buttons, which call
+            // incrementValue/decrementValue directly) needs this bound —
+            // the page-load binding at $('.input-number').on('change', ...)
+            // only ever covered the elements that existed at that point.
+            $('#grid-tbody .input-number').on('change', function () {
+                handleInputChange(this);
+            });
+            document.querySelectorAll('#grid-tbody .input-number').forEach(function (input) {
+                updateMinusButtonState(input);
+            });
+        }
 
         function fetchDraftData(resort_id, Dept_id, year, employment_type) {
             // console.log(resort_id, Dept_id, year, employment_type);

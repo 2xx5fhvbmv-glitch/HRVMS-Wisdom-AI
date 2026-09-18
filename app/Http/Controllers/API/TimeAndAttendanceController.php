@@ -2945,16 +2945,12 @@ class TimeAndAttendanceController extends Controller
                                                                     ->where('t1.resort_id', $resort_id)
                                                                     ->where('employees.resort_id', $resort_id)
                                                                     ->where('employees.status', 'Active')
-                                                                    // Only employees with a duty roster entry for today can
-                                                                    // be marked (hodMarkAttendancePresent creates the
-                                                                    // attendance row from the roster entry), so hide the
-                                                                    // rest instead of letting the mark silently fail.
-                                                                    ->whereExists(function ($q) use ($currentDate) {
-                                                                        $q->select(DB::raw(1))
-                                                                          ->from('duty_roster_entries as dre')
-                                                                          ->whereColumn('dre.Emp_id', 'employees.id')
-                                                                          ->whereRaw('DATE(dre.date) = ?', [$currentDate]);
-                                                                    })
+                                                                    // No duty-roster-entry filter here: hodMarkAttendancePresent
+                                                                    // already auto-creates a roster row for Casual/Intern
+                                                                    // employees who don't have one, and a filter here hid
+                                                                    // those employees before that fallback could ever run.
+                                                                    // Matches web's AttandanceRegisterController::nonPermanentList(),
+                                                                    // which has no such filter for any category.
                                                                     ->select(
                                                                         't3.id as id',
                                                                         't1.id as admin_id',

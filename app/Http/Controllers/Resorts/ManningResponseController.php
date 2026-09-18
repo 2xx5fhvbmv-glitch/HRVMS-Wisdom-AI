@@ -433,6 +433,31 @@ class ManningResponseController extends Controller
         return response()->json($headcountData);
     }
 
+    /**
+     * Position rows for the manning grid, scoped to department + category —
+     * called on every Permanent/Casual/Intern tab switch so the grid shows
+     * that category's own positions instead of one shared static list
+     * (Permanent = employee_category NULL, matching every position that
+     * existed before Casual/Intern positions could be created at all).
+     */
+    public function getPositionsByCategory($deptId, $employmentType = 'Permanent')
+    {
+        $resortId = Auth::guard('resort-admin')->user()->resort_id;
+
+        $positions = ResortPosition::where('resort_id', $resortId)
+            ->where('dept_id', $deptId)
+            ->where('status', 'active')
+            ->when($employmentType === 'Permanent', function ($q) {
+                $q->whereNull('employee_category');
+            }, function ($q) use ($employmentType) {
+                $q->where('employee_category', $employmentType);
+            })
+            ->orderBy('position_title')
+            ->get(['id', 'position_title', 'no_of_positions']);
+
+        return response()->json(['success' => true, 'positions' => $positions]);
+    }
+
     public function ShowDepartmentWiseBudgetData(Request $request)
     {
         $data = json_decode($request->data[0], true);

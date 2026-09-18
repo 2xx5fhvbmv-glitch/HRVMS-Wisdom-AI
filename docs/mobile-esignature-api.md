@@ -1,103 +1,163 @@
 # E-signature — Mobile API
 
-For the mobile team. **Status: not built yet.** This doc is the proposed
-contract for endpoints that don't exist in `app/Http/Controllers/API/`
-today — confirmed by grep, nothing under `API/` references `signature_img`.
-Treat everything below as spec to build against, not a description of live
-code (unlike most docs in this folder).
+For the mobile app developer. **Status: built and live**, verified directly
+against `app/Http/Controllers/API/ProfileController.php`,
+`API/LeaveController.php`, `API/OnBoardingController.php` and
+`routes/api.php` — this replaces the earlier "not built yet" version of this
+doc. All routes below sit under the standard mobile auth group
+(`auth:api` Passport bearer token + `applyResortSmtp`), same as every other
+`API/` endpoint.
 
-## What already exists (verified against real code, web side)
+---
 
-- `resort_admins.signature_img` — real column (`app/Models/ResortAdmin.php:52`).
-  Same table/model as `profile_picture`, resolved via
-  `Common::getResortUserPicture($userId, 1)` (type `1` = signature, `0` =
-  profile photo).
-- Web portal upload: `ResortLoginController::UpdateResortProfile`
-  (`routes/resort_route.php:196`, `POST /update/user/profile`) — **plain
-  raw file upload**, straight to `Common::UploadProfileAwsPic()`, no
-  processing. No background removal, no preview/confirm step exists
-  anywhere in this codebase today, web included — that part of the design
-  below is new for everyone, not a mobile-catches-up-to-web situation.
-- Approval gate pattern (already live, 3 places): `InterviewAssessmentController.php:346`,
-  `FeedbackFormController.php:171`, `EvaluationFormController.php:171` all
-  block submission with *"Authorized signature is missing. Please upload it
-  first from your profile page."* when `signature_img` is empty.
-- Snapshot pattern (already live): at submit time these same controllers copy
-  `signature_img` into a permanent `interviewer_signature` field on the
-  response row (`InterviewAssessmentController.php:447,456`) — never
-  re-derived later, so a signature changed afterward doesn't retroactively
-  alter past records. Leave/Island Pass approval needs the same treatment
-  (not yet built — see below).
-- Mobile equivalent of the upload pattern to mirror:
-  `API/ProfileController::changeProfileImage()` (`app/Http/Controllers/API/ProfileController.php:415`) —
-  validates one file, resolves user via `Auth::guard('api')->user()` →
-  `ResortAdmin::find($user->id)`, uploads via `Common::UploadProfileAwsPic()`,
-  saves, returns `{status, message}`.
+## 1. Signature capture — upload once, from profile
 
-## Proposed endpoints (new — to be built in `API/ProfileController.php`)
+Three endpoints. Flow: **preview** (upload raw photo, server removes
+background, returns a preview) → user taps "Is this clear?" → **confirm**
+(saves it) or discard client-side (no reject/cancel call needed — the temp
+file just expires). **get** reads back whatever's currently saved.
 
-All under `auth:api` (Passport Bearer token), same as every other mobile
-endpoint in this controller.
+| Method | Endpoint |
+|---|---|
+| POST | `resort/profile-signature-preview` |
+| POST | `resort/profile-signature-confirm` |
+| GET  | `resort/profile-signature` |
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `profile/signature/preview` | Upload a raw signature photo. Server runs background removal, stores the *processed* result under a short-lived temp path, returns a preview image URL + `preview_token`. Nothing persisted to `signature_img` yet. |
-| POST | `profile/signature/confirm` | Body: `preview_token`. Moves the previously-processed temp file to the permanent path and sets `resort_admins.signature_img`. |
-| GET | `profile/signature` | Returns current `signature_img` URL, or `null` if none uploaded. |
+### `POST resort/profile-signature-preview`
 
-No reject/cancel endpoint — on "No" the app just discards the preview and
-never calls `confirm`. The temp file expires/gets swept, nothing to clean up
-client-side.
+Multipart body, field `signature_image` — required, file, mimes:
+`jpg,jpeg,png,gif,webp,heic,heif`.
 
-### `POST profile/signature/preview`
-
-Request: multipart, field `signature_image` (image file, same mime allowlist
-as `changeProfileImage`: jpg, jpeg, png, gif, svg, webp, heic, heif).
-
-Response:
+Success `200`:
 ```json
-{ "status": true, "message": "Preview ready", "preview_url": "...", "preview_token": "..." }
+{
+  "success": true,
+  "preview_url": "https://...",   // signed URL, expires in 15 min
+  "preview_token": "..."           // 40-char string, pass to confirm
+}
 ```
-On failure (bad file, processing error): `{ "status": false, "message": "..." }`.
 
-### `POST profile/signature/confirm`
+Failure shapes:
+- Not authenticated → `401`, `{ "success": false, "message": "Unauthorized" }`
+- Validation (bad/missing file) → `400`, `{ "success": false, "errors": {...} }`
+- Employee record not resolved → `200`, `{ "success": false, "message": "Employee not found" }`
+- Server error → `500`, `{ "success": false, "message": "Server error" }`
 
-Request: `{ "preview_token": "..." }`
+Nothing is written to the employee's real signature at this point.
+`preview_token` is only valid for **10 minutes** and only for the account
+that requested it.
 
-Response: `{ "status": true, "message": "Signature saved" }` — same shape as
-`changeProfileImage()`'s response, mirrored for consistency.
+### `POST resort/profile-signature-confirm`
 
-`preview_token` not found/expired → `{ "status": false, "message": "Preview expired, please retake" }`.
+Body: `{ "preview_token": "..." }` — required, string.
 
-### `GET profile/signature`
+Success `200`:
+```json
+{
+  "success": true,
+  "message": "Signature saved",
+  "signature_url": "https://..."   // signed URL, expires in 30 min
+}
+```
 
-Response: `{ "status": true, "signature_url": "..." }` or
-`{ "status": true, "signature_url": null }` if nothing uploaded yet.
+Failure shapes:
+- Not authenticated → `401`, same shape as above
+- Missing/non-string `preview_token` → `400`, `{ "success": false, "errors": {...} }`
+- Token expired, wrong account, or already consumed → `200`, `{ "success": false, "message": "Preview expired, please retake" }`
+- Employee record not resolved → `200`, `{ "success": false, "message": "Employee not found" }`
+- Server error → `500`, `{ "success": false, "message": "Server error" }`
 
-## Approval-gate change (server-side, no app work needed)
+On success this is the point the employee's `signature_img` actually
+changes — every later approval starts using it immediately.
 
-`API/LeaveController::handleLeaveAction()` — the shared handler for both
-Leave and Island Pass approve/reject/hold — will get the same "signature
-missing" guard described above. This is a byproduct of Leave and Island Pass
-sharing one code path, not a new requirement on Island Pass: **Island Pass
-does not put a signature on its own PDF**, but an approver with no
-`signature_img` will be blocked from approving *either* type until they
-upload one. Not yet added (confirmed: zero `signature_img` references in
-`API/LeaveController.php` today).
+### `GET resort/profile-signature`
 
-Expected error shape when blocked, matching the web pattern:
+No params.
+
+Success `200`, always `success: true`:
+```json
+{ "success": true, "signature_url": "https://..." }
+```
+or, if nothing's been uploaded yet (**not a 404** — same 200 shape, field
+just null):
+```json
+{ "success": true, "signature_url": null }
+```
+`signature_url` is a fresh 30-minute signed URL each call, not a stable
+link — don't cache it past that window.
+
+---
+
+## 2. Leave & Island Pass approval — unaffected, no signature required
+
+`POST resort/handle-leave-action` (shared handler for Leave and Island
+Pass approve/reject) has **no signature gate and never calls the snapshot
+helper** — confirmed in code, with an explicit comment explaining why:
+these requests are never turned into a PDF, so there's nowhere for a
+signature to render. Approving/rejecting either type works exactly as
+before; nothing changes on the app side and no signature upload is a
+prerequisite for this action.
+
+Payload is unchanged: `leave_id` (required), `action` (required,
+`Approved`/`Rejected`), `reason` (required only when `action` is
+`Rejected`).
+
+---
+
+## 3. Onboarding acknowledgment — signature required, gated
+
+`POST on-boarding/store-acknowledgement` **does** require a signature on
+file before it will accept a submission — this is very likely the first
+time a new employee ever uploads one (right at the pre-hire→hired
+transition), so the app should check `GET resort/profile-signature` first
+and route to the upload flow (§1) if `signature_url` comes back null,
+rather than letting the user hit the gate error blind.
+
+Request:
+```json
+{
+  "acknowledgements": [
+    {
+      "acknowledgement_type": "Contract Signed",
+      "acknowledged_date": "2026-09-18",
+      "status": "Yes"
+    }
+  ]
+}
+```
+`acknowledgements` — required array, min 1. Per item: `acknowledgement_type`
+(required string), `acknowledged_date` (required date), `status` (required,
+`Yes` or `No`).
+
+Gate error (no signature on file) — `422`:
 ```json
 { "success": false, "message": "Authorized signature is missing. Please upload it first from your profile page." }
 ```
 
-## Out of scope for mobile
+Validation failure → `422`, `{ "success": false, "errors": {...} }`.
 
-- PDF generation / embedding the signature image into any document — entirely
-  web-backend's job.
-- The approval-time snapshot itself (copying `signature_img` into a
-  permanent record) — server-side, fires automatically wherever
-  `handleLeaveAction()` records the decision. Mobile just calls the existing
-  approve/reject/hold endpoints as today.
-- Grievance, Incident, Budget, Performance — mobile controllers for these
-  already exist, but web-side PDF/export + approver chains aren't ready yet.
-  Nothing to build against for these four until that lands.
+Success → `201`:
+```json
+{
+  "success": true,
+  "message": "Acknowledgements stored successfully.",
+  "data": [ /* created records, each including signature_img/signature_name/signed_at */ ],
+  "duplicates": []   // acknowledgement_type values already submitted before, silently skipped
+}
+```
+Re-submitting the same `(acknowledgement_type, acknowledged_date)` pair for
+the same employee is not an error — it's skipped and listed in
+`duplicates`, and the success message gets an "Already stored: X, Y" suffix.
+
+---
+
+## Out of scope for mobile today
+
+- No PDF is ever built or shown by the app — entirely a web-backend
+  concern. The app only ever calls the three signature endpoints above,
+  plus whatever approval/submit endpoint it already calls.
+- Resignation (`API/ResignationController.php`) has zero signature
+  integration currently — nothing to build against there yet.
+- Grievance, Incident, Budget, Performance, Talent Acquisition approvals —
+  same as before, no mobile-side signature work until the corresponding
+  web-side PDF/approval-chain work lands.

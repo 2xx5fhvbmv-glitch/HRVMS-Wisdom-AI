@@ -886,7 +886,12 @@ class WorkforcePlanningDashboardController extends Controller
                 $emp_details = Employee::where('Admin_Parent_id',$id)->get();
                 $department_details = ResortDepartment::where('id',$emp_details[0]->Dept_id)->get();
                 // dd($department_details);
-                $positions = ResortPosition::where('status','active')->where('dept_id',$emp_details[0]->Dept_id)->get();
+                // Initial page load renders the Permanent tab (the manning
+                // grid's default-checked radio) — exclude Casual/Intern-only
+                // positions here so they don't leak into the Permanent grid
+                // on first load, before any tab switch calls
+                // manning.responses.getPositionsByCategory.
+                $positions = ResortPosition::where('status','active')->where('dept_id',$emp_details[0]->Dept_id)->whereNull('employee_category')->get();
                 // dd($positions);
                 $resort_divisions_count = ResortDivision::where('status','active')->where('resort_id',$resort_id)->count();
                 $resort_departments_count = ResortDepartment::where('status','active')->where('resort_id',$resort_id)->count();

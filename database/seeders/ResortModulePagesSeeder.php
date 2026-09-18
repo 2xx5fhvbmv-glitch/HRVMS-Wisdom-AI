@@ -67,6 +67,14 @@ class ResortModulePagesSeeder extends Seeder
               "place_order"     => "0"
             ],
            [
+              "page_name"       => "Position Configuration — Casuals & Interns",
+              "Module_Id"       => "1",
+              "internal_route"  => "resort.positionconfig.index",
+              "TypeOfPage"      => "InsideOfMenu",
+              "type"            => "normal",
+              "place_order"     => "6"
+            ],
+           [
               "page_name"       => "Benefit Grid",
               "Module_Id"       => "1",
               "internal_route"  => "resort.benifitgrid.index",

@@ -101,13 +101,21 @@ class CasualInternEmployeeImport implements ToModel, WithHeadingRow
             return null;
         }
 
+        // employee_category on resort_positions is 'Casual'/'Intern' (matches
+        // ManningResponseController's enum); this importer's own EmploymentType
+        // column is 'Casual'/'Internship' — map before filtering so a Casual
+        // import can never silently attach to an Intern-only (or Permanent,
+        // untagged) position that happens to share a title.
+        $positionCategory = $employmentType === 'Internship' ? 'Intern' : 'Casual';
+
         $position = ResortPosition::where('position_title', $positionName)
             ->where('status', 'active')
             ->where('resort_id', $this->resort->resort_id)
             ->where('dept_id', $department->id)
+            ->where('employee_category', $positionCategory)
             ->first();
         if (!$position) {
-            $this->addError($excelRowNumber, $row, "Position '{$positionName}' does not match an existing position in {$departmentName}.");
+            $this->addError($excelRowNumber, $row, "Position '{$positionName}' does not match an existing {$positionCategory} position in {$departmentName}.");
             return null;
         }
 
