@@ -47,10 +47,42 @@ class PromotionController extends Controller
             ->where('status','Active')
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->get();
-        $positions = ResortPosition::where('resort_id',$resort_id)->where('status','active')->get();
+        // Page loads with no employee selected yet — Permanent is the
+        // default, reloaded per-category once an employee is picked (see
+        // getPositionsForPromotion(), called from getEmpDetails()'s success
+        // handler).
+        $positions = ResortPosition::where('resort_id',$resort_id)->where('status','active')->permanent()->get();
         $emp_grade = config('settings.eligibilty'); // Assuming this maps IDs to names
         $benefitGrids = ResortBenifitGrid::where('resort_id',$this->resort->resort_id)->get();
         return view('resorts.people.promotion.initiate-promotion',compact('page_title','employees','positions','emp_grade','benefitGrids'));
+    }
+
+    /**
+     * Reloads the NEW POSITION dropdown once an employee is picked —
+     * scoped to that employee's own manning category, same pattern as
+     * VacancyController::getPositionsByVacancyType(). Without it this list
+     * was one static Permanent-dept... well, unscoped-by-category list, so
+     * a Casual/Intern employee's promotion could offer a Permanent-only
+     * position (or vice versa).
+     */
+    public function getPositionsForPromotion(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+        $employee = Employee::where('id', $request->employee_id)
+            ->where('resort_id', $resort_id)
+            ->first();
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
+        }
+
+        $category = Common::manningCategory($employee->employment_type);
+        $positions = ResortPosition::where('resort_id', $resort_id)
+            ->where('status', 'active')
+            ->forCategory($category)
+            ->orderBy('position_title')
+            ->get(['id', 'position_title']);
+
+        return response()->json(['success' => true, 'positions' => $positions]);
     }
 
     public function submitPromotion(Request $request)

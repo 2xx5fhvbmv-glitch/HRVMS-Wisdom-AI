@@ -151,6 +151,7 @@ class PayrollController extends Controller
         $scopedDeptIds = $isFinanceDept ? null : \App\Helpers\Common::getScopedDepartmentIds();
         $employees = Employee::with('resortAdmin')->where('resort_id',$resort_id)
             ->whereIn('status', ['Active', 'Probationary','Resigned'])
+            ->whereNotIn('employment_type', \App\Helpers\Common::manningCategoryEmploymentTypes('Casual'))
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->get();
         $deductions = Deduction::where('resort_id',$resort_id)->get();
@@ -177,8 +178,11 @@ class PayrollController extends Controller
             $endDay = min($cutoffDay, $baseEnd->daysInMonth);
             $periodEnd = $baseEnd->copy()->day($endDay);
 
-            // Check payroll status for this period
+            // Check payroll status for this period — scoped to the
+            // Permanent run only (§35's Casual run tracks its own periods
+            // separately, even for the same date range).
             $existingPayroll = Payroll::where('resort_id', $resort_id)
+                ->where('payroll_category', 'Permanent')
                 ->where('start_date', $periodStart->format('Y-m-d'))
                 ->where('end_date', $periodEnd->format('Y-m-d'))
                 ->first(['id', 'status']);
@@ -207,6 +211,7 @@ class PayrollController extends Controller
 
         // Get payrolls pending approval or approved (for the dropdown)
         $pendingApprovalPayrolls = Payroll::where('resort_id', $resort_id)
+            ->where('payroll_category', 'Permanent')
             ->whereIn('status', ['pending_approval', 'approved'])
             ->orderByDesc('created_at')
             ->get(['id', 'start_date', 'end_date', 'status']);
@@ -232,9 +237,13 @@ class PayrollController extends Controller
         $currentEmployee = \Auth::guard('resort-admin')->user()->GetEmployee ?? null;
         $isFinanceDept = \App\Helpers\Common::isFinanceDepartment($currentEmployee->Dept_id ?? null);
         $scopedDeptIds = $isFinanceDept ? null : \App\Helpers\Common::getScopedDepartmentIds();
+        // §35 — Casual staff are paid through their own separate run (or not
+        // at all, under the lump-sum model) — never mixed into this one.
+        // Interns stay in this list (§34).
         $query = Employee::with(['resortAdmin', 'position', 'department', 'section'])
             ->where('resort_id', $resort_id)
             ->whereIn('status', ['Active', 'Probationary','Resigned'])
+            ->whereNotIn('employment_type', \App\Helpers\Common::manningCategoryEmploymentTypes('Casual'))
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
         // Was requiring a whereHas('EmployeeAttandance', whereBetween date)
@@ -405,14 +414,21 @@ class PayrollController extends Controller
         $request->validate([
             'start_date' => 'required|date',
             'end_date' => 'required|date',
-            'status' => 'required|string'
+            'status' => 'required|string',
+            'payroll_category' => 'nullable|in:Permanent,Casual',
         ]);
 
         try {
             $resortId = $this->resort->resort_id;
+            // §35 — Casual runs entirely separately from Permanent+Intern,
+            // even for the same date range, so it needs its own row rather
+            // than colliding with (and silently overwriting) the Permanent
+            // one for that same period.
+            $payrollCategory = $request->payroll_category ?: 'Permanent';
 
             // ❌ Check if a locked payroll already exists for the same date range
             $lockedPayrollExists = Payroll::where('resort_id', $resortId)
+                ->where('payroll_category', $payrollCategory)
                 ->where('start_date', $request->start_date)
                 ->where('end_date', $request->end_date)
                 ->where('status', 'locked')
@@ -429,6 +445,7 @@ class PayrollController extends Controller
             $payroll = Payroll::updateOrCreate(
                 [
                     'resort_id' => $resortId,
+                    'payroll_category' => $payrollCategory,
                     'start_date' => $request->start_date,
                     'end_date' => $request->end_date
                 ],
@@ -721,6 +738,16 @@ class PayrollController extends Controller
                 // Already settled via F&F — exclude from SC pool.
                 continue;
             }
+            // §34 — Interns never get service charge, same as Casual staff
+            // (this endpoint only ever sees Permanent+Intern Emp_ids since
+            // Casual isn't part of this payroll run at all). Not a benefit-
+            // grid-absence accident: resolveEmpGrade() has a rank-based
+            // fallback with no employment_type check, so an Intern whose
+            // rank/position maps to an SC-eligible grade was showing up
+            // here before this guard existed.
+            if (Common::manningCategory($employee->employment_type ?? '') === 'Intern') {
+                continue;
+            }
             // Employee's own benefit_grid_level wins when it's still a real,
             // active grade for this resort (resolveEmpGrade() guards against
             // stale/poisoned values); otherwise falls back to the rank-based
@@ -784,6 +811,12 @@ class PayrollController extends Controller
                     ], 404);
                 }
 
+                // §34 — force 0 regardless of what the client posted. This
+                // is the actual write path (getEligibleEmployees() above is
+                // only the UI gate, not trusted) — a forged/stale payload
+                // can't sneak an Intern into service charge here.
+                $isIntern = Common::manningCategory($emp_detail->employment_type ?? '') === 'Intern';
+
                 PayrollServiceCharge::updateOrCreate(
                     [
                         'payroll_id' => $request->payroll_id,
@@ -792,7 +825,7 @@ class PayrollController extends Controller
                     [
                         'Emp_id' => $serviceCharge['id'],
                         'total_working_days' => $serviceCharge['totalWorkingDays'],
-                        'service_charge_amount' => $serviceCharge['serviceCharge'],
+                        'service_charge_amount' => $isIntern ? 0 : $serviceCharge['serviceCharge'],
                     ]
                 );
 
@@ -809,9 +842,15 @@ class PayrollController extends Controller
                 foreach ($payroll_service_charges as $payroll) 
                 {
                     $employee           =  Employee::where('id', $payroll->employee_id)->where('resort_id', $this->resort->resort_id)->first();
+                    if (Common::manningCategory($employee->employment_type ?? '') === 'Intern') {
+                        // §34 — an Intern correctly getting SC=0 is not a
+                        // compliance breach; skip so this never fires a
+                        // false "eligible but underpaid" alert for them.
+                        continue;
+                    }
                     $grade              =  Common::resolveEmpGrade($this->resort->resort_id, $employee->rank, $employee->benefit_grid_level);
                     $resortBenifitsGrid =  ResortBenifitGrid::where('resort_id', $this->resort->resort_id)->where('emp_grade', $grade)->where('service_charge', '1')->where('status','Active')->first();
-                    
+
                     if($resortBenifitsGrid && $payroll->service_charge_amount > 0)
                     {
                             Compliance::create([
@@ -1001,6 +1040,9 @@ class PayrollController extends Controller
                     [
                         'Emp_id' => $review['id'],
                         'service_charge' => $review['serviceCharge'] ?? 0,
+                        // §35 — only ever sent by the Casual run; null for
+                        // every Permanent/Intern review, same as before.
+                        'service_provider_commission' => $review['serviceProviderCommission'] ?? null,
                         'regularOTPay' => $review['overtimeNormal'] ?? 0,
                         'fridayOTPay' => $review['overtimeFriday'] ?? 0,
                         'holidayOTPay' => $review['overtimeHoliday'] ?? 0,

@@ -545,6 +545,7 @@
                     $('#hdn_old_basic_salary').val(response.data.basic_salary);
                     $('#last-promotion-date').text(response.data.last_promotion_date || 'N/A');
                     $('#old_position_id').val(response.data.pos_id);
+                    loadPositionsForEmployee(empId);
                     // ✅ Set position ID on the View Job Description link
                     
                     if (response.data.job_desc_url) {
@@ -579,6 +580,26 @@
                 toastr.error("Error fetching employee details.", "Error", {
                     positionClass: 'toast-bottom-right'
                 });
+            }
+        });
+    }
+
+    // NEW POSITION list is scoped to the selected employee's own manning
+    // category — reload it here rather than assuming the page-load list
+    // (Permanent by default) still applies once a Casual/Intern employee
+    // is picked.
+    function loadPositionsForEmployee(empId) {
+        $.ajax({
+            url: '{{ route('people.promotion.positionsForEmployee') }}',
+            type: 'GET',
+            data: { employee_id: empId },
+            success: function (res) {
+                let html = '<option value="">' + ($('#new_position').data('placeholder') || 'Select Position') + '</option>';
+                (res.positions || []).forEach(function (p) {
+                    html += '<option value="' + p.id + '">' + $('<div>').text(p.position_title).html() + '</option>';
+                });
+                $('#new_position').html(html).val('').trigger('change');
+                window.wisdomDD.rebuild('#new_position');
             }
         });
     }

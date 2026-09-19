@@ -994,7 +994,6 @@ class EmployeeController extends Controller
             ->where('status','active')
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('id', $scopedDeptIds))
             ->get();
-        $positions = ResortPosition::where('resort_id',$resort_id)->where('status','active')->get();
         $sections = ResortSection::where('resort_id',$resort_id)->where('status','active')->get();
         $resort_divisions = ResortDivision::where('resort_id',$resort_id)->where('status','active')->get();
         $resort_allowances = ResortBudgetCost::where('resort_id', $resort_id)->where('is_payroll_allowance',1)->get();
@@ -1006,6 +1005,17 @@ class EmployeeController extends Controller
         if (!$employee) {
             return abort(403, 'You do not have access to this employee.');
         }
+        // Scoped to this employee's own category so the dropdown doesn't
+        // offer a position from a different bucket — but always keep their
+        // OWN current position selectable even if it's since become a
+        // different category (e.g. re-tagged after hire), so the page
+        // doesn't silently drop the value they already have.
+        $employeeCategory = Common::manningCategory($employee->employment_type);
+        $positions = ResortPosition::where('resort_id',$resort_id)->where('status','active')
+            ->where(function ($q) use ($employeeCategory, $employee) {
+                $q->forCategory($employeeCategory)->orWhere('id', $employee->Position_id);
+            })
+            ->get();
         $emp_benigit_grid = Common::getBenefitGrid($employee->position->Rank,$this->resort->resort_id);
         $benefitGrids = ResortBenifitGrid::where('resort_id',$this->resort->resort_id)->where('status','active')->get();
 
@@ -1366,7 +1376,7 @@ class EmployeeController extends Controller
             ->latest('id')
             ->first();
 
-        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports','recentActivities','xpatExpiries','transportationOptions','travelQuotas','travelUsage','pendingEmploymentVerificationRequest'));
+        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports','recentActivities','xpatExpiries','transportationOptions','travelQuotas','travelUsage','pendingEmploymentVerificationRequest','employeeCategory'));
     }
 
     /**
@@ -2758,11 +2768,19 @@ class EmployeeController extends Controller
 
     public function getPositionBySection(Request $request){
 
+        // Backs both Add Employee (always Permanent — Casual/Intern
+        // employees are only ever created through their own importer/hire
+        // flow, never this manual form) and Edit Employee (sends the
+        // employee's own category, so re-selecting their department/section
+        // doesn't drop them into a list that excludes their own position).
+        $employeeCategory = $request->input('employee_category', 'Permanent');
+
         if(!$request->has('section_id') || empty($request->section_id)){
             $departmentId = $request->department_id;
             $positions = ResortPosition::where('resort_id', $this->resort->resort_id)
                 ->where('dept_id', $departmentId)
                 ->where('status', 'active')
+                ->forCategory($employeeCategory)
                 ->get();
             return response()->json(['success' => true, 'positions' => $positions]);
         }else{
@@ -2770,6 +2788,7 @@ class EmployeeController extends Controller
             $positions = ResortPosition::where('resort_id', $this->resort->resort_id)
                 ->where('section_id', $sectionId)
                 ->where('status', 'active')
+                ->forCategory($employeeCategory)
                 ->get();
             return response()->json(['success' => true, 'positions' => $positions]);
         }

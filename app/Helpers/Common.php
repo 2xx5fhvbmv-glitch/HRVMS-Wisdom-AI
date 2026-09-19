@@ -153,6 +153,42 @@ class Common
         return 'Permanent';
     }
 
+    /**
+     * Shared by API\TimeAndAttendanceController::hodMarkAttendancePresent()
+     * and Resorts\TimeAndAttendance\AttandanceRegisterController::nonPermanentMark()
+     * so a Casual/Intern manual OT entry validates identically from mobile
+     * and web. Returns an error message, or null when valid. Normal vs
+     * holiday OT rate is NOT decided here — payroll derives that later with
+     * the same rule the Permanent flow uses.
+     */
+    public static function validateOvertimeHours($value): ?string
+    {
+        if (!is_numeric($value)) {
+            return 'ot_hours must be a number.';
+        }
+        $value = (float) $value;
+        if ($value < 0 || $value > 12) {
+            return 'ot_hours must be between 0 and 12.';
+        }
+        if (abs($value * 4 - round($value * 4)) > 1e-9) {
+            return 'ot_hours must be in 0.25 hour increments.';
+        }
+        return null;
+    }
+
+    /**
+     * parent_attendaces.OverTime/duty_roster_entries.OverTime store OT as an
+     * "H:i" string everywhere else in this codebase (see ImportAttandance,
+     * DutyRosterController::StoreOverTime) — never decimal hours. Convert
+     * here so a manually entered 2.5 lands as "02:30", matching every other
+     * writer of this column.
+     */
+    public static function decimalHoursToTimeString(float $hours): string
+    {
+        $totalMinutes = (int) round($hours * 60);
+        return sprintf('%02d:%02d', intdiv($totalMinutes, 60), $totalMinutes % 60);
+    }
+
     public static function nextEmployeeId($resortId): string
     {
         $prefix   = optional(Resort::find($resortId))->resort_prefix ?: 'DR';
@@ -7271,6 +7307,16 @@ class Common
         // $resortId was accepted but never used — payroll_service_charges
         // has no resort_id column of its own, so ownership is verified via
         // its parent payroll row instead.
+
+        // §34 — Interns never get service charge. Guarded here (not just at
+        // the write side) so a stale row saved before this guard existed
+        // can't still pay out through any of this function's callers
+        // (earnings fold-in, pension/EWT calc).
+        $employee = Employee::find($employee_id);
+        if ($employee && self::manningCategory($employee->employment_type ?? '') === 'Intern') {
+            return 0;
+        }
+
         $service_charge = PayrollServiceCharge::join('payroll', 'payroll.id', '=', 'payroll_service_charges.payroll_id')
             ->where('payroll_service_charges.payroll_id', $payrollId)
             ->where('payroll_service_charges.employee_id', $employee_id)

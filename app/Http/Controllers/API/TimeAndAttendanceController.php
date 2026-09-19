@@ -2891,6 +2891,37 @@ class TimeAndAttendanceController extends Controller
         $resort_id                                          =   $user->resort_id;
         $perms                                              =   $request->query('perms', '');
 
+        // Casual/Intern staff often get marked late — was hard-coded to
+        // today even though the mark endpoint already accepts a date.
+        $dateParam                                          =   $request->query('date');
+        if (!empty($dateParam)) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateParam)) {
+                return response()->json(['success' => false, 'message' => 'Invalid date format, expected YYYY-MM-DD.'], 422);
+            }
+            try {
+                $requestedDate                              =   Carbon::createFromFormat('Y-m-d', $dateParam)->startOfDay();
+            } catch (\Exception $e) {
+                return response()->json(['success' => false, 'message' => 'Invalid date format, expected YYYY-MM-DD.'], 422);
+            }
+        } else {
+            $requestedDate                                  =   Carbon::today();
+        }
+        if ($requestedDate->gt(Carbon::today())) {
+            return response()->json(['success' => false, 'message' => 'Cannot view attendance for a future date.'], 422);
+        }
+        $cutoffDay                                          =   PayrollConfig::where('resort_id', $resort_id)->value('cutoff_day') ?? 1;
+        $cutoffPeriod                                       =   Common::getCurrentCutoffPeriod($cutoffDay);
+        if ($requestedDate->lt($cutoffPeriod['start']->copy()->startOfDay())) {
+            return response()->json(['success' => false, 'message' => 'This date falls in a closed payroll period and can no longer be marked.'], 422);
+        }
+
+        // Mixed Permanent/Casual/Intern teams — let the manager tell them
+        // apart and filter by manning category.
+        $category                                           =   $request->query('category', 'All');
+        if (!in_array($category, ['Permanent', 'Casual', 'Intern', 'All'], true)) {
+            $category                                       =   'All';
+        }
+
         $rankConfig                                         =   config('settings.Position_Rank', []);
         $currentRankLabel                                   =   $rankConfig[$employee->rank ?? ''] ?? '';
 
@@ -2926,7 +2957,7 @@ class TimeAndAttendanceController extends Controller
 
         try {
 
-            $currentDate                                    =   Carbon::today()->format('Y-m-d');
+            $currentDate                                    =   $requestedDate->format('Y-m-d');
             // This must return the HOD/HR's whole scoped roster so they can
             // mark anyone who hasn't self-checked-in — not just employees
             // who already have a Present attendance row. The old query
@@ -2958,6 +2989,7 @@ class TimeAndAttendanceController extends Controller
                                                                         't1.last_name',
                                                                         't1.profile_picture',
                                                                         'employees.id as emp_id',
+                                                                        'employees.employment_type',
                                                                         'rp.position_title',
                                                                         't3.Status',
                                                                         't3.CheckingTime',
@@ -2968,6 +3000,9 @@ class TimeAndAttendanceController extends Controller
             if ($employeeIds !== null) {
                 $query->whereIn('employees.id', $employeeIds);
             }
+            if ($category !== 'All') {
+                $query->whereIn('employees.employment_type', Common::manningCategoryEmploymentTypes($category));
+            }
 
             $employeeAttendance                             =   $query->get();
 
@@ -2976,17 +3011,31 @@ class TimeAndAttendanceController extends Controller
                     $item->profile_picture = Common::getResortUserPicture($item->admin_id);
                 }
                 $item->date                                  =   $currentDate;
-                $hasRealCheckIn                              =   !empty($item->CheckingTime) && !in_array(trim($item->CheckingTime), ['0', '00:00', '00:00:00']);
-                if ($hasRealCheckIn && in_array($item->Status, ['Present', 'On-Time', 'Late'], true)) {
-                    $item->attendance_display_status         =   'Present';
-                    $item->can_mark_present                  =   false;
-                } elseif ($item->Status === 'Absent') {
-                    $item->attendance_display_status         =   'Absent';
-                    $item->can_mark_present                  =   true;
+                $item->manning_category                      =   Common::manningCategory($item->employment_type);
+
+                $manualStatuses                              =   ['Present', 'Absent', 'Sick', 'DayOff', 'ShortLeave', 'HalfDayLeave', 'FullDayLeave'];
+                if ($item->CheckInCheckOut_Type === 'Manual' && in_array($item->Status, $manualStatuses, true)) {
+                    // Manual marking (the only path Casual/Intern go
+                    // through) stores a synthetic shift start time, not a
+                    // real punch — the check-in-time sanity test below
+                    // would wrongly show these as "Not Marked". Trust the
+                    // stored Status outright instead.
+                    $item->attendance_display_status         =   $item->Status;
                 } else {
-                    $item->attendance_display_status         =   'Not Marked';
-                    $item->can_mark_present                  =   true;
+                    $hasRealCheckIn                          =   !empty($item->CheckingTime) && !in_array(trim($item->CheckingTime), ['0', '00:00', '00:00:00']);
+                    if ($hasRealCheckIn && in_array($item->Status, ['Present', 'On-Time', 'Late'], true)) {
+                        $item->attendance_display_status     =   'Present';
+                    } elseif ($item->Status === 'Absent') {
+                        $item->attendance_display_status     =   'Absent';
+                    } else {
+                        $item->attendance_display_status     =   'Not Marked';
+                    }
                 }
+                $item->can_mark_present                      =   $item->attendance_display_status !== 'Present';
+                // Managers may correct an already-marked day, not just mark
+                // an unmarked one — separate flag so older app builds that
+                // only understand can_mark_present keep working.
+                $item->can_change_status                     =   true;
                 return $item;
             })->toArray();
 
@@ -3061,6 +3110,39 @@ class TimeAndAttendanceController extends Controller
             }
         }
 
+        // Overtime capture for Casual/Intern, who have no punches to derive
+        // it from automatically. One employee per request (plain ot_hours),
+        // or ot_hours[<emp_id>] for a bulk emp_id request. Shared validation
+        // with the web equivalent (nonPermanentMark) via Common::validateOvertimeHours().
+        $otHoursRaw                                         =   $request->input('ot_hours');
+        $otHoursByEmp                                       =   [];
+        if ($otHoursRaw !== null && $otHoursRaw !== '') {
+            if (is_array($otHoursRaw)) {
+                foreach ($otHoursRaw as $otEmpId => $otValue) {
+                    if ($otValue === null || $otValue === '') {
+                        continue;
+                    }
+                    $otError                                 =   Common::validateOvertimeHours($otValue);
+                    if ($otError) {
+                        return response()->json(['success' => false, 'message' => $otError], 422);
+                    }
+                    $otHoursByEmp[(int) $otEmpId]            =   (float) $otValue;
+                }
+            } else {
+                if (count($empIds) !== 1) {
+                    return response()->json(['success' => false, 'message' => 'Send ot_hours[emp_id] when marking more than one employee.'], 422);
+                }
+                $otError                                     =   Common::validateOvertimeHours($otHoursRaw);
+                if ($otError) {
+                    return response()->json(['success' => false, 'message' => $otError], 422);
+                }
+                $otHoursByEmp[(int) $empIds[0]]              =   (float) $otHoursRaw;
+            }
+            if (!empty($otHoursByEmp) && $status !== 'Present') {
+                return response()->json(['success' => false, 'message' => 'ot_hours is only valid when status is Present.'], 422);
+            }
+        }
+
         try {
             $timeAttendance                                 =   [];
             $appTimezone                                   =   config('app.timezone', 'UTC');
@@ -3071,7 +3153,12 @@ class TimeAndAttendanceController extends Controller
 
             DB::beginTransaction();
 
-            // Mark by attendance_id (existing behaviour)
+            // Manager marking OT on behalf of a Casual/Intern with no app —
+            // they're the only approver that exists for these employees.
+            $actorEmpId                                     =   optional($user->GetEmployee)->id;
+
+            // Mark by attendance_id (existing behaviour) — no OT support on
+            // this path; ot_hours only applies to the emp_id loop below.
             foreach ($attendaceIds as $value) {
                 $parentAttendance                           =   ParentAttendace::where('resort_id', $resort_id)->where('id', $value)->whereIn('Status', ['', null])->first();
                 if ($parentAttendance) {
@@ -3099,6 +3186,7 @@ class TimeAndAttendanceController extends Controller
                             'CheckingOutTime'               =>  $parentAttendance->CheckingOutTime,
                             'Status'                        =>  $parentAttendance->Status,
                             'CheckInCheckOut_Type'          =>  $parentAttendance->CheckInCheckOut_Type,
+                            'ot_hours'                      =>  null,
                         ];
                     }
                 }
@@ -3210,6 +3298,12 @@ class TimeAndAttendanceController extends Controller
                         'Status'                            =>  $status,
                         'CheckInCheckOut_Type'              =>  'Manual',
                     ]);
+                    if (isset($otHoursByEmp[$empId])) {
+                        $parentAttendance->OverTime         =   Common::decimalHoursToTimeString($otHoursByEmp[$empId]);
+                        $parentAttendance->OTStatus          =   'Approved';
+                        $parentAttendance->OTApproved_By     =   $actorEmpId;
+                        $parentAttendance->save();
+                    }
                     ChildAttendace::create([
                         'Parent_attd_id'                    =>  $parentAttendance->id,
                         'InTime_out'                        =>  $startTime,
@@ -3224,6 +3318,7 @@ class TimeAndAttendanceController extends Controller
                         'CheckingOutTime'                   =>  $parentAttendance->CheckingOutTime,
                         'Status'                            =>  $parentAttendance->Status,
                         'CheckInCheckOut_Type'              =>  $parentAttendance->CheckInCheckOut_Type,
+                        'ot_hours'                          =>  $otHoursByEmp[$empId] ?? null,
                     ];
                     $markResultByEmpId[$empId]              =   [
                         'emp_id'                            =>  $empId,
@@ -3233,6 +3328,7 @@ class TimeAndAttendanceController extends Controller
                         'CheckingOutTime'                   =>  $parentAttendance->CheckingOutTime,
                         'Status'                            =>  $parentAttendance->Status,
                         'CheckInCheckOut_Type'              =>  $parentAttendance->CheckInCheckOut_Type,
+                        'ot_hours'                          =>  $otHoursByEmp[$empId] ?? null,
                     ];
                     continue;
                 }
@@ -3246,6 +3342,19 @@ class TimeAndAttendanceController extends Controller
                 $parentAttendance->CheckingOutTime          =   $endTime;
                 $parentAttendance->Status                   =   $status;
                 $parentAttendance->CheckInCheckOut_Type     =   'Manual';
+                if ($status !== 'Present') {
+                    // Correcting a day away from Present (e.g. Present -> Sick)
+                    // must not leave a stale approved OT balance sitting on a
+                    // non-Present row — payroll's OT aggregation doesn't all
+                    // check Status, only whether OverTime is set.
+                    $parentAttendance->OverTime              =   null;
+                    $parentAttendance->OTStatus              =   null;
+                    $parentAttendance->OTApproved_By         =   null;
+                } elseif (isset($otHoursByEmp[$empId])) {
+                    $parentAttendance->OverTime              =   Common::decimalHoursToTimeString($otHoursByEmp[$empId]);
+                    $parentAttendance->OTStatus              =   'Approved';
+                    $parentAttendance->OTApproved_By         =   $actorEmpId;
+                }
                 $parentAttendance->save();
 
                 ChildAttendace::updateOrCreate(
@@ -3264,6 +3373,7 @@ class TimeAndAttendanceController extends Controller
                     'CheckingOutTime'                      =>  $parentAttendance->CheckingOutTime,
                     'Status'                                =>  $parentAttendance->Status,
                     'CheckInCheckOut_Type'                 =>  $parentAttendance->CheckInCheckOut_Type,
+                    'ot_hours'                              =>  $otHoursByEmp[$empId] ?? null,
                 ];
                 $markResultByEmpId[$empId]                  =   [
                     'emp_id'                                =>  $parentAttendance->Emp_id,
@@ -3273,6 +3383,7 @@ class TimeAndAttendanceController extends Controller
                     'CheckingOutTime'                      =>  $parentAttendance->CheckingOutTime,
                     'Status'                                =>  $parentAttendance->Status,
                     'CheckInCheckOut_Type'                 =>  $parentAttendance->CheckInCheckOut_Type,
+                    'ot_hours'                              =>  $otHoursByEmp[$empId] ?? null,
                 ];
             }
 
@@ -3309,8 +3420,7 @@ class TimeAndAttendanceController extends Controller
 
             // Notify each employee whose attendance the HOD/HR just marked
             // present — but not the actor themselves, if they happened to
-            // be in their own marked batch.
-            $actorEmpId                                     =   optional($user->GetEmployee)->id;
+            // be in their own marked batch. $actorEmpId already resolved above.
             $markedEmpIds                                   =   array_values(array_unique(array_filter(array_column($timeAttendance, 'emp_id'))));
             $notifyEmpIds                                   =   $actorEmpId ? array_diff($markedEmpIds, [$actorEmpId]) : $markedEmpIds;
             if (!empty($notifyEmpIds)) {
@@ -3330,6 +3440,179 @@ class TimeAndAttendanceController extends Controller
             return response()->json($response);
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Month grid/summary for a manager's Casual/Intern reports — Phase 2
+     * §33 (docs/casual-intern-*): "month" view companion to
+     * hodMarkAttendance()'s single-day list. Same auth/scoping as that
+     * method; built straight from parent_attendaces so a status marked
+     * here, on hodMarkAttendance, or on the web equivalent
+     * (AttandanceRegisterController::nonPermanentMark) always agrees —
+     * one underlying table, not a second source of truth.
+     */
+    public function hodCasualInternMonth(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $user                                               =   Auth::guard('api')->user();
+        $employee                                           =   $user->GetEmployee;
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee record not found.'], 403);
+        }
+
+        $resort_id                                          =   $user->resort_id;
+        $perms                                              =   $request->query('perms', '');
+
+        $category                                           =   $request->query('category', 'All');
+        if (!in_array($category, ['Casual', 'Intern', 'All'], true)) {
+            $category                                       =   'All';
+        }
+
+        $monthParam                                         =   $request->query('month');
+        if (!empty($monthParam)) {
+            if (!preg_match('/^\d{4}-\d{2}$/', $monthParam)) {
+                return response()->json(['success' => false, 'message' => 'Invalid month format, expected YYYY-MM.'], 422);
+            }
+            try {
+                $monthStart                                 =   Carbon::createFromFormat('Y-m-d', $monthParam . '-01')->startOfMonth();
+            } catch (\Exception $e) {
+                return response()->json(['success' => false, 'message' => 'Invalid month format, expected YYYY-MM.'], 422);
+            }
+        } else {
+            $monthStart                                     =   Carbon::now()->startOfMonth();
+        }
+        $monthEnd                                           =   $monthStart->copy()->endOfMonth();
+
+        // Same authorisation/department scoping as hodMarkAttendance().
+        $rankConfig                                         =   config('settings.Position_Rank', []);
+        $currentRankLabel                                   =   $rankConfig[$employee->rank ?? ''] ?? '';
+        $hrDeptId                                           =   ResortDepartment::where('resort_id', $resort_id)
+                                                                        ->where(function ($q) {
+                                                                            $q->where('name', 'Human Resources')
+                                                                              ->orWhere('name', 'like', '%Human Resources%');
+                                                                        })
+                                                                        ->value('id');
+        $isHRDepartment                                     =   ($hrDeptId && (int) $employee->Dept_id === (int) $hrDeptId);
+        $isHROrGM                                           =   in_array($currentRankLabel, ['HR', 'GM'], true);
+
+        if (strtolower($perms) === 'all') {
+            $employeeIds                                    =   null;
+        } elseif (strtolower($perms) === 'department') {
+            $employeeIds                                    =   Employee::where('resort_id', $resort_id)
+                                                                        ->where('Dept_id', $employee->Dept_id)
+                                                                        ->pluck('id')
+                                                                        ->toArray();
+            $employeeIds                                    =   empty($employeeIds) ? [-1] : $employeeIds;
+        } else {
+            if ($isHROrGM || $isHRDepartment) {
+                $employeeIds                                =   null;
+            } else {
+                $employeeIds                                =   Employee::where('resort_id', $resort_id)
+                                                                            ->where('Dept_id', $employee->Dept_id)
+                                                                            ->pluck('id')
+                                                                            ->toArray();
+                $employeeIds                                =   empty($employeeIds) ? [-1] : $employeeIds;
+            }
+        }
+
+        try {
+            // This endpoint is Casual/Intern only — 'All' here means both
+            // of those, never Permanent (unlike hodMarkAttendance()'s
+            // category param, which includes Permanent).
+            $nonPermanentTypes                              =   array_merge(
+                Common::manningCategoryEmploymentTypes('Casual'),
+                Common::manningCategoryEmploymentTypes('Intern')
+            );
+            $employmentTypes                                =   $category === 'All' ? $nonPermanentTypes : Common::manningCategoryEmploymentTypes($category);
+
+            $empQuery                                       =   Employee::from('employees')
+                                                                    ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                                                                    ->join('resort_positions as rp', 'rp.id', '=', 'employees.Position_id')
+                                                                    ->where('t1.resort_id', $resort_id)
+                                                                    ->where('employees.resort_id', $resort_id)
+                                                                    ->where('employees.status', 'Active')
+                                                                    ->whereIn('employees.employment_type', $employmentTypes)
+                                                                    ->select(
+                                                                        'employees.id as emp_id',
+                                                                        't1.first_name',
+                                                                        't1.last_name',
+                                                                        'rp.position_title',
+                                                                        'employees.employment_type'
+                                                                    );
+            if ($employeeIds !== null) {
+                $empQuery->whereIn('employees.id', $employeeIds);
+            }
+
+            $employees                                      =   $empQuery->get();
+
+            if ($employees->isEmpty()) {
+                return response()->json(['status' => true, 'month' => $monthStart->format('Y-m'), 'employees' => []]);
+            }
+
+            $attendanceByEmp                                =   ParentAttendace::where('resort_id', $resort_id)
+                                                                    ->whereIn('Emp_id', $employees->pluck('emp_id'))
+                                                                    ->whereBetween('date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')])
+                                                                    ->get(['Emp_id', 'date', 'Status', 'OverTime'])
+                                                                    ->groupBy('Emp_id');
+
+            $leaveStatuses                                  =   ['ShortLeave', 'HalfDayLeave', 'FullDayLeave'];
+
+            $employeesOut                                    =   $employees->map(function ($emp) use ($attendanceByEmp, $monthStart, $monthEnd, $leaveStatuses) {
+                $rowsByDate                                  =   ($attendanceByEmp->get($emp->emp_id) ?? collect())->keyBy(function ($row) {
+                    return Carbon::parse($row->date)->format('Y-m-d');
+                });
+
+                $days                                        =   [];
+                $otHours                                     =   [];
+                $summary                                     =   ['Present' => 0, 'Absent' => 0, 'Sick' => 0, 'DayOff' => 0, 'leave' => 0, 'not_marked' => 0];
+
+                for ($date = $monthStart->copy(); $date->lte($monthEnd); $date->addDay()) {
+                    $dateStr                                =   $date->format('Y-m-d');
+                    $row                                     =   $rowsByDate->get($dateStr);
+                    $status                                  =   $row->Status ?? null;
+                    $days[$dateStr]                         =   $status ?: null;
+
+                    if (!empty($row->OverTime) && !in_array($row->OverTime, ['0', '0:0', '0:00', '00:00', '00:00:00', '-', ''], true)) {
+                        $otParts                            =   explode(':', $row->OverTime);
+                        $otHours[$dateStr]                  =   round(((int) ($otParts[0] ?? 0)) + ((int) ($otParts[1] ?? 0)) / 60, 2);
+                    }
+
+                    if (!$status) {
+                        $summary['not_marked']++;
+                    } elseif (in_array($status, $leaveStatuses, true)) {
+                        $summary['leave']++;
+                    } elseif (isset($summary[$status])) {
+                        $summary[$status]++;
+                    } else {
+                        $summary['not_marked']++;
+                    }
+                }
+
+                return [
+                    'emp_id'          => $emp->emp_id,
+                    'name'            => trim($emp->first_name . ' ' . $emp->last_name),
+                    'position_title'  => $emp->position_title,
+                    'employment_type' => $emp->employment_type,
+                    'days'            => $days,
+                    'ot_hours'        => $otHours,
+                    'summary'         => $summary,
+                ];
+            })->values();
+
+            return response()->json([
+                'status'    => true,
+                'month'     => $monthStart->format('Y-m'),
+                'employees' => $employeesOut,
+            ]);
+        } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::error($e->getMessage());

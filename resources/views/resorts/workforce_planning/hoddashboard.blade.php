@@ -444,20 +444,37 @@
                      modals broke the backdrop and made this button unclickable. --}}
                 <div id="manning-review-step" style="display:none;">
                     <div class="modal-body">
-                        <table class="table table-sm">
-                            <tbody>
-                                <tr><th>Category</th><td id="mrv-category"></td></tr>
-                                <tr><th>Department</th><td id="mrv-department"></td></tr>
-                                <tr><th>Year</th><td id="mrv-year"></td></tr>
-                                <tr><th>Total Headcount</th><td id="mrv-headcount"></td></tr>
-                                <tr><th>Filled Positions</th><td id="mrv-filled"></td></tr>
-                                <tr><th>Vacant Positions</th><td id="mrv-vacant"></td></tr>
-                            </tbody>
-                        </table>
-                        <p class="text-muted mb-0" style="font-size:13px;">
-                            This submits the <strong id="mrv-category-inline"></strong> manning request only —
-                            Casual and Intern (if applicable) are separate submissions, not included here.
-                        </p>
+                        <div id="manning-review-single">
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr><th>Category</th><td id="mrv-category"></td></tr>
+                                    <tr><th>Department</th><td id="mrv-department"></td></tr>
+                                    <tr><th>Year</th><td id="mrv-year"></td></tr>
+                                    <tr><th>Total Headcount</th><td id="mrv-headcount"></td></tr>
+                                    <tr><th>Filled Positions</th><td id="mrv-filled"></td></tr>
+                                    <tr><th>Vacant Positions</th><td id="mrv-vacant"></td></tr>
+                                </tbody>
+                            </table>
+                            <p class="text-muted mb-0" style="font-size:13px;">
+                                This submits the <strong id="mrv-category-inline"></strong> manning request only —
+                                Casual and Intern (if applicable) are separate submissions, not included here.
+                            </p>
+                        </div>
+                        {{-- §29 — more than one category has data waiting. Each
+                             submits as its own independent manning_responses
+                             row (unchanged store() call, once per category),
+                             just reviewed and confirmed together so an HOD
+                             never loses track of which they've already sent. --}}
+                        <div id="manning-review-multi" style="display:none;">
+                            <p class="text-muted mb-2" style="font-size:13px;">
+                                More than one category has data ready — each submits as its own separate manning request.
+                            </p>
+                            <table class="table table-sm">
+                                <thead><tr><th>Category</th><th>Total Headcount</th><th>Filled</th><th>Vacant</th></tr></thead>
+                                <tbody id="mrv-multi-rows"></tbody>
+                            </table>
+                            <div id="mrv-multi-results" class="mt-2" style="font-size:13px;"></div>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-sm wfp-btn-secondary" id="manningReviewBackBtn">Back, let me check</button>
@@ -579,27 +596,50 @@
             // exists for the newly-selected category loads via the
             // existing fetchDraftData(), once the new rows exist to fill.
             $(document).on('change', 'input[name="employment_type"]', function () {
-                headcounts = {};
                 var category = $(this).val();
-                $.ajax({
-                    url: `{{ route('manning.responses.getPositionsByCategory', ['deptId' => ':Dept_id', 'employmentType' => ':employment_type']) }}`
-                        .replace(':Dept_id', Dept_id)
-                        .replace(':employment_type', category || 'Permanent'),
-                    type: 'GET',
-                    success: function (response) {
-                        renderPositionRows((response && response.positions) || []);
-                        updateTotalHeadcount();
-                        fetchDraftData(resort_id, Dept_id, year, category);
-                    },
-                    error: function () {
-                        toastr.error('Error loading positions for this category.', 'Error', {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                });
+                var leavingCategory = window.mrfPreviousCategory || 'Permanent';
+                window.mrfPreviousCategory = category;
+
+                function loadCategory() {
+                    headcounts = {};
+                    $.ajax({
+                        url: `{{ route('manning.responses.getPositionsByCategory', ['deptId' => ':Dept_id', 'employmentType' => ':employment_type']) }}`
+                            .replace(':Dept_id', Dept_id)
+                            .replace(':employment_type', category || 'Permanent'),
+                        type: 'GET',
+                        success: function (response) {
+                            renderPositionRows((response && response.positions) || []);
+                            updateTotalHeadcount();
+                            fetchDraftData(resort_id, Dept_id, year, category);
+                        },
+                        error: function () {
+                            toastr.error('Error loading positions for this category.', 'Error', {
+                                positionClass: 'toast-bottom-right'
+                            });
+                        }
+                    });
+                }
+
+                // Auto-save the category being LEFT before switching, so an
+                // HOD filling in Permanent then tabbing to Casual doesn't
+                // lose the Permanent numbers (§29). Only when it actually
+                // has data — an untouched tab (headcount still 0) has
+                // nothing worth persisting, and skipping it means a tab
+                // nobody touched never counts as "has data" for the
+                // multi-category submit review below.
+                var leavingHeadcount = parseInt($('#total_headcount').val()) || 0;
+                if (leavingHeadcount > 0 && leavingCategory !== category) {
+                    var draftFormData = new FormData(document.getElementById('manningResponseForm'));
+                    // The radio's own DOM state already reflects the NEW
+                    // category by the time `change` fires — override so the
+                    // saved draft is filed under the category being left,
+                    // not the one being switched to.
+                    draftFormData.set('employment_type', leavingCategory);
+                    saveAsDraft(draftFormData, true).then(loadCategory).catch(loadCategory);
+                } else {
+                    loadCategory();
+                }
             });
-
-
         });
         // Initialize tooltips
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
@@ -715,22 +755,79 @@
         // doManningSubmit(). An HOD should never be unsure whether they
         // just submitted Permanent, Casual, or Intern, or which
         // department/year.
+        // §29 — an HOD can have more than one category's worth of unsaved-
+        // but-real data waiting (thanks to the tab-switch auto-save above).
+        // Submit checks the server for what's already saved under the
+        // OTHER categories, adds in whatever's live in the DOM for the
+        // CURRENT one, and shows either today's single-category recap
+        // (0 or 1 category has data) or a combined list (2-3 do).
+        window.mrfCategoriesToSubmit = null;
+
         $('#manningResponseForm').submit(function(e) {
             e.preventDefault();
 
             const categoryVal = $('input[name="employment_type"]:checked').val() || 'Permanent';
             const categoryLabel = $('label[for="employment_type-' + categoryVal.toLowerCase() + '"]').text().trim() || categoryVal;
+            const liveHeadcount = parseInt($('#total_headcount').val()) || 0;
+            const liveFilled = parseInt($('#total_filled_headcount').val()) || 0;
+            const liveVacant = parseInt($('#total_vacant_headcount').val()) || 0;
 
-            $('#mrv-category').text(categoryLabel);
-            $('#mrv-category-inline').text(categoryLabel);
-            $('#mrv-department').text(@json($department_details[0]->name ?? ''));
-            $('#mrv-year').text($('#year').val());
-            $('#mrv-headcount').text($('#total_headcount').val() || 0);
-            $('#mrv-filled').text($('#total_filled_headcount').val() || 0);
-            $('#mrv-vacant').text($('#total_vacant_headcount').val() || 0);
+            $.ajax({
+                url: `{{ route('manning.responses.categoriesWithData', ['deptId' => ':Dept_id', 'year' => ':year']) }}`
+                    .replace(':Dept_id', Dept_id)
+                    .replace(':year', year),
+                type: 'GET',
+                success: function (res) {
+                    const categories = (res && res.categories) || {};
+                    // The current tab's live DOM values always win over
+                    // whatever's saved for it server-side — it's the
+                    // freshest, may include edits since the last auto-save.
+                    if (liveHeadcount > 0) {
+                        categories[categoryVal] = {
+                            total_headcount: liveHeadcount,
+                            total_filled_positions: liveFilled,
+                            total_vacant_positions: liveVacant,
+                        };
+                    } else {
+                        delete categories[categoryVal];
+                    }
 
-            $('#manningResponseForm').hide();
-            $('#manning-review-step').show();
+                    const categoryKeys = Object.keys(categories);
+
+                    if (categoryKeys.length <= 1) {
+                        // Today's flow, unchanged.
+                        window.mrfCategoriesToSubmit = null;
+                        $('#manning-review-multi').hide();
+                        $('#manning-review-single').show();
+                        $('#mrv-category').text(categoryLabel);
+                        $('#mrv-category-inline').text(categoryLabel);
+                        $('#mrv-department').text(@json($department_details[0]->name ?? ''));
+                        $('#mrv-year').text($('#year').val());
+                        $('#mrv-headcount').text(liveHeadcount);
+                        $('#mrv-filled').text(liveFilled);
+                        $('#mrv-vacant').text(liveVacant);
+                    } else {
+                        window.mrfCategoriesToSubmit = categories;
+                        $('#mrv-multi-results').empty();
+                        let rows = '';
+                        categoryKeys.forEach(function (cat) {
+                            const c = categories[cat];
+                            rows += `<tr><td>${cat}</td><td>${c.total_headcount}</td><td>${c.total_filled_positions}</td><td>${c.total_vacant_positions}</td></tr>`;
+                        });
+                        $('#mrv-multi-rows').html(rows);
+                        $('#manning-review-single').hide();
+                        $('#manning-review-multi').show();
+                    }
+
+                    $('#manningResponseForm').hide();
+                    $('#manning-review-step').show();
+                },
+                error: function () {
+                    toastr.error('Could not check other categories for saved data.', 'Error', {
+                        positionClass: 'toast-bottom-right'
+                    });
+                }
+            });
         });
 
         $('#manningReviewBackBtn').on('click', function() {
@@ -739,8 +836,138 @@
         });
 
         $('#manningReviewConfirmBtn').on('click', function() {
-            doManningSubmit();
+            if (window.mrfCategoriesToSubmit) {
+                submitMultipleCategories(window.mrfCategoriesToSubmit);
+            } else {
+                doManningSubmit();
+            }
         });
+
+        // Submits each category as its own independent manning_responses
+        // row (store() is unchanged, called once per category). The
+        // CURRENT tab submits its live form; every other category submits
+        // from its own saved draft (fetched fresh, not assumed from the
+        // summary table above). Attempts all of them even if one fails, so
+        // the HOD is told exactly which went through and which didn't
+        // rather than being left unsure mid-sequence.
+        function submitMultipleCategories(categories) {
+            const activeCategory = $('input[name="employment_type"]:checked').val() || 'Permanent';
+            const categoryKeys = Object.keys(categories);
+            const results = [];
+
+            function submitOne(index) {
+                if (index >= categoryKeys.length) {
+                    finishMultiSubmit(results);
+                    return;
+                }
+                const cat = categoryKeys[index];
+
+                if (cat === activeCategory) {
+                    $("#Submit_message_id").val($("#BudgetRejacted_message_id").val()?.trim() || $("#message_id").val());
+                    let formData = $('#manningResponseForm').serialize();
+                    $.ajax({
+                        url: "{{ route('manning.responses.store') }}",
+                        type: "POST",
+                        data: formData,
+                        success: function (response) {
+                            results.push({ category: cat, success: !!(response && response.success), message: response && response.msg });
+                            submitOne(index + 1);
+                        },
+                        error: function () {
+                            results.push({ category: cat, success: false, message: 'Server error' });
+                            submitOne(index + 1);
+                        }
+                    });
+                } else {
+                    // Not the active tab — pull its saved draft fresh
+                    // rather than trusting the totals shown in the recap,
+                    // then submit that.
+                    $.ajax({
+                        url: `{{ route('manning.responses.getDraft', ['resortId' => ':resort_id', 'deptId' => ':Dept_id', 'year' => ':year', 'employmentType' => ':employment_type']) }}`
+                            .replace(':resort_id', resort_id)
+                            .replace(':Dept_id', Dept_id)
+                            .replace(':year', year)
+                            .replace(':employment_type', cat),
+                        type: 'GET',
+                        success: function (draft) {
+                            if (!draft || draft.success === false) {
+                                results.push({ category: cat, success: false, message: 'No saved draft found' });
+                                submitOne(index + 1);
+                                return;
+                            }
+                            const monthly_data = {};
+                            const filled_positions = {};
+                            const vacant_positions = {};
+                            for (const positionId in draft) {
+                                if (!draft.hasOwnProperty(positionId)) continue;
+                                monthly_data[positionId] = {};
+                                filled_positions[positionId] = {};
+                                vacant_positions[positionId] = {};
+                                for (let month = 1; month <= 12; month++) {
+                                    const monthData = draft[positionId][month];
+                                    if (!monthData) continue;
+                                    monthly_data[positionId][month - 1] = monthData.headcount || 0;
+                                    filled_positions[positionId][month - 1] = monthData.filledcount || 0;
+                                    vacant_positions[positionId][month - 1] = monthData.vacantcount || 0;
+                                }
+                            }
+                            const totals = categories[cat];
+                            $.ajax({
+                                url: "{{ route('manning.responses.store') }}",
+                                type: "POST",
+                                data: {
+                                    _token: '{{ csrf_token() }}',
+                                    resort_id: resort_id,
+                                    dept_id: Dept_id,
+                                    year: year,
+                                    employment_type: cat,
+                                    monthly_data: monthly_data,
+                                    filled_positions: filled_positions,
+                                    vacant_positions: vacant_positions,
+                                    total_headcount: totals.total_headcount,
+                                    total_filled_headcount: totals.total_filled_positions,
+                                    total_vacant_headcount: totals.total_vacant_positions,
+                                    message_id: $("#Submit_message_id").val(),
+                                },
+                                success: function (response) {
+                                    results.push({ category: cat, success: !!(response && response.success), message: response && response.msg });
+                                    submitOne(index + 1);
+                                },
+                                error: function () {
+                                    results.push({ category: cat, success: false, message: 'Server error' });
+                                    submitOne(index + 1);
+                                }
+                            });
+                        },
+                        error: function () {
+                            results.push({ category: cat, success: false, message: 'Could not load saved draft' });
+                            submitOne(index + 1);
+                        }
+                    });
+                }
+            }
+
+            submitOne(0);
+        }
+
+        function finishMultiSubmit(results) {
+            const succeeded = results.filter(r => r.success).map(r => r.category);
+            const failed = results.filter(r => !r.success);
+
+            if (succeeded.length) {
+                toastr.success('Submitted: ' + succeeded.join(', '), 'Success', { positionClass: 'toast-bottom-right' });
+            }
+            failed.forEach(function (r) {
+                toastr.error(r.category + ': ' + (r.message || 'Submission failed'), 'Error', { positionClass: 'toast-bottom-right' });
+            });
+
+            $('#sendRespond-modal').modal('hide');
+            // Multiple categories/rows changed at once — reload so every
+            // affected part of the page (lifecycle panel, headcount
+            // badges, per-category state) reflects the final DB state,
+            // rather than hand-syncing each from N separate responses.
+            setTimeout(function () { location.reload(); }, 1500);
+        }
 
         function doManningSubmit() {
             $("#Budget_id").val($("#Budget_id").val());
@@ -1420,32 +1647,39 @@
                 // Send the form data via AJAX to save as draft
                 saveAsDraft(formData);
             });
+        });
 
-            // Function to handle AJAX request
-            function saveAsDraft(formData) {
-                // Make an AJAX request to save the draft
-                fetch("{{ route('manning.responses.saveDraft') }}", {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
+        // Function to handle AJAX request. `silent` skips the alert()s —
+        // used by the tab-switch auto-save (§29, called from the OTHER
+        // <script> block above — must stay a top-level declaration here,
+        // not nested inside the DOMContentLoaded wrapper above, or it's
+        // unreachable from there). Returns the fetch promise so a caller
+        // can chain on it.
+        function saveAsDraft(formData, silent) {
+            // Make an AJAX request to save the draft
+            return fetch("{{ route('manning.responses.saveDraft') }}", {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!silent) {
                     if (data.success) {
                         alert('Draft saved successfully!');
-                        // Optionally, you can close the modal or provide more feedback
                     } else {
                         alert('Error saving draft. Please try again.');
                     }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('An unexpected error occurred.');
-                });
-            }
-        });
+                }
+                return data;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                if (!silent) alert('An unexpected error occurred.');
+            });
+        }
 
         // Rebuilds #grid-tbody from a category's own position list (§27) —
         // replaces the old "one static shared grid, tabs just relabel it"

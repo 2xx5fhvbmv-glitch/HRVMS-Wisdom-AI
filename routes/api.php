@@ -203,6 +203,7 @@ use Illuminate\Support\Facades\Route;
 			Route::get('timeandattendance/hod-mark-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendance']);
 			Route::post('timeandattendance/hod-mark-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendancePresent']);
 			Route::post('timeandattendance/hod-mark-attendance-present', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendancePresent']);
+			Route::get('timeandattendance/hod-casual-intern-month', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodCasualInternMonth']);
 		});
 
 

@@ -4196,7 +4196,11 @@ if (!function_exists('safeParseDate')) {
         $.ajax({
             url: '{{ route("people.getPositionBySection") }}',
             type: 'GET',
-            data: params,
+            // This employee's own category — without it the endpoint
+            // defaults to Permanent-only and a Casual/Intern employee's
+            // position vanishes from the list the moment department/
+            // section is touched on this page.
+            data: Object.assign({ employee_category: '{{ $employeeCategory }}' }, params),
             success: function (res) {
                 $('#position-select').empty().append('<option value="">Select Position</option>');
                 res.positions.forEach(pos => {

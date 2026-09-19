@@ -72,7 +72,10 @@ class VacancyController extends Controller
             $resort_sections = ResortSection::where('dept_id',$Dept_id)->get();
             $sectionName = isset($resort_sections[0]) ? $resort_sections[0]->name : '';
             $sectionId = isset($resort_sections[0]) ? $resort_sections[0]->id : '';
-            $resort_positions = ResortPosition::where('dept_id',$Dept_id)->get();
+            // Form opens on Permanent by default; the employee_type change
+            // handler reloads this list via getPositionsByVacancyType() when
+            // the user picks Casual/Agency or Trainee/Intern.
+            $resort_positions = ResortPosition::where('dept_id',$Dept_id)->permanent()->get();
 
             // Get budgeted position IDs and available slots per position
             $budgetedPositionIds = [];
@@ -656,7 +659,11 @@ class VacancyController extends Controller
             $resort_sections = ResortSection::where('dept_id', $Dept_id)->get();
             $sectionName = isset($resort_sections[0]) ? $resort_sections[0]->name : '';
             $sectionId = isset($resort_sections[0]) ? $resort_sections[0]->id : '';
-            $resort_positions = ResortPosition::where('dept_id', $Dept_id)->get();
+            // Scoped to whichever category this draft vacancy already is —
+            // getPositionsByVacancyType() reloads it if the type is changed.
+            $resort_positions = ResortPosition::where('dept_id', $Dept_id)
+                ->forCategory(Common::manningCategoryForVacancy($vacancy->employee_type ?? 'Permanant'))
+                ->get();
 
             $budgetedPositionIds = [];
             $positionAvailableSlots = [];
@@ -1109,6 +1116,30 @@ class VacancyController extends Controller
                 : ($validatedData['status'] === 'Inactive' ? 'Vacancy saved. Switch it to Active and resubmit when you\'re ready to send it for approval.'
                 : 'Vacancy submitted successfully.'),
         ]);
+    }
+
+    /**
+     * Reloads the Add/Edit Vacancy position dropdown when employee_type
+     * changes — same tab-switch-reload pattern §27b used for the manning
+     * grid. Without this the dropdown was one static Permanent-dept list,
+     * so a Casual/Intern-only position never appeared (or, before the
+     * whereNull scoping above, every category appeared mixed together).
+     */
+    public function getPositionsByVacancyType(Request $request)
+    {
+        $resort_id = Auth::guard('resort-admin')->user()->resort_id;
+        $deptId = $request->query('deptId');
+        $employeeType = $request->query('employeeType', 'Permanant');
+        $manningCategory = Common::manningCategoryForVacancy($employeeType);
+
+        $positions = ResortPosition::where('resort_id', $resort_id)
+            ->where('dept_id', $deptId)
+            ->where('status', 'active')
+            ->forCategory($manningCategory)
+            ->orderBy('position_title')
+            ->get(['id', 'position_title', 'code']);
+
+        return response()->json(['success' => true, 'positions' => $positions]);
     }
 
     public function getRank(Request $request)

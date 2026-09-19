@@ -388,6 +388,36 @@ class ManningResponseController extends Controller
         }
     }
 
+    /**
+     * Which of Permanent/Casual/Intern already have a saved
+     * draft/submission for this dept+year — powers §29 (submit several
+     * categories together). A row only exists here because the tab-switch
+     * auto-save gates on total_headcount > 0, so existence alone is a
+     * reliable "this category has real data" signal — no need to
+     * re-check the total here.
+     */
+    public function getCategoriesWithData($deptId, $year)
+    {
+        $resortId = Auth::guard('resort-admin')->user()->resort_id;
+
+        $rows = ManningResponse::where('resort_id', $resortId)
+            ->where('dept_id', $deptId)
+            ->where('year', $year)
+            ->whereIn('employment_type', ['Permanent', 'Casual', 'Intern'])
+            ->get(['employment_type', 'total_headcount', 'total_filled_positions', 'total_vacant_positions']);
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row->employment_type] = [
+                'total_headcount' => $row->total_headcount,
+                'total_filled_positions' => $row->total_filled_positions,
+                'total_vacant_positions' => $row->total_vacant_positions,
+            ];
+        }
+
+        return response()->json(['success' => true, 'categories' => $result]);
+    }
+
     public function getDraft($resortId, $deptId, $year, $employmentType = 'Permanent')
     {
         // {resortId} is a client-supplied URL segment — never trust it.
@@ -443,6 +473,14 @@ class ManningResponseController extends Controller
     public function getPositionsByCategory($deptId, $employmentType = 'Permanent')
     {
         $resortId = Auth::guard('resort-admin')->user()->resort_id;
+
+        // Same rule ShowDepartmentWiseBudgetData (below) already applies:
+        // dept_id is client-supplied, an HOD could otherwise pass another
+        // department's id and list its positions.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (is_array($scopedDeptIds) && !in_array((int) $deptId, $scopedDeptIds, true)) {
+            return response()->json(['success' => false, 'message' => 'You do not have access to this department.'], 403);
+        }
 
         $positions = ResortPosition::where('resort_id', $resortId)
             ->where('dept_id', $deptId)

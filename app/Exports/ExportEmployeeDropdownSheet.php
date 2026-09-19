@@ -76,7 +76,11 @@ class ExportEmployeeDropdownSheet implements FromArray, WithTitle, WithEvents, W
             ->orderBy('name')
             ->get();
             
+        // Paired with the general Employee Import (EmployeeImport.php, now
+        // ->permanent()-scoped) — without this, the template offers
+        // Casual/Intern position titles that importer will reject.
         $positions = ResortPosition::where('resort_id', $this->resortId)->where('status', 'active')
+            ->permanent()
             ->orderBy('position_title')
             ->get();
            

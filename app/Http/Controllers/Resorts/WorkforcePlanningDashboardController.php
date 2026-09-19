@@ -770,6 +770,10 @@ class WorkforcePlanningDashboardController extends Controller
                 })
                 ->where('p.resort_id', '=', $resort_id)
                 ->when(is_array($scopedDeptIds), fn ($q) => $q->whereIn('p.dept_id', $scopedDeptIds))
+                // p.employee_category, not just the e.employment_type join
+                // above — without this a Casual-only position still showed
+                // as a row (with 0 employees) on the Permanent tab.
+                ->when($employmentType === 'Permanent', fn ($q) => $q->whereNull('p.employee_category'), fn ($q) => $q->where('p.employee_category', $employmentType))
                 ->select(
                     'p.id',
                     'p.position_title',
@@ -895,7 +899,7 @@ class WorkforcePlanningDashboardController extends Controller
                 // dd($positions);
                 $resort_divisions_count = ResortDivision::where('status','active')->where('resort_id',$resort_id)->count();
                 $resort_departments_count = ResortDepartment::where('status','active')->where('resort_id',$resort_id)->count();
-                $resort_positions_count = ResortPosition::where('status','active')->where('dept_id',$emp_details[0]->Dept_id)->count();
+                $resort_positions_count = ResortPosition::where('status','active')->where('dept_id',$emp_details[0]->Dept_id)->whereNull('employee_category')->count();
 
                 $total_emp = ResortAdmin::where('resort_id', $resort_id)->count();
 

@@ -362,6 +362,22 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div class="card">
+                            <div class="card-title">
+                                <div class="row g-2">
+                                    <div class="col">
+                                        <h3 class="text-nowrap">Casuals — Payment Model</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="mb-3">Choose whether Casual staff are paid via the service provider (lump sum) or directly, and set each Casual position's basic salary and service-provider commission.</p>
+                            <div class="row g-2 mb-md-4 mb-3">
+                                <div class="col-12">
+                                    <a href="{{route('people.casualPaymentModel.index')}}" class="btn btn-themeSkyblue btn-sm">Configure Casual Payment Model</a>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
