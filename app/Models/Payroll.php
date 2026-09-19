@@ -11,7 +11,7 @@ class Payroll extends Model
 {
     use HasFactory;
     protected $table = 'payroll';
-    protected $fillable = ['resort_id','start_date', 'end_date', 'status' ,'total_payroll','total_employees','draft_date','payment_date','city_ledger_file','payroll_unit'];
+    protected $fillable = ['resort_id','payroll_category','start_date', 'end_date', 'status' ,'total_payroll','total_employees','draft_date','payment_date','city_ledger_file','payroll_unit'];
 
     public static function boot(){
         parent::boot();

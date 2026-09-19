@@ -113,6 +113,7 @@ class EmployeeImport implements ToModel, WithHeadingRow
             ->where('status', 'active')
             ->where('resort_id', $this->resort->resort_id)
             ->where('dept_id', $department->id)
+            ->permanent()
             ->first();
 
         if (!$position) {

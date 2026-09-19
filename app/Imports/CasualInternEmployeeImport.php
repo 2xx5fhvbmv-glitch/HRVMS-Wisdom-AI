@@ -9,8 +9,8 @@ use App\Models\Employee;
 use App\Models\ResortAdmin;
 use App\Models\ResortDepartment;
 use App\Models\ResortPosition;
-use App\Models\WorkPermit;
 use App\Helpers\Common;
+use Carbon\Carbon;
 use DB;
 
 /**
@@ -70,7 +70,17 @@ class CasualInternEmployeeImport implements ToModel, WithHeadingRow
         $positionName = trim((string) ($row['position'] ?? ''));
         $reportingEmpCode = trim((string) ($row['reportingmanagerempid'] ?? ''));
         $employmentType = trim((string) ($row['employmenttype'] ?? ''));
-        $workPermitNumber = trim((string) ($row['workpermitnumber'] ?? ''));
+
+        $visaExpiryDate = $this->parseDate($row['visaexpirydate'] ?? null);
+        if ($visaExpiryDate === false) {
+            $this->addError($excelRowNumber, $row, "VisaExpiryDate '" . ($row['visaexpirydate'] ?? '') . "' is not a valid date.");
+            return null;
+        }
+        $workPermitExpiryDate = $this->parseDate($row['workpermitexpirydate'] ?? null);
+        if ($workPermitExpiryDate === false) {
+            $this->addError($excelRowNumber, $row, "WorkPermitExpiryDate '" . ($row['workpermitexpirydate'] ?? '') . "' is not a valid date.");
+            return null;
+        }
 
         $missing = [];
         if ($firstName === '') $missing[] = 'FirstName';
@@ -178,25 +188,22 @@ class CasualInternEmployeeImport implements ToModel, WithHeadingRow
             'joining_date' => now()->format('Y-m-d'),
             'employment_type' => $employmentType,
             'passport_number' => $idNumber,
+            // §30 — optional; both blank is fine (e.g. a Maldivian
+            // national hire has neither). Plain employees columns, not a
+            // Visa-module renewal record — the existing expiry-reminder
+            // pipeline (CheckVisaExpiryReminders) reads visa_renewals/
+            // work_permits, not these, so an import here doesn't yet
+            // trigger a reminder; that's a separate change if wanted.
+            'visa_expiry_date' => $visaExpiryDate,
+            'work_permit_expiry_date' => $workPermitExpiryDate,
         ];
 
-        DB::transaction(function () use ($ResortAdmindata, $employeeData, $workPermitNumber) {
+        DB::transaction(function () use ($ResortAdmindata, $employeeData) {
             $profile = Common::persistEmployeeProfile($ResortAdmindata, $employeeData, $this->resort->resort_id);
             if ($profile['employeeCreated']) {
                 $this->created++;
             } else {
                 $this->updated++;
-            }
-
-            // §25 — optional; work_permits is a one-to-many payment-tracking
-            // table (Status/PaymentType default to Unpaid/Installment), not
-            // an employees column, so this only seeds the permit number —
-            // the Visa module owns the rest of that record's lifecycle.
-            if ($workPermitNumber !== '') {
-                WorkPermit::updateOrCreate(
-                    ['employee_id' => $profile['employee']->id],
-                    ['resort_id' => $this->resort->resort_id, 'Work_Permit_Number' => $workPermitNumber]
-                );
             }
         });
 
@@ -212,6 +219,38 @@ class CasualInternEmployeeImport implements ToModel, WithHeadingRow
         // path.
 
         return null;
+    }
+
+    /**
+     * Same convention as EmployeeImport::parseDate() — accepts an Excel
+     * serial date, d/m/Y, or anything Carbon can parse. Returns a Y-m-d
+     * string, null when blank, or false when present but unparseable
+     * (caller reports the error).
+     */
+    private function parseDate($value)
+    {
+        if (is_null($value) || trim((string) $value) === '') {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            try {
+                return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value)->format('Y-m-d');
+            } catch (\Exception $e) {
+                return false;
+            }
+        }
+
+        $value = trim((string) $value);
+        try {
+            return Carbon::createFromFormat('d/m/Y', $value)->format('Y-m-d');
+        } catch (\Exception $e) {
+            try {
+                return Carbon::parse($value)->format('Y-m-d');
+            } catch (\Exception $e2) {
+                return false;
+            }
+        }
     }
 
     private function addError(int $excelRowNumber, array $row, string $error): void

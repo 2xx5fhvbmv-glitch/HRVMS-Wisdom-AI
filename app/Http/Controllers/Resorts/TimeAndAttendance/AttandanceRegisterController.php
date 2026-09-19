@@ -147,6 +147,106 @@ class AttandanceRegisterController extends Controller
     }
 
     /**
+     * Month grid/summary for Casual/Intern — web counterpart of
+     * API\TimeAndAttendanceController::hodCasualInternMonth(). Same
+     * category scoping as nonPermanentList() and the same per-day/summary
+     * shape as the mobile endpoint, both read straight off
+     * parent_attendaces, so a month total here always matches the mobile
+     * app's for the same resort/month/category.
+     */
+    public function nonPermanentMonth(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+        $category = $request->input('category', 'All'); // Casual|Intern|All
+
+        $monthParam = $request->input('month');
+        if (!empty($monthParam)) {
+            if (!preg_match('/^\d{4}-\d{2}$/', $monthParam)) {
+                return response()->json(['success' => false, 'message' => 'Invalid month format, expected YYYY-MM.'], 422);
+            }
+            $monthStart = Carbon::createFromFormat('Y-m-d', $monthParam . '-01')->startOfMonth();
+        } else {
+            $monthStart = Carbon::now()->startOfMonth();
+        }
+        $monthEnd = $monthStart->copy()->endOfMonth();
+
+        $nonPermanentTypes = array_merge(
+            Common::manningCategoryEmploymentTypes('Casual'),
+            Common::manningCategoryEmploymentTypes('Intern')
+        );
+        $employmentTypes = in_array($category, ['Casual', 'Intern'], true)
+            ? Common::manningCategoryEmploymentTypes($category)
+            : $nonPermanentTypes;
+
+        $query = Employee::where('resort_id', $resort_id)
+            ->where('status', 'Active')
+            ->whereIn('employment_type', $employmentTypes);
+        if (!empty($this->underEmp_id)) {
+            $query->whereIn('id', $this->underEmp_id);
+        }
+        $employees = $query->with('resortAdmin')->get(['id', 'Admin_Parent_id', 'Position_id', 'employment_type']);
+
+        if ($employees->isEmpty()) {
+            return response()->json(['success' => true, 'month' => $monthStart->format('Y-m'), 'employees' => []]);
+        }
+
+        $attendanceByEmp = ParentAttendace::where('resort_id', $resort_id)
+            ->whereIn('Emp_id', $employees->pluck('id'))
+            ->whereBetween('date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')])
+            ->get(['Emp_id', 'date', 'Status', 'OverTime'])
+            ->groupBy('Emp_id');
+
+        $leaveStatuses = ['ShortLeave', 'HalfDayLeave', 'FullDayLeave'];
+
+        $employeesOut = $employees->map(function ($emp) use ($attendanceByEmp, $monthStart, $monthEnd, $leaveStatuses) {
+            $rowsByDate = ($attendanceByEmp->get($emp->id) ?? collect())->keyBy(function ($row) {
+                return Carbon::parse($row->date)->format('Y-m-d');
+            });
+
+            $days = [];
+            $otHours = [];
+            $summary = ['Present' => 0, 'Absent' => 0, 'Sick' => 0, 'DayOff' => 0, 'leave' => 0, 'not_marked' => 0];
+
+            for ($date = $monthStart->copy(); $date->lte($monthEnd); $date->addDay()) {
+                $dateStr = $date->format('Y-m-d');
+                $row = $rowsByDate->get($dateStr);
+                $status = $row->Status ?? null;
+                $days[$dateStr] = $status ?: null;
+
+                if (!empty($row->OverTime) && !in_array($row->OverTime, ['0', '0:0', '0:00', '00:00', '00:00:00', '-', ''], true)) {
+                    $otParts = explode(':', $row->OverTime);
+                    $otHours[$dateStr] = round(((int) ($otParts[0] ?? 0)) + ((int) ($otParts[1] ?? 0)) / 60, 2);
+                }
+
+                if (!$status) {
+                    $summary['not_marked']++;
+                } elseif (in_array($status, $leaveStatuses, true)) {
+                    $summary['leave']++;
+                } elseif (isset($summary[$status])) {
+                    $summary[$status]++;
+                } else {
+                    $summary['not_marked']++;
+                }
+            }
+
+            return [
+                'emp_id' => $emp->id,
+                'name' => trim(($emp->resortAdmin->first_name ?? '') . ' ' . ($emp->resortAdmin->last_name ?? '')),
+                'employment_type' => $emp->employment_type,
+                'days' => $days,
+                'ot_hours' => $otHours,
+                'summary' => $summary,
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'month' => $monthStart->format('Y-m'),
+            'employees' => $employeesOut,
+        ]);
+    }
+
+    /**
      * Mark one employee's daily status for a date. Mirrors
      * API\TimeAndAttendanceController::hodMarkAttendancePresent()'s
      * per-employee logic exactly (same auto-provisioned roster for
@@ -171,6 +271,23 @@ class AttandanceRegisterController extends Controller
         $status = $request->status;
         $date = $request->date ?: Carbon::now()->format('Y-m-d');
         $location = 'Web Attendance Register';
+
+        // Same overtime capture as the mobile equivalent
+        // (API\TimeAndAttendanceController::hodMarkAttendancePresent) — same
+        // validation via Common::validateOvertimeHours() so a value valid on
+        // one platform is valid on the other.
+        $otHours = null;
+        $otHoursRaw = $request->input('ot_hours');
+        if ($otHoursRaw !== null && $otHoursRaw !== '') {
+            $otError = Common::validateOvertimeHours($otHoursRaw);
+            if ($otError) {
+                return response()->json(['success' => false, 'message' => $otError], 422);
+            }
+            if ($status !== 'Present') {
+                return response()->json(['success' => false, 'message' => 'ot_hours is only valid when status is Present.'], 422);
+            }
+            $otHours = (float) $otHoursRaw;
+        }
 
         if (!Employee::where('id', $empId)->where('resort_id', $resort_id)->exists()) {
             return response()->json(['success' => false, 'message' => 'Employee not found in this resort.'], 404);
@@ -244,6 +361,12 @@ class AttandanceRegisterController extends Controller
                     'Status' => $status,
                     'CheckInCheckOut_Type' => 'Manual',
                 ]);
+                if ($otHours !== null) {
+                    $parentAttendance->OverTime = Common::decimalHoursToTimeString($otHours);
+                    $parentAttendance->OTStatus = 'Approved';
+                    $parentAttendance->OTApproved_By = $this->resort->GetEmployee->id ?? null;
+                    $parentAttendance->save();
+                }
                 ChildAttendace::create([
                     'Parent_attd_id' => $parentAttendance->id,
                     'InTime_out' => $startTime,
@@ -259,6 +382,17 @@ class AttandanceRegisterController extends Controller
                 $parentAttendance->CheckingOutTime = $endTime;
                 $parentAttendance->Status = $status;
                 $parentAttendance->CheckInCheckOut_Type = 'Manual';
+                if ($status !== 'Present') {
+                    // Same reset as the mobile equivalent — a stale approved
+                    // OT balance must not survive a correction away from Present.
+                    $parentAttendance->OverTime = null;
+                    $parentAttendance->OTStatus = null;
+                    $parentAttendance->OTApproved_By = null;
+                } elseif ($otHours !== null) {
+                    $parentAttendance->OverTime = Common::decimalHoursToTimeString($otHours);
+                    $parentAttendance->OTStatus = 'Approved';
+                    $parentAttendance->OTApproved_By = $this->resort->GetEmployee->id ?? null;
+                }
                 $parentAttendance->save();
 
                 ChildAttendace::updateOrCreate(
@@ -287,6 +421,7 @@ class AttandanceRegisterController extends Controller
                 'message' => 'Attendance marked ' . $status . '.',
                 'emp_id' => $empId,
                 'status' => $parentAttendance->Status,
+                'ot_hours' => $otHours,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();

@@ -41,7 +41,8 @@ class CasualInternEmployeeTemplateExport implements FromCollection, WithHeadings
             'EmploymentType',
             'Email',
             'Gender',
-            'WorkPermitNumber',
+            'VisaExpiryDate',
+            'WorkPermitExpiryDate',
         ];
     }
 
@@ -50,7 +51,7 @@ class CasualInternEmployeeTemplateExport implements FromCollection, WithHeadings
         return collect([[
             'firstname' => '', 'lastname' => '', 'passportidnumber' => '', 'nationality' => '',
             'mobilenumber' => '', 'department' => '', 'position' => '', 'reportingmanagerempid' => '',
-            'employmenttype' => '', 'email' => '', 'gender' => '', 'workpermitnumber' => '',
+            'employmenttype' => '', 'email' => '', 'gender' => '', 'visaexpirydate' => '', 'workpermitexpirydate' => '',
         ]]);
     }
 
@@ -64,8 +65,12 @@ class CasualInternEmployeeTemplateExport implements FromCollection, WithHeadings
                     ->where('status', 'active')
                     ->pluck('name')->filter()->unique()->values()->toArray();
 
+                // Casual/Intern only — paired with CasualInternEmployeeImport.php's
+                // per-row employee_category match, which would otherwise reject a
+                // Permanent-only position title picked straight from this dropdown.
                 $positions = ResortPosition::where('resort_id', $this->resort->resort_id)
                     ->where('status', 'active')
+                    ->whereIn('employee_category', ['Casual', 'Intern'])
                     ->pluck('position_title')->filter()->unique()->values()->toArray();
 
                 $reportingEmpIds = Employee::where('resort_id', $this->resort->resort_id)
@@ -100,6 +105,7 @@ class CasualInternEmployeeTemplateExport implements FromCollection, WithHeadings
                 $addListValidation('G2', $positions, 'Position', 'Choose a position from the dropdown');
                 $addListValidation('H2', $reportingEmpIds, 'Reporting Manager', 'Choose the reporting manager\'s Employee ID');
                 $addListValidation('I2', $employmentTypes, 'Employment Type', 'Casual or Internship only');
+                $addListValidation('K2', ['Male', 'Female'], 'Gender', 'Male or Female only');
             },
         ];
     }

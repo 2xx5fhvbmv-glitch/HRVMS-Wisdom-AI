@@ -517,9 +517,40 @@
                 }
             });
 
+            // Position list is scoped to whichever category is picked here
+            // (Permanent by default on page load) — reload it whenever the
+            // type changes, same tab-switch-reload pattern the manning grid
+            // uses. The previously-selected position almost certainly
+            // doesn't belong to the new category, so it's cleared along
+            // with everything derived from it (rank/division/section/
+            // allowances/budgeted salary).
+            function avReloadPositionsForType(employeeType) {
+                $.ajax({
+                    url: '{{ route('resort.vacancies.positionsByType') }}',
+                    type: 'GET',
+                    data: { deptId: {{ (int) $Dept_id }}, employeeType: employeeType },
+                    success: function (res) {
+                        var html = '<option value="">Select position</option>';
+                        (res.positions || []).forEach(function (p) {
+                            html += '<option value="' + p.id + '">' + $('<div>').text(p.position_title).html() + '</option>';
+                        });
+                        $('#position').html(html).val('');
+                        window.wisdomDD.rebuild('#position');
+
+                        $('#txt-rank').val('');
+                        $('#rank_id').val('');
+                        $('#budgeted-salary-container').hide();
+                        $('#allowance-list').html(avEmptyPositionBox());
+                        $('#vacancy-validation-msg').hide();
+                        $('#vacancy-manning-info').hide();
+                    }
+                });
+            }
+
             document.querySelectorAll('input[name="employee_type"]').forEach((radio) => {
                 radio.addEventListener('change', function() {
                     const employmentType = this.value;
+                    avReloadPositionsForType(employmentType);
 
                     // Div elements
                     const permanentDiv = document.getElementById('permanent-div');

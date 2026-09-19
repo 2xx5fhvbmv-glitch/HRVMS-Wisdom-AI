@@ -246,6 +246,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/manning/responses/saveDraft', 'ManningResponseController@saveDraft')->name('manning.responses.saveDraft');
     Route::get('/manning/responses/get-draft-data/{resortId}/{deptId}/{year}/{employmentType?}', 'ManningResponseController@getDraft')->name('manning.responses.getDraft');
     Route::get('/manning/responses/positions/{deptId}/{employmentType?}', 'ManningResponseController@getPositionsByCategory')->name('manning.responses.getPositionsByCategory');
+    Route::get('/manning/responses/categories-with-data/{deptId}/{year}', 'ManningResponseController@getCategoriesWithData')->name('manning.responses.categoriesWithData');
     Route::post( '/manning/responses/show/department/wise-budget-data', 'ManningResponseController@ShowDepartmentWiseBudgetData')->name('resort.department.wise.budget.data');
     Route::put( '/manning/responses/update-budget-data/{id}', 'ManningResponseController@updateBudgetData')->name('resort.budget.update');
     Route::put( '/manning/responses/update-grand-total', 'ManningResponseController@updateParentTotal')->name('resort.budget.updateParentTotal');
@@ -393,6 +394,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::put('/talent-acquisition/update-vacancy/{id}', 'TalentAcquisition\VacancyController@update')->name('resort.vacancies.update');
     Route::get('/talent-acquisition/get-rank', 'TalentAcquisition\VacancyController@getRank')->name('resort.getRank');
     Route::get('/talent-acquisition/replacement-candidates', 'TalentAcquisition\VacancyController@getReplacementCandidates')->name('resort.vacancies.replacementCandidates');
+    Route::get('/talent-acquisition/positions-by-vacancy-type', 'TalentAcquisition\VacancyController@getPositionsByVacancyType')->name('resort.vacancies.positionsByType');
     // Route::get('/talent-acquisition/FreshApplicant', 'TalentAcquisition\VacancyController@GetAllApplicatioWiseVacancies')->name('');
 
     Route::get('/talent-acquisition/vacancies-grid-view', 'TalentAcquisition\VacancyController@GridViewData')->name('ta.vacancies.GirdData');
@@ -662,6 +664,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     // marks their daily status and allocates their duty roster from here.
     Route::get('/time-and-attendance/nonpermanent', 'TimeAndAttendance\AttandanceRegisterController@nonPermanentIndex')->name('resort.timeandattendance.nonpermanent.index');
     Route::get('/time-and-attendance/nonpermanent/list', 'TimeAndAttendance\AttandanceRegisterController@nonPermanentList')->name('resort.timeandattendance.nonpermanent.list');
+    Route::get('/time-and-attendance/nonpermanent/month', 'TimeAndAttendance\AttandanceRegisterController@nonPermanentMonth')->name('resort.timeandattendance.nonpermanent.month');
     Route::post('/time-and-attendance/nonpermanent/mark', 'TimeAndAttendance\AttandanceRegisterController@nonPermanentMark')->name('resort.timeandattendance.nonpermanent.mark');
     Route::post('/time-and-attendance/nonpermanent/allocate-roster', 'TimeAndAttendance\AttandanceRegisterController@nonPermanentAllocateRoster')->name('resort.timeandattendance.nonpermanent.allocateRoster');
 
@@ -910,6 +913,14 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/payroll/{payroll_id}/activity-log', 'Payroll\PayrollController@showActivityLog')->name('payroll.activity-log');
     Route::get('/payroll/notes/{payroll_id}', 'Payroll\PayrollController@getNotes')->name('payroll.getNotes');
     Route::get('/payroll/download/{payroll_id}', 'Payroll\PayrollController@downloadPayroll')->name('payroll.download');
+
+    // §35 — Casual payroll run. The wizard's other steps (save-draft,
+    // save-employees, save-attendance, save-deductions, save-reviews,
+    // save-summary, send-for-approval, approve, view) reuse the routes
+    // above as-is — see CasualPayrollController's docblock for why.
+    Route::get('payroll/casual-run', 'Payroll\CasualPayrollController@index')->name('resort.casualPayroll.index');
+    Route::get('payroll/casual-run/employees', 'Payroll\CasualPayrollController@getEmployees')->name('resort.casualPayroll.employees');
+    Route::post('payroll/casual-run/fetch-time-attendance', 'Payroll\CasualPayrollController@fetchTimeAttendance')->name('resort.casualPayroll.fetchTimeAttendance');
 
     Route::get('payroll/pension', 'Payroll\PensionController@index')->name('payroll.pension.index');
     Route::get('payroll/ewt', 'Payroll\EWTController@index')->name('payroll.ewt.index');
@@ -1659,6 +1670,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
         //Promotion Dasboard
         Route::get('/people/promotion/dashboard', 'People\Promotion\DashboardController@index')->name('people.promotion.dashboard');
        Route::get('/people/promotion/initiate-promotion', 'People\Promotion\PromotionController@index')->name('people.promotion.initiate');
+       Route::get('/people/promotion/positions-for-employee', 'People\Promotion\PromotionController@getPositionsForPromotion')->name('people.promotion.positionsForEmployee');
        Route::get('people/job-description/by-position/{posId}', 'TalentAcquisition\JobDescriptionController@fetchByPosition')->name('job.description.by.position');
        Route::get('people/benefit-grid/view/{level}', 'BenifitGridController@viewByLevel')
        ->name('benefit.grid.view');
@@ -1709,6 +1721,11 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
        // Letterhead & E-signature configuration (used by document/letter PDFs).
        Route::get('/people/configuration/letterhead', 'People\ConfigController@letterheadIndex')->name('people.config.letterhead');
        Route::post('/people/configuration/letterhead/store', 'People\ConfigController@letterheadStore')->name('people.config.letterhead.store');
+
+      // §35 — Casuals payment model + per-position basic salary/commission.
+      Route::get('/people/configuration/casual-payment-model', 'People\configuration\CasualPaymentModelController@index')->name('people.casualPaymentModel.index');
+      Route::post('/people/configuration/casual-payment-model', 'People\configuration\CasualPaymentModelController@storeModel')->name('people.casualPaymentModel.storeModel');
+      Route::post('/people/configuration/casual-payment-model/position-pay', 'People\configuration\CasualPaymentModelController@storePositionPay')->name('people.casualPaymentModel.storePositionPay');
 
       //  Exit Clearance Module configuration
       Route::get('/people/exit-clearance-forms', 'People\configuration\ExitClearanceController@index')->name('people.exit-clearance.index');

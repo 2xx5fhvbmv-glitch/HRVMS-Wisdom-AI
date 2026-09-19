@@ -9,6 +9,7 @@ use App\Models\ResortPosition;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
  * "Position Configuration — Casuals & Interns" — HR creates positions that
@@ -51,24 +52,53 @@ class PositionConfigController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
         }
 
+        $resortId = $this->resort->resort_id;
+
+        // Non-HR/GM HOD/XCOM only ever manages their own department, same
+        // rule every other list/dashboard in this app applies.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (is_array($scopedDeptIds) && !in_array((int) $request->dept_id, $scopedDeptIds, true)) {
+            return response()->json(['success' => false, 'message' => 'You do not have access to this department.'], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'employee_category' => 'required|in:Casual,Intern',
-            'dept_id' => 'required|integer',
-            'section_id' => 'nullable|integer',
-            'position_title' => 'required|string|max:191',
+            'dept_id' => ['required', 'integer', Rule::exists('resort_departments', 'id')->where('resort_id', $resortId)],
+            'section_id' => ['nullable', 'integer', Rule::exists('resort_sections', 'id')->where('dept_id', $request->dept_id)],
+            'position_title' => [
+                'required', 'string', 'max:191',
+                Rule::unique('resort_positions', 'position_title')
+                    ->where('resort_id', $resortId)
+                    ->where('dept_id', $request->dept_id)
+                    ->where('employee_category', $request->employee_category),
+            ],
+        ], [
+            'dept_id.exists' => 'That department does not belong to your resort.',
+            'section_id.exists' => 'That section does not belong to the chosen department.',
+            'position_title.unique' => 'This position already exists for this department and category.',
         ]);
         if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors(),
+            ], 400);
         }
 
         try {
             $position = ResortPosition::create([
-                'resort_id' => $this->resort->resort_id,
+                'resort_id' => $resortId,
                 'dept_id' => $request->dept_id,
                 'section_id' => $request->section_id ?: null,
                 'position_title' => trim($request->position_title),
                 'employee_category' => $request->employee_category,
                 'status' => 'active',
+                // resort_positions.Rank is NOT NULL with no default — left
+                // unset it saves as 0, which matches no rank label anywhere
+                // (config('settings.Position_Rank') is 1-12). Casual/Intern
+                // staff have no approval authority and are marked by their
+                // supervisor, same as rank 6 (Line Workers) everywhere else.
+                'Rank' => 6,
             ]);
 
             return response()->json([

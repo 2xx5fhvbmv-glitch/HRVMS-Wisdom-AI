@@ -91,4 +91,34 @@ class ResortPosition extends Model
         return $this->hasMany(Employee::class, 'Position_id', 'id');
     }
 
+    public function payConfig()
+    {
+        return $this->hasOne(CasualPositionPayConfig::class, 'position_id', 'id');
+    }
+
+    /**
+     * employee_category NULL means Permanent — every position that existed
+     * before Casual/Intern positions could be created at all. Use this
+     * anywhere a list/count is meant for Permanent purposes only, so
+     * Casual/Intern positions (same table, tagged 'Casual'/'Intern') don't
+     * leak in.
+     */
+    public function scopePermanent($query)
+    {
+        return $query->whereNull('employee_category');
+    }
+
+    /**
+     * $category: 'Permanent' (-> whereNull) or 'Casual'/'Intern' (-> exact
+     * match). Use where the category is already known/selected, e.g. a
+     * vacancy form scoped to its own employee_type.
+     */
+    public function scopeForCategory($query, $category)
+    {
+        if ($category === 'Permanent' || empty($category)) {
+            return $query->whereNull('employee_category');
+        }
+        return $query->where('employee_category', $category);
+    }
+
 }

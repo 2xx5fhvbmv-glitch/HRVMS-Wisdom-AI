@@ -482,9 +482,31 @@
                 }
             });
 
+            // Position list is scoped to whichever category is picked here
+            // (this vacancy's own category on page load) — reload it
+            // whenever the type changes, same tab-switch-reload pattern
+            // the manning grid uses. The previously-selected position
+            // almost certainly doesn't belong to the new category.
+            function avReloadPositionsForType(employeeType) {
+                $.ajax({
+                    url: '{{ route('resort.vacancies.positionsByType') }}',
+                    type: 'GET',
+                    data: { deptId: {{ (int) $Dept_id }}, employeeType: employeeType },
+                    success: function (res) {
+                        var html = '<option value="">Select position</option>';
+                        (res.positions || []).forEach(function (p) {
+                            html += '<option value="' + p.id + '">' + $('<div>').text(p.position_title).html() + '</option>';
+                        });
+                        $('#position').html(html).val('').trigger('change');
+                        window.wisdomDD.rebuild('#position');
+                    }
+                });
+            }
+
             document.querySelectorAll('input[name="employee_type"]').forEach((radio) => {
                 radio.addEventListener('change', function() {
                     const employmentType = this.value;
+                    avReloadPositionsForType(employmentType);
                     const permanentDiv = document.getElementById('permanent-div');
                     const tempDiv = document.getElementById('temp-div');
                     const replacementEmployee = document.getElementById('replacement-employee');

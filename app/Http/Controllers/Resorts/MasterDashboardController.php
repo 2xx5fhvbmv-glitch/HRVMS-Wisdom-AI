@@ -1962,6 +1962,12 @@ class MasterDashboardController extends Controller
         // Check if active URL matches any page
         $activePageModuleId = \App\Models\ModulePages::where('internal_route', $active_url)->value('Module_Id');
 
+        // §35 — Casual Payroll only makes sense once a resort has opted
+        // into paying Casuals directly (the page itself already redirects
+        // away otherwise, but the doc calls for it not to appear in the
+        // menu at all under the lump-sum model, not just redirect-on-click).
+        $casualPaymentModel = \App\Models\ResortSiteSettings::where('resort_id', $resort_id)->value('casual_payment_model') ?? 'lump_sum';
+
         // Build menu in-memory (0 additional queries)
         $menu = ['menu' => [], 'resort_id' => $resort_id];
         $isSuperAdmin = ($resort->type === 'super');
@@ -1972,6 +1978,9 @@ class MasterDashboardController extends Controller
             $modulePages = $allPages->get($m->ModuleId, collect());
             $submenu = [];
             foreach ($modulePages as $page) {
+                if ($page->internal_route === 'resort.casualPayroll.index' && $casualPaymentModel !== 'direct_pay') {
+                    continue;
+                }
                 $permKey = $m->ModuleId . '_' . $page->Page_id;
                 if ($isSuperAdmin || in_array($permKey, $allowedPages)) {
                     $submenu[] = [

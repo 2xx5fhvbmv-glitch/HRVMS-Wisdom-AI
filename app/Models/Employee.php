@@ -109,6 +109,8 @@ class Employee extends Model
         'vacancy_id',
         'college_institute_name',
         'service_provider_name',
+        'visa_expiry_date',
+        'work_permit_expiry_date',
     ];
 
     public static function boot(){

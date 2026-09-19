@@ -702,18 +702,20 @@ class BudgetController extends Controller
             return response()->json(['success' => false, 'message' => 'Department not found'], 404);
         }
 
+        // Scope both the position list and the employees by this manning
+        // budget's own category — without it, a Casual/Intern-only position
+        // leaked into a Permanent budget's AI context (and vice versa), and
+        // the "current headcount/budget" blended categories for the same
+        // position id regardless of which category's budget this is.
+        $employmentType = $manningResponse->employment_type ?? 'Permanent';
+
         // Replicate the position + employee fetch used by CompareBudget
         // so the AI sees the same context.
         $positions = ResortPosition::where('dept_id', $deptID)
             ->where('resort_id', $this->resort->resort_id)
             ->where('status', 'active')
+            ->forCategory($employmentType)
             ->get();
-
-        // Scope employees by this manning budget's own category — without
-        // it, the AI recommendation's "current headcount/budget" context
-        // blended Permanent and Casual/Intern employees together for the
-        // same position regardless of which category's budget this is.
-        $employmentType = $manningResponse->employment_type ?? 'Permanent';
         foreach ($positions as $p) {
             $emps = Employee::where('Position_id', $p->id)
                 ->where('Dept_id', $deptID)
@@ -3493,10 +3495,15 @@ class BudgetController extends Controller
                 ->get();
 
             // Get positions without section
+            // 'all' ("All Combined" tab) blends every category, same as the
+            // manning-response guard above; any real category scopes to it
+            // so a Casual/Intern-only position doesn't leak into a
+            // Permanent department's drill-down (or vice versa).
             $positionsWithoutSection = ResortPosition::where('dept_id', $departmentId)
                 ->where('resort_id', $resortId)
                 ->whereNull('section_id')
                 ->where('status', 'active')
+                ->when($employmentType !== 'all', fn($q) => $q->forCategory($employmentType))
                 ->get();
 
             // Get positions grouped by section
@@ -3506,6 +3513,7 @@ class BudgetController extends Controller
                     ->where('section_id', $section->id)
                     ->where('resort_id', $resortId)
                     ->where('status', 'active')
+                    ->when($employmentType !== 'all', fn($q) => $q->forCategory($employmentType))
                     ->get();
 
                 $positionsBySection[$section->id] = $positions;
@@ -4141,9 +4149,15 @@ class BudgetController extends Controller
                 ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details', 'benefit_grid_levels']);
 
             // ---- Positions in scope ----
+            // Consistent with getDepartmentHierarchy()'s same 'all'/category
+            // guard — the employee/manning-response totals below are
+            // already correctly category-scoped regardless, this just stops
+            // the wrong-category positions from adding harmless-but-wasted
+            // $0 rows to the response.
             $positions = ResortPosition::where('resort_id', $resortId)
                 ->where('status', 'active')
                 ->whereIn('dept_id', $rankWiseDepartments)
+                ->when(!$isAllCategories, fn($q) => $q->forCategory($employmentType))
                 ->get(['id', 'dept_id', 'section_id']);
             $positionIds = $positions->pluck('id');
 
