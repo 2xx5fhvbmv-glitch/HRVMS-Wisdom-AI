@@ -25,7 +25,9 @@ return new class extends Migration
 
             $table->foreign('cost_id')->references('id')->on('resort_nonpermanent_budget_costs')->onDelete('cascade');
             $table->foreign('position_id')->references('id')->on('resort_positions')->onDelete('cascade');
-            $table->unique(['cost_id', 'position_id']);
+            // Laravel's auto-generated name for this pair exceeds MySQL's
+            // 64-char identifier limit — explicit short name required.
+            $table->unique(['cost_id', 'position_id'], 'rnbcp_cost_position_unique');
         });
     }
 
