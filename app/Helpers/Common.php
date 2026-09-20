@@ -5403,20 +5403,30 @@ class Common
     /**
      * True if the logged-in resort user has unrestricted access to all departments
      * (Super admin, master admin, GM, or anyone in the HR department).
+     *
+     * Pass $employee explicitly for mobile/API-guard callers — the web
+     * resort-admin session this defaults to is never authenticated there,
+     * so every API controller would otherwise silently get "false" (see
+     * getScopedDepartmentIds() below for the matching mobile check).
      */
-    public static function hasFullDataAccess()
+    public static function hasFullDataAccess($employee = null)
     {
-        $user = \Auth::guard('resort-admin')->user();
-        if (!$user) return false;
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
 
-        // Explicit admin types — always full access regardless of employee link.
-        if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
-            return true;
+            // Explicit admin types — always full access regardless of employee link.
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+
+            $emp = $user->GetEmployee ?? null;
+        } else {
+            $emp = $employee;
         }
 
         // Beyond that, an employee record is required. Without one we can't
         // verify rank or department, so default to RESTRICTED (not permissive).
-        $emp = $user->GetEmployee ?? null;
         if (!$emp) return false;
 
         $rank = (int) $emp->rank;
@@ -5460,18 +5470,23 @@ class Common
      * Returns the department ids the logged-in resort user is allowed to see, or NULL
      * for unrestricted (all departments). Mirrors getPerformanceScopedEmpIds() but at
      * the department level — use it to filter department-keyed tables / dropdowns.
+     *
+     * Pass $employee explicitly for mobile/API-guard callers — see
+     * hasFullDataAccess() above for why the resort-admin default can't work there.
      */
-    public static function getScopedDepartmentIds()
+    public static function getScopedDepartmentIds($employee = null)
     {
-        if (self::hasFullDataAccess()) return null;
+        if (self::hasFullDataAccess($employee)) return null;
 
-        $user = \Auth::guard('resort-admin')->user();
-        if (!$user) return [];
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return [];
+            $employee = $user->GetEmployee ?? null;
+        }
 
-        $emp = $user->GetEmployee ?? null;
-        if (!$emp || !$emp->Dept_id) return [];
+        if (!$employee || !$employee->Dept_id) return [];
 
-        return [(int) $emp->Dept_id];
+        return [(int) $employee->Dept_id];
     }
 
     /**

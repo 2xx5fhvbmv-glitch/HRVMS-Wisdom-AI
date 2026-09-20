@@ -198,10 +198,21 @@ class HousekeepingRequestController extends Controller
         }
 
         try {
+            // HR/GM (hasFullDataAccess) see every request resort-wide, same as
+            // before. A HOD/EXCOM calling this same endpoint previously saw
+            // that too — this was the "HOD can't tell which requests are
+            // theirs" gap: nothing distinguished "everything" from "my
+            // department's queue". Scope it the same way every other
+            // department-keyed list in this app already does.
+            $scopedDeptIds = Common::getScopedDepartmentIds($this->user->GetEmployee);
+
             $requests = HousekeepingRequest::join('employees as t1', 't1.id', '=', 'housekeeping_requests.employee_id')
                 ->join('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
                 ->join('housekeeping_service_catalog as hsc', 'hsc.id', '=', 'housekeeping_requests.housekeeping_service_id')
                 ->where('housekeeping_requests.resort_id', $this->resort_id)
+                ->when($scopedDeptIds !== null, function ($query) use ($scopedDeptIds) {
+                    return $query->whereIn('t1.Dept_id', $scopedDeptIds);
+                })
                 ->select(
                     'housekeeping_requests.*',
                     't2.first_name', 't2.last_name',

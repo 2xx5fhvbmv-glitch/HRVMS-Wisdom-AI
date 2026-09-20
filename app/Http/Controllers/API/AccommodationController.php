@@ -19,6 +19,7 @@ use App\Models\AccommodationType;
 use App\Models\HousekeepingSchedules;
 use App\Models\ChildHouseKeepingSchedules;
 use App\Models\HousekeepingSchedulesImg;
+use App\Models\HousekeepingRequest;
 use App\Helpers\Common;
 use App\Models\ChildMaintananceRequest;
 use App\Models\ChildApprovedMaintanaceRequests;
@@ -1446,10 +1447,23 @@ class AccommodationController extends Controller
         try {
             $currentDate                                    =   Carbon::now()->format('Y-m-d');
             $filterDate                                     =   $request->input('date', $currentDate); // Use provided date or default to today
+            $callerEmployee                                 =   $this->user->GetEmployee;
+            $callerDeptId                                   =   $callerEmployee->Dept_id ?? null;
 
+            // Was a strict 1:1 identity match against whichever single employee
+            // HR literally picked as Assigned_To/ApprovedBy — any other HOD or
+            // EXCOM in that same department got "No schedules found" for a
+            // schedule that belongs to their department just as much. Widened
+            // to "assigned to me, OR assigned to anyone in my department".
             $housekeepingSchedules                          =   HousekeepingSchedules::join('building_models as bm', 'bm.id', '=', 'housekeeping_schedules.BuildingName')
+                                                                    ->leftJoin('employees as assignedEmp', 'assignedEmp.id', '=', 'housekeeping_schedules.Assigned_To')
                                                                     ->where('housekeeping_schedules.resort_id', $this->resort_id)
-                                                                    ->where('housekeeping_schedules.Assigned_To', $this->user->GetEmployee->id)
+                                                                    ->where(function ($q) use ($callerEmployee, $callerDeptId) {
+                                                                        $q->where('housekeeping_schedules.Assigned_To', $callerEmployee->id);
+                                                                        if ($callerDeptId) {
+                                                                            $q->orWhere('assignedEmp.Dept_id', $callerDeptId);
+                                                                        }
+                                                                    })
                                                                     ->whereDate('housekeeping_schedules.date', $filterDate);
 
             $housekeepingSchedules                          =   $housekeepingSchedules->select('housekeeping_schedules.*', 'bm.BuildingName as BName')->get();
@@ -1457,7 +1471,12 @@ class AccommodationController extends Controller
             $assignedHousekeeping                           =   HousekeepingSchedules::join('child_housekeeping_schedules as ch', 'ch.housekeeping_id', '=', 'housekeeping_schedules.id')
                                                                     ->join('employees as e', 'e.id', '=', 'ch.ApprovedBy')
                                                                     ->join('resort_admins', 'e.Admin_Parent_id', '=', 'resort_admins.id')
-                                                                    ->where('ch.ApprovedBy', $this->user->GetEmployee->id)
+                                                                    ->where(function ($q) use ($callerEmployee, $callerDeptId) {
+                                                                        $q->where('ch.ApprovedBy', $callerEmployee->id);
+                                                                        if ($callerDeptId) {
+                                                                            $q->orWhere('e.Dept_id', $callerDeptId);
+                                                                        }
+                                                                    })
                                                                     ->where('ch.status', '=', 'Assigned')
                                                                     ->whereDate('housekeeping_schedules.date', $filterDate)
                                                                     ->select('ch.id', 'housekeeping_schedules.RoomNo', 'housekeeping_schedules.special_instructions', 'housekeeping_schedules.status', 'housekeeping_schedules.clean_type', 'resort_admins.first_name', 'resort_admins.last_name')
@@ -1480,6 +1499,53 @@ class AccommodationController extends Controller
             $response['message']                            =   'Housekeeping Schedule Dashboard.';
             $response['accomodation_data']                  =   $data;
             return response()->json($response);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * HOD's work queue for the Benefit-Grid-driven Housekeeping Request
+     * system (HousekeepingRequestController) — this route existed with no
+     * controller method behind it at all (500 on every call), which is the
+     * concrete reason a Housekeeping HOD could never find a request HR had
+     * submitted anywhere in the app. Department-scoped the same way
+     * HousekeepingRequestController::requestList() now is, so a HOD only
+     * sees their own department's requests while HR/GM (hasFullDataAccess)
+     * calling the same rank group would see all of them.
+     */
+    public function hodAssignedCleaning(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $scopedDeptIds = Common::getScopedDepartmentIds($this->user->GetEmployee);
+
+            $requests = HousekeepingRequest::join('employees as t1', 't1.id', '=', 'housekeeping_requests.employee_id')
+                ->join('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
+                ->join('housekeeping_service_catalog as hsc', 'hsc.id', '=', 'housekeeping_requests.housekeeping_service_id')
+                ->where('housekeeping_requests.resort_id', $this->resort_id)
+                ->when($scopedDeptIds !== null, function ($query) use ($scopedDeptIds) {
+                    return $query->whereIn('t1.Dept_id', $scopedDeptIds);
+                })
+                ->select(
+                    'housekeeping_requests.*',
+                    't2.first_name', 't2.last_name',
+                    'hsc.name as service_name'
+                )
+                ->orderBy('housekeeping_requests.created_at', 'desc')
+                ->get();
+
+            return response()->json([
+                'status'  => true,
+                'message' => $requests->isEmpty() ? 'No housekeeping requests found.' : 'Housekeeping requests retrieved successfully.',
+                'data'    => $requests,
+            ]);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
