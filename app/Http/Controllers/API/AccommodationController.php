@@ -923,6 +923,16 @@ class AccommodationController extends Controller
             if (!$anyAssigned) {
                 AssingAccommodation::where("id", $assignId)->where('resort_id', $this->resort_id)->update(['emp_id' => $emp_id, "effected_date" => date('Y-m-d')]);
 
+                Common::recordAccommodationHistory(
+                    $this->resort_id,
+                    $emp_id,
+                    null,
+                    $assignId,
+                    null,
+                    date('Y-m-d'),
+                    'Initial Assignment'
+                );
+
                 $Employeelist                           =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
                                                                 ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
                                                                 ->join('assing_accommodations as t3', "t3.emp_id", "=", "employees.id")
@@ -982,6 +992,20 @@ class AccommodationController extends Controller
 
                 DB::commit();
 
+                try {
+                    $assignedBedNo = AssingAccommodation::where('id', $assignId)->value('BedNo');
+                    Common::notifyEmployees(
+                        $this->resort_id,
+                        [(int) $emp_id],
+                        'Accommodation Assigned',
+                        'You have been assigned to bed ' . ($assignedBedNo ?? '') . '.',
+                        'Accommodation',
+                        $assignId
+                    );
+                } catch (\Exception $ne) {
+                    \Log::warning('Accommodation assign notification failed: ' . $ne->getMessage());
+                }
+
                 $response['status']                             =   true;
                 $response['message']                            =   'Bed assigned successfully.';
                 $response['bed_assign_data']                    =   $data;
@@ -1017,6 +1041,7 @@ class AccommodationController extends Controller
                                                                     ->leftJoin('employees as e', 'e.id', '=', 't1.emp_id')
                                                                     ->leftJoin('resort_admins as rd', "rd.id", "=", "e.Admin_Parent_id")
                                                                     ->leftJoin('resort_positions as rp', "rp.id", "=", "e.Position_id")
+                                                                    ->leftJoin('building_models as bm', 'bm.id', '=', 'available_accommodation_models.BuildingName')
                                                                     ->where('available_accommodation_models.resort_id', $this->resort_id)
                                                                     ->when($request->accommodation_type_id, function ($query) use ($request) {
                                                                         return $query->where('available_accommodation_models.Accommodation_type_id', $request->accommodation_type_id);
@@ -1031,7 +1056,7 @@ class AccommodationController extends Controller
                                                                         return $query->where('available_accommodation_models.RoomNo', $request->room_no);
                                                                     })
                                                                     // ->groupBy('available_accommodation_models.id')
-                                                                    ->get(['available_accommodation_models.id as available_a_id', 'available_accommodation_models.*', 't1.*', 'rd.first_name', 'rd.last_name', 'rp.position_title'])
+                                                                    ->get(['available_accommodation_models.id as available_a_id', 'available_accommodation_models.*', 't1.*', 'rd.id as Parentid', 'rd.first_name', 'rd.last_name', 'rp.position_title', 'bm.BuildingName as BName'])
                                                                     ->map(function ($accommodation) {
 
                                                                         $accommodation->AccommodationName           =   $accommodation->accommodationType->AccommodationName ?? 'Not Available';
@@ -1042,6 +1067,12 @@ class AccommodationController extends Controller
                                                                             ->count();
                                                                         // Calculate Available Beds
                                                                         $accommodation->AssingAccommodationCount    =  $AssingAccommodationCount;
+
+                                                                        // Real occupant photo/name for the room-info card — previously
+                                                                        // absent, and BuildingName (an FK, despite the name) came back
+                                                                        // as a raw id instead of display text.
+                                                                        $accommodation->profileImg                  =  Common::getResortUserPicture($accommodation->Parentid);
+                                                                        $accommodation->EmployeeName                 =  $accommodation->Parentid ? ucfirst(trim($accommodation->first_name . ' ' . $accommodation->last_name)) : null;
 
                                                                         return $accommodation;
                                                                     });

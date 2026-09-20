@@ -293,7 +293,31 @@ class AssignAccommodationController extends Controller
         DB::beginTransaction();
         try
         {
+                    // If this employee already had a bed elsewhere, free it and
+                    // log the move instead of silently orphaning that row —
+                    // this endpoint previously had no way to tell "first
+                    // assignment" from "employee already housed" apart.
+                    $previousBed = AssingAccommodation::where('emp_id', $emp_id)
+                        ->where('resort_id', $this->resort->resort_id)
+                        ->where('id', '!=', $assignId)
+                        ->first();
+                    $previousBedId = $previousBed->id ?? null;
+                    $previousEffectedDate = $previousBed->effected_date ?? null;
+                    if ($previousBed) {
+                        $previousBed->update(['emp_id' => 0, 'effected_date' => null]);
+                    }
+
                     $bed->update(['emp_id'=>$emp_id,"effected_date"=>date('Y-m-d')]);
+
+                    Common::recordAccommodationHistory(
+                        $this->resort->resort_id,
+                        $emp_id,
+                        $previousBedId,
+                        $bed->id,
+                        $previousEffectedDate,
+                        date('Y-m-d'),
+                        $previousBedId ? 'Reassigned via Assign screen' : 'Initial Assignment'
+                    );
 
                     $Employeelist = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
                                     ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")

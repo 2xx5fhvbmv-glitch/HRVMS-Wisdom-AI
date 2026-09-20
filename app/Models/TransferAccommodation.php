@@ -18,7 +18,11 @@ class TransferAccommodation extends Model
         parent::boot();
 
         self::saving(function ($model) {
-            if (!$model->exists) {
+            // Guarded the same way as modified_by below — this model is now
+            // also written from the API (mobile) guard's accommodation
+            // assignment endpoint, which never authenticates 'resort-admin',
+            // so the unconditional ->user()->id here would null-fatal there.
+            if (!$model->exists && Auth::guard('resort-admin')->check()) {
                 $model->created_by = Auth::guard('resort-admin')->user()->id;
             }
 

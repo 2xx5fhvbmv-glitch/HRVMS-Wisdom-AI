@@ -514,6 +514,15 @@ class InventoryController extends Controller
             if ($bed) {
                 $unassignedEmpId = $bed->emp_id;
                 $decrementInventory($bed->available_a_id);
+                Common::recordAccommodationHistory(
+                    $resort_id,
+                    $unassignedEmpId,
+                    $bed->id,
+                    null,
+                    $bed->effected_date,
+                    date('Y-m-d'),
+                    'Unassigned'
+                );
                 $bed->update(['emp_id' => 0, 'effected_date' => null]);
 
                 try {
@@ -540,7 +549,7 @@ class InventoryController extends Controller
             ->where('assing_accommodations.emp_id', '!=', 0)
             ->join('employees as e', 'e.id', '=', 'assing_accommodations.emp_id')
             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-            ->select('assing_accommodations.id as assign_id', 'assing_accommodations.available_a_id', 'assing_accommodations.BedNo', 'assing_accommodations.emp_id as numeric_emp_id', 'e.Emp_id', 'ra.first_name', 'ra.last_name')
+            ->select('assing_accommodations.id as assign_id', 'assing_accommodations.available_a_id', 'assing_accommodations.BedNo', 'assing_accommodations.effected_date', 'assing_accommodations.emp_id as numeric_emp_id', 'e.Emp_id', 'ra.first_name', 'ra.last_name')
             ->get();
 
         if ($assignedBeds->isEmpty()) {
@@ -550,6 +559,15 @@ class InventoryController extends Controller
         // If only 1 employee, unassign directly
         if ($assignedBeds->count() === 1) {
             $decrementInventory($assignedBeds->first()->available_a_id);
+            Common::recordAccommodationHistory(
+                $resort_id,
+                $assignedBeds->first()->numeric_emp_id,
+                $assignedBeds->first()->assign_id,
+                null,
+                $assignedBeds->first()->effected_date,
+                date('Y-m-d'),
+                'Unassigned'
+            );
             AssingAccommodation::where('id', $assignedBeds->first()->assign_id)
                 ->update(['emp_id' => 0, 'effected_date' => null]);
 

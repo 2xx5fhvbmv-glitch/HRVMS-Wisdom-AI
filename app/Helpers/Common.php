@@ -4705,6 +4705,28 @@ class Common
     }
 
     /**
+     * Record one accommodation lifecycle event (initial assign, move, or
+     * unassign) as a transfer_accommodations row. Centralized so every
+     * write path (web assign, web move, web unassign, API assign) produces
+     * the same history trail instead of each silently overwriting the live
+     * assing_accommodations row with nothing left behind. Pass null for
+     * $oldAccommodationId on a first-time assignment, or null for
+     * $newAccommodationId on an unassign/vacate.
+     */
+    public static function recordAccommodationHistory($resortId, $empId, $oldAccommodationId, $newAccommodationId, $oldDate, $newDate, $reason)
+    {
+        \App\Models\TransferAccommodation::create([
+            'resort_id'            => $resortId,
+            'Emp_id'               => $empId,
+            'OldAccommodation_id'  => $oldAccommodationId,
+            'NewAccommodation_id'  => $newAccommodationId,
+            'OldDate'              => $oldDate,
+            'NewdDate'             => $newDate,
+            'Reason'               => $reason,
+        ]);
+    }
+
+    /**
      * Resolve an Emp_main_id value (stored as numeric id, base64 id, or Emp_id
      * string like "DR-22") to a numeric employee primary key, or null if not found.
      * Legacy cycle rows stored the Emp_id string instead of the numeric key, so all
