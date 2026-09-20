@@ -1149,7 +1149,12 @@ class VacancyController extends Controller
 
         if ($position) {
             $rankId = $position->Rank; // Assume 'rank' field stores the rank ID
-            $rankName = config("settings.Position_Rank.$rankId") ?? null;
+            // WP1 (D1) — a Casual/Intern position's Rank is 0 (no
+            // Position_Rank config key), which would otherwise return a
+            // blank rank name here instead of a real label.
+            $rankName = !empty($position->employee_category)
+                ? $position->employee_category
+                : (config("settings.Position_Rank.$rankId") ?? null);
 
             return response()->json(['rank' => $rankName,'rank_id'=> $rankId ]);
         } else {
@@ -1376,7 +1381,13 @@ class VacancyController extends Controller
                 'division_id' => $vacancy->division ?: 0,
                 'Section_id' => $vacancy->section ?: null,
                 'reporting_to' => $validated['reporting_to'],
-                'rank' => $vacancy->rank,
+                // WP1 (D1) — forced 0 regardless of what's stored on the
+                // vacancy row (a vacancy created before this fix could
+                // still carry a stale non-zero rank); main_rank explicitly
+                // set too rather than left null, so nothing downstream
+                // needs to treat "null" as a second Casual/Intern sentinel.
+                'rank' => 0,
+                'main_rank' => 0,
                 'is_employee' => 1,
                 'status' => 'Onboarding',
                 'employment_type' => $employmentType,
@@ -1384,8 +1395,11 @@ class VacancyController extends Controller
                 'nationality' => $validated['nationality'],
                 'college_institute_name' => $isIntern ? $validated['college_institute_name'] : null,
                 'service_provider_name' => $serviceProviderName,
-                'basic_salary' => $vacancy->propsed_salary ?: $vacancy->budgeted_salary,
-                'basic_salary_currency' => 'USD',
+                // WP3 (D3) — this whole method only ever hires Casual/
+                // Intern (guarded at the top of the method). Their one
+                // salary source is the Casual Payment Model screen, not a
+                // value copied from the vacancy at hire time — leave unset
+                // (0/null) rather than seed a stale figure nothing reads.
                 'vacancy_id' => $vacancy->id,
             ]);
 

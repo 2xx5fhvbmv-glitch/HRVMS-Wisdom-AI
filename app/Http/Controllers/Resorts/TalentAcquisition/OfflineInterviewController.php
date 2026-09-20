@@ -884,6 +884,14 @@ class OfflineInterviewController extends Controller
             $employmentType = 'Casual';
         }
 
+        // WP1 (D1) — Casual/Intern never carry a Permanent rank (1-12),
+        // forced to 0 regardless of what's stored on the requisition (which
+        // could be stale, or copied from a position that predates this
+        // rule). Permanent hires through this same shared path keep using
+        // the requisition's actual rank, unchanged.
+        $isNonPermanentHire = Common::manningCategory($employmentType) !== 'Permanent';
+        $hireRank = $isNonPermanentHire ? 0 : $oi->rank;
+
         $employee = Employee::create([
             'resort_id'             => $resort_id,
             'Emp_id'                => $emp_id,
@@ -895,7 +903,8 @@ class OfflineInterviewController extends Controller
             'Position_id'           => $oi->position_id,
             'division_id'           => $oi->division_id ?: 0,
             'reporting_to'          => $oi->reporting_to ?: 0,
-            'rank'                  => $oi->rank,
+            'rank'                  => $hireRank,
+            'main_rank'             => $hireRank,
             'is_employee'           => 1,
             // Same pre-joining gate as convertApplicant — HR activates later.
             'status'                => 'Onboarding',
@@ -904,7 +913,12 @@ class OfflineInterviewController extends Controller
             'joining_date'          => null,
             'employment_type'       => $employmentType,
             'passport_number'       => $applicant->passport_no,
-            'basic_salary'          => $oi->proposed_salary ?: $oi->budget_salary,
+            // WP3 (D3) — Casual/Intern's one salary source is the Casual
+            // Payment Model screen, never a value copied from the
+            // requisition at hire time (that column isn't even read for
+            // them anymore — see Common::casualInternBasicSalary()).
+            // Permanent hires through this same shared path keep it.
+            'basic_salary'          => $isNonPermanentHire ? null : ($oi->proposed_salary ?: $oi->budget_salary),
             'basic_salary_currency' => 'USD',
             'present_address'       => trim(implode(', ', array_filter([
                 $applicant->address_line_one, $applicant->address_line_two,

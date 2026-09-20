@@ -93,12 +93,14 @@ class PositionConfigController extends Controller
                 'position_title' => trim($request->position_title),
                 'employee_category' => $request->employee_category,
                 'status' => 'active',
-                // resort_positions.Rank is NOT NULL with no default — left
-                // unset it saves as 0, which matches no rank label anywhere
-                // (config('settings.Position_Rank') is 1-12). Casual/Intern
-                // staff have no approval authority and are marked by their
-                // supervisor, same as rank 6 (Line Workers) everywhere else.
-                'Rank' => 6,
+                // WP1 (D1, supersedes the earlier Rank=6 decision) —
+                // Casual/Intern never carry a Permanent rank (1-12) and
+                // never reach a benefit grid. 0 is the sentinel:
+                // resolveEmpGrade() short-circuits on it, and it matches no
+                // Position_Rank config key, so anywhere a rank badge is
+                // shown it falls through to Common::rankLabel()'s
+                // "Casual"/"Intern" text instead of a Permanent rank name.
+                'Rank' => 0,
             ]);
 
             return response()->json([

@@ -738,14 +738,16 @@ class PayrollController extends Controller
                 // Already settled via F&F — exclude from SC pool.
                 continue;
             }
-            // §34 — Interns never get service charge, same as Casual staff
-            // (this endpoint only ever sees Permanent+Intern Emp_ids since
-            // Casual isn't part of this payroll run at all). Not a benefit-
-            // grid-absence accident: resolveEmpGrade() has a rank-based
-            // fallback with no employment_type check, so an Intern whose
-            // rank/position maps to an SC-eligible grade was showing up
-            // here before this guard existed.
-            if (Common::manningCategory($employee->employment_type ?? '') === 'Intern') {
+            // §34/WP1 — Interns AND Casual never get service charge.
+            // This endpoint builds its employee set purely from whatever
+            // Emp_ids the request posts (no employment_type filter of its
+            // own), so "Casual isn't part of this payroll run" was an
+            // assumption about the caller, not something enforced here —
+            // a forged/future request could still pass a Casual Emp_id
+            // through. resolveEmpGrade() now short-circuits on rank 0
+            // too (WP1), but this stays as an explicit, category-based
+            // belt-and-braces check rather than relying on that alone.
+            if (Common::manningCategory($employee->employment_type ?? '') !== 'Permanent') {
                 continue;
             }
             // Employee's own benefit_grid_level wins when it's still a real,
@@ -2470,12 +2472,21 @@ class PayrollController extends Controller
                 }
             }
 
-            $basic = floatval($employee->basic_salary);
-            // dd($employee->basic_salary_currency);
-            // dd($basic, $employee->basic_salary_currency, $currency, $settings->DollertoMVR);
-            if ($currency === 'MVR' && $employee->basic_salary_currency === 'USD') {
+            // WP3/WP34 (D3) — Interns fold into this same Permanent payroll
+            // run, but must NEVER be paid from employees.basic_salary —
+            // their one salary source is the Casual Payment Model screen
+            // (position rate, or a per-person custom override).
+            if (Common::manningCategory($employee->employment_type ?? '') === 'Intern') {
+                $internSalary = Common::casualInternBasicSalary($employee);
+                $basic = $internSalary['amount'];
+                $basicCurrencyForFx = $internSalary['currency'];
+            } else {
+                $basic = floatval($employee->basic_salary);
+                $basicCurrencyForFx = $employee->basic_salary_currency;
+            }
+            if ($currency === 'MVR' && $basicCurrencyForFx === 'USD') {
                 $basic *= $settings->DollertoMVR;
-            } elseif ($currency === 'Dollar' && $employee->basic_salary_currency === 'MVR') {
+            } elseif ($currency === 'Dollar' && $basicCurrencyForFx === 'MVR') {
                 $basic /= $settings->DollertoMVR;
             }
             // Per day salary = basic / total days in cutoff period (e.g. 28 for Feb-Mar, 31 for Jan, etc.)
@@ -2516,7 +2527,7 @@ class PayrollController extends Controller
                 $totalAllowance += $amount;
             }
 
-            $serviceCharge = Common::getServiceCharge($employee->id, $this->resort->resort_id, $request->payrollId);
+            $serviceCharge = Common::getServiceCharge($employee->id, $this->resort->resort_id, $request->payrollId, $employee);
              if ($currency === 'MVR')
              {
                 $serviceCharge *= $settings->DollertoMVR;
@@ -2990,7 +3001,7 @@ class PayrollController extends Controller
             }
 
             // Service Charge in MVR
-            $serviceCharge = Common::getServiceCharge($employee->id, $resortId, $payrollId);
+            $serviceCharge = Common::getServiceCharge($employee->id, $resortId, $payrollId, $employee);
             $serviceChargeInMVR = ($currency === 'Dollar') ? $serviceCharge * $settings['DollertoMVR'] : $serviceCharge;
 
             // Total OT pay in MVR

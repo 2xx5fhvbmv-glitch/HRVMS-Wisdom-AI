@@ -165,9 +165,13 @@ class LeaveController extends Controller
 
             $benefit_grid = Common::getBenefitGrid($emp_grade,$resort_id);
 
-            // Check if benefit grid exists and provide fallback values
-            $benefit_grid_emp_grade = $benefit_grid->emp_grade ?? $emp_grade;
-            $benefit_grid_id = $benefit_grid->id ?? null;
+            // Check if benefit grid exists and provide fallback values.
+            // WP1 — $benefit_grid is null for Casual/Intern; optional()
+            // avoids a "property on null" warning on top of the existing
+            // ?? fallback (which already handled the resulting value fine,
+            // just not the warning laravel.log would otherwise pick up).
+            $benefit_grid_emp_grade = optional($benefit_grid)->emp_grade ?? $emp_grade;
+            $benefit_grid_id = optional($benefit_grid)->id;
 
             // Gender drives which leave categories are eligible (eligible_emp_type).
             // For self, it's the logged-in account's own gender; when applying on
@@ -264,7 +268,12 @@ class LeaveController extends Controller
             )
             ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
             ->where('resort_benefit_grid_child.rank', $rank)
-            ->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid->id)
+            // WP1 — $benefit_grid is null for Casual/Intern (rank 0, no
+            // grid). optional()->id stays null rather than a fatal
+            // "property on null" access, and a null benefit_grid_id
+            // correctly matches no rows — empty leave categories, no
+            // allocation, matching D1 exactly.
+            ->where('resort_benefit_grid_child.benefit_grid_id', optional($benefit_grid)->id)
             ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$rank])
             ->where('resort_benefit_grid_child.allocated_days', '>', 0)
             ->where(function ($query) {

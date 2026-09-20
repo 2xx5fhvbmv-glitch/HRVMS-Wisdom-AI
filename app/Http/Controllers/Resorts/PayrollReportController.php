@@ -96,6 +96,7 @@ class PayrollReportController extends Controller
         })->values();
 
         $payrolls = DB::table('payroll')->where('resort_id', $resortId)
+            ->where('payroll_category', 'Permanent')
             ->orderBy('start_date', 'desc')
             ->get(['id', 'start_date', 'end_date', 'status'])
             ->map(fn($p) => [
@@ -118,12 +119,14 @@ class PayrollReportController extends Controller
         $months = collect(range(1, 12))->map(fn($m) => ['value' => $m, 'label' => Carbon::create()->month($m)->format('F')]);
 
         $years = DB::table('payroll')->where('resort_id', $resortId)
+            ->where('payroll_category', 'Permanent')
             ->selectRaw('DISTINCT YEAR(start_date) as y')->orderBy('y', 'desc')->pluck('y');
 
         $allowanceTypes = DB::table('payroll_review_allowances as a')
             ->join('payroll_reviews as pr', 'pr.id', '=', 'a.payroll_review_id')
             ->join('payroll as pay', 'pay.id', '=', 'pr.payroll_id')
             ->where('pay.resort_id', $resortId)
+            ->where('pay.payroll_category', 'Permanent')
             ->distinct()->orderBy('a.allowance_type')->pluck('a.allowance_type');
 
         $deductionTypes = array_keys($this->deductionColumns());
@@ -263,7 +266,12 @@ class PayrollReportController extends Controller
     {
         $pids = array_values(array_filter((array) $pids));
         if (empty($pids)) return collect();
+        // WP9 — this whole report engine is the Permanent Payroll Reports
+        // screen (Casual has its own separate run flow via
+        // CasualPayrollController); without this a Casual run's rows blend
+        // into every report here.
         return DB::table('payroll')->where('resort_id', $this->resort->resort_id)
+            ->where('payroll_category', 'Permanent')
             ->whereIn('id', $pids)->orderBy('start_date')->get();
     }
 
@@ -312,14 +320,22 @@ class PayrollReportController extends Controller
     {
         $rid = $this->resort->resort_id;
 
-        if (!empty($filters['payroll'])) return [(int) $filters['payroll']];
+        // WP9 — every run this method resolves feeds basePayslip()/reports
+        // built for Permanent payroll; a Casual run must never be picked
+        // here (explicit ?payroll=<id> included — an id belonging to a
+        // Casual run wouldn't resolve, matching the other paths below).
+        if (!empty($filters['payroll'])) {
+            $isPermanent = DB::table('payroll')->where('id', $filters['payroll'])
+                ->where('resort_id', $rid)->where('payroll_category', 'Permanent')->exists();
+            return $isPermanent ? [(int) $filters['payroll']] : [];
+        }
 
         $from = $filters['from_date'] ?? null;
         $to   = $filters['to_date'] ?? null;
         $year = $filters['year'] ?? null;
 
         if ($from || $to || $year) {
-            $q = DB::table('payroll')->where('resort_id', $rid);
+            $q = DB::table('payroll')->where('resort_id', $rid)->where('payroll_category', 'Permanent');
             if ($year) $q->whereRaw('YEAR(start_date) = ?', [$year]);
             // Period overlaps the window: run.start_date <= to AND run.end_date >= from.
             if ($to)   $q->whereDate('start_date', '<=', $to);
@@ -329,10 +345,12 @@ class PayrollReportController extends Controller
 
         $latest = DB::table('payroll as p')
             ->where('p.resort_id', $rid)
+            ->where('p.payroll_category', 'Permanent')
             ->whereExists(fn($q) => $q->select(DB::raw(1))->from('payroll_reviews')
                 ->whereColumn('payroll_reviews.payroll_id', 'p.id'))
             ->orderBy('p.start_date', 'desc')->first()
             ?: DB::table('payroll')->where('resort_id', $rid)
+                ->where('payroll_category', 'Permanent')
                 ->orderBy('start_date', 'desc')->first();
 
         return $latest ? [(int) $latest->id] : [];
@@ -349,6 +367,7 @@ class PayrollReportController extends Controller
             ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
             ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
             ->where('pay.resort_id', $this->resort->resort_id)
+            ->where('pay.payroll_category', 'Permanent')
             ->whereIn('pr.payroll_id', (array) $payrollId)
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($filters['department'] ?? null, fn($q) => $q->where('e.Dept_id', $filters['department']));
@@ -418,8 +437,8 @@ class PayrollReportController extends Controller
     /** #4 Payroll Comparison. */
     public function payrollComparison(array $filters): array
     {
-        $payA = $filters['from_payroll'] ? DB::table('payroll')->where('id', $filters['from_payroll'])->where('resort_id', $this->resort->resort_id)->first() : null;
-        $payB = $filters['to_payroll'] ? DB::table('payroll')->where('id', $filters['to_payroll'])->where('resort_id', $this->resort->resort_id)->first() : null;
+        $payA = $filters['from_payroll'] ? DB::table('payroll')->where('id', $filters['from_payroll'])->where('resort_id', $this->resort->resort_id)->where('payroll_category', 'Permanent')->first() : null;
+        $payB = $filters['to_payroll'] ? DB::table('payroll')->where('id', $filters['to_payroll'])->where('resort_id', $this->resort->resort_id)->where('payroll_category', 'Permanent')->first() : null;
         if (!$payA || !$payB) {
             return ['columns' => ['Component', 'Month A', 'Month B', 'Difference', '% Change'],
                 'rows' => [['Component' => 'Select two payroll periods to compare.', 'Month A' => '', 'Month B' => '', 'Difference' => '', '% Change' => '']]];
@@ -1005,6 +1024,7 @@ class PayrollReportController extends Controller
         $prevNet = [];
         if ($runs->isNotEmpty()) {
             $prev = DB::table('payroll')->where('resort_id', $this->resort->resort_id)
+                ->where('payroll_category', 'Permanent')
                 ->where('start_date', '<', $runs->min('start_date'))->orderByDesc('start_date')->first();
             if ($prev) {
                 $prevNet = DB::table('payroll_reviews')->where('payroll_id', $prev->id)
@@ -1396,6 +1416,7 @@ class PayrollReportController extends Controller
     public function processingStatus(array $filters): array
     {
         $runs = DB::table('payroll')->where('resort_id', $this->resort->resort_id)
+            ->where('payroll_category', 'Permanent')
             ->when($filters['payroll'], fn($q) => $q->where('id', $filters['payroll']))
             ->orderByDesc('start_date')->get();
 

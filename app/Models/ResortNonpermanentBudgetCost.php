@@ -67,4 +67,13 @@ class ResortNonpermanentBudgetCost extends Model
         return $createdby;
     }
 
+    /**
+     * WP2 (D2) — positions this cost line is restricted to. Empty = applies
+     * to every position of this cost's own applies_to category.
+     */
+    public function positions()
+    {
+        return $this->belongsToMany(ResortPosition::class, 'resort_nonpermanent_budget_cost_positions', 'cost_id', 'position_id');
+    }
+
 }

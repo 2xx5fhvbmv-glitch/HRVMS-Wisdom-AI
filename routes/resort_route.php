@@ -247,6 +247,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/manning/responses/get-draft-data/{resortId}/{deptId}/{year}/{employmentType?}', 'ManningResponseController@getDraft')->name('manning.responses.getDraft');
     Route::get('/manning/responses/positions/{deptId}/{employmentType?}', 'ManningResponseController@getPositionsByCategory')->name('manning.responses.getPositionsByCategory');
     Route::get('/manning/responses/categories-with-data/{deptId}/{year}', 'ManningResponseController@getCategoriesWithData')->name('manning.responses.categoriesWithData');
+    Route::post('/manning/responses/close-notification', 'ManningResponseController@closeManningRequestNotification')->name('manning.responses.closeNotification');
     Route::post( '/manning/responses/show/department/wise-budget-data', 'ManningResponseController@ShowDepartmentWiseBudgetData')->name('resort.department.wise.budget.data');
     Route::put( '/manning/responses/update-budget-data/{id}', 'ManningResponseController@updateBudgetData')->name('resort.budget.update');
     Route::put( '/manning/responses/update-grand-total', 'ManningResponseController@updateParentTotal')->name('resort.budget.updateParentTotal');
@@ -1726,6 +1727,8 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::get('/people/configuration/casual-payment-model', 'People\configuration\CasualPaymentModelController@index')->name('people.casualPaymentModel.index');
       Route::post('/people/configuration/casual-payment-model', 'People\configuration\CasualPaymentModelController@storeModel')->name('people.casualPaymentModel.storeModel');
       Route::post('/people/configuration/casual-payment-model/position-pay', 'People\configuration\CasualPaymentModelController@storePositionPay')->name('people.casualPaymentModel.storePositionPay');
+      Route::post('/people/configuration/casual-payment-model/employee-pay', 'People\configuration\CasualPaymentModelController@storeEmployeePay')->name('people.casualPaymentModel.storeEmployeePay');
+      Route::delete('/people/configuration/casual-payment-model/employee-pay', 'People\configuration\CasualPaymentModelController@destroyEmployeePay')->name('people.casualPaymentModel.destroyEmployeePay');
 
       //  Exit Clearance Module configuration
       Route::get('/people/exit-clearance-forms', 'People\configuration\ExitClearanceController@index')->name('people.exit-clearance.index');

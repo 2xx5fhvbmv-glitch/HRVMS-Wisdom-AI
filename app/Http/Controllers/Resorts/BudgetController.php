@@ -206,6 +206,17 @@ class BudgetController extends Controller
             })
             ->where('p.resort_id', '=', $resortId)
             ->whereIn('p.dept_id', $departmentIds)
+            // WP6(D6) — without this, every position of the department
+            // appeared on every category's tab (with headcount 0 for the
+            // categories it doesn't belong to) — a Casual position visible
+            // on the Permanent tab and vice versa.
+            ->where(function ($q) use ($employmentType) {
+                if ($employmentType === 'Permanent') {
+                    $q->whereNull('p.employee_category');
+                } else {
+                    $q->where('p.employee_category', $employmentType);
+                }
+            })
             ->select(
                 'p.id',
                 'mr.id as Budget_id',
@@ -564,6 +575,14 @@ class BudgetController extends Controller
                 // that resort's positions from rendering on our page.
                 ->where('p.resort_id', '=', $this->resort->resort_id)
                 ->where('p.dept_id', '=', $deptID)
+                // WP6(D6) — $budgetId belongs to one category only; without
+                // this, positions of the OTHER categories in the same dept
+                // still rendered here (with 0 headcount).
+                ->when($manningResponse, function ($q) use ($manningResponse) {
+                    $manningResponse->employment_type === 'Permanent'
+                        ? $q->whereNull('p.employee_category')
+                        : $q->where('p.employee_category', $manningResponse->employment_type);
+                })
                 ->select(
                     'p.id',
                     'p.position_title',
@@ -1048,12 +1067,10 @@ class BudgetController extends Controller
         // 'nonpermanent', but always defined so the view can safely check it.
         $activeSub = $employmentType === 'Casual' || $employmentType === 'Intern' ? $employmentType : null;
 
-        // Get resort budget costs for the modal — resort-wide, not
-        // category-scoped, so this is computed once regardless of tab.
-        $resortCosts = ResortBudgetCost::where('resort_id', $resortId)
-            ->where('status', 'active')
-            ->orderBy('id')
-            ->get();
+        // WP2 (D2) — was unconditionally resort_budget_costs (Permanent)
+        // regardless of which tab was active; Casual/Intern must read only
+        // their own Cost Configuration lines.
+        $resortCosts = Common::getCachedActiveResortCosts($resortId, $employmentType);
 
         return view('resorts.budget.view_budget_hierarchical')->with(compact(
             'page_title',
@@ -1158,6 +1175,16 @@ class BudgetController extends Controller
                 })
                 ->where('p.resort_id', '=', $resortId)
                 ->where('p.dept_id', '=', $department->dept_id)
+                // WP6(D6) — same fix as resolveManningCategoryData(): scope
+                // the position catalog itself to the selected category, not
+                // just the pmd/mr headcount join.
+                ->where(function ($q) use ($employmentType) {
+                    if ($employmentType === 'Permanent') {
+                        $q->whereNull('p.employee_category');
+                    } else {
+                        $q->where('p.employee_category', $employmentType);
+                    }
+                })
                 ->select(
                     'p.id',
                     'mr.id as Budget_id',
@@ -1853,11 +1880,17 @@ class BudgetController extends Controller
 
         if ($departmentsInScope->isNotEmpty())
         {
-            // Initialize the consolidated budget array and retrieve unique headers
+            // Initialize the consolidated budget array and retrieve unique headers.
+            // WP2 (D2) — this closure runs once per category (see comment
+            // above), so $employmentType here is always one concrete
+            // category, never 'All' — Casual/Intern headers must come from
+            // their own Cost Configuration, never resort_budget_costs.
             $consolidatedBudget = [];
-            $header = ResortBudgetCost::where('resort_id', $resortId)
-                ->distinct()
+            $header = Common::getCachedActiveResortCosts($resortId, $employmentType)
                 ->pluck('particulars')
+                ->filter()
+                ->unique()
+                ->values()
                 ->toArray();
 
             // ---- Batch-fetch per-employee/per-vacant calculation inputs
@@ -1876,7 +1909,13 @@ class BudgetController extends Controller
             // columns directly — so all of this can be fetched resort-wide
             // (scoped to in-scope departments) up front.
             $inScopeDeptIdsForBatch = $departmentsInScope->pluck('id')->all();
-            $activeResortCostsForBatch = Common::getCachedActiveResortCosts($resortId);
+            // Section 9 audit — was missing $employmentType, so every
+            // category (including Casual/Intern) got PERMANENT cost lines
+            // here (computeEmployeeYearlyTotalBatched()'s own comment
+            // wrongly assumed this was already category-scoped). This
+            // closure runs once per category (see $resolveCategory above),
+            // so $employmentType is exactly the category being rendered.
+            $activeResortCostsForBatch = Common::getCachedActiveResortCosts($resortId, $employmentType);
 
             // Resort-wide, not scoped to $inScopeDeptIdsForBatch: the
             // per-position employee fetch below (unchanged) filters by
@@ -2023,8 +2062,12 @@ class BudgetController extends Controller
                 // this department even if it isn't catalogued under
                 // resort_positions.dept_id (legacy data), again matching
                 // view-budget's effective coverage.
+                // WP6(D6) — same fix as ViewBudget/ViewManning: this closure
+                // runs once per category, so the catalog itself must be
+                // scoped to it, not just the headcount data below.
                 $catalogPositions = ResortPosition::where('resort_id', $resortId)
                     ->where('dept_id', $departmentId)
+                    ->forCategory($employmentType)
                     ->get();
 
                 $employeePositionIds = DB::table('employees')
@@ -2043,6 +2086,7 @@ class BudgetController extends Controller
                 if (!empty($missingEmployeePositionIds)) {
                     $extra = ResortPosition::where('resort_id', $resortId)
                         ->whereIn('id', $missingEmployeePositionIds)
+                        ->forCategory($employmentType)
                         ->get();
                     $catalogPositions = $catalogPositions->concat($extra);
                 }
@@ -2128,6 +2172,7 @@ class BudgetController extends Controller
                             'ra.first_name',
                             'ra.last_name',
                             'e.rank',
+                            'e.employment_type',
                             'e.nationality',
                             'e.religion',
                             'e.basic_salary',
@@ -2267,10 +2312,9 @@ class BudgetController extends Controller
                 }
             }
 
-            // Get additional resort costs by particular cost title
-            $resortCosts = ResortBudgetCost::where('resort_id', $resortId)
-                ->select('id', 'particulars', 'amount', 'amount_unit')
-                ->get();
+            // Get additional resort costs by particular cost title.
+            // WP2 (D2) — category-scoped, same reasoning as $header above.
+            $resortCosts = Common::getCachedActiveResortCosts($resortId, $employmentType);
 
             // Calculate and store totals for all levels (Position, Section, Department, Division)
             if (!empty($consolidatedBudget)) {
@@ -2456,14 +2500,42 @@ class BudgetController extends Controller
             'mvrToDollarRate'
         ))->render();
 
-        // Matches the original endpoint's own "your custom condition"
-        // override — the AJAX response has always unconditionally
-        // reported the budget as completed regardless of the computed
-        // per-category value, preserved here rather than changed as part
-        // of this unrelated tab feature.
+        // WP7(D4) — Send To Finance/Send To GM must enable only once every
+        // department has submitted (for every category the current tab
+        // covers — 'all' needs all 3, 'nonpermanent' needs both Casual and
+        // Intern, 'permanent' needs just Permanent). This used to be
+        // hardcoded true, so the buttons' enabled state never reflected
+        // reality; the JS also had the true/false meaning backwards (see
+        // consolidated.blade.php fetchConsolidatedBudget()), so in practice
+        // the buttons were simply always disabled.
+        $allDepartments = ResortDepartment::where('resort_id', $resortId)->get(['id', 'name']);
+        $submittedDeptIdsByCategory = [];
+        foreach ($categoriesNeeded as $cat) {
+            $submittedDeptIdsByCategory[$cat] = ManningResponse::where('year', $selectedYear)
+                ->where('resort_id', $resortId)
+                ->where('employment_type', $cat)
+                ->pluck('dept_id')
+                ->unique()
+                ->all();
+        }
+        $missingDepartments = [];
+        foreach ($allDepartments as $dept) {
+            foreach ($categoriesNeeded as $cat) {
+                if (!in_array($dept->id, $submittedDeptIdsByCategory[$cat], true)) {
+                    $missingDepartments[] = $dept->name;
+                    break;
+                }
+            }
+        }
+        $totalDepartments = $allDepartments->count();
+        $missingDepartments = array_values(array_unique($missingDepartments));
+
         return response()->json([
             'html' => $html,
-            'isBudgetCompleted' => true,
+            'isBudgetCompleted' => empty($missingDepartments),
+            'totalDepartments' => $totalDepartments,
+            'submittedDepartments' => $totalDepartments - count($missingDepartments),
+            'missingDepartments' => $missingDepartments,
         ]);
     }
 
@@ -2589,17 +2661,26 @@ class BudgetController extends Controller
         $empId = (int) ($employee->id ?? 0);
         if (!$empId) return 0.0;
 
-        $sharedFallback = (float) (($employee->proposed_salary ?? 0) > 0
-            ? $employee->proposed_salary
-            : ($employee->basic_salary ?? 0));
-        $salaryTotal = Common::computeAnnualSalaryFromMonthlyOverrides($monthlySalariesByMonth, $sharedFallback);
-
         $costTotal = 0.0;
         foreach ($activeResortCosts as $cost) {
             $isMvrTemplate = strtoupper(trim((string) ($cost->amount_unit ?? 'USD'))) === 'MVR';
             $savedByMonth = $savedByEmpCostMonth[$cost->id] ?? [];
             $costTotal += Common::computeAnnualCostFromData($year, $cost, $employee, $savedByMonth, $isMvrTemplate ? $mvrToUsdRate : 1.0);
         }
+
+        // WP2 (D2/D3) — mirrors Common::annualBudgetForEmployee(): Casual/
+        // Intern are costed ONLY from their applicable cost lines (already
+        // the sole content of $activeResortCosts when $employmentType is
+        // Casual/Intern — see the batch-fetch above). No separate salary
+        // leg, no Permanent-style allowance leg.
+        if (Common::manningCategory($employee->employment_type ?? '') !== 'Permanent') {
+            return $costTotal;
+        }
+
+        $sharedFallback = (float) (($employee->proposed_salary ?? 0) > 0
+            ? $employee->proposed_salary
+            : ($employee->basic_salary ?? 0));
+        $salaryTotal = Common::computeAnnualSalaryFromMonthlyOverrides($monthlySalariesByMonth, $sharedFallback);
 
         $allowanceTotal = $allowanceMonthly * 12;
 
@@ -3614,6 +3695,7 @@ class BudgetController extends Controller
                     'e.Position_id',
                     'e.Admin_Parent_id',
                     'e.rank',
+                    'e.employment_type',
                     'e.Dept_id',
                     'e.nationality',
                     'e.basic_salary',
@@ -3775,11 +3857,8 @@ class BudgetController extends Controller
                 return response()->json(['success' => false, 'message' => 'Position not found']);
             }
 
-            // Get all resort budget costs
-            $resortCosts = ResortBudgetCost::where('resort_id', $resortId)
-                ->where('status', 'active')
-                ->orderBy('id')
-                ->get();
+            // WP2 (D2) — this employee's own category, not always Permanent.
+            $resortCosts = Common::getCachedActiveResortCosts($resortId, Common::manningCategory($employee->employment_type ?? ''));
 
             // Get employee budget cost configurations for all months
             $employeeBudgetConfigs = ResortEmployeeBudgetCostConfiguration::where('employee_id', $employeeId)
@@ -3851,15 +3930,28 @@ class BudgetController extends Controller
             $isLocal  = strtolower(trim((string) ($employee->nationality ?? ''))) === 'maldivian';
             $isMuslim = strtolower(trim((string) ($employee->religion ?? '')))   === 'muslim';
             $basicForPercent = (float) ($currentBasicSalary ?: 0);
+            $benefitGridLevel = isset($employee->benefit_grid_level) ? (int) $employee->benefit_grid_level : null;
+            // WP2 (D2) — this employee's own category, threaded into
+            // Common::computeBudgetCostMonthlyValue() so a Casual/Intern
+            // cost line's applies_to is actually enforced here too.
+            $empManningCategory = Common::manningCategory($employee->employment_type ?? '');
+            $empPositionIdForTies = (int) ($employee->Position_id ?? $positionId ?? 0);
 
             for ($m = 1; $m <= 12; $m++) {
                 foreach ($resortCosts as $cost) {
                     if (isset($monthCostLookup[$m][$cost->id])) {
                         continue; // explicit override — leave it untouched
                     }
+                    // WP2 (D2) — same position-tie check as
+                    // Common::computeAnnualCostFromData(): a cost line
+                    // restricted to specific positions shows 0 for an
+                    // employee outside that list.
+                    $ties = $cost->applies_to_position_ids ?? [];
+                    $value = (empty($ties) || in_array($empPositionIdForTies, $ties, true))
+                        ? Common::computeBudgetCostMonthlyValue($cost, $m, (int) $year, $isLocal, $isMuslim, $basicForPercent, $benefitGridLevel, $empManningCategory)
+                        : 0.0;
                     $monthCostLookup[$m][$cost->id] = [
-                        'value'    => $this->computeBudgetCostMonthlyValue(
-                                          $cost, $m, (int) $year, $isLocal, $isMuslim, $basicForPercent),
+                        'value'    => $value,
                         'currency' => $cost->amount_unit,
                         'hours'    => 0,
                         'computed' => true, // value derived from the cost config, not a saved override
@@ -3916,57 +4008,6 @@ class BudgetController extends Controller
     }
 
     /**
-     * Compute one ResortBudgetCost's value for a single month column.
-     *
-     * Used as the live fallback in getEmployeeMonthlyData() so the budget
-     * table reflects the configured Budget → Cost definitions instead of 0
-     * when an employee has no saved per-month override.
-     *
-     * Rules:
-     *  - Applicability: a 'Locals Only' / 'Xpat Only' / 'Muslim Only' cost
-     *    contributes 0 for an employee outside that group.
-     *  - Amount unit '%'  → percentage of the employee's basic salary.
-     *  - Frequency → per-month figure:
-     *      Month        → full amount every month
-     *      Year         → amount / 12
-     *      Quarter      → amount / 3
-     *      Daily        → amount × days in that calendar month
-     *      One time …   → full amount in January only
-     *  - The value is returned in the cost's own amount_unit (no FX
-     *    conversion) — same number shown on the Budget → Cost screen.
-     */
-    private function computeBudgetCostMonthlyValue($cost, int $month, int $year, bool $isLocal, bool $isMuslim, float $basicSalary): float
-    {
-        $details = trim((string) ($cost->details ?? 'Both'));
-        if ($details === 'Locals Only'  && !$isLocal)  return 0.0;
-        if ($details === 'Xpat Only'    &&  $isLocal)  return 0.0;
-        if ($details === 'Muslim Only'  && !$isMuslim) return 0.0;
-
-        $amount = (float) ($cost->amount ?? 0);
-        $unit   = strtoupper(trim((string) ($cost->amount_unit ?? 'USD')));
-        $freq   = strtolower(trim((string) ($cost->frequency ?? 'Month')));
-
-        // Percentage costs (e.g. Pension 7%) are a % of basic salary.
-        $base = ($unit === '%') ? ($basicSalary * $amount / 100) : $amount;
-
-        if (str_contains($freq, 'year')) {
-            return round($base / 12, 2);
-        }
-        if (str_contains($freq, 'quarter')) {
-            return round($base / 3, 2);
-        }
-        if (str_contains($freq, 'dai')) {
-            $daysInMonth = (int) date('t', mktime(0, 0, 0, $month, 1, $year));
-            return round($base * $daysInMonth, 2);
-        }
-        if (str_contains($freq, 'one time')) {
-            return $month === 1 ? round($base, 2) : 0.0;
-        }
-        // Default: a monthly cost.
-        return round($base, 2);
-    }
-
-    /**
      * Get vacant position monthly budget breakdown
      */
     public function getVacantMonthlyData(Request $request)
@@ -3982,11 +4023,11 @@ class BudgetController extends Controller
                 return response()->json(['success' => false, 'message' => 'Position not found']);
             }
 
-            // Get all resort budget costs
-            $resortCosts = ResortBudgetCost::where('resort_id', $resortId)
-                ->where('status', 'active')
-                ->orderBy('id')
-                ->get();
+            // WP2 (D2) — a vacant slot's category comes from its position
+            // (resort_positions.employee_category), the only place that
+            // information exists for a slot with no employee yet.
+            $vacantCategory = $position->employee_category ?: 'Permanent';
+            $resortCosts = Common::getCachedActiveResortCosts($resortId, $vacantCategory);
 
             // Get or create vacant budget cost record
             $vacantBudgetCost = ResortVacantBudgetCost::firstOrCreate(
@@ -4143,10 +4184,20 @@ class BudgetController extends Controller
                 ->value('DollertoMVR') ?: 15.42);
             if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
 
-            $resortCosts = DB::table('resort_budget_costs')
-                ->where('resort_id', $resortId)
-                ->where('status', 'active')
-                ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details', 'benefit_grid_levels']);
+            // WP2 (D2) — single-category mode gets that category's own cost
+            // list. 'All Combined' can't use one flat list (a Casual cost
+            // row has no meaning for a Permanent employee and vice versa —
+            // computeBudgetCostMonthlyValue()'s applies_to check only
+            // guards resort_nonpermanent_budget_costs rows, so blending the
+            // two tables here would re-apply every Permanent template to
+            // every Casual/Intern employee too); each employee below picks
+            // their own list by their own employment_type instead.
+            $resortCostsByCategory = [
+                'Permanent' => Common::getCachedActiveResortCosts($resortId, 'Permanent'),
+                'Casual' => Common::getCachedActiveResortCosts($resortId, 'Casual'),
+                'Intern' => Common::getCachedActiveResortCosts($resortId, 'Intern'),
+            ];
+            $resortCosts = $isAllCategories ? $resortCostsByCategory['Permanent'] : $resortCostsByCategory[$employmentType];
 
             // ---- Positions in scope ----
             // Consistent with getDepartmentHierarchy()'s same 'all'/category
@@ -4181,7 +4232,7 @@ class BudgetController extends Controller
                 ->when(!$isAllCategories, function ($q) use ($employmentType) {
                     $q->whereIn('employment_type', Common::manningCategoryEmploymentTypes($employmentType));
                 })
-                ->get(['id', 'Position_id', 'basic_salary', 'proposed_salary', 'nationality', 'religion', 'benefit_grid_level']);
+                ->get(['id', 'Position_id', 'employment_type', 'basic_salary', 'proposed_salary', 'nationality', 'religion', 'benefit_grid_level']);
             $employeeIds = $employees->pluck('id');
 
             $monthlySalariesByEmployee = DB::table('resort_employee_monthly_salaries')
@@ -4216,19 +4267,31 @@ class BudgetController extends Controller
                 // position assigned contributes to no position's total.
                 if (!$emp->Position_id) continue;
 
-                $sharedFallback = (float) (($emp->proposed_salary ?? 0) > 0
-                    ? $emp->proposed_salary
-                    : ($emp->basic_salary ?? 0));
-                $empMonthly = ($monthlySalariesByEmployee[$emp->id] ?? collect())->keyBy('month')->toArray();
-                $salaryTotal = Common::computeAnnualSalaryFromMonthlyOverrides($empMonthly, $sharedFallback);
+                // WP2 (D2/D3) — each employee's OWN category picks the
+                // cost list (matters for 'All Combined', where employees
+                // span all three); Casual/Intern skip the salary/allowance
+                // legs entirely, same rule as Common::annualBudgetForEmployee().
+                $empCategory = Common::manningCategory($emp->employment_type ?? '');
+                $empCosts = $isAllCategories ? $resortCostsByCategory[$empCategory] : $resortCosts;
 
                 $costTotal = 0.0;
-                foreach ($resortCosts as $cost) {
+                foreach ($empCosts as $cost) {
                     $savedByMonth = $costConfigsByEmployee[$emp->id][$cost->id] ?? [];
                     $isMvrTemplate = strtoupper(trim((string) ($cost->amount_unit ?? 'USD'))) === 'MVR';
                     $mvrToUsdRate = $isMvrTemplate ? (1.0 / $dollarToMvr) : 1.0;
                     $costTotal += Common::computeAnnualCostFromData($year, $cost, $emp, $savedByMonth, $mvrToUsdRate);
                 }
+
+                if ($empCategory !== 'Permanent') {
+                    $positionTotals[$emp->Position_id] = ($positionTotals[$emp->Position_id] ?? 0) + $costTotal;
+                    continue;
+                }
+
+                $sharedFallback = (float) (($emp->proposed_salary ?? 0) > 0
+                    ? $emp->proposed_salary
+                    : ($emp->basic_salary ?? 0));
+                $empMonthly = ($monthlySalariesByEmployee[$emp->id] ?? collect())->keyBy('month')->toArray();
+                $salaryTotal = Common::computeAnnualSalaryFromMonthlyOverrides($empMonthly, $sharedFallback);
 
                 $allowanceTotal = (float) ($allowanceTotals[$emp->id] ?? 0) * 12;
 

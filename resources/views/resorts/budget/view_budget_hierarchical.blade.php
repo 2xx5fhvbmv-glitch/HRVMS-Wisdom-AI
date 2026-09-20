@@ -1390,7 +1390,14 @@ $(document).ready(function() {
                         let empIteration = 1;
                         response.employees.forEach(employee => {
                             const rankConfig = @json(config('settings.Position_Rank'));
-                            const rankName = rankConfig[employee.rank] || employee.rank;
+                            // WP1 (D1) — Casual/Intern have Rank 0 (no
+                            // Position_Rank key), which used to fall through
+                            // to the `|| employee.rank` branch and render
+                            // the literal digit "0" as the badge. Mirrors
+                            // Common::manningCategory()'s mapping.
+                            const rankName = employee.employment_type === 'Casual' ? 'Casual'
+                                : employee.employment_type === 'Internship' ? 'Intern'
+                                : (rankConfig[employee.rank] || employee.rank);
                             const employeeAccordionId = `empAccordion_${positionId}_${empIteration}`;
 
                             html += `

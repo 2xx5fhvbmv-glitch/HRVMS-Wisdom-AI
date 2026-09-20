@@ -154,6 +154,7 @@ class PayslipController extends Controller
         $payroll = Payroll::join('payroll_employees as pe', 'pe.payroll_id', '=', 'payroll.id')
             ->where('pe.employee_id', $employeeId)
             ->where('payroll.resort_id', $resort_id)
+            ->where('payroll.payroll_category', 'Permanent')
             ->where(function($q) use ($month, $year) {
                 $q->where(function($q2) use ($month, $year) {
                     $q2->whereMonth('payroll.end_date', $month)->whereYear('payroll.end_date', $year);
@@ -260,6 +261,7 @@ class PayslipController extends Controller
             }
         ])
         ->where('resort_id', $resort_id)
+        ->where('payroll_category', 'Permanent')
         ->where(function($q) use ($month, $year) {
             // Match by end_date month/year (payroll is identified by its end period)
             $q->where(function($q2) use ($month, $year) {
@@ -341,6 +343,7 @@ class PayslipController extends Controller
             'timeAndAttendances' => fn($q) => $q->where('employee_id', $employeeId)
         ])
             ->where('resort_id', $resort_id)
+            ->where('payroll_category', 'Permanent')
             ->whereMonth('start_date', $month)
             ->whereYear('end_date', $year)
             ->whereHas('employees', fn($q) => $q->where('employee_id', $employeeId))

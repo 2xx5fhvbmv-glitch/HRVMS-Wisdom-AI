@@ -265,6 +265,7 @@ class EWTController extends Controller
             ])
             ->whereYear('start_date', $year)
             ->where('status', 'locked')
+            ->where('payroll_category', 'Permanent')
             ->whereHas('employees.employee', function($q)  {
                 $q->where('status', 'Active');
             })
@@ -464,6 +465,7 @@ class EWTController extends Controller
                 ])
                 ->whereYear('start_date', $year)
                 ->where('status', 'locked')
+                ->where('payroll_category', 'Permanent')
                 ->whereHas('employees.employee', function($q) {
                     $q->whereIn('status', ['Inactive', 'Terminated', 'Resigned']);
                 })

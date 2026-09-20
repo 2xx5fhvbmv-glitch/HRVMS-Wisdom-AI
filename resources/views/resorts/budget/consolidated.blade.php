@@ -123,6 +123,12 @@
                         <form id="SendToFinance" method="POST"  >
                             @csrf
                             <input type="hidden" name="year" id="SendToFinanceYear" value="">
+                            {{-- WP7(D4) — without this the controller had no
+                                 idea which tab was open and forwarded EVERY
+                                 category for every department at once,
+                                 regardless of which one the HR/Finance user
+                                 was actually looking at. --}}
+                            <input type="hidden" name="employment_type" id="SendToFinanceEmploymentType" value="Permanent">
                             <p class="mb-0 fw-500 departmentBudget"></p>
                             @if($employeeRankPosition['position'] == 'HR')
                                 <button type="submit" class="btn wfp-btn-primary SendToFinance" id="SendToFinanceButton" >Send To Finance</button>
@@ -265,17 +271,19 @@
 
     // 3 tabs (Permanent / Casual & Intern / All Combined) — cbTab tracks
     // which is active, cbSub tracks which of Casual/Intern the "Casual &
-    // Intern" tab's sub-toggle shows. fetchConsolidatedBudget() below
-    // resolves these into the single `employment_type` value the endpoint
-    // expects ('Permanent' | 'Casual' | 'Intern' | 'all') on every
-    // (re)load — same category model as View Manning/View Budget.
+    // Intern" tab's sub-toggle shows. fetchConsolidatedBudget() sends these
+    // straight through as `category_view`/`sub`, matching the controller's
+    // param names exactly (same category model as View Manning/View Budget).
     let cbTab = 'permanent';
     let cbSub = 'Casual';
 
-    function cbEffectiveEmploymentType() {
-        if (cbTab === 'nonpermanent') return cbSub;
-        if (cbTab === 'all') return 'all';
-        return 'Permanent';
+    // WP7(D4) — the SendToFinance/SendToGM form has no other way to know
+    // which tab's data the user is looking at; keep its hidden field in
+    // sync with cbTab/cbSub on every switch.
+    function cbSyncEmploymentTypeField() {
+        var value = cbTab === 'nonpermanent' ? cbSub : (cbTab === 'all' ? 'all' : 'Permanent');
+        var field = document.getElementById('SendToFinanceEmploymentType');
+        if (field) field.value = value;
     }
 
     function cbSwitchTab(tab, btn) {
@@ -287,6 +295,7 @@
         btn.classList.remove('wfp-btn-secondary');
         btn.classList.add('wfp-btn-primary');
         document.getElementById('cbSubToggle').classList.toggle('d-none', tab !== 'nonpermanent');
+        cbSyncEmploymentTypeField();
         fetchConsolidatedBudget(document.getElementById('year').value);
     }
 
@@ -298,6 +307,7 @@
         });
         btn.classList.remove('wfp-btn-secondary');
         btn.classList.add('wfp-btn-accent');
+        cbSyncEmploymentTypeField();
         fetchConsolidatedBudget(document.getElementById('year').value);
     }
 
@@ -311,17 +321,28 @@
             $.ajax({
                 url: url, // Use the generated URL
                 type: 'GET',
-                data: { year: selectedYear, employment_type: cbEffectiveEmploymentType() },
+                // WP7 — the controller reads `category_view` ('permanent' /
+                // 'nonpermanent' / 'all') + `sub` ('Casual'/'Intern'), never
+                // `employment_type`. Sending the wrong param name meant every
+                // tab switch silently re-fetched the Permanent tree.
+                data: { year: selectedYear, category_view: cbTab, sub: cbSub },
                 success: function(response) {
                     $('#accordionViewBudget').html(response.html); // Update this to match your HTML structure
                     $('#cbSearchInput').val('');
                     cbUpdateSummaryCards();
+                    // WP7(D4) — was inverted (disabled the buttons when
+                    // isBudgetCompleted was true), the opposite of View
+                    // Manning's `{{ $isBudgetCompleted ? '' : 'disabled' }}`
+                    // convention. Combined with the backend's old hardcoded
+                    // `true`, the buttons were simply always disabled.
+                    var missingList = (response.missingDepartments || []).join(', ');
+                    var tooltip = missingList ? ('Waiting on: ' + missingList) : '';
                     if (response.isBudgetCompleted === true) {
-                        $("#SendToFinanceButton").prop("disabled", true);
-                        $("#SendToGMButton").prop("disabled", true);
+                        $("#SendToFinanceButton").prop("disabled", false).attr('title', '');
+                        $("#SendToGMButton").prop("disabled", false).attr('title', '');
                     } else {
-                        $("#SendToFinanceButton").prop("disabled", false);
-                        $("#SendToGMButton").prop("disabled", false);
+                        $("#SendToFinanceButton").prop("disabled", true).attr('title', tooltip);
+                        $("#SendToGMButton").prop("disabled", true).attr('title', tooltip);
                     }
 
                     // NOTE: do NOT call recalculateAllTotals here. The server

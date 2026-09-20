@@ -848,6 +848,7 @@ class DashboardController extends Controller
         // --- Monthly actual paid (per month, current year) ---
         $monthlyPayroll = DB::table('payroll')
             ->where('resort_id', $resort_id)
+            ->where('payroll_category', 'Permanent')
             ->whereYear('start_date', $currentYear)
             ->selectRaw('MONTH(start_date) as m, SUM(total_payroll) as t')
             ->groupBy(DB::raw('MONTH(start_date)'))->pluck('t', 'm')->toArray();

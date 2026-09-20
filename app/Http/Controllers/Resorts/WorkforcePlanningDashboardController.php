@@ -952,7 +952,11 @@ class WorkforcePlanningDashboardController extends Controller
                     ->where('resort_id', $resort_id)
                     ->where('Department_id', $Dept_id);
             })
-            ->groupBy('message_id')
+            // WP5 — was groupBy('message_id'): Permanent/Casual/Intern share
+            // one message_id for the same manning request, so this
+            // collapsed all three categories' timelines into one row.
+            // Budget_id (= manning_responses.id) is unique per category.
+            ->groupBy('Budget_id')
             ->get()
             ->toArray();
             // Show a Revise prompt only when the LATEST budget_status for
@@ -960,6 +964,23 @@ class WorkforcePlanningDashboardController extends Controller
             // and the latest-row constraint, so once GM later approved the
             // budget (a newer Approved row), the older Rejected row still
             // came back and the Revise button stayed enabled.
+            //
+            // WP5 — the "latest row" check and the join back to
+            // resorts_parent_notifications both used to key on message_id.
+            // Two bugs from that: (1) Permanent/Casual/Intern share one
+            // message_id for the same request, so a newer row for one
+            // category (e.g. Casual approved) could suppress a genuinely
+            // Rejected row for a different category (e.g. Permanent) —
+            // fixed by keying the "latest" subquery on Budget_id instead,
+            // which is unique per category. (2) ReviseBudget()/SendToFinance()
+            // used to write a bogus literal (e.g. "5") into
+            // budget_statuses.message_id instead of the real one, which
+            // made the join to resorts_parent_notifications return 0 rows
+            // — fixed at the write side (see ResortAllNotificationController),
+            // this query is unchanged there since it was already correct
+            // once fed real data. t6.employment_type is now selected so the
+            // Revise popup can preselect the actual category that was
+            // rejected, instead of always defaulting to Permanent.
             $BudgetRejactedStatus  =  ResortsParentNotifications::join('resort_admins as t1', 't1.id', '=', 'resorts_parent_notifications.user_id')
             ->join('employees as t2', 't2.Admin_Parent_id', '=', 't1.id')
             ->leftJoin('resort_departments as t3', 't3.id', '=', 't2.Dept_id')
@@ -969,7 +990,7 @@ class WorkforcePlanningDashboardController extends Controller
             ->where('t5.resort_id', $resort_id)
             ->where('t5.Department_id', $Dept_id)
             ->where('t5.status', 'Rejected')
-            ->whereRaw('t5.id = (SELECT MAX(bs2.id) FROM budget_statuses bs2 WHERE bs2.message_id = t5.message_id AND bs2.resort_id = ? AND bs2.Department_id = ?)', [$resort_id, $Dept_id])
+            ->whereRaw('t5.id = (SELECT MAX(bs2.id) FROM budget_statuses bs2 WHERE bs2.Budget_id = t5.Budget_id AND bs2.resort_id = ? AND bs2.Department_id = ?)', [$resort_id, $Dept_id])
             ->where('t4.response', "Yes")
             ->orderBy('t5.id',  'desc')
             ->first([
@@ -982,7 +1003,8 @@ class WorkforcePlanningDashboardController extends Controller
                 't5.OtherComments as reminder_message_subject',
                 'resorts_parent_notifications.message_id',
                 't5.Budget_id',
-                't6.year'
+                't6.year',
+                't6.employment_type',
             ]);
 
 

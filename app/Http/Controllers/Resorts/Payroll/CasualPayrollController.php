@@ -106,6 +106,10 @@ class CasualPayrollController extends Controller
      */
     public function getEmployees(Request $request)
     {
+        if (Common::checkRouteWisePermission('resort.casualPayroll.index', config('settings.resort_permissions.view')) == false) {
+            return abort(403, 'Unauthorized access');
+        }
+
         $resort_id = $this->resort->resort_id;
 
         $configuredPositionIds = CasualPositionPayConfig::where('resort_id', $resort_id)->pluck('position_id');
@@ -140,6 +144,10 @@ class CasualPayrollController extends Controller
      */
     public function fetchTimeAttendance(Request $request)
     {
+        if (Common::checkRouteWisePermission('resort.casualPayroll.index', config('settings.resort_permissions.view')) == false) {
+            return abort(403, 'Unauthorized access');
+        }
+
         $resort_id = $this->resort->resort_id;
 
         $request->validate([
@@ -200,7 +208,12 @@ class CasualPayrollController extends Controller
                 continue;
             }
 
-            $basic = $toDisplay((float) $payConfig->basic_salary, $payConfig->basic_salary_currency);
+            // WP3 (D3) — the one salary source: per-person custom override
+            // if set, else the position rate. Commission has no per-person
+            // concept (it's what the resort owes the agency per position),
+            // stays sourced from the position config directly.
+            $salary = Common::casualInternBasicSalary($employee);
+            $basic = $toDisplay($salary['amount'], $salary['currency']);
             $commission = $toDisplay((float) $payConfig->commission_amount, $payConfig->commission_currency);
 
             $records = ($attendanceByEmp->get($empId) ?? collect())->values();

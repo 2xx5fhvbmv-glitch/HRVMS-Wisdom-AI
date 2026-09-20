@@ -29,7 +29,12 @@ class ManningResponse extends Model
         'total_filled_positions',
         'total_vacant_positions',
         'total_headcount',
-        'budget_process_status'
+        'budget_process_status',
+        // WP4 — was missing, so saveDraft()'s 'status' => 'draft' write
+        // was silently dropped by mass-assignment; drafts and real
+        // submissions both ended up with status = '' (the column is
+        // NOT NULL with no default, non-strict MySQL substitutes '').
+        'status',
     ];
 
     public static function boot(){

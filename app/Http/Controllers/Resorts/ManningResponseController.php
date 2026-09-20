@@ -215,6 +215,10 @@ class ManningResponseController extends Controller
                     'total_headcount' => $validated['total_headcount'],
                     'total_filled_positions' => $validated['total_filled_headcount'] ?? 0,
                     'total_vacant_positions' => $validated['total_vacant_headcount'] ?? 0,
+                    // WP4 — was never set, so a real submission and a draft
+                    // were indistinguishable (both '' — see the model's
+                    // $fillable fix). This is the actual "submit" moment.
+                    'status' => 'submitted',
                 ]);
             } else {
                 // Create a new ManningResponse if no record exists
@@ -226,6 +230,7 @@ class ManningResponseController extends Controller
                     'total_headcount' => $validated['total_headcount'],
                     'total_filled_positions' => $validated['total_filled_headcount'] ?? 0,
                     'total_vacant_positions' => $validated['total_vacant_headcount'] ?? 0,
+                    'status' => 'submitted',
                 ]);
             }
 
@@ -246,10 +251,23 @@ class ManningResponseController extends Controller
                 }
             }
 
-            // Update the notification response
-            ResortsChildNotifications::where('Parent_msg_id', $request['message_id'])
-                ->where('Department_id', $request['dept_id'])
-                ->update(['response' => 'yes']);
+            // WP4 — a multi-category submit calls store() once per category
+            // sequentially; closing the notification on every individual
+            // success meant one category succeeding could mark the HOD's
+            // WHOLE request "answered" even if a sibling category in the
+            // same batch failed (they'd have no way to resend it — the
+            // dashboard would already show "No Requests"). The multi-
+            // category JS (submitMultipleCategories()) sets this true for
+            // every call in the batch and only closes the notification
+            // itself, once, after confirming every category succeeded
+            // (finishMultiSubmit() -> closeManningRequestNotification()).
+            // A single-category submit never sets it, so today's behavior
+            // (close immediately) is unchanged for the common case.
+            if (!$request->boolean('skip_notification_close')) {
+                ResortsChildNotifications::where('Parent_msg_id', $request['message_id'])
+                    ->where('Department_id', $request['dept_id'])
+                    ->update(['response' => 'yes']);
+            }
 
             $Year = $validated['year'];
 
@@ -338,6 +356,36 @@ class ManningResponseController extends Controller
             $validated['resort_id'] = Auth::guard('resort-admin')->user()->resort_id;
             $validated['employment_type'] = $validated['employment_type'] ?? 'Permanent';
 
+            // WP4 — same rule getPositionsByCategory()/ShowDepartmentWiseBudgetData()
+            // already apply: dept_id is client-supplied, an HOD could
+            // otherwise auto-save a draft into another department's slot.
+            $scopedDeptIds = Common::getScopedDepartmentIds();
+            if (is_array($scopedDeptIds) && !in_array((int) $validated['dept_id'], $scopedDeptIds, true)) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'You do not have access to this department.'], 403);
+            }
+
+            $existing = ManningResponse::where([
+                'resort_id' => $validated['resort_id'],
+                'dept_id' => $validated['dept_id'],
+                'year' => $validated['year'],
+                'employment_type' => $validated['employment_type'],
+            ])->first();
+
+            // WP4 — a tab switch away from an ALREADY-SUBMITTED category
+            // must never silently demote it back to 'draft'. Revision
+            // (HR sending a submitted category back) is a separate, HR-
+            // initiated flow (WP5) that flips status itself — this method
+            // only ever writes a fresh, still-open draft.
+            if ($existing && $existing->status === 'submitted') {
+                DB::commit();
+                return response()->json([
+                    'success' => true,
+                    'skipped' => true,
+                    'msg' => 'Already submitted — not modified by the auto-save.',
+                ]);
+            }
+
             // Save or update the ManningResponse
             $manningResponse = ManningResponse::updateOrCreate(
                 [
@@ -389,20 +437,28 @@ class ManningResponseController extends Controller
     }
 
     /**
-     * Which of Permanent/Casual/Intern already have a saved
-     * draft/submission for this dept+year — powers §29 (submit several
-     * categories together). A row only exists here because the tab-switch
-     * auto-save gates on total_headcount > 0, so existence alone is a
-     * reliable "this category has real data" signal — no need to
-     * re-check the total here.
+     * Which of Permanent/Casual/Intern already have an UNSUBMITTED draft
+     * for this dept+year — powers §29 (submit several categories
+     * together). WP4 — status='draft' only: an already-submitted category
+     * must never appear here, or the multi-category recap would resubmit
+     * it (duplicate BudgetStatus row, duplicate HR notification). A row
+     * only exists at all because the tab-switch auto-save gates on
+     * total_headcount > 0, so existence is a reliable "has real data"
+     * signal on top of the status filter.
      */
     public function getCategoriesWithData($deptId, $year)
     {
         $resortId = Auth::guard('resort-admin')->user()->resort_id;
 
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (is_array($scopedDeptIds) && !in_array((int) $deptId, $scopedDeptIds, true)) {
+            return response()->json(['success' => false, 'message' => 'You do not have access to this department.'], 403);
+        }
+
         $rows = ManningResponse::where('resort_id', $resortId)
             ->where('dept_id', $deptId)
             ->where('year', $year)
+            ->where('status', 'draft')
             ->whereIn('employment_type', ['Permanent', 'Casual', 'Intern'])
             ->get(['employment_type', 'total_headcount', 'total_filled_positions', 'total_vacant_positions']);
 
@@ -416,6 +472,30 @@ class ManningResponseController extends Controller
         }
 
         return response()->json(['success' => true, 'categories' => $result]);
+    }
+
+    /**
+     * WP4 — closes the HOD's pending manning request, called once by the
+     * multi-category submit flow (finishMultiSubmit()) only after every
+     * intended category's store() call has succeeded. Never called by a
+     * single-category submit — store() closes it directly in that case,
+     * unchanged from before this fix.
+     */
+    public function closeManningRequestNotification(Request $request)
+    {
+        $resortId = Auth::guard('resort-admin')->user()->resort_id;
+        $deptId = (int) $request->input('dept_id');
+
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (is_array($scopedDeptIds) && !in_array($deptId, $scopedDeptIds, true)) {
+            return response()->json(['success' => false, 'message' => 'You do not have access to this department.'], 403);
+        }
+
+        ResortsChildNotifications::where('Parent_msg_id', $request->input('message_id'))
+            ->where('Department_id', $deptId)
+            ->update(['response' => 'yes']);
+
+        return response()->json(['success' => true]);
     }
 
     public function getDraft($resortId, $deptId, $year, $employmentType = 'Permanent')
@@ -526,6 +606,15 @@ class ManningResponseController extends Controller
             $available_rank = $rank[$current_rank] ?? '';
             // dd($available_rank);
 
+            // WP6(D6) — $Budget_id names one specific manning_response (one
+            // category, one year) but was never actually used to scope the
+            // query below: the mr join only checked resort_id, so this
+            // blended every year/category's positions+headcounts together
+            // regardless of which budget the caller asked about.
+            $manningResponseForBudget = $Budget_id ? \App\Models\ManningResponse::find($Budget_id) : null;
+            $scopeEmploymentType = $manningResponseForBudget->employment_type ?? 'Permanent';
+            $scopeYear = $manningResponseForBudget->year ?? $year;
+
             $getPositions = DB::table('resort_positions as p')
                 // Employees join now scopes to THIS resort. Without it
                 // the downstream HAVING COUNT(e.id) > 0 could fire on the
@@ -549,9 +638,11 @@ class ManningResponseController extends Controller
                 // outer `use ($resortId, ...)` was importing $resortId
                 // into the closure but never applying it, so any other
                 // resort's manning_response sharing a pmd row leaked in.
-                ->leftJoin('manning_responses as mr', function ($join) use ($resortId) {
+                ->leftJoin('manning_responses as mr', function ($join) use ($resortId, $scopeYear, $scopeEmploymentType) {
                     $join->on('pmd.manning_response_id', '=', 'mr.id')
-                         ->where('mr.resort_id', '=', $resortId);
+                         ->where('mr.resort_id', '=', $resortId)
+                         ->where('mr.year', '=', $scopeYear)
+                         ->where('mr.employment_type', '=', $scopeEmploymentType);
                 })
                 ->leftJoin('budget_statuses as bs', function($join) {
                     $join->on('mr.id', '=', 'bs.Budget_id')
@@ -559,6 +650,13 @@ class ManningResponseController extends Controller
                 })
                 ->where('p.resort_id', '=', $resortId)
                 ->where('p.dept_id', '=', $dept_id)
+                ->where(function ($q) use ($scopeEmploymentType) {
+                    if ($scopeEmploymentType === 'Permanent') {
+                        $q->whereNull('p.employee_category');
+                    } else {
+                        $q->where('p.employee_category', $scopeEmploymentType);
+                    }
+                })
                 ->select(
                     'p.id as Position_id',
                     'mr.id as Budget_id',

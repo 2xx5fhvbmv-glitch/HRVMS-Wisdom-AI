@@ -139,11 +139,19 @@ class LiabilityEstimationController extends Controller
                 $activeForBreakdown = $activeForBreakdown->merge($legEmployees);
                 $empIdsForBreakdown = array_merge($empIdsForBreakdown, $legEmployees->pluck('id')->all());
 
-                foreach ($legEmployees as $emp) {
-                    $shared = (float) (($emp->proposed_salary ?? 0) > 0
-                        ? $emp->proposed_salary
-                        : ($emp->basic_salary ?? 0));
-                    $estLegEmployeeSalary += $shared * 12;
+                // WP2/WP3 (D2/D3) — Casual/Intern have no separate salary
+                // leg here: their Cost Configuration line amount already
+                // includes salary (D2), and employees.basic_salary isn't
+                // even their real rate anyway (that's the Payment Model
+                // screen — D3). Adding it here would double-count on top
+                // of the cost-line sum below.
+                if ($leg['category'] === 'Permanent') {
+                    foreach ($legEmployees as $emp) {
+                        $shared = (float) (($emp->proposed_salary ?? 0) > 0
+                            ? $emp->proposed_salary
+                            : ($emp->basic_salary ?? 0));
+                        $estLegEmployeeSalary += $shared * 12;
+                    }
                 }
 
                 $legCostColumns = $leg['table'] === 'resort_budget_costs'
@@ -152,6 +160,19 @@ class LiabilityEstimationController extends Controller
                 $legCosts = DB::table($leg['table'])
                     ->where('resort_id', $resortId)->where('status', 'active')
                     ->get($legCostColumns);
+
+                // WP2 (D2) — position ties, same as Common::getCachedActiveResortCosts();
+                // this leg builds its own $cost rows via raw DB::table rather
+                // than that helper, so position ties have to be attached here too.
+                if ($leg['table'] === 'resort_nonpermanent_budget_costs') {
+                    $legPositionTies = DB::table('resort_nonpermanent_budget_cost_positions')
+                        ->whereIn('cost_id', $legCosts->pluck('id'))
+                        ->get(['cost_id', 'position_id'])
+                        ->groupBy('cost_id');
+                    $legCosts->each(function ($cost) use ($legPositionTies) {
+                        $cost->applies_to_position_ids = ($legPositionTies->get($cost->id) ?? collect())->pluck('position_id')->all();
+                    });
+                }
                 $costsForBreakdown = $costsForBreakdown->merge($legCosts);
 
                 // PERFORMANCE: pre-fetch saved per-month overrides instead of
@@ -239,8 +260,12 @@ class LiabilityEstimationController extends Controller
         };
 
         // ✅ Current Liability from Payroll Reviews for the year
+        // WP9 — Casual payroll runs go through a separate liability path
+        // (this module tracks Permanent employee liabilities); without this
+        // a Casual run's rows inflate the Current Liability total.
         $payrolls = Payroll::with('reviews')
             ->where('resort_id', $resortId)
+            ->where('payroll_category', 'Permanent')
             ->whereYear('start_date', $currentYear)
             ->get();
 
@@ -409,9 +434,15 @@ class LiabilityEstimationController extends Controller
             })
             ->get();
 
+        // WP2 (D2) — this whole block reads Food cost templates from
+        // resort_budget_costs (Permanent only); Casual/Intern must never
+        // be costed from that table, so they're excluded here rather than
+        // silently picking up a Permanent food-allowance rate they were
+        // never configured for.
         $activeEmpsForFood = Employee::with('resortAdmin:id,first_name,last_name')
             ->where('resort_id', $resortId)
             ->where('status', 'Active')
+            ->whereIn('employment_type', Common::manningCategoryEmploymentTypes('Permanent'))
             ->get(['id', 'Admin_Parent_id', 'Emp_id', 'basic_salary', 'basic_salary_currency', 'nationality', 'religion', 'benefit_grid_level', 'joining_date']);
 
         if ($foodCostTemplates->isNotEmpty() && $activeEmpsForFood->isNotEmpty()) {
@@ -1466,12 +1497,16 @@ class LiabilityEstimationController extends Controller
         $isMuslim = strtolower(trim((string) ($employee->religion    ?? ''))) === 'muslim';
         $basicForPercent = (float) ($employee->basic_salary ?? 0);
         $benefitGridLevel = isset($employee->benefit_grid_level) ? (int) $employee->benefit_grid_level : null;
+        // WP2 (D2) — same position-tie check as Common::computeAnnualCostFromData().
+        $positionTies = $cost->applies_to_position_ids ?? [];
+        $employeePositionId = (int) ($employee->Position_id ?? $employee->position_id ?? 0);
+        $ownsThisTie = empty($positionTies) || in_array($employeePositionId, $positionTies, true);
 
         $total = 0.0;
         for ($m = 1; $m <= 12; $m++) {
             if (isset($savedByMonth[$m])) {
                 $total += $savedByMonth[$m];
-            } else {
+            } elseif ($ownsThisTie) {
                 $val = \App\Helpers\Common::computeBudgetCostMonthlyValue(
                     $cost, $m, $year, $isLocal, $isMuslim, $basicForPercent, $benefitGridLevel, $manningCategory
                 );

@@ -93,6 +93,12 @@ class NonpermanentBudgetCostController extends Controller
             $cost->status = $request->status ?? 'active';
             $cost->save();
 
+            // WP2 (D2) — empty/omitted = applies to every position of this
+            // cost's own category (unrestricted, today's behavior).
+            if ($request->filled('position_ids')) {
+                $cost->positions()->sync($request->input('position_ids'));
+            }
+
             return response()->json(['success' => true, 'message' => 'Cost added successfully.']);
 
         } catch (\Exception $e) {
@@ -135,6 +141,13 @@ class NonpermanentBudgetCostController extends Controller
             $cost->details = $request->input('details');
             $cost->status = $request->input('status');
             $cost->save();
+
+            // WP2 (D2) — sync() with an empty array clears all ties (back to
+            // "applies to every position"), matching the field being blanked
+            // out on edit; the key just needs to be present in the request.
+            if ($request->has('position_ids')) {
+                $cost->positions()->sync($request->input('position_ids', []));
+            }
 
             return response()->json(['success' => true, 'message' => 'Cost updated successfully.']);
         } catch (\Exception $e) {

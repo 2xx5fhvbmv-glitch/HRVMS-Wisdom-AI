@@ -2141,16 +2141,49 @@ class Common
      */
     private static array $activeResortCostsCache = [];
 
-    public static function getCachedActiveResortCosts($resortId)
+    /**
+     * WP2 (D2) — $category picks the table: 'Permanent' (default, every
+     * existing caller) reads resort_budget_costs unchanged;
+     * 'Casual'/'Intern' reads resort_nonpermanent_budget_costs, scoped to
+     * rows where applies_to matches that category or 'Both'. Casual/Intern
+     * must NEVER be costed from the Permanent table — see
+     * Common::annualBudgetForEmployee().
+     */
+    public static function getCachedActiveResortCosts($resortId, string $category = 'Permanent')
     {
         if (!$resortId) return collect();
-        if (!array_key_exists($resortId, self::$activeResortCostsCache)) {
-            self::$activeResortCostsCache[$resortId] = \DB::table('resort_budget_costs')
-                ->where('resort_id', $resortId)
-                ->where('status', 'active')
-                ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details']);
+        $cacheKey = $resortId . '_' . $category;
+        if (!array_key_exists($cacheKey, self::$activeResortCostsCache)) {
+            if ($category === 'Casual' || $category === 'Intern') {
+                $costs = \DB::table('resort_nonpermanent_budget_costs')
+                    ->where('resort_id', $resortId)
+                    ->where('status', 'active')
+                    ->where(function ($q) use ($category) {
+                        $q->where('applies_to', $category)->orWhere('applies_to', 'Both');
+                    })
+                    ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details', 'applies_to']);
+
+                // WP2 (D2) — attach this line's position ties (empty =
+                // applies to every position of the category). Consumers
+                // (computeAnnualCostFromData) check the employee's/vacant
+                // slot's own Position_id against this list.
+                $positionTies = \DB::table('resort_nonpermanent_budget_cost_positions')
+                    ->whereIn('cost_id', $costs->pluck('id'))
+                    ->get(['cost_id', 'position_id'])
+                    ->groupBy('cost_id');
+                $costs->each(function ($cost) use ($positionTies) {
+                    $cost->applies_to_position_ids = ($positionTies->get($cost->id) ?? collect())->pluck('position_id')->all();
+                });
+
+                self::$activeResortCostsCache[$cacheKey] = $costs;
+            } else {
+                self::$activeResortCostsCache[$cacheKey] = \DB::table('resort_budget_costs')
+                    ->where('resort_id', $resortId)
+                    ->where('status', 'active')
+                    ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details', 'benefit_grid_levels']);
+            }
         }
-        return self::$activeResortCostsCache[$resortId];
+        return self::$activeResortCostsCache[$cacheKey];
     }
 
     public static function GetResortCurrentCurrency()
@@ -5656,6 +5689,17 @@ class Common
     // Manager, both rank HOD) can sit on different grades.
     public static function resolveEmpGrade($resortId, $rank, $benefitGridLevel = null, $positionId = null)
     {
+        // WP1 — rank 0 is the Casual/Intern sentinel (D1: no Permanent
+        // employee legitimately has rank 0; every rank-mapping screen only
+        // ever offers 1-12). Short-circuit before the benefit_grid_level/
+        // positionId overrides below, which would otherwise still resolve
+        // a real grade for a Casual/Intern employee carrying a stale or
+        // accidental override — Casual/Intern must never reach a benefit
+        // grid, full stop, regardless of what else is set on the row.
+        if ((int) $rank === 0) {
+            return null;
+        }
+
         if (!empty($benefitGridLevel)) {
             $stillValid = \App\Models\ResortBenefitGradeLevel::where('id', $benefitGridLevel)
                 ->where('resort_id', $resortId)
@@ -5983,6 +6027,96 @@ class Common
             ->where('status', 'active')
             ->first();
         return $benefit_grid;
+    }
+
+    /**
+     * WP1 (D1) — Casual/Intern never have a Permanent rank (1-12; 0 is the
+     * sentinel), never look up a benefit grid, and are labelled "Casual"/
+     * "Intern" everywhere a rank label would appear. Two small helpers so
+     * every consumer asks the same question the same way instead of each
+     * re-deriving "is this employee non-permanent" from raw employment_type
+     * strings.
+     */
+    public static function isNonPermanentEmployee($employee): bool
+    {
+        if (!$employee) {
+            return false;
+        }
+        return self::manningCategory($employee->employment_type ?? '') !== 'Permanent';
+    }
+
+    /**
+     * "Casual" / "Intern" for a non-permanent employee, the real
+     * config('settings.Position_Rank') label for a Permanent one. Never
+     * returns a raw rank number or blank — every view that shows a rank
+     * badge should read this instead of indexing Position_Rank directly.
+     */
+    public static function rankLabel($employee): string
+    {
+        if (!$employee) {
+            return '';
+        }
+        if (self::isNonPermanentEmployee($employee)) {
+            return self::manningCategory($employee->employment_type ?? '');
+        }
+        $rankConfig = config('settings.Position_Rank', []);
+        return $rankConfig[$employee->rank ?? ''] ?? '';
+    }
+
+    /**
+     * Entry point for "does this EMPLOYEE have a benefit grid" — returns
+     * null immediately for Casual/Intern without ever touching
+     * resolveEmpGrade()/ResortBenifitGrid, rather than relying on rank 0
+     * happening to resolve to nothing. Prefer this over calling
+     * getBenefitGrid()/resolveEmpGrade() directly with a raw rank when an
+     * Employee model is already in hand.
+     */
+    public static function getBenefitGridForEmployee($employee)
+    {
+        if (self::isNonPermanentEmployee($employee)) {
+            return null;
+        }
+        $empGrade = self::resolveEmpGrade(
+            $employee->resort_id,
+            $employee->rank ?? 0,
+            $employee->benefit_grid_level ?? null,
+            $employee->Position_id ?? null
+        );
+        return $empGrade ? self::getBenefitGrid($empGrade, $employee->resort_id) : null;
+    }
+
+    /**
+     * WP3 (D3) — the ONE salary source for Casual/Intern: custom per-person
+     * override (casual_employee_pay_overrides) if one is set, else the
+     * position rate (casual_position_pay_configs). Never
+     * employees.basic_salary for this population — that column is written
+     * at hire time for historical/display reasons only and must not be
+     * trusted as current pay.
+     *
+     * Returns ['amount' => float, 'currency' => 'USD'|'MVR', 'source' =>
+     * 'custom'|'position'|'unconfigured']. 'unconfigured' (amount 0) means
+     * neither a position rate nor an override exists yet — callers should
+     * treat this the same as "not set up", not "genuinely paid $0".
+     */
+    public static function casualInternBasicSalary($employee): array
+    {
+        $empId = (int) ($employee->id ?? 0);
+        if ($empId) {
+            $override = \App\Models\CasualEmployeePayOverride::where('employee_id', $empId)->first();
+            if ($override) {
+                return ['amount' => (float) $override->basic_salary, 'currency' => $override->basic_salary_currency, 'source' => 'custom'];
+            }
+        }
+
+        $positionId = (int) ($employee->Position_id ?? $employee->position_id ?? 0);
+        if ($positionId) {
+            $config = \App\Models\CasualPositionPayConfig::where('position_id', $positionId)->first();
+            if ($config) {
+                return ['amount' => (float) $config->basic_salary, 'currency' => $config->basic_salary_currency, 'source' => 'position'];
+            }
+        }
+
+        return ['amount' => 0.0, 'currency' => 'USD', 'source' => 'unconfigured'];
     }
 
     public static function GetThemeColor($status)
@@ -6770,13 +6904,25 @@ class Common
         $basicForPercent = (float) ($employee->basic_salary ?? 0);
         $benefitGridLevel = isset($employee->benefit_grid_level) ? (int) $employee->benefit_grid_level : null;
         $isMvrTemplate = strtoupper(trim((string) ($cost->amount_unit ?? 'USD'))) === 'MVR';
+        // WP2 (D2) — Casual/Intern cost lines carry applies_to; this is
+        // what lets computeBudgetCostMonthlyValue() actually enforce it,
+        // matching LiabilityEstimationController's already-correct pattern.
+        $manningCategory = self::manningCategory($employee->employment_type ?? '');
+
+        // WP2 (D2) — a cost line tied to specific positions (see
+        // getCachedActiveResortCosts()) never live-computes for an
+        // employee outside that list. A saved override always wins
+        // regardless (HR entered it explicitly for this person).
+        $positionTies = $cost->applies_to_position_ids ?? [];
+        $employeePositionId = (int) ($employee->Position_id ?? $employee->position_id ?? 0);
+        $ownsThisTie = empty($positionTies) || in_array($employeePositionId, $positionTies, true);
 
         $total = 0.0;
         for ($m = 1; $m <= 12; $m++) {
             if (isset($savedByMonth[$m])) {
                 $total += (float) $savedByMonth[$m];
-            } else {
-                $val = self::computeBudgetCostMonthlyValue($cost, $m, $year, $isLocal, $isMuslim, $basicForPercent, $benefitGridLevel);
+            } elseif ($ownsThisTie) {
+                $val = self::computeBudgetCostMonthlyValue($cost, $m, $year, $isLocal, $isMuslim, $basicForPercent, $benefitGridLevel, $manningCategory);
                 if ($isMvrTemplate) $val *= $mvrToUsdRate;
                 $total += $val;
             }
@@ -6899,6 +7045,21 @@ class Common
     {
         $empId = (int) ($employee->id ?? 0);
         if (!$empId) return 0.0;
+
+        // WP2 (D2/D3) — Casual/Intern are costed ONLY from their applicable
+        // Cost Configuration for Casuals & Interns lines. No separate
+        // salary leg (the line amount already includes salary — D2) and no
+        // Permanent-style allowance leg (employees_allowance is a benefit-
+        // grid-driven concept; Casual/Intern never have one — WP1/D1).
+        $manningCategory = self::manningCategory($employee->employment_type ?? '');
+        if ($manningCategory !== 'Permanent') {
+            $nonPermanentCosts = self::getCachedActiveResortCosts($resortId, $manningCategory);
+            $total = 0.0;
+            foreach ($nonPermanentCosts as $cost) {
+                $total += self::annualCostForEmployee($resortId, $year, $cost, $employee);
+            }
+            return $total;
+        }
 
         // Used by the allowance leg below. The cost-template leg gets its
         // own MVR→USD conversion internally via annualCostForEmployee().
@@ -7340,7 +7501,7 @@ class Common
         return round($tax, 2);
     }
 
-    public static function getServiceCharge($employee_id, $resortId,$payrollId){
+    public static function getServiceCharge($employee_id, $resortId, $payrollId, $employee = null){
         // $resortId was accepted but never used — payroll_service_charges
         // has no resort_id column of its own, so ownership is verified via
         // its parent payroll row instead.
@@ -7349,7 +7510,10 @@ class Common
         // the write side) so a stale row saved before this guard existed
         // can't still pay out through any of this function's callers
         // (earnings fold-in, pension/EWT calc).
-        $employee = Employee::find($employee_id);
+        // WP9 — both live callers already hold this employee in memory
+        // (looping a payroll run of N employees); re-querying it here was a
+        // redundant N+1. Pass it in via $employee to skip the lookup.
+        $employee = $employee ?? Employee::find($employee_id);
         if ($employee && self::manningCategory($employee->employment_type ?? '') === 'Intern') {
             return 0;
         }
@@ -9886,6 +10050,28 @@ class Common
     }
 
     /**
+     * WP5 — the real message_id (an FK to resorts_child_notifications /
+     * resorts_parent_notifications, e.g. "DR...") for a manning budget,
+     * traced back to the FIRST budget_statuses row ever written for this
+     * Budget_id — that's ManningResponseController::store()'s "Respond to
+     * HR" row, the only write site that ever stores the true message_id.
+     * Every later stage (SendToFinance, ReviseBudget) used to overwrite
+     * message_id with a bogus literal from config('settings.Notifications')
+     * (a flat array of stringified numbers, never an actual message id),
+     * which broke every downstream dashboard query joining back to
+     * resorts_parent_notifications on message_id. Use this instead of
+     * touching that config array for anything id-shaped.
+     */
+    public static function resolveMessageIdForBudget($budgetId): ?string
+    {
+        return \App\Models\BudgetStatus::where('Budget_id', $budgetId)
+            ->whereNotNull('message_id')
+            ->where('message_id', '!=', '')
+            ->orderBy('id')
+            ->value('message_id');
+    }
+
+    /**
      * Valid "Reporting Manager" candidates for the Reporting Person dropdown
      * (Employee create + Employment Data edit + Visa document wizard).
      * Scopes by rank per the hierarchy: GM has none, EXCOM reports only to
@@ -10481,9 +10667,15 @@ class Common
     public static function GetResortPositionWiseRank($position_id,$position_rank, $resort_id)
     {
 
-        $ResortPosition = ResortPosition::where('resort_id', $resort_id)->where('id', $position_id)->first(['position_title']);
+        $ResortPosition = ResortPosition::where('resort_id', $resort_id)->where('id', $position_id)->first(['position_title', 'employee_category']);
         if($ResortPosition)
         {
+            // WP1 — a Casual/Intern position must never be reassigned a
+            // real rank by title-string match (e.g. a Casual "Security
+            // Officer" hire would otherwise silently become rank 10 here).
+            if (!empty($ResortPosition->employee_category)) {
+                return 0;
+            }
             if($ResortPosition->Rank != 8)   // not a gm rank
             {
                 if($ResortPosition->position_title == "Security Officer") // SO

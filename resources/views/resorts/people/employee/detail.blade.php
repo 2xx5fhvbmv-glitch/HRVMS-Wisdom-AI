@@ -1352,6 +1352,19 @@ if (!function_exists('safeParseDate')) {
                                                             <tr>
                                                                 <th>Basic Salary:</th>
                                                                 <td>
+                                                                    @if(isset($casualInternSalary))
+                                                                        {{-- WP3 (D3) — Casual/Intern's real rate comes from
+                                                                             the Payment Model screen, never
+                                                                             employees.basic_salary (raw column shown here
+                                                                             for every other category) — not editable here,
+                                                                             edited on that screen instead. --}}
+                                                                        <span class="view-mode">
+                                                                            {{ number_format($casualInternSalary['amount'], 2) }} {{ $casualInternSalary['currency'] }}
+                                                                            @if($casualInternSalary['source'] === 'custom')<span class="badge bg-info">custom</span>@endif
+                                                                            @if($casualInternSalary['source'] === 'unconfigured')<span class="badge bg-warning">not configured</span>@endif
+                                                                        </span>
+                                                                        <a href="{{ route('people.casualPaymentModel.index') }}" class="d-block" style="font-size:12px;">Edit in Payment Model →</a>
+                                                                    @else
                                                                     <span class="view-mode">{{ number_format($employee->basic_salary, 2) ?? 0 }} {{ $employee->basic_salary_currency }}</span>
                                                                     <input type="text" name="basic_salary" class="form-control edit-mode d-none" value="{{ $employee->basic_salary }}">
                                                                     <select class="form-select dd-native-select edit-mode d-none" id="detail-basic-salary-currency" name="basic_salary_currency">
@@ -1370,6 +1383,7 @@ if (!function_exists('safeParseDate')) {
                                                                             </div>
                                                                         </div>
                                                                     </div>
+                                                                    @endif
                                                                 </td>
                                                             </tr>
                                                             <tr>

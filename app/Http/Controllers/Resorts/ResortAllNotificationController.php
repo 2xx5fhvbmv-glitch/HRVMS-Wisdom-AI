@@ -325,28 +325,25 @@ class ResortAllNotificationController extends Controller
         $resort = Auth::guard('resort-admin')->user();
         $employeeRankPosition = Common::getEmployeeRankPosition($resort->getEmployee);
         $resort_id = $resort->resort_id;
-        $notificationsType = config('settings.Notifications');
         $typeofCommets = config('settings.manningRequestLifeCycle');
         // Always defined now (was left unset on the GM/else branches,
         // relying on PHP's undefined-variable-is-null fallback — harmless
         // as a value but threw a notice, and read again further down).
         $budgetProcessStatus = null;
         if($employeeRankPosition['position'] == 'HR') {
-            $Message_id = $notificationsType[4];
-            $typeofCommet = $typeofCommets[1];
+            $typeofCommet = $typeofCommets[1]; // "Reviewed by HR and Sent to Finance" — correct for this action
             $budgetProcessStatus = 'Finance';
         }elseif($employeeRankPosition['position'] == 'Finance') {
-            $Message_id = $notificationsType[5];
-            $typeofCommet = $typeofCommets[2];
+            // WP5 — was $typeofCommets[2] "Revise Budget", wrong text for
+            // Finance forwarding to GM (that's index [3]).
+            $typeofCommet = $typeofCommets[3];
             $budgetProcessStatus = 'GM';
         }elseif($employeeRankPosition['position'] == 'GM') {
-            $Message_id = $notificationsType[9];
             $typeofCommet = $typeofCommets[3];
             // GM has no "forward to next stage" here — GM IS the final
             // stage. Final approval is a separate, dedicated action
             // (BudgetController::approveBudget()), not this method.
         }else{
-            $Message_id = "";
             $typeofCommet = "";
         }
 
@@ -361,10 +358,35 @@ class ResortAllNotificationController extends Controller
             ? Common::snapshotSignature($resort->id, 'budget-approval', $resort_id . '-' . $request->year . '-' . $employeeRankPosition['position'])
             : [];
 
+        // WP7(D4) — was resort+year only, forwarding EVERY department's
+        // EVERY category in one call regardless of which tab the user was
+        // on, and with no server-side check that every department had
+        // actually submitted (the button's disabled state on the Consolidated
+        // Budget page was the only gate, and it was broken — see
+        // BudgetController::viewConsolidatedBudget()).
+        $employmentType = $request->input('employment_type', 'Permanent');
+        $categoriesToSend = $employmentType === 'all' ? ['Permanent', 'Casual', 'Intern'] : [$employmentType];
+
+        $totalDepartments = ResortDepartment::where('resort_id', $resort_id)->count();
+        foreach ($categoriesToSend as $cat) {
+            $submittedCount = ManningResponse::where('resort_id', $resort_id)
+                ->where('year', $request->year)
+                ->where('employment_type', $cat)
+                ->distinct('dept_id')
+                ->count('dept_id');
+            if ($submittedCount < $totalDepartments) {
+                return response()->json([
+                    'success' => false,
+                    'msg' => "Not every department has submitted their {$cat} budget for {$request->year} yet.",
+                ]);
+            }
+        }
+
         DB::beginTransaction();
         try{
             $budgets = ManningResponse::where('resort_id', $resort_id)
                                     ->where('year', $request->year)
+                                    ->whereIn('employment_type', $categoriesToSend)
                                     ->get();
 
                 foreach ($budgets as $key => $budget) {
@@ -381,7 +403,12 @@ class ResortAllNotificationController extends Controller
                     }
 
                     $BudgetStatus =BudgetStatus::create([
-                        'message_id'=>$Message_id,
+                        // WP5 — per-budget, not a single value resolved once
+                        // outside the loop: this loop spans every
+                        // department/category for the year, and each one has
+                        // its own message_id chain traced back to its own
+                        // "Respond to HR" submission.
+                        'message_id'=>Common::resolveMessageIdForBudget($budget->id),
                         'Department_id'=>$budget->dept_id,
                         'Budget_id'=>$budget->id,
                         'resort_id'=>$resort_id,
@@ -447,22 +474,28 @@ class ResortAllNotificationController extends Controller
         $Budget_id = $request->budget_id;
         $Department_id =  $request->department_id;
         $revise_Comment = $request->ReviseBudgetComment;
-        $notificationsType = config('settings.Notifications');
+        // WP5 — was config('settings.Notifications')[4|5|9], a flat array
+        // of stringified numbers ("5", "6", "10"...) never meant to be an
+        // id at all — writing that into budget_statuses.message_id broke
+        // every downstream dashboard query joining back to
+        // resorts_parent_notifications on message_id (0 rows, so the HOD
+        // never saw the revision request). The real message_id is only
+        // ever stored once, on the original "Respond to HR" row.
+        $Message_id = Common::resolveMessageIdForBudget($Budget_id);
         $typeofCommets = config('settings.manningRequestLifeCycle');
         if($employeeRankPosition['position'] == 'HR') {
-            $Message_id = $notificationsType[4];
-            $typeofCommet = $typeofCommets[1];
+            // WP5 — was $typeofCommets[1] "Reviewed by HR and Sent to
+            // Finance" on a status='Rejected' row — actively misleading;
+            // HR is sending the budget BACK to the HOD, not forward.
+            $typeofCommet = 'Sent back to department for revision';
             $budgetProcessStatus = 'Finance';
         }elseif($employeeRankPosition['position'] == 'Finance') {
-            $Message_id = $notificationsType[5];
-            $typeofCommet = $typeofCommets[2];
+            $typeofCommet = 'Sent back to department for revision';
             $budgetProcessStatus = 'GM';
         }elseif($employeeRankPosition['position'] == 'GM') {
-            $Message_id = $notificationsType[9];
             $typeofCommet = $typeofCommets[3];
             // $budgetProcessStatus = 'GM';
         }else{
-            $Message_id = "";
             $typeofCommet = "";
         }
 
@@ -496,13 +529,23 @@ class ResortAllNotificationController extends Controller
             try {
                 $deptHead = Common::FindResortHODDepartment($resort_id, $Department_id);
 
+                // WP5 — the message had no category/year, so an HOD with
+                // more than one open manning request had no way to tell
+                // WHICH one this bell entry was about until they opened
+                // the popup.
+                $manningResponse = \App\Models\ManningResponse::find($Budget_id);
+                $categoryLabel = $manningResponse->employment_type ?? 'Permanent';
+                $yearLabel = $manningResponse->year ?? '';
+                $pageId = \DB::table('module_pages')->where('internal_route', 'resort.workforceplan.hoddashboard')->value('id');
+
                 Common::notifyEmployees(
                     $resort_id,
                     $deptHead ? [$deptHead->id] : [],
                     'Budget Sent Back for Revision',
-                    'Your department budget has been sent back for revision' . ($revise_Comment ? (': ' . $revise_Comment) : '.'),
+                    "{$categoryLabel} budget {$yearLabel} has been sent back for revision" . ($revise_Comment ? (': ' . $revise_Comment) : '.'),
                     'WorkForce Planning',
-                    $Budget_id
+                    $Budget_id,
+                    $pageId
                 );
             } catch (\Exception $notifErr) {
                 \Log::warning('ReviseBudget notification failed for department ' . $Department_id . ': ' . $notifErr->getMessage());

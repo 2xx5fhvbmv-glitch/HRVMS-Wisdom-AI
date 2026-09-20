@@ -1011,12 +1011,24 @@ class EmployeeController extends Controller
         // different category (e.g. re-tagged after hire), so the page
         // doesn't silently drop the value they already have.
         $employeeCategory = Common::manningCategory($employee->employment_type);
+        // WP3 (D3) — the actual current salary for a Casual/Intern
+        // employee, since employees.basic_salary isn't their real rate
+        // (that's the Payment Model screen). null for Permanent — the
+        // blade already reads $employee->basic_salary directly for them.
+        $casualInternSalary = $employeeCategory !== 'Permanent' ? Common::casualInternBasicSalary($employee) : null;
         $positions = ResortPosition::where('resort_id',$resort_id)->where('status','active')
             ->where(function ($q) use ($employeeCategory, $employee) {
                 $q->forCategory($employeeCategory)->orWhere('id', $employee->Position_id);
             })
             ->get();
-        $emp_benigit_grid = Common::getBenefitGrid($employee->position->Rank,$this->resort->resort_id);
+        // WP1 (D1) — was passing the raw position Rank straight into
+        // getBenefitGrid(), bypassing resolveEmpGrade() entirely; a
+        // Casual/Intern position whose Rank happened to equal a real
+        // Permanent grade (emp_grade is keyed by rank number on many
+        // resorts) could show that resort's actual Line Workers/etc grid
+        // on this page. getBenefitGridForEmployee() returns null outright
+        // for Casual/Intern, never touching ResortBenifitGrid at all.
+        $emp_benigit_grid = Common::getBenefitGridForEmployee($employee);
         $benefitGrids = ResortBenifitGrid::where('resort_id',$this->resort->resort_id)->where('status','active')->get();
 
         // ------------------------------------------------------------------
@@ -1376,7 +1388,7 @@ class EmployeeController extends Controller
             ->latest('id')
             ->first();
 
-        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports','recentActivities','xpatExpiries','transportationOptions','travelQuotas','travelUsage','pendingEmploymentVerificationRequest','employeeCategory'));
+        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports','recentActivities','xpatExpiries','transportationOptions','travelQuotas','travelUsage','pendingEmploymentVerificationRequest','employeeCategory','casualInternSalary'));
     }
 
     /**

@@ -884,9 +884,17 @@ class ComplianceController extends Controller
                $endOfLastMonth = $lastMonth->copy()->endOfMonth()->format('Y-m-d');
                   
                // Fetch payroll data for last month
+               // WP9 — the un-grouped orWhereBetween below let the OR branch
+               // escape the resort_id scope entirely (matching any resort's
+               // payroll whose end_date fell in the window); grouped now,
+               // and payroll_category added so a Casual run doesn't get
+               // picked up for this Permanent-payroll compliance check.
                $payrollData = Payroll::where('resort_id', $resort->resort_id)
-                    ->whereBetween('start_date', [$startOfLastMonth, $endOfLastMonth])
-                    ->orWhereBetween('end_date', [$startOfLastMonth, $endOfLastMonth])
+                    ->where('payroll_category', 'Permanent')
+                    ->where(function ($q) use ($startOfLastMonth, $endOfLastMonth) {
+                        $q->whereBetween('start_date', [$startOfLastMonth, $endOfLastMonth])
+                          ->orWhereBetween('end_date', [$startOfLastMonth, $endOfLastMonth]);
+                    })
                     ->first();
 
                if($payrollData) 
@@ -1175,7 +1183,15 @@ class ComplianceController extends Controller
                     
 
                     // Pension Compliance start
-               $payrollData = Payroll::where('resort_id', $resort->resort_id)->whereBetween('start_date', [$startOfLastMonth, $endOfLastMonth])->orWhereBetween('end_date', [$startOfLastMonth, $endOfLastMonth])->first();
+               // WP9 — same grouping + payroll_category fix as the Senior
+               // HR and Management check above.
+               $payrollData = Payroll::where('resort_id', $resort->resort_id)
+                    ->where('payroll_category', 'Permanent')
+                    ->where(function ($q) use ($startOfLastMonth, $endOfLastMonth) {
+                        $q->whereBetween('start_date', [$startOfLastMonth, $endOfLastMonth])
+                          ->orWhereBetween('end_date', [$startOfLastMonth, $endOfLastMonth]);
+                    })
+                    ->first();
                if($payrollData)
                {
                     $payrollDeductions = PayrollDeduction::where('payroll_id', $payrollData->id)->get();

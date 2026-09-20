@@ -37,15 +37,22 @@
             </div>
         </div>
 
-        <div class="card" id="cpm-positions-card" style="{{ $paymentModel === 'direct_pay' ? '' : 'display:none;' }}">
+        {{-- WP3 (D3) — always visible regardless of the payment model above:
+             Interns are always paid through the Permanent payroll run
+             reading THIS rate (never employees.basic_salary), independent
+             of whether this resort pays Casuals directly or via lump sum.
+             Commission only applies to Casual (no service provider for
+             Interns). --}}
+        <div class="card mb-4" id="cpm-positions-card">
             <div class="card-body">
                 <h5 class="mb-1">Position pay — configured once, reused every month</h5>
-                <p class="text-muted mb-3" style="font-size:13px;">Basic salary and service-provider commission can be in different currencies — the total only shows when both match.</p>
+                <p class="text-muted mb-3" style="font-size:13px;">Basic salary and service-provider commission can be in different currencies — the total only shows when both match. Commission doesn't apply to Interns.</p>
                 <div class="table-responsive">
                     <table class="table table-collapse">
                         <thead>
                             <tr>
                                 <th>Position</th>
+                                <th>Category</th>
                                 <th>Department</th>
                                 <th>Basic Salary</th>
                                 <th>Currency</th>
@@ -57,9 +64,10 @@
                         </thead>
                         <tbody>
                             @forelse ($positions as $pos)
-                                @php $cfg = $pos->payConfig; @endphp
+                                @php $cfg = $pos->payConfig; $isCasual = $pos->employee_category === 'Casual'; @endphp
                                 <tr data-position-id="{{ $pos->id }}">
                                     <td>{{ $pos->position_title }}</td>
+                                    <td>{{ $pos->employee_category }}</td>
                                     <td>{{ $pos->department->name ?? '' }}</td>
                                     <td><input type="number" min="0" step="0.01" class="form-control form-control-sm cpm-basic" value="{{ $cfg->basic_salary ?? 0 }}"></td>
                                     <td>
@@ -68,18 +76,51 @@
                                             <option value="MVR" {{ ($cfg->basic_salary_currency ?? 'USD') === 'MVR' ? 'selected' : '' }}>MVR</option>
                                         </select>
                                     </td>
-                                    <td><input type="number" min="0" step="0.01" class="form-control form-control-sm cpm-commission" value="{{ $cfg->commission_amount ?? 0 }}"></td>
+                                    <td><input type="number" min="0" step="0.01" class="form-control form-control-sm cpm-commission" value="{{ $cfg->commission_amount ?? 0 }}" {{ $isCasual ? '' : 'disabled' }}></td>
                                     <td>
-                                        <select class="form-select form-select-sm cpm-commission-currency">
+                                        <select class="form-select form-select-sm cpm-commission-currency" {{ $isCasual ? '' : 'disabled' }}>
                                             <option value="USD" {{ ($cfg->commission_currency ?? 'USD') === 'USD' ? 'selected' : '' }}>USD</option>
                                             <option value="MVR" {{ ($cfg->commission_currency ?? 'USD') === 'MVR' ? 'selected' : '' }}>MVR</option>
                                         </select>
                                     </td>
                                     <td class="cpm-total text-muted">—</td>
-                                    <td><button type="button" class="btn btn-sm wfp-btn-primary cpm-save-row">Save</button></td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm wfp-btn-primary cpm-save-row">Save</button>
+                                        <button type="button" class="btn btn-sm wfp-btn-secondary cpm-toggle-people" data-position-id="{{ $pos->id }}">People</button>
+                                    </td>
+                                </tr>
+                                <tr class="cpm-people-row" data-position-id="{{ $pos->id }}" style="display:none;">
+                                    <td colspan="9">
+                                        <table class="table table-sm mb-0">
+                                            <thead><tr><th>Name</th><th>Custom Salary</th><th>Currency</th><th></th></tr></thead>
+                                            <tbody>
+                                                @forelse ($pos->employees as $emp)
+                                                    @php $override = $emp->payOverride; @endphp
+                                                    <tr data-employee-id="{{ $emp->id }}">
+                                                        <td>{{ trim(($emp->resortAdmin->first_name ?? '') . ' ' . ($emp->resortAdmin->last_name ?? '')) }}
+                                                            @if($override)<span class="badge bg-info">custom</span>@endif
+                                                        </td>
+                                                        <td><input type="number" min="0" step="0.01" class="form-control form-control-sm cpm-emp-basic" value="{{ $override->basic_salary ?? '' }}" placeholder="position rate"></td>
+                                                        <td>
+                                                            <select class="form-select form-select-sm cpm-emp-currency">
+                                                                <option value="USD" {{ ($override->basic_salary_currency ?? 'USD') === 'USD' ? 'selected' : '' }}>USD</option>
+                                                                <option value="MVR" {{ ($override->basic_salary_currency ?? 'USD') === 'MVR' ? 'selected' : '' }}>MVR</option>
+                                                            </select>
+                                                        </td>
+                                                        <td>
+                                                            <button type="button" class="btn btn-sm wfp-btn-primary cpm-save-emp">Save</button>
+                                                            <button type="button" class="btn btn-sm wfp-btn-neutral cpm-clear-emp" {{ $override ? '' : 'disabled' }}>Use position rate</button>
+                                                        </td>
+                                                    </tr>
+                                                @empty
+                                                    <tr><td colspan="4" class="text-muted">No one in this position yet.</td></tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="8">No Casual positions yet — create some first under Workforce Planning → Position Configuration.</td></tr>
+                                <tr><td colspan="9">No Casual/Intern positions yet — create some first under Workforce Planning → Position Configuration.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -113,7 +154,6 @@
         });
 
         $('input[name="casual_payment_model"]').on('change', function () {
-            $('#cpm-positions-card').toggle($(this).val() === 'direct_pay');
             $.ajax({
                 url: '{{ route('people.casualPaymentModel.storeModel') }}',
                 type: 'POST',
@@ -145,6 +185,49 @@
                 },
                 error: function (xhr) {
                     toastr.error((xhr.responseJSON && xhr.responseJSON.message) || 'Could not save.', 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            });
+        });
+
+        $('#cpm-positions-card').on('click', '.cpm-toggle-people', function () {
+            $('.cpm-people-row[data-position-id="' + $(this).data('position-id') + '"]').toggle();
+        });
+
+        $('#cpm-positions-card').on('click', '.cpm-save-emp', function () {
+            const row = $(this).closest('tr');
+            $.ajax({
+                url: '{{ route('people.casualPaymentModel.storeEmployeePay') }}',
+                type: 'POST',
+                data: {
+                    employee_id: row.data('employee-id'),
+                    basic_salary: row.find('.cpm-emp-basic').val(),
+                    basic_salary_currency: row.find('.cpm-emp-currency').val(),
+                    _token: '{{ csrf_token() }}'
+                },
+                success: function (res) {
+                    toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                    row.find('.cpm-clear-emp').prop('disabled', false);
+                },
+                error: function (xhr) {
+                    toastr.error((xhr.responseJSON && xhr.responseJSON.message) || 'Could not save.', 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            });
+        });
+
+        $('#cpm-positions-card').on('click', '.cpm-clear-emp', function () {
+            const row = $(this).closest('tr');
+            const clearBtn = $(this);
+            $.ajax({
+                url: '{{ route('people.casualPaymentModel.destroyEmployeePay') }}',
+                type: 'DELETE',
+                data: { employee_id: row.data('employee-id'), _token: '{{ csrf_token() }}' },
+                success: function (res) {
+                    toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                    row.find('.cpm-emp-basic').val('');
+                    clearBtn.prop('disabled', true);
+                },
+                error: function () {
+                    toastr.error('Could not clear custom salary.', 'Error', { positionClass: 'toast-bottom-right' });
                 }
             });
         });

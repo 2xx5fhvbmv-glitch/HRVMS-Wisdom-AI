@@ -220,11 +220,13 @@
                                     <input type="hidden" name="budget" id="budget" value="{{ $BudgetRejactedStatus->Budget_id }}">
 
                                     <input type="hidden" name="BudgetRejacted_message_id" id="BudgetRejacted_message_id" value="{{(isset( $BudgetRejactedStatus->message_id)?   $BudgetRejactedStatus->message_id :'') }}">
+                                    <input type="hidden" name="BudgetRejacted_employment_type" id="BudgetRejacted_employment_type" value="{{ $BudgetRejactedStatus->employment_type ?? 'Permanent' }}">
+                                    <p class="mb-1"><strong>{{ $BudgetRejactedStatus->employment_type ?? 'Permanent' }} budget {{ $BudgetRejactedStatus->year ?? '' }}</strong></p>
                                     <h5>{{ (isset($BudgetRejactedStatus->reminder_message_subject )) ? $BudgetRejactedStatus->reminder_message_subject : $BudgetRejactedStatus->message_subject }}</h5>
                                 </div>
                             </div>
                             <div class="text-center">
-                                <a href="#sendRespond-modal" data-message_id = "{{ (isset($BudgetRejactedStatus->message_id ) ? $BudgetRejactedStatus->message_id :'') }}" data-Budget_id="{{ (isset($BudgetRejactedStatus->Budget_id ) ? $BudgetRejactedStatus->Budget_id :'') }}" data-bs-toggle="modal" class="btn btn-sm wfp-btn-primary">Revise
+                                <a href="#sendRespond-modal" data-message_id = "{{ (isset($BudgetRejactedStatus->message_id ) ? $BudgetRejactedStatus->message_id :'') }}" data-Budget_id="{{ (isset($BudgetRejactedStatus->Budget_id ) ? $BudgetRejactedStatus->Budget_id :'') }}" data-employment_type="{{ $BudgetRejactedStatus->employment_type ?? 'Permanent' }}" data-bs-toggle="modal" class="btn btn-sm wfp-btn-primary">Revise
                                     Response</a>
                             </div>
                         @else
@@ -579,6 +581,15 @@
 
             $("#Submit_message_id").val($("#BudgetRejacted_message_id").val());
 
+                // WP5 — preselect the tab the rejection was actually about,
+                // instead of always opening on whatever tab was last active
+                // (usually Permanent), which showed the wrong category's
+                // numbers to revise.
+                var revisedCategory = $('#BudgetRejacted_employment_type').val();
+                if (revisedCategory) {
+                    $('input[name="employment_type"][value="' + revisedCategory + '"]').prop('checked', true);
+                }
+
                 fetchDraftData(resort_id, Dept_id, year, $('input[name="employment_type"]:checked').val());
 
 
@@ -635,7 +646,22 @@
                     // saved draft is filed under the category being left,
                     // not the one being switched to.
                     draftFormData.set('employment_type', leavingCategory);
-                    saveAsDraft(draftFormData, true).then(loadCategory).catch(loadCategory);
+                    // WP4 — saveAsDraft() now actually rejects on failure
+                    // (was silently always resolving), so this .catch() is
+                    // reachable for the first time; still proceed to
+                    // loadCategory() either way (don't block the tab
+                    // switch), but the HOD needs to actually SEE that their
+                    // last edits to the leaving category weren't saved —
+                    // "silent" only ever meant "no blocking alert()", not
+                    // "no visible error at all".
+                    saveAsDraft(draftFormData, true)
+                        .then(loadCategory)
+                        .catch(function (err) {
+                            toastr.error((err && (err.message || err.msg)) || 'Could not save ' + leavingCategory + "'s changes before switching tabs.", 'Error', {
+                                positionClass: 'toast-bottom-right'
+                            });
+                            loadCategory();
+                        });
                 } else {
                     loadCategory();
                 }
@@ -864,7 +890,10 @@
 
                 if (cat === activeCategory) {
                     $("#Submit_message_id").val($("#BudgetRejacted_message_id").val()?.trim() || $("#message_id").val());
-                    let formData = $('#manningResponseForm').serialize();
+                    // WP4 — every call in a multi-category batch skips the
+                    // notification close; finishMultiSubmit() closes it
+                    // once, itself, only if every category succeeded.
+                    let formData = $('#manningResponseForm').serialize() + '&skip_notification_close=1';
                     $.ajax({
                         url: "{{ route('manning.responses.store') }}",
                         type: "POST",
@@ -928,6 +957,7 @@
                                     total_filled_headcount: totals.total_filled_positions,
                                     total_vacant_headcount: totals.total_vacant_positions,
                                     message_id: $("#Submit_message_id").val(),
+                                    skip_notification_close: 1,
                                 },
                                 success: function (response) {
                                     results.push({ category: cat, success: !!(response && response.success), message: response && response.msg });
@@ -961,12 +991,36 @@
                 toastr.error(r.category + ': ' + (r.message || 'Submission failed'), 'Error', { positionClass: 'toast-bottom-right' });
             });
 
-            $('#sendRespond-modal').modal('hide');
-            // Multiple categories/rows changed at once — reload so every
-            // affected part of the page (lifecycle panel, headcount
-            // badges, per-category state) reflects the final DB state,
-            // rather than hand-syncing each from N separate responses.
-            setTimeout(function () { location.reload(); }, 1500);
+            // WP4 — the HOD's request is only "answered" once every
+            // intended category went through. If ANY category failed, the
+            // notification stays open so they can see it's still pending
+            // and retry the failed one(s) — closing it here would leave
+            // them with no way to resend a category that never actually
+            // reached HR.
+            function reloadPage() {
+                $('#sendRespond-modal').modal('hide');
+                setTimeout(function () { location.reload(); }, 1500);
+            }
+
+            if (failed.length === 0 && succeeded.length > 0) {
+                $.ajax({
+                    url: "{{ route('manning.responses.closeNotification') }}",
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        dept_id: Dept_id,
+                        message_id: $("#Submit_message_id").val(),
+                    },
+                    complete: reloadPage,
+                });
+            } else {
+                // Multiple categories/rows changed at once — reload so
+                // every affected part of the page (lifecycle panel,
+                // headcount badges, per-category state) reflects the
+                // final DB state, rather than hand-syncing each from N
+                // separate responses.
+                reloadPage();
+            }
         }
 
         function doManningSubmit() {
@@ -1655,8 +1709,12 @@
         // not nested inside the DOMContentLoaded wrapper above, or it's
         // unreachable from there). Returns the fetch promise so a caller
         // can chain on it.
+        // WP4 — resolves ONLY on a real success (including the no-op
+        // "already submitted, not modified" case), rejects on everything
+        // else (network error, 403, validation failure) so a caller's
+        // .catch() actually fires instead of this swallowing it and
+        // always resolving regardless of what the server said.
         function saveAsDraft(formData, silent) {
-            // Make an AJAX request to save the draft
             return fetch("{{ route('manning.responses.saveDraft') }}", {
                 method: 'POST',
                 body: formData,
@@ -1664,20 +1722,19 @@
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 }
             })
-            .then(response => response.json())
-            .then(data => {
-                if (!silent) {
-                    if (data.success) {
-                        alert('Draft saved successfully!');
-                    } else {
-                        alert('Error saving draft. Please try again.');
-                    }
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok || !data.success) {
+                    if (!silent) alert(data.message || data.msg || 'Error saving draft. Please try again.');
+                    return Promise.reject(data);
                 }
+                if (!silent) alert('Draft saved successfully!');
                 return data;
             })
             .catch(error => {
                 console.error('Error:', error);
-                if (!silent) alert('An unexpected error occurred.');
+                if (!silent && !(error && error.success === false)) alert('An unexpected error occurred.');
+                return Promise.reject(error);
             });
         }
 

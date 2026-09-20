@@ -220,6 +220,14 @@ class Employee extends Model
         return $this->belongsTo(ResortAdmin::class, 'Admin_Parent_id', 'id');
     }
 
+    /**
+     * WP3 (D3) — Level 2 custom salary override, Casual/Intern only.
+     */
+    public function payOverride()
+    {
+        return $this->hasOne(\App\Models\CasualEmployeePayOverride::class, 'employee_id', 'id');
+    }
+
     public function department()
     {
         return $this->belongsTo(ResortDepartment::class, 'Dept_id', 'id');
