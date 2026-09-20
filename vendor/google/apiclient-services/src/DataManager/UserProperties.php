@@ -17,8 +17,19 @@
 
 namespace Google\Service\DataManager;
 
-class UserProperties extends \Google\Model
+class UserProperties extends \Google\Collection
 {
+  public const CUSTOMER_TYPE_CUSTOMER_TYPE_UNSPECIFIED = 'CUSTOMER_TYPE_UNSPECIFIED';
+  public const CUSTOMER_TYPE_NEW = 'NEW';
+  public const CUSTOMER_TYPE_RETURNING = 'RETURNING';
+  public const CUSTOMER_TYPE_REENGAGED = 'REENGAGED';
+  public const CUSTOMER_VALUE_BUCKET_CUSTOMER_VALUE_BUCKET_UNSPECIFIED = 'CUSTOMER_VALUE_BUCKET_UNSPECIFIED';
+  public const CUSTOMER_VALUE_BUCKET_LOW = 'LOW';
+  public const CUSTOMER_VALUE_BUCKET_MEDIUM = 'MEDIUM';
+  public const CUSTOMER_VALUE_BUCKET_HIGH = 'HIGH';
+  protected $collection_key = 'additionalUserProperties';
+  protected $additionalUserPropertiesType = UserProperty::class;
+  protected $additionalUserPropertiesDataType = 'array';
   /**
    * @var string
    */
@@ -29,28 +40,42 @@ class UserProperties extends \Google\Model
   public $customerValueBucket;
 
   /**
-   * @param string
+   * @param UserProperty[] $additionalUserProperties
+   */
+  public function setAdditionalUserProperties($additionalUserProperties)
+  {
+    $this->additionalUserProperties = $additionalUserProperties;
+  }
+  /**
+   * @return UserProperty[]
+   */
+  public function getAdditionalUserProperties()
+  {
+    return $this->additionalUserProperties;
+  }
+  /**
+   * @param self::CUSTOMER_TYPE_* $customerType
    */
   public function setCustomerType($customerType)
   {
     $this->customerType = $customerType;
   }
   /**
-   * @return string
+   * @return self::CUSTOMER_TYPE_*
    */
   public function getCustomerType()
   {
     return $this->customerType;
   }
   /**
-   * @param string
+   * @param self::CUSTOMER_VALUE_BUCKET_* $customerValueBucket
    */
   public function setCustomerValueBucket($customerValueBucket)
   {
     $this->customerValueBucket = $customerValueBucket;
   }
   /**
-   * @return string
+   * @return self::CUSTOMER_VALUE_BUCKET_*
    */
   public function getCustomerValueBucket()
   {

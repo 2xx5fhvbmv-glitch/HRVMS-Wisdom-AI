@@ -19,23 +19,54 @@ namespace Google\Service\Backupdr;
 
 class DataSourceGcpResourceInfo extends \Google\Model
 {
+  protected $alloyDbClusterPropertiesType = AlloyDBClusterDataSourceReferenceProperties::class;
+  protected $alloyDbClusterPropertiesDataType = '';
   protected $cloudSqlInstancePropertiesType = CloudSqlInstanceDataSourceReferenceProperties::class;
   protected $cloudSqlInstancePropertiesDataType = '';
+  protected $filestoreInstancePropertiesType = FilestoreInstanceDataSourceReferenceProperties::class;
+  protected $filestoreInstancePropertiesDataType = '';
   /**
+   * Output only. The resource name of the Google Cloud resource. Ex:
+   * projects/{project}/zones/{zone}/instances/{instance}
+   *
    * @var string
    */
   public $gcpResourcename;
   /**
+   * Output only. The location of the Google Cloud resource. Ex:
+   * //"global"/"unspecified"
+   *
    * @var string
    */
   public $location;
   /**
+   * Output only. The type of the Google Cloud resource. Ex:
+   * compute.googleapis.com/Instance
+   *
    * @var string
    */
   public $type;
 
   /**
-   * @param CloudSqlInstanceDataSourceReferenceProperties
+   * Output only. The properties of the AlloyDB cluster.
+   *
+   * @param AlloyDBClusterDataSourceReferenceProperties $alloyDbClusterProperties
+   */
+  public function setAlloyDbClusterProperties(AlloyDBClusterDataSourceReferenceProperties $alloyDbClusterProperties)
+  {
+    $this->alloyDbClusterProperties = $alloyDbClusterProperties;
+  }
+  /**
+   * @return AlloyDBClusterDataSourceReferenceProperties
+   */
+  public function getAlloyDbClusterProperties()
+  {
+    return $this->alloyDbClusterProperties;
+  }
+  /**
+   * Output only. The properties of the Cloud SQL instance.
+   *
+   * @param CloudSqlInstanceDataSourceReferenceProperties $cloudSqlInstanceProperties
    */
   public function setCloudSqlInstanceProperties(CloudSqlInstanceDataSourceReferenceProperties $cloudSqlInstanceProperties)
   {
@@ -49,7 +80,26 @@ class DataSourceGcpResourceInfo extends \Google\Model
     return $this->cloudSqlInstanceProperties;
   }
   /**
-   * @param string
+   * Output only. The properties of the Filestore instance.
+   *
+   * @param FilestoreInstanceDataSourceReferenceProperties $filestoreInstanceProperties
+   */
+  public function setFilestoreInstanceProperties(FilestoreInstanceDataSourceReferenceProperties $filestoreInstanceProperties)
+  {
+    $this->filestoreInstanceProperties = $filestoreInstanceProperties;
+  }
+  /**
+   * @return FilestoreInstanceDataSourceReferenceProperties
+   */
+  public function getFilestoreInstanceProperties()
+  {
+    return $this->filestoreInstanceProperties;
+  }
+  /**
+   * Output only. The resource name of the Google Cloud resource. Ex:
+   * projects/{project}/zones/{zone}/instances/{instance}
+   *
+   * @param string $gcpResourcename
    */
   public function setGcpResourcename($gcpResourcename)
   {
@@ -63,7 +113,10 @@ class DataSourceGcpResourceInfo extends \Google\Model
     return $this->gcpResourcename;
   }
   /**
-   * @param string
+   * Output only. The location of the Google Cloud resource. Ex:
+   * //"global"/"unspecified"
+   *
+   * @param string $location
    */
   public function setLocation($location)
   {
@@ -77,7 +130,10 @@ class DataSourceGcpResourceInfo extends \Google\Model
     return $this->location;
   }
   /**
-   * @param string
+   * Output only. The type of the Google Cloud resource. Ex:
+   * compute.googleapis.com/Instance
+   *
+   * @param string $type
    */
   public function setType($type)
   {

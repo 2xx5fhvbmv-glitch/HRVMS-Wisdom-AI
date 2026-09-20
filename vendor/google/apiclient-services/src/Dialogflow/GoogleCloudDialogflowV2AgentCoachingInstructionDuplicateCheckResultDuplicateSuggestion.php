@@ -33,7 +33,7 @@ class GoogleCloudDialogflowV2AgentCoachingInstructionDuplicateCheckResultDuplica
   public $suggestionIndex;
 
   /**
-   * @param string
+   * @param string $answerRecord
    */
   public function setAnswerRecord($answerRecord)
   {
@@ -47,7 +47,7 @@ class GoogleCloudDialogflowV2AgentCoachingInstructionDuplicateCheckResultDuplica
     return $this->answerRecord;
   }
   /**
-   * @param float
+   * @param float $similarityScore
    */
   public function setSimilarityScore($similarityScore)
   {
@@ -61,7 +61,7 @@ class GoogleCloudDialogflowV2AgentCoachingInstructionDuplicateCheckResultDuplica
     return $this->similarityScore;
   }
   /**
-   * @param int
+   * @param int $suggestionIndex
    */
   public function setSuggestionIndex($suggestionIndex)
   {

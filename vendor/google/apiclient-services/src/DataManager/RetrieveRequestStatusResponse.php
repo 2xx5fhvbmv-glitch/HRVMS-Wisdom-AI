@@ -24,7 +24,7 @@ class RetrieveRequestStatusResponse extends \Google\Collection
   protected $requestStatusPerDestinationDataType = 'array';
 
   /**
-   * @param RequestStatusPerDestination[]
+   * @param RequestStatusPerDestination[] $requestStatusPerDestination
    */
   public function setRequestStatusPerDestination($requestStatusPerDestination)
   {

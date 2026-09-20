@@ -3,9 +3,12 @@
 namespace Laravel\Passport\Console;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Date;
 use Laravel\Passport\Passport;
+use Symfony\Component\Console\Attribute\AsCommand;
 
+#[AsCommand(name: 'passport:purge')]
 class PurgeCommand extends Command
 {
     /**
@@ -15,7 +18,8 @@ class PurgeCommand extends Command
      */
     protected $signature = 'passport:purge
                             {--revoked : Only purge revoked tokens and authentication codes}
-                            {--expired : Only purge expired tokens and authentication codes}';
+                            {--expired : Only purge expired tokens and authentication codes}
+                            {--hours=168 : The number of hours to retain expired tokens}';
 
     /**
      * The console command description.
@@ -27,29 +31,29 @@ class PurgeCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): void
     {
-        $expired = Carbon::now()->subDays(7);
+        $revoked = $this->option('revoked') || ! $this->option('expired');
 
-        if (($this->option('revoked') && $this->option('expired')) ||
-            (! $this->option('revoked') && ! $this->option('expired'))) {
-            Passport::token()->where('revoked', 1)->orWhereDate('expires_at', '<', $expired)->delete();
-            Passport::authCode()->where('revoked', 1)->orWhereDate('expires_at', '<', $expired)->delete();
-            Passport::refreshToken()->where('revoked', 1)->orWhereDate('expires_at', '<', $expired)->delete();
+        $expired = $this->option('expired') || ! $this->option('revoked')
+            ? Date::now()->subHours($this->option('hours'))
+            : false;
 
-            $this->info('Purged revoked items and items expired for more than seven days.');
-        } elseif ($this->option('revoked')) {
-            Passport::token()->where('revoked', 1)->delete();
-            Passport::authCode()->where('revoked', 1)->delete();
-            Passport::refreshToken()->where('revoked', 1)->delete();
+        $constraint = fn (Builder $query): Builder => $query
+            ->when($revoked, fn () => $query->orWhere('revoked', true))
+            ->when($expired, fn () => $query->orWhere('expires_at', '<', $expired));
 
-            $this->info('Purged revoked items.');
-        } elseif ($this->option('expired')) {
-            Passport::token()->whereDate('expires_at', '<', $expired)->delete();
-            Passport::authCode()->whereDate('expires_at', '<', $expired)->delete();
-            Passport::refreshToken()->whereDate('expires_at', '<', $expired)->delete();
+        Passport::token()->newQuery()->where($constraint)->delete();
+        Passport::authCode()->newQuery()->where($constraint)->delete();
+        Passport::refreshToken()->newQuery()->where($constraint)->delete();
 
-            $this->info('Purged items expired for more than seven days.');
+        if (Passport::$deviceCodeGrantEnabled) {
+            Passport::deviceCode()->newQuery()->where($constraint)->delete();
         }
+
+        $this->components->info(sprintf('Purged %s.', implode(' and ', array_filter([
+            $revoked ? 'revoked items' : null,
+            $expired ? "items expired for more than {$expired->longAbsoluteDiffForHumans()}" : null,
+        ]))));
     }
 }

@@ -33,7 +33,7 @@ class SurveyResultExport implements FromCollection, WithHeadings, WithCustomStar
         return ['ID', 'Participant Name', 'Question', 'Answer'];
     }
 
-    public function map($row): array
+    public function map(mixed $row): array
     {
         return [
             $row['id'],

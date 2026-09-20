@@ -17,8 +17,15 @@
 
 namespace Google\Service\DataManager;
 
-class AdIdentifiers extends \Google\Model
+class AdIdentifiers extends \Google\Collection
 {
+  protected $collection_key = 'encryptedUserIds';
+  /**
+   * @var string
+   */
+  public $dclid;
+  protected $encryptedUserIdsType = EncryptedUserId::class;
+  protected $encryptedUserIdsDataType = 'array';
   /**
    * @var string
    */
@@ -27,8 +34,24 @@ class AdIdentifiers extends \Google\Model
    * @var string
    */
   public $gclid;
+  /**
+   * @var string
+   */
+  public $impressionId;
   protected $landingPageDeviceInfoType = DeviceInfo::class;
   protected $landingPageDeviceInfoDataType = '';
+  /**
+   * @var string
+   */
+  public $matchId;
+  /**
+   * @var string
+   */
+  public $mobileDeviceId;
+  /**
+   * @var string
+   */
+  public $ppid;
   /**
    * @var string
    */
@@ -36,10 +59,42 @@ class AdIdentifiers extends \Google\Model
   /**
    * @var string
    */
+  public $visitorPpid;
+  /**
+   * @var string
+   */
   public $wbraid;
 
   /**
-   * @param string
+   * @param string $dclid
+   */
+  public function setDclid($dclid)
+  {
+    $this->dclid = $dclid;
+  }
+  /**
+   * @return string
+   */
+  public function getDclid()
+  {
+    return $this->dclid;
+  }
+  /**
+   * @param EncryptedUserId[] $encryptedUserIds
+   */
+  public function setEncryptedUserIds($encryptedUserIds)
+  {
+    $this->encryptedUserIds = $encryptedUserIds;
+  }
+  /**
+   * @return EncryptedUserId[]
+   */
+  public function getEncryptedUserIds()
+  {
+    return $this->encryptedUserIds;
+  }
+  /**
+   * @param string $gbraid
    */
   public function setGbraid($gbraid)
   {
@@ -53,7 +108,7 @@ class AdIdentifiers extends \Google\Model
     return $this->gbraid;
   }
   /**
-   * @param string
+   * @param string $gclid
    */
   public function setGclid($gclid)
   {
@@ -67,7 +122,21 @@ class AdIdentifiers extends \Google\Model
     return $this->gclid;
   }
   /**
-   * @param DeviceInfo
+   * @param string $impressionId
+   */
+  public function setImpressionId($impressionId)
+  {
+    $this->impressionId = $impressionId;
+  }
+  /**
+   * @return string
+   */
+  public function getImpressionId()
+  {
+    return $this->impressionId;
+  }
+  /**
+   * @param DeviceInfo $landingPageDeviceInfo
    */
   public function setLandingPageDeviceInfo(DeviceInfo $landingPageDeviceInfo)
   {
@@ -81,7 +150,49 @@ class AdIdentifiers extends \Google\Model
     return $this->landingPageDeviceInfo;
   }
   /**
-   * @param string
+   * @param string $matchId
+   */
+  public function setMatchId($matchId)
+  {
+    $this->matchId = $matchId;
+  }
+  /**
+   * @return string
+   */
+  public function getMatchId()
+  {
+    return $this->matchId;
+  }
+  /**
+   * @param string $mobileDeviceId
+   */
+  public function setMobileDeviceId($mobileDeviceId)
+  {
+    $this->mobileDeviceId = $mobileDeviceId;
+  }
+  /**
+   * @return string
+   */
+  public function getMobileDeviceId()
+  {
+    return $this->mobileDeviceId;
+  }
+  /**
+   * @param string $ppid
+   */
+  public function setPpid($ppid)
+  {
+    $this->ppid = $ppid;
+  }
+  /**
+   * @return string
+   */
+  public function getPpid()
+  {
+    return $this->ppid;
+  }
+  /**
+   * @param string $sessionAttributes
    */
   public function setSessionAttributes($sessionAttributes)
   {
@@ -95,7 +206,21 @@ class AdIdentifiers extends \Google\Model
     return $this->sessionAttributes;
   }
   /**
-   * @param string
+   * @param string $visitorPpid
+   */
+  public function setVisitorPpid($visitorPpid)
+  {
+    $this->visitorPpid = $visitorPpid;
+  }
+  /**
+   * @return string
+   */
+  public function getVisitorPpid()
+  {
+    return $this->visitorPpid;
+  }
+  /**
+   * @param string $wbraid
    */
   public function setWbraid($wbraid)
   {

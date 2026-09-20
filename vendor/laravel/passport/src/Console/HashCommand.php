@@ -3,8 +3,11 @@
 namespace Laravel\Passport\Console;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Passport\Passport;
+use Symfony\Component\Console\Attribute\AsCommand;
 
+#[AsCommand(name: 'passport:hash')]
 class HashCommand extends Command
 {
     /**
@@ -23,22 +26,13 @@ class HashCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @return void
      */
-    public function handle()
+    public function handle(): void
     {
-        if (! Passport::$hashesClientSecrets) {
-            $this->warn('Please enable client hashing yet in your AppServiceProvider before continuing.');
-
-            return;
-        }
-
-        if ($this->option('force') || $this->confirm('Are you sure you want to hash all client secrets? This cannot be undone.')) {
-            $model = Passport::clientModel();
-
-            foreach ((new $model)->whereNotNull('secret')->cursor() as $client) {
-                if (password_get_info($client->secret)['algo'] === PASSWORD_BCRYPT) {
+        if ($this->option('force') ||
+            $this->components->confirm('Are you sure you want to hash all client secrets? This cannot be undone.')) {
+            foreach (Passport::client()->newQuery()->whereNotNull('secret')->cursor() as $client) {
+                if (Hash::isHashed($client->secret) && ! Hash::needsRehash($client->secret)) {
                     continue;
                 }
 
@@ -49,7 +43,7 @@ class HashCommand extends Command
                 ])->save();
             }
 
-            $this->info('All client secrets were successfully hashed.');
+            $this->components->info('All client secrets were successfully hashed.');
         }
     }
 }

@@ -4,36 +4,21 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class() extends Migration
+return new class extends Migration
 {
     /**
-     * Get the migration connection name.
-     *
-     * @return string|null
-     */
-    public function getConnection()
-    {
-        return config('passport.storage.database.connection');
-    }
-
-    /**
      * Run the migrations.
-     *
-     * @return void
      */
-    public function up()
+    public function up(): void
     {
-        $schema = Schema::connection($this->getConnection());
-
-        $schema->create('oauth_clients', function (Blueprint $table) {
-            $table->bigIncrements('id');
-            $table->unsignedBigInteger('user_id')->nullable()->index();
+        Schema::create('oauth_clients', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->nullableMorphs('owner');
             $table->string('name');
-            $table->string('secret', 100)->nullable();
+            $table->string('secret')->nullable();
             $table->string('provider')->nullable();
-            $table->text('redirect');
-            $table->boolean('personal_access_client');
-            $table->boolean('password_client');
+            $table->text('redirect_uris');
+            $table->text('grant_types');
             $table->boolean('revoked');
             $table->timestamps();
         });
@@ -41,13 +26,17 @@ return new class() extends Migration
 
     /**
      * Reverse the migrations.
-     *
-     * @return void
      */
-    public function down()
+    public function down(): void
     {
-        $schema = Schema::connection($this->getConnection());
+        Schema::dropIfExists('oauth_clients');
+    }
 
-        $schema->dropIfExists('oauth_clients');
+    /**
+     * Get the migration connection name.
+     */
+    public function getConnection(): ?string
+    {
+        return $this->connection ?? config('passport.connection');
     }
 };

@@ -14,6 +14,7 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Carbon\Carbon;
 use DateTime;
 use App\Models\ServiceCharges;
+use Illuminate\Database\Eloquent\Model;
 
 class ImportServiceCharges implements  ToModel, WithHeadingRow
 {
@@ -24,7 +25,7 @@ class ImportServiceCharges implements  ToModel, WithHeadingRow
         $this->resort= Auth::guard('resort-admin')->user();
     }
 
-    public function model(array $row)
+    public function model(array $row): Model|array|null
     {
         // Skip empty rows
         if (empty($row['month']) || empty($row['year'])) {

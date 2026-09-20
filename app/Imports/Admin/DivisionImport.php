@@ -13,7 +13,7 @@ class DivisionImport implements ToCollection, WithHeadingRow
     public int $skipped = 0;
     public array $errors = [];
 
-    public function collection(Collection $rows)
+    public function collection(Collection $rows): void
     {
         foreach ($rows as $i => $row) {
             $rowNum = $i + 2; // header is row 1

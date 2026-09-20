@@ -19,13 +19,31 @@ namespace Google\Service\DataManager;
 
 class Event extends \Google\Collection
 {
+  public const EVENT_SOURCE_EVENT_SOURCE_UNSPECIFIED = 'EVENT_SOURCE_UNSPECIFIED';
+  public const EVENT_SOURCE_WEB = 'WEB';
+  public const EVENT_SOURCE_APP = 'APP';
+  public const EVENT_SOURCE_IN_STORE = 'IN_STORE';
+  public const EVENT_SOURCE_PHONE = 'PHONE';
+  public const EVENT_SOURCE_MESSAGE = 'MESSAGE';
+  public const EVENT_SOURCE_OTHER = 'OTHER';
   protected $collection_key = 'experimentalFields';
   protected $adIdentifiersType = AdIdentifiers::class;
   protected $adIdentifiersDataType = '';
+  protected $additionalEventParametersType = EventParameter::class;
+  protected $additionalEventParametersDataType = 'array';
+  /**
+   * @var string
+   */
+  public $appInstanceId;
   protected $cartDataType = CartData::class;
   protected $cartDataDataType = '';
+  /**
+   * @var string
+   */
+  public $clientId;
   protected $consentType = Consent::class;
   protected $consentDataType = '';
+  public $conversionCount;
   public $conversionValue;
   /**
    * @var string
@@ -39,6 +57,12 @@ class Event extends \Google\Collection
   public $destinationReferences;
   protected $eventDeviceInfoType = DeviceInfo::class;
   protected $eventDeviceInfoDataType = '';
+  protected $eventLocationType = EventLocation::class;
+  protected $eventLocationDataType = '';
+  /**
+   * @var string
+   */
+  public $eventName;
   /**
    * @var string
    */
@@ -53,17 +77,23 @@ class Event extends \Google\Collection
    * @var string
    */
   public $lastUpdatedTimestamp;
+  protected $thirdPartyUserDataType = UserData::class;
+  protected $thirdPartyUserDataDataType = '';
   /**
    * @var string
    */
   public $transactionId;
   protected $userDataType = UserData::class;
   protected $userDataDataType = '';
+  /**
+   * @var string
+   */
+  public $userId;
   protected $userPropertiesType = UserProperties::class;
   protected $userPropertiesDataType = '';
 
   /**
-   * @param AdIdentifiers
+   * @param AdIdentifiers $adIdentifiers
    */
   public function setAdIdentifiers(AdIdentifiers $adIdentifiers)
   {
@@ -77,7 +107,35 @@ class Event extends \Google\Collection
     return $this->adIdentifiers;
   }
   /**
-   * @param CartData
+   * @param EventParameter[] $additionalEventParameters
+   */
+  public function setAdditionalEventParameters($additionalEventParameters)
+  {
+    $this->additionalEventParameters = $additionalEventParameters;
+  }
+  /**
+   * @return EventParameter[]
+   */
+  public function getAdditionalEventParameters()
+  {
+    return $this->additionalEventParameters;
+  }
+  /**
+   * @param string $appInstanceId
+   */
+  public function setAppInstanceId($appInstanceId)
+  {
+    $this->appInstanceId = $appInstanceId;
+  }
+  /**
+   * @return string
+   */
+  public function getAppInstanceId()
+  {
+    return $this->appInstanceId;
+  }
+  /**
+   * @param CartData $cartData
    */
   public function setCartData(CartData $cartData)
   {
@@ -91,7 +149,21 @@ class Event extends \Google\Collection
     return $this->cartData;
   }
   /**
-   * @param Consent
+   * @param string $clientId
+   */
+  public function setClientId($clientId)
+  {
+    $this->clientId = $clientId;
+  }
+  /**
+   * @return string
+   */
+  public function getClientId()
+  {
+    return $this->clientId;
+  }
+  /**
+   * @param Consent $consent
    */
   public function setConsent(Consent $consent)
   {
@@ -104,6 +176,14 @@ class Event extends \Google\Collection
   {
     return $this->consent;
   }
+  public function setConversionCount($conversionCount)
+  {
+    $this->conversionCount = $conversionCount;
+  }
+  public function getConversionCount()
+  {
+    return $this->conversionCount;
+  }
   public function setConversionValue($conversionValue)
   {
     $this->conversionValue = $conversionValue;
@@ -113,7 +193,7 @@ class Event extends \Google\Collection
     return $this->conversionValue;
   }
   /**
-   * @param string
+   * @param string $currency
    */
   public function setCurrency($currency)
   {
@@ -127,7 +207,7 @@ class Event extends \Google\Collection
     return $this->currency;
   }
   /**
-   * @param CustomVariable[]
+   * @param CustomVariable[] $customVariables
    */
   public function setCustomVariables($customVariables)
   {
@@ -141,7 +221,7 @@ class Event extends \Google\Collection
     return $this->customVariables;
   }
   /**
-   * @param string[]
+   * @param string[] $destinationReferences
    */
   public function setDestinationReferences($destinationReferences)
   {
@@ -155,7 +235,7 @@ class Event extends \Google\Collection
     return $this->destinationReferences;
   }
   /**
-   * @param DeviceInfo
+   * @param DeviceInfo $eventDeviceInfo
    */
   public function setEventDeviceInfo(DeviceInfo $eventDeviceInfo)
   {
@@ -169,21 +249,49 @@ class Event extends \Google\Collection
     return $this->eventDeviceInfo;
   }
   /**
-   * @param string
+   * @param EventLocation $eventLocation
+   */
+  public function setEventLocation(EventLocation $eventLocation)
+  {
+    $this->eventLocation = $eventLocation;
+  }
+  /**
+   * @return EventLocation
+   */
+  public function getEventLocation()
+  {
+    return $this->eventLocation;
+  }
+  /**
+   * @param string $eventName
+   */
+  public function setEventName($eventName)
+  {
+    $this->eventName = $eventName;
+  }
+  /**
+   * @return string
+   */
+  public function getEventName()
+  {
+    return $this->eventName;
+  }
+  /**
+   * @param self::EVENT_SOURCE_* $eventSource
    */
   public function setEventSource($eventSource)
   {
     $this->eventSource = $eventSource;
   }
   /**
-   * @return string
+   * @return self::EVENT_SOURCE_*
    */
   public function getEventSource()
   {
     return $this->eventSource;
   }
   /**
-   * @param string
+   * @param string $eventTimestamp
    */
   public function setEventTimestamp($eventTimestamp)
   {
@@ -197,7 +305,7 @@ class Event extends \Google\Collection
     return $this->eventTimestamp;
   }
   /**
-   * @param ExperimentalField[]
+   * @param ExperimentalField[] $experimentalFields
    */
   public function setExperimentalFields($experimentalFields)
   {
@@ -211,7 +319,7 @@ class Event extends \Google\Collection
     return $this->experimentalFields;
   }
   /**
-   * @param string
+   * @param string $lastUpdatedTimestamp
    */
   public function setLastUpdatedTimestamp($lastUpdatedTimestamp)
   {
@@ -225,7 +333,21 @@ class Event extends \Google\Collection
     return $this->lastUpdatedTimestamp;
   }
   /**
-   * @param string
+   * @param UserData $thirdPartyUserData
+   */
+  public function setThirdPartyUserData(UserData $thirdPartyUserData)
+  {
+    $this->thirdPartyUserData = $thirdPartyUserData;
+  }
+  /**
+   * @return UserData
+   */
+  public function getThirdPartyUserData()
+  {
+    return $this->thirdPartyUserData;
+  }
+  /**
+   * @param string $transactionId
    */
   public function setTransactionId($transactionId)
   {
@@ -239,7 +361,7 @@ class Event extends \Google\Collection
     return $this->transactionId;
   }
   /**
-   * @param UserData
+   * @param UserData $userData
    */
   public function setUserData(UserData $userData)
   {
@@ -253,7 +375,21 @@ class Event extends \Google\Collection
     return $this->userData;
   }
   /**
-   * @param UserProperties
+   * @param string $userId
+   */
+  public function setUserId($userId)
+  {
+    $this->userId = $userId;
+  }
+  /**
+   * @return string
+   */
+  public function getUserId()
+  {
+    return $this->userId;
+  }
+  /**
+   * @param UserProperties $userProperties
    */
   public function setUserProperties(UserProperties $userProperties)
   {

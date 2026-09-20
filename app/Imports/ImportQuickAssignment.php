@@ -8,6 +8,7 @@ use App\Helpers\Common;
 
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Illuminate\Database\Eloquent\Model;
 use App\Models\Employee;
 use App\Models\BuildingModel;
 use App\Models\AssingAccommodation;
@@ -24,7 +25,7 @@ class ImportQuickAssignment implements ToModel, WithHeadingRow
         $this->resort = Auth::guard('resort-admin')->user();
     }
 
-    public function model(array $row)
+    public function model(array $row): Model|array|null
     {
         // Headings: Employee, Building, Floor, Room, Bed No
         $employeeRaw = trim($row['employee'] ?? '');

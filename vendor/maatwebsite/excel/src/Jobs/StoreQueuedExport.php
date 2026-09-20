@@ -2,53 +2,36 @@
 
 namespace Maatwebsite\Excel\Jobs;
 
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
 use Maatwebsite\Excel\Files\Filesystem;
 use Maatwebsite\Excel\Files\TemporaryFile;
 
 class StoreQueuedExport implements ShouldQueue
 {
-    use Queueable;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable;
 
     /**
-     * @var string
+     * @param  array<string, mixed>|string  $diskOptions
      */
-    private $filePath;
-
-    /**
-     * @var string|null
-     */
-    private $disk;
-
-    /**
-     * @var TemporaryFile
-     */
-    private $temporaryFile;
-    /**
-     * @var array|string
-     */
-    private $diskOptions;
-
-    /**
-     * @param  TemporaryFile  $temporaryFile
-     * @param  string  $filePath
-     * @param  string|null  $disk
-     * @param  array|string  $diskOptions
-     */
-    public function __construct(TemporaryFile $temporaryFile, string $filePath, ?string $disk = null, $diskOptions = [])
-    {
-        $this->disk          = $disk;
-        $this->filePath      = $filePath;
-        $this->temporaryFile = $temporaryFile;
-        $this->diskOptions   = $diskOptions;
+    public function __construct(
+        private readonly TemporaryFile $temporaryFile,
+        private readonly string $filePath,
+        private readonly ?string $disk = null,
+        private readonly array|string $diskOptions = [],
+    ) {
     }
 
-    /**
-     * @param  Filesystem  $filesystem
-     */
-    public function handle(Filesystem $filesystem)
+    public function handle(Filesystem $filesystem): void
     {
+        // Determine if the batch has been cancelled...
+        if ($this->batch()?->cancelled()) {
+            return;
+        }
+
         $filesystem->disk($this->disk, $this->diskOptions)->copy(
             $this->temporaryFile,
             $this->filePath

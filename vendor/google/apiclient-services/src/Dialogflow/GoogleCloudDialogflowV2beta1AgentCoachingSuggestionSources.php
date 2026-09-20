@@ -26,7 +26,7 @@ class GoogleCloudDialogflowV2beta1AgentCoachingSuggestionSources extends \Google
   public $instructionIndexes;
 
   /**
-   * @param int[]
+   * @param int[] $instructionIndexes
    */
   public function setInstructionIndexes($instructionIndexes)
   {

@@ -15,9 +15,11 @@ use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Completion\CompletionInput;
 use Symfony\Component\Console\Completion\CompletionSuggestions;
+use Symfony\Component\Console\Completion\Suggestion;
 use Symfony\Component\Console\Exception\ExceptionInterface;
 use Symfony\Component\Console\Exception\InvalidArgumentException;
 use Symfony\Component\Console\Exception\LogicException;
+use Symfony\Component\Console\Helper\HelperInterface;
 use Symfony\Component\Console\Helper\HelperSet;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
@@ -30,83 +32,56 @@ use Symfony\Component\Console\Output\OutputInterface;
  *
  * @author Fabien Potencier <fabien@symfony.com>
  */
-class Command
+class Command implements SignalableCommandInterface
 {
     // see https://tldp.org/LDP/abs/html/exitcodes.html
     public const SUCCESS = 0;
     public const FAILURE = 1;
     public const INVALID = 2;
 
-    /**
-     * @var string|null The default command name
-     */
-    protected static $defaultName;
-
-    /**
-     * @var string|null The default command description
-     */
-    protected static $defaultDescription;
-
-    private $application;
-    private $name;
-    private $processTitle;
-    private $aliases = [];
-    private $definition;
-    private $hidden = false;
-    private $help = '';
-    private $description = '';
-    private $fullDefinition;
-    private $ignoreValidationErrors = false;
-    private $code;
-    private $synopsis = [];
-    private $usages = [];
-    private $helperSet;
-
-    /**
-     * @return string|null
-     */
-    public static function getDefaultName()
-    {
-        $class = static::class;
-
-        if (\PHP_VERSION_ID >= 80000 && $attribute = (new \ReflectionClass($class))->getAttributes(AsCommand::class)) {
-            return $attribute[0]->newInstance()->name;
-        }
-
-        $r = new \ReflectionProperty($class, 'defaultName');
-
-        return $class === $r->class ? static::$defaultName : null;
-    }
-
-    public static function getDefaultDescription(): ?string
-    {
-        $class = static::class;
-
-        if (\PHP_VERSION_ID >= 80000 && $attribute = (new \ReflectionClass($class))->getAttributes(AsCommand::class)) {
-            return $attribute[0]->newInstance()->description;
-        }
-
-        $r = new \ReflectionProperty($class, 'defaultDescription');
-
-        return $class === $r->class ? static::$defaultDescription : null;
-    }
+    private ?Application $application = null;
+    private ?string $name = null;
+    private ?string $processTitle = null;
+    private array $aliases = [];
+    private InputDefinition $definition;
+    private bool $hidden = false;
+    private string $help = '';
+    private string $description = '';
+    private ?InputDefinition $fullDefinition = null;
+    private bool $ignoreValidationErrors = false;
+    private ?InvokableCommand $code = null;
+    private array $synopsis = [];
+    private array $usages = [];
+    private ?HelperSet $helperSet = null;
 
     /**
      * @param string|null $name The name of the command; passing null means it must be set in configure()
      *
      * @throws LogicException When the command name is empty
      */
-    public function __construct(?string $name = null)
+    public function __construct(?string $name = null, ?callable $code = null)
     {
         $this->definition = new InputDefinition();
 
-        if (null === $name && null !== $name = static::getDefaultName()) {
+        $attribute = $this->getCommandAttribute($code);
+
+        if ($code) {
+            $this->setCode($code);
+        }
+
+        if (null !== $name ??= $attribute?->name) {
             $aliases = explode('|', $name);
 
             if ('' === $name = array_shift($aliases)) {
                 $this->setHidden(true);
                 $name = array_shift($aliases);
             }
+
+            // we must not overwrite existing aliases, combine new ones with existing ones
+            $aliases = array_unique([
+                ...$this->aliases,
+                ...$aliases,
+            ]);
 
             $this->setAliases($aliases);
         }
@@ -116,7 +91,19 @@ class Command
         }
 
         if ('' === $this->description) {
-            $this->setDescription(static::getDefaultDescription() ?? '');
+            $this->setDescription($attribute?->description ?? '');
+        }
+
+        if ('' === $this->help) {
+            $this->setHelp($attribute?->help ?? '');
+        }
+
+        foreach ($attribute?->usages ?? [] as $usage) {
+            $this->addUsage($usage);
+        }
+
+        if (!$code && \is_callable($this) && self::class === (new \ReflectionMethod($this, 'execute'))->class) {
+            $this->code = new InvokableCommand($this, $this(...));
         }
 
         $this->configure();
@@ -127,12 +114,12 @@ class Command
      *
      * This is mainly useful for the help command.
      */
-    public function ignoreValidationErrors()
+    public function ignoreValidationErrors(): void
     {
         $this->ignoreValidationErrors = true;
     }
 
-    public function setApplication(?Application $application = null)
+    public function setApplication(?Application $application): void
     {
         $this->application = $application;
         if ($application) {
@@ -144,27 +131,23 @@ class Command
         $this->fullDefinition = null;
     }
 
-    public function setHelperSet(HelperSet $helperSet)
+    public function setHelperSet(HelperSet $helperSet): void
     {
         $this->helperSet = $helperSet;
     }
 
     /**
      * Gets the helper set.
-     *
-     * @return HelperSet|null
      */
-    public function getHelperSet()
+    public function getHelperSet(): ?HelperSet
     {
         return $this->helperSet;
     }
 
     /**
      * Gets the application instance for this command.
-     *
-     * @return Application|null
      */
-    public function getApplication()
+    public function getApplication(): ?Application
     {
         return $this->application;
     }
@@ -174,10 +157,8 @@ class Command
      *
      * Override this to check for x or y and return false if the command cannot
      * run properly under the current conditions.
-     *
-     * @return bool
      */
-    public function isEnabled()
+    public function isEnabled(): bool
     {
         return true;
     }
@@ -185,7 +166,7 @@ class Command
     /**
      * Configures the current command.
      */
-    protected function configure()
+    protected function configure(): void
     {
     }
 
@@ -203,7 +184,7 @@ class Command
      *
      * @see setCode()
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         throw new LogicException('You must override the execute() method in the concrete command class.');
     }
@@ -215,7 +196,7 @@ class Command
      * This means that this is the only place where the command can
      * interactively ask for values of missing required arguments.
      */
-    protected function interact(InputInterface $input, OutputInterface $output)
+    protected function interact(InputInterface $input, OutputInterface $output): void
     {
     }
 
@@ -229,7 +210,7 @@ class Command
      * @see InputInterface::bind()
      * @see InputInterface::validate()
      */
-    protected function initialize(InputInterface $input, OutputInterface $output)
+    protected function initialize(InputInterface $input, OutputInterface $output): void
     {
     }
 
@@ -247,7 +228,7 @@ class Command
      * @see setCode()
      * @see execute()
      */
-    public function run(InputInterface $input, OutputInterface $output)
+    public function run(InputInterface $input, OutputInterface $output): int
     {
         // add the application arguments and options
         $this->mergeApplicationDefinition();
@@ -259,6 +240,14 @@ class Command
             if (!$this->ignoreValidationErrors) {
                 throw $e;
             }
+        }
+
+        // The command name argument is often omitted when a command is executed directly with its run() method,
+        // and it may hold an abbreviation or an alias when the command was resolved from one (e.g. Application::find()).
+        // Normalize it to the command's actual name so it can be relied on afterwards, since it's required by the
+        // application, and so argument resolution during interact() below can already rely on it.
+        if ($input->hasArgument('command') && null !== $name = $this->getName()) {
+            $input->setArgument('command', $name);
         }
 
         $this->initialize($input, $output);
@@ -281,35 +270,42 @@ class Command
 
         if ($input->isInteractive()) {
             $this->interact($input, $output);
-        }
 
-        // The command name argument is often omitted when a command is executed directly with its run() method.
-        // It would fail the validation if we didn't make sure the command argument is present,
-        // since it's required by the application.
-        if ($input->hasArgument('command') && null === $input->getArgument('command')) {
-            $input->setArgument('command', $this->getName());
+            if ($this->code?->isInteractive()) {
+                $this->code->interact($input, $output);
+            }
         }
 
         $input->validate();
 
         if ($this->code) {
-            $statusCode = ($this->code)($input, $output);
-        } else {
-            $statusCode = $this->execute($input, $output);
-
-            if (!\is_int($statusCode)) {
-                throw new \TypeError(sprintf('Return value of "%s::execute()" must be of the type int, "%s" returned.', static::class, get_debug_type($statusCode)));
-            }
+            return ($this->code)($input, $output);
         }
 
-        return is_numeric($statusCode) ? (int) $statusCode : 0;
+        return $this->execute($input, $output);
     }
 
     /**
-     * Adds suggestions to $suggestions for the current completion input (e.g. option or argument).
+     * Supplies suggestions when resolving possible completion options for input (e.g. option or argument).
      */
     public function complete(CompletionInput $input, CompletionSuggestions $suggestions): void
     {
+        $definition = $this->getDefinition();
+        if (CompletionInput::TYPE_OPTION_VALUE === $input->getCompletionType() && $definition->hasOption($input->getCompletionName())) {
+            $definition->getOption($input->getCompletionName())->complete($input, $suggestions);
+        } elseif (CompletionInput::TYPE_ARGUMENT_VALUE === $input->getCompletionType() && $definition->hasArgument($input->getCompletionName())) {
+            $definition->getArgument($input->getCompletionName())->complete($input, $suggestions);
+        }
+    }
+
+    /**
+     * Gets the code that is executed by the command.
+     *
+     * @return ?callable null if the code has not been set with setCode()
+     */
+    public function getCode(): ?callable
+    {
+        return $this->code?->getCode();
     }
 
     /**
@@ -326,23 +322,9 @@ class Command
      *
      * @see execute()
      */
-    public function setCode(callable $code)
+    public function setCode(callable $code): static
     {
-        if ($code instanceof \Closure) {
-            $r = new \ReflectionFunction($code);
-            if (null === $r->getClosureThis()) {
-                set_error_handler(static function () {});
-                try {
-                    if ($c = \Closure::bind($code, $this)) {
-                        $code = $c;
-                    }
-                } finally {
-                    restore_error_handler();
-                }
-            }
-        }
-
-        $this->code = $code;
+        $this->code = new InvokableCommand($this, $code);
 
         return $this;
     }
@@ -356,7 +338,7 @@ class Command
      *
      * @internal
      */
-    public function mergeApplicationDefinition(bool $mergeArgs = true)
+    public function mergeApplicationDefinition(bool $mergeArgs = true): void
     {
         if (null === $this->application) {
             return;
@@ -377,11 +359,9 @@ class Command
     /**
      * Sets an array of argument and option instances.
      *
-     * @param array|InputDefinition $definition An array of argument and option instances or a definition instance
-     *
      * @return $this
      */
-    public function setDefinition($definition)
+    public function setDefinition(array|InputDefinition $definition): static
     {
         if ($definition instanceof InputDefinition) {
             $this->definition = $definition;
@@ -396,10 +376,8 @@ class Command
 
     /**
      * Gets the InputDefinition attached to this Command.
-     *
-     * @return InputDefinition
      */
-    public function getDefinition()
+    public function getDefinition(): InputDefinition
     {
         return $this->fullDefinition ?? $this->getNativeDefinition();
     }
@@ -411,34 +389,33 @@ class Command
      * be changed by merging with the application InputDefinition.
      *
      * This method is not part of public API and should not be used directly.
-     *
-     * @return InputDefinition
      */
-    public function getNativeDefinition()
+    public function getNativeDefinition(): InputDefinition
     {
-        if (null === $this->definition) {
-            throw new LogicException(sprintf('Command class "%s" is not correctly initialized. You probably forgot to call the parent constructor.', static::class));
+        $definition = $this->definition ?? throw new LogicException(\sprintf('Command class "%s" is not correctly initialized. You probably forgot to call the parent constructor.', static::class));
+
+        if ($this->code && !$definition->getArguments() && !$definition->getOptions()) {
+            $this->code->configure($definition);
         }
 
-        return $this->definition;
+        return $definition;
     }
 
     /**
      * Adds an argument.
      *
-     * @param int|null $mode    The argument mode: InputArgument::REQUIRED or InputArgument::OPTIONAL
-     * @param mixed    $default The default value (for InputArgument::OPTIONAL mode only)
+     * @param                                                                               $mode            The argument mode: InputArgument::REQUIRED or InputArgument::OPTIONAL
+     * @param                                                                               $default         The default value (for InputArgument::OPTIONAL mode only)
+     * @param array|\Closure(CompletionInput,CompletionSuggestions):list<string|Suggestion> $suggestedValues The values used for input completion
      *
      * @return $this
      *
      * @throws InvalidArgumentException When argument mode is not valid
      */
-    public function addArgument(string $name, ?int $mode = null, string $description = '', $default = null)
+    public function addArgument(string $name, ?int $mode = null, string $description = '', mixed $default = null, array|\Closure $suggestedValues = []): static
     {
-        $this->definition->addArgument(new InputArgument($name, $mode, $description, $default));
-        if (null !== $this->fullDefinition) {
-            $this->fullDefinition->addArgument(new InputArgument($name, $mode, $description, $default));
-        }
+        $this->definition->addArgument(new InputArgument($name, $mode, $description, $default, $suggestedValues));
+        $this->fullDefinition?->addArgument(new InputArgument($name, $mode, $description, $default, $suggestedValues));
 
         return $this;
     }
@@ -446,20 +423,19 @@ class Command
     /**
      * Adds an option.
      *
-     * @param string|array|null $shortcut The shortcuts, can be null, a string of shortcuts delimited by | or an array of shortcuts
-     * @param int|null          $mode     The option mode: One of the InputOption::VALUE_* constants
-     * @param mixed             $default  The default value (must be null for InputOption::VALUE_NONE)
+     * @param                                                                               $shortcut        The shortcuts, can be null, a string of shortcuts delimited by | or an array of shortcuts
+     * @param                                                                               $mode            The option mode: One of the InputOption::VALUE_* constants
+     * @param                                                                               $default         The default value (must be null for InputOption::VALUE_NONE)
+     * @param array|\Closure(CompletionInput,CompletionSuggestions):list<string|Suggestion> $suggestedValues The values used for input completion
      *
      * @return $this
      *
      * @throws InvalidArgumentException If option mode is invalid or incompatible
      */
-    public function addOption(string $name, $shortcut = null, ?int $mode = null, string $description = '', $default = null)
+    public function addOption(string $name, string|array|null $shortcut = null, ?int $mode = null, string $description = '', mixed $default = null, array|\Closure $suggestedValues = []): static
     {
-        $this->definition->addOption(new InputOption($name, $shortcut, $mode, $description, $default));
-        if (null !== $this->fullDefinition) {
-            $this->fullDefinition->addOption(new InputOption($name, $shortcut, $mode, $description, $default));
-        }
+        $this->definition->addOption(new InputOption($name, $shortcut, $mode, $description, $default, $suggestedValues));
+        $this->fullDefinition?->addOption(new InputOption($name, $shortcut, $mode, $description, $default, $suggestedValues));
 
         return $this;
     }
@@ -476,7 +452,7 @@ class Command
      *
      * @throws InvalidArgumentException When the name is invalid
      */
-    public function setName(string $name)
+    public function setName(string $name): static
     {
         $this->validateName($name);
 
@@ -493,7 +469,7 @@ class Command
      *
      * @return $this
      */
-    public function setProcessTitle(string $title)
+    public function setProcessTitle(string $title): static
     {
         $this->processTitle = $title;
 
@@ -502,23 +478,18 @@ class Command
 
     /**
      * Returns the command name.
-     *
-     * @return string|null
      */
-    public function getName()
+    public function getName(): ?string
     {
         return $this->name;
     }
 
     /**
      * @param bool $hidden Whether or not the command should be hidden from the list of commands
-     *                     The default value will be true in Symfony 6.0
      *
      * @return $this
-     *
-     * @final since Symfony 5.1
      */
-    public function setHidden(bool $hidden /* = true */)
+    public function setHidden(bool $hidden = true): static
     {
         $this->hidden = $hidden;
 
@@ -528,7 +499,7 @@ class Command
     /**
      * @return bool whether the command should be publicly shown or not
      */
-    public function isHidden()
+    public function isHidden(): bool
     {
         return $this->hidden;
     }
@@ -538,7 +509,7 @@ class Command
      *
      * @return $this
      */
-    public function setDescription(string $description)
+    public function setDescription(string $description): static
     {
         $this->description = $description;
 
@@ -547,10 +518,8 @@ class Command
 
     /**
      * Returns the description for the command.
-     *
-     * @return string
      */
-    public function getDescription()
+    public function getDescription(): string
     {
         return $this->description;
     }
@@ -560,7 +529,7 @@ class Command
      *
      * @return $this
      */
-    public function setHelp(string $help)
+    public function setHelp(string $help): static
     {
         $this->help = $help;
 
@@ -569,10 +538,8 @@ class Command
 
     /**
      * Returns the help for the command.
-     *
-     * @return string
      */
-    public function getHelp()
+    public function getHelp(): string
     {
         return $this->help;
     }
@@ -580,13 +547,11 @@ class Command
     /**
      * Returns the processed help for the command replacing the %command.name% and
      * %command.full_name% patterns with the real values dynamically.
-     *
-     * @return string
      */
-    public function getProcessedHelp()
+    public function getProcessedHelp(): string
     {
         $name = $this->name;
-        $isSingleCommand = $this->application && $this->application->isSingleCommand();
+        $isSingleCommand = $this->application?->isSingleCommand();
 
         $placeholders = [
             '%command.name%',
@@ -609,7 +574,7 @@ class Command
      *
      * @throws InvalidArgumentException When an alias is invalid
      */
-    public function setAliases(iterable $aliases)
+    public function setAliases(iterable $aliases): static
     {
         $list = [];
 
@@ -618,17 +583,15 @@ class Command
             $list[] = $alias;
         }
 
-        $this->aliases = \is_array($aliases) ? $aliases : $list;
+        $this->aliases = $list;
 
         return $this;
     }
 
     /**
      * Returns the aliases for the command.
-     *
-     * @return array
      */
-    public function getAliases()
+    public function getAliases(): array
     {
         return $this->aliases;
     }
@@ -637,15 +600,13 @@ class Command
      * Returns the synopsis for the command.
      *
      * @param bool $short Whether to show the short version of the synopsis (with options folded) or not
-     *
-     * @return string
      */
-    public function getSynopsis(bool $short = false)
+    public function getSynopsis(bool $short = false): string
     {
         $key = $short ? 'short' : 'long';
 
         if (!isset($this->synopsis[$key])) {
-            $this->synopsis[$key] = trim(sprintf('%s %s', $this->name, $this->definition->getSynopsis($short)));
+            $this->synopsis[$key] = trim(\sprintf('%s %s', $this->name, $this->definition->getSynopsis($short)));
         }
 
         return $this->synopsis[$key];
@@ -656,10 +617,10 @@ class Command
      *
      * @return $this
      */
-    public function addUsage(string $usage)
+    public function addUsage(string $usage): static
     {
         if (!str_starts_with($usage, $this->name)) {
-            $usage = sprintf('%s %s', $this->name, $usage);
+            $usage = \sprintf('%s %s', $this->name, $usage);
         }
 
         $this->usages[] = $usage;
@@ -669,10 +630,8 @@ class Command
 
     /**
      * Returns alternative usages of the command.
-     *
-     * @return array
      */
-    public function getUsages()
+    public function getUsages(): array
     {
         return $this->usages;
     }
@@ -680,18 +639,26 @@ class Command
     /**
      * Gets a helper instance by name.
      *
-     * @return mixed
-     *
      * @throws LogicException           if no HelperSet is defined
      * @throws InvalidArgumentException if the helper is not defined
      */
-    public function getHelper(string $name)
+    public function getHelper(string $name): HelperInterface
     {
         if (null === $this->helperSet) {
-            throw new LogicException(sprintf('Cannot retrieve helper "%s" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method.', $name));
+            throw new LogicException(\sprintf('Cannot retrieve helper "%s" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method.', $name));
         }
 
         return $this->helperSet->get($name);
+    }
+
+    public function getSubscribedSignals(): array
+    {
+        return $this->code?->getSubscribedSignals() ?? [];
+    }
+
+    public function handleSignal(int $signal, int|false $previousExitCode = 0): int|false
+    {
+        return $this->code?->handleSignal($signal, $previousExitCode) ?? false;
     }
 
     /**
@@ -701,10 +668,66 @@ class Command
      *
      * @throws InvalidArgumentException When the name is invalid
      */
-    private function validateName(string $name)
+    private function validateName(string $name): void
     {
         if (!preg_match('/^[^\:]++(\:[^\:]++)*$/', $name)) {
-            throw new InvalidArgumentException(sprintf('Command name "%s" is invalid.', $name));
+            throw new InvalidArgumentException(\sprintf('Command name "%s" is invalid.', $name));
         }
+    }
+
+    private function getCommandAttribute(?callable $code): ?AsCommand
+    {
+        if (null === $code) {
+            /** @var AsCommand|null $attribute */
+            $attribute = (new \ReflectionClass(static::class)->getAttributes(AsCommand::class)[0] ?? null)?->newInstance();
+
+            return $attribute;
+        }
+
+        $reflection = new \ReflectionFunction($code(...));
+
+        if ($reflection->isAnonymous() || !$class = $reflection->getClosureScopeClass()) {
+            throw new InvalidArgumentException(\sprintf('The command must be an instance of "%s", an invokable object or a method of an object.', self::class));
+        }
+
+        /** @var AsCommand|null $attribute */
+        $attribute = ($reflection->getAttributes(AsCommand::class)[0] ?? null)?->newInstance();
+
+        if ('__invoke' === $reflection->getName()) {
+            $classAttribute = $class->getAttributes(AsCommand::class)[0] ?? null;
+
+            if ($attribute && $classAttribute) {
+                throw new LogicException(\sprintf('The "%s" class and its "__invoke()" method cannot both have the "%s" attribute.', $class->getName(), AsCommand::class));
+            }
+
+            /** @var AsCommand|null $attribute */
+            $attribute ??= $classAttribute?->newInstance();
+        } elseif ($attribute && $prefix = ($class->getAttributes(AsCommand::class)[0] ?? null)?->newInstance()->name) {
+            // the class-level name prefixes the names declared on methods
+            $hidden = str_starts_with($prefix, '|');
+            if ($prefix = explode('|', ltrim($prefix, '|'))[0]) {
+                $names = explode('|', $attribute->name);
+                if ($hidden && '' !== $names[0]) {
+                    // the method commands of a hidden class-level command are hidden too
+                    array_unshift($names, '');
+                }
+                $attribute->name = implode('|', array_map(static function (string $name) use ($prefix, $class, $reflection) {
+                    if ('' === $name) {
+                        return $name;
+                    }
+                    if (str_starts_with($name, $prefix.':')) {
+                        throw new LogicException(\sprintf('The name "%s" of the command "%s::%s()" repeats the class-level name "%s": method-level names are relative to it, use "%s" instead.', $name, $class->getName(), $reflection->getName(), $prefix, substr($name, \strlen($prefix) + 1)));
+                    }
+
+                    return $prefix.':'.$name;
+                }, $names));
+            }
+        }
+
+        if (!$attribute) {
+            throw new LogicException(\sprintf('The command must use the "%s" attribute.', AsCommand::class));
+        }
+
+        return $attribute;
     }
 }

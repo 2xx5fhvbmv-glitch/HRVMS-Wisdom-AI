@@ -15,6 +15,7 @@ use App\Models\AssingAccommodation;
 use App\Models\AvailableAccommodationModel;
 use App\Models\Employee;
 use App\Helpers\Common;
+use Illuminate\Support\Enumerable;
 
 class QuickAssignmentTempleteExport implements FromCollection, WithHeadings, WithEvents
 {
@@ -30,7 +31,7 @@ class QuickAssignmentTempleteExport implements FromCollection, WithHeadings, Wit
         return ['Employee', 'Building', 'Floor', 'Room', 'Bed No'];
     }
 
-    public function collection()
+    public function collection(): Enumerable
     {
         return collect([]);
     }

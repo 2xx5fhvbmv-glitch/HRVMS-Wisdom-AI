@@ -19,16 +19,27 @@ namespace Google\Service\OracleDatabase;
 
 class ListDbSystemsResponse extends \Google\Collection
 {
-  protected $collection_key = 'dbSystems';
+  protected $collection_key = 'unreachable';
   protected $dbSystemsType = DbSystem::class;
   protected $dbSystemsDataType = 'array';
   /**
+   * A token identifying a page of results the server should return.
+   *
    * @var string
    */
   public $nextPageToken;
+  /**
+   * Unreachable locations when listing resources across all locations using
+   * wildcard location '-'.
+   *
+   * @var string[]
+   */
+  public $unreachable;
 
   /**
-   * @param DbSystem[]
+   * The list of DbSystems.
+   *
+   * @param DbSystem[] $dbSystems
    */
   public function setDbSystems($dbSystems)
   {
@@ -42,7 +53,9 @@ class ListDbSystemsResponse extends \Google\Collection
     return $this->dbSystems;
   }
   /**
-   * @param string
+   * A token identifying a page of results the server should return.
+   *
+   * @param string $nextPageToken
    */
   public function setNextPageToken($nextPageToken)
   {
@@ -54,6 +67,23 @@ class ListDbSystemsResponse extends \Google\Collection
   public function getNextPageToken()
   {
     return $this->nextPageToken;
+  }
+  /**
+   * Unreachable locations when listing resources across all locations using
+   * wildcard location '-'.
+   *
+   * @param string[] $unreachable
+   */
+  public function setUnreachable($unreachable)
+  {
+    $this->unreachable = $unreachable;
+  }
+  /**
+   * @return string[]
+   */
+  public function getUnreachable()
+  {
+    return $this->unreachable;
   }
 }
 

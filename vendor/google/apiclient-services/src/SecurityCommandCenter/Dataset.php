@@ -33,7 +33,7 @@ class Dataset extends \Google\Model
   public $source;
 
   /**
-   * @param string
+   * @param string $displayName
    */
   public function setDisplayName($displayName)
   {
@@ -47,7 +47,7 @@ class Dataset extends \Google\Model
     return $this->displayName;
   }
   /**
-   * @param string
+   * @param string $name
    */
   public function setName($name)
   {
@@ -61,7 +61,7 @@ class Dataset extends \Google\Model
     return $this->name;
   }
   /**
-   * @param string
+   * @param string $source
    */
   public function setSource($source)
   {

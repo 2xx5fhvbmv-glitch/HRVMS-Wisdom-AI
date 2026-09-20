@@ -25,36 +25,47 @@ use Symfony\Component\HttpKernel\HttpKernelInterface;
  */
 final class ViewEvent extends RequestEvent
 {
+    public readonly ?ControllerArgumentsMetadata $controllerMetadata;
+
     /**
-     * The return value of the controller.
-     *
-     * @var mixed
+     * @deprecated since Symfony 8.1, use $controllerMetadata instead
      */
-    private $controllerResult;
+    public private(set) ?ControllerArgumentsEvent $controllerArgumentsEvent {
+        get {
+            trigger_deprecation('symfony/http-kernel', '8.1', 'Accessing the "controllerArgumentsEvent" property of the "%s" class is deprecated. Use "controllerMetadata" instead.', __CLASS__);
 
-    public function __construct(HttpKernelInterface $kernel, Request $request, int $requestType, $controllerResult)
-    {
-        parent::__construct($kernel, $request, $requestType);
+            if (!$m = $this->controllerMetadata) {
+                return null;
+            }
 
-        $this->controllerResult = $controllerResult;
+            return $this->controllerArgumentsEvent ??= new ControllerArgumentsEvent($this->getKernel(), \Closure::bind(fn () => $this->controllerEvent, $m, ControllerMetadata::class)(), $m->getArguments(), $this->getRequest(), $this->getRequestType());
+        }
     }
 
-    /**
-     * Returns the return value of the controller.
-     *
-     * @return mixed
-     */
-    public function getControllerResult()
+    public function __construct(
+        HttpKernelInterface $kernel,
+        Request $request,
+        int $requestType,
+        private mixed $controllerResult,
+        ControllerArgumentsMetadata|ControllerArgumentsEvent|null $controllerMetadata = null,
+    ) {
+        if ($controllerMetadata instanceof ControllerArgumentsEvent) {
+            trigger_deprecation('symfony/http-kernel', '8.1', 'Passing a ControllerArgumentsEvent to the ViewEvent constructor is deprecated. Pass a ControllerArgumentsMetadata instance instead.');
+            $this->controllerArgumentsEvent = $controllerMetadata;
+            $controllerEvent = \Closure::bind(fn () => $this->controllerEvent, $controllerMetadata, ControllerArgumentsEvent::class)();
+            $controllerMetadata = new ControllerArgumentsMetadata($controllerEvent, $controllerMetadata);
+        }
+        $this->controllerMetadata = $controllerMetadata;
+
+        parent::__construct($kernel, $request, $requestType);
+    }
+
+    public function getControllerResult(): mixed
     {
         return $this->controllerResult;
     }
 
-    /**
-     * Assigns the return value of the controller.
-     *
-     * @param mixed $controllerResult The controller return value
-     */
-    public function setControllerResult($controllerResult): void
+    public function setControllerResult(mixed $controllerResult): void
     {
         $this->controllerResult = $controllerResult;
     }

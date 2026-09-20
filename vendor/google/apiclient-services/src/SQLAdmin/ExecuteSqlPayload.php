@@ -20,32 +20,108 @@ namespace Google\Service\SQLAdmin;
 class ExecuteSqlPayload extends \Google\Model
 {
   /**
+   * Unspecified mode, effectively the same as `FAIL_PARTIAL_RESULT`.
+   */
+  public const PARTIAL_RESULT_MODE_PARTIAL_RESULT_MODE_UNSPECIFIED = 'PARTIAL_RESULT_MODE_UNSPECIFIED';
+  /**
+   * Throw an error if the result exceeds 10 MB or if only a partial result can
+   * be retrieved. Don't return the result.
+   */
+  public const PARTIAL_RESULT_MODE_FAIL_PARTIAL_RESULT = 'FAIL_PARTIAL_RESULT';
+  /**
+   * Return a truncated result and set `partial_result` to true if the result
+   * exceeds 10 MB or if only a partial result can be retrieved due to error.
+   * Don't throw an error.
+   */
+  public const PARTIAL_RESULT_MODE_ALLOW_PARTIAL_RESULT = 'ALLOW_PARTIAL_RESULT';
+  /**
+   * Optional. Specifies the name of the application that is making the request.
+   * This field is used for telemetry. Only alphanumeric characters, dashes, and
+   * underscores are allowed. The maximum length is 32 characters.
+   *
+   * @var string
+   */
+  public $application;
+  /**
+   * Optional. When set to `true`, the API caller identity associated with the
+   * request is used for database authentication. The API caller must be an IAM
+   * user in the database.
+   *
    * @var bool
    */
   public $autoIamAuthn;
   /**
+   * Optional. Name of the database on which the statement will be executed.
+   *
    * @var string
    */
   public $database;
   /**
+   * Optional. Controls how the API should respond when the SQL execution result
+   * is incomplete due to the size limit or another error. The default mode is
+   * to throw an error.
+   *
    * @var string
    */
   public $partialResultMode;
   /**
+   * Optional. The resource name of the Secret Manager secret holding the
+   * password for the user to log into the database. The secret should be
+   * created using the regional endpoint (for API) or from the Regional Secrets
+   * page (for UI), and stored in the same region as the Cloud SQL instance. The
+   * expected resource name format is `projects/{project}/locations/{location}/s
+   * ecrets/{secret}/versions/{secret_version}`. Used together with the `user`
+   * field. The secret resource name will not be stored.
+   *
+   * @var string
+   */
+  public $passwordSecretVersion;
+  /**
+   * Optional. The maximum number of rows returned per SQL statement.
+   *
    * @var string
    */
   public $rowLimit;
   /**
+   * Required. SQL statements to run on the database. It can be a single
+   * statement or a sequence of statements separated by semicolons.
+   *
    * @var string
    */
   public $sqlStatement;
   /**
+   * Optional. The name of an existing database user to connect to the database.
+   * When `auto_iam_authn` is set to true, this field is ignored and the API
+   * caller's IAM user is used.
+   *
    * @var string
    */
   public $user;
 
   /**
-   * @param bool
+   * Optional. Specifies the name of the application that is making the request.
+   * This field is used for telemetry. Only alphanumeric characters, dashes, and
+   * underscores are allowed. The maximum length is 32 characters.
+   *
+   * @param string $application
+   */
+  public function setApplication($application)
+  {
+    $this->application = $application;
+  }
+  /**
+   * @return string
+   */
+  public function getApplication()
+  {
+    return $this->application;
+  }
+  /**
+   * Optional. When set to `true`, the API caller identity associated with the
+   * request is used for database authentication. The API caller must be an IAM
+   * user in the database.
+   *
+   * @param bool $autoIamAuthn
    */
   public function setAutoIamAuthn($autoIamAuthn)
   {
@@ -59,7 +135,9 @@ class ExecuteSqlPayload extends \Google\Model
     return $this->autoIamAuthn;
   }
   /**
-   * @param string
+   * Optional. Name of the database on which the statement will be executed.
+   *
+   * @param string $database
    */
   public function setDatabase($database)
   {
@@ -73,21 +151,52 @@ class ExecuteSqlPayload extends \Google\Model
     return $this->database;
   }
   /**
-   * @param string
+   * Optional. Controls how the API should respond when the SQL execution result
+   * is incomplete due to the size limit or another error. The default mode is
+   * to throw an error.
+   *
+   * Accepted values: PARTIAL_RESULT_MODE_UNSPECIFIED, FAIL_PARTIAL_RESULT,
+   * ALLOW_PARTIAL_RESULT
+   *
+   * @param self::PARTIAL_RESULT_MODE_* $partialResultMode
    */
   public function setPartialResultMode($partialResultMode)
   {
     $this->partialResultMode = $partialResultMode;
   }
   /**
-   * @return string
+   * @return self::PARTIAL_RESULT_MODE_*
    */
   public function getPartialResultMode()
   {
     return $this->partialResultMode;
   }
   /**
-   * @param string
+   * Optional. The resource name of the Secret Manager secret holding the
+   * password for the user to log into the database. The secret should be
+   * created using the regional endpoint (for API) or from the Regional Secrets
+   * page (for UI), and stored in the same region as the Cloud SQL instance. The
+   * expected resource name format is `projects/{project}/locations/{location}/s
+   * ecrets/{secret}/versions/{secret_version}`. Used together with the `user`
+   * field. The secret resource name will not be stored.
+   *
+   * @param string $passwordSecretVersion
+   */
+  public function setPasswordSecretVersion($passwordSecretVersion)
+  {
+    $this->passwordSecretVersion = $passwordSecretVersion;
+  }
+  /**
+   * @return string
+   */
+  public function getPasswordSecretVersion()
+  {
+    return $this->passwordSecretVersion;
+  }
+  /**
+   * Optional. The maximum number of rows returned per SQL statement.
+   *
+   * @param string $rowLimit
    */
   public function setRowLimit($rowLimit)
   {
@@ -101,7 +210,10 @@ class ExecuteSqlPayload extends \Google\Model
     return $this->rowLimit;
   }
   /**
-   * @param string
+   * Required. SQL statements to run on the database. It can be a single
+   * statement or a sequence of statements separated by semicolons.
+   *
+   * @param string $sqlStatement
    */
   public function setSqlStatement($sqlStatement)
   {
@@ -115,7 +227,11 @@ class ExecuteSqlPayload extends \Google\Model
     return $this->sqlStatement;
   }
   /**
-   * @param string
+   * Optional. The name of an existing database user to connect to the database.
+   * When `auto_iam_authn` is set to true, this field is ignored and the API
+   * caller's IAM user is used.
+   *
+   * @param string $user
    */
   public function setUser($user)
   {

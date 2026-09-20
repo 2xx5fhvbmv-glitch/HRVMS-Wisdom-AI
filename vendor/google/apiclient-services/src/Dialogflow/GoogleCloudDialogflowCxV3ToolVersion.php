@@ -39,7 +39,7 @@ class GoogleCloudDialogflowCxV3ToolVersion extends \Google\Model
   public $updateTime;
 
   /**
-   * @param string
+   * @param string $createTime
    */
   public function setCreateTime($createTime)
   {
@@ -53,7 +53,7 @@ class GoogleCloudDialogflowCxV3ToolVersion extends \Google\Model
     return $this->createTime;
   }
   /**
-   * @param string
+   * @param string $displayName
    */
   public function setDisplayName($displayName)
   {
@@ -67,7 +67,7 @@ class GoogleCloudDialogflowCxV3ToolVersion extends \Google\Model
     return $this->displayName;
   }
   /**
-   * @param string
+   * @param string $name
    */
   public function setName($name)
   {
@@ -81,7 +81,7 @@ class GoogleCloudDialogflowCxV3ToolVersion extends \Google\Model
     return $this->name;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3Tool
+   * @param GoogleCloudDialogflowCxV3Tool $tool
    */
   public function setTool(GoogleCloudDialogflowCxV3Tool $tool)
   {
@@ -95,7 +95,7 @@ class GoogleCloudDialogflowCxV3ToolVersion extends \Google\Model
     return $this->tool;
   }
   /**
-   * @param string
+   * @param string $updateTime
    */
   public function setUpdateTime($updateTime)
   {

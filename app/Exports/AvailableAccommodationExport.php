@@ -11,6 +11,7 @@ use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use Illuminate\Support\Enumerable;
 
 class AvailableAccommodationExport implements FromCollection, WithHeadings, WithEvents
 {
@@ -26,7 +27,7 @@ class AvailableAccommodationExport implements FromCollection, WithHeadings, With
         return ['BuildingName', 'Floor','Room','TypeOfAccommodation', 'Capacity', 'RoomType','BedNo','BlockFor','ItemName','CleaningShedule','RoomStatus','Occupancytheresold'];
     }
 
-    public function collection()
+    public function collection(): Enumerable
     {
         return collect([]); // Empty collection for the Excel template
     }

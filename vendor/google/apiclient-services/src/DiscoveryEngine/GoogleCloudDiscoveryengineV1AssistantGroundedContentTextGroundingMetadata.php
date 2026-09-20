@@ -19,14 +19,18 @@ namespace Google\Service\DiscoveryEngine;
 
 class GoogleCloudDiscoveryengineV1AssistantGroundedContentTextGroundingMetadata extends \Google\Collection
 {
-  protected $collection_key = 'segments';
+  protected $collection_key = 'visualSegments';
   protected $referencesType = GoogleCloudDiscoveryengineV1AssistantGroundedContentTextGroundingMetadataReference::class;
   protected $referencesDataType = 'array';
   protected $segmentsType = GoogleCloudDiscoveryengineV1AssistantGroundedContentTextGroundingMetadataSegment::class;
   protected $segmentsDataType = 'array';
+  protected $visualSegmentsType = GoogleCloudDiscoveryengineV1AssistantGroundedContentTextGroundingMetadataVisualSegment::class;
+  protected $visualSegmentsDataType = 'array';
 
   /**
-   * @param GoogleCloudDiscoveryengineV1AssistantGroundedContentTextGroundingMetadataReference[]
+   * References for the grounded text.
+   *
+   * @param GoogleCloudDiscoveryengineV1AssistantGroundedContentTextGroundingMetadataReference[] $references
    */
   public function setReferences($references)
   {
@@ -40,7 +44,9 @@ class GoogleCloudDiscoveryengineV1AssistantGroundedContentTextGroundingMetadata 
     return $this->references;
   }
   /**
-   * @param GoogleCloudDiscoveryengineV1AssistantGroundedContentTextGroundingMetadataSegment[]
+   * Grounding information for parts of the text.
+   *
+   * @param GoogleCloudDiscoveryengineV1AssistantGroundedContentTextGroundingMetadataSegment[] $segments
    */
   public function setSegments($segments)
   {
@@ -52,6 +58,22 @@ class GoogleCloudDiscoveryengineV1AssistantGroundedContentTextGroundingMetadata 
   public function getSegments()
   {
     return $this->segments;
+  }
+  /**
+   * Grounding information for parts of the visual content.
+   *
+   * @param GoogleCloudDiscoveryengineV1AssistantGroundedContentTextGroundingMetadataVisualSegment[] $visualSegments
+   */
+  public function setVisualSegments($visualSegments)
+  {
+    $this->visualSegments = $visualSegments;
+  }
+  /**
+   * @return GoogleCloudDiscoveryengineV1AssistantGroundedContentTextGroundingMetadataVisualSegment[]
+   */
+  public function getVisualSegments()
+  {
+    return $this->visualSegments;
   }
 }
 

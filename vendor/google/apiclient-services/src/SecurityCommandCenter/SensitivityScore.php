@@ -19,20 +19,25 @@ namespace Google\Service\SecurityCommandCenter;
 
 class SensitivityScore extends \Google\Model
 {
+  public const SCORE_SENSITIVITY_SCORE_LEVEL_UNSPECIFIED = 'SENSITIVITY_SCORE_LEVEL_UNSPECIFIED';
+  public const SCORE_SENSITIVITY_LOW = 'SENSITIVITY_LOW';
+  public const SCORE_SENSITIVITY_UNKNOWN = 'SENSITIVITY_UNKNOWN';
+  public const SCORE_SENSITIVITY_MODERATE = 'SENSITIVITY_MODERATE';
+  public const SCORE_SENSITIVITY_HIGH = 'SENSITIVITY_HIGH';
   /**
    * @var string
    */
   public $score;
 
   /**
-   * @param string
+   * @param self::SCORE_* $score
    */
   public function setScore($score)
   {
     $this->score = $score;
   }
   /**
-   * @return string
+   * @return self::SCORE_*
    */
   public function getScore()
   {

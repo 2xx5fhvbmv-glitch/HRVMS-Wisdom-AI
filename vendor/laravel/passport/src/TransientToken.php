@@ -2,36 +2,30 @@
 
 namespace Laravel\Passport;
 
-class TransientToken
+use Laravel\Passport\Contracts\ScopeAuthorizable;
+
+class TransientToken implements ScopeAuthorizable
 {
     /**
      * Determine if the token has a given scope.
-     *
-     * @param  string  $scope
-     * @return bool
      */
-    public function can($scope)
+    public function can(string $scope): bool
     {
         return true;
     }
 
     /**
      * Determine if the token is missing a given scope.
-     *
-     * @param  string  $scope
-     * @return bool
      */
-    public function cant($scope)
+    public function cant(string $scope): bool
     {
         return false;
     }
 
     /**
      * Determine if the token is a transient JWT token.
-     *
-     * @return bool
      */
-    public function transient()
+    public function transient(): bool
     {
         return true;
     }

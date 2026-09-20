@@ -96,11 +96,14 @@ class Dfareporting extends \Google\Service
   public $regions;
   public $remarketingListShares;
   public $remarketingLists;
+  public $reportData;
   public $reports;
   public $reports_compatibleFields;
   public $reports_files;
   public $sites;
   public $sizes;
+  public $studioCreativeAssets;
+  public $studioCreatives;
   public $subaccounts;
   public $targetableRemarketingLists;
   public $targetingTemplates;
@@ -2314,6 +2317,20 @@ class Dfareporting extends \Google\Service
               'path' => 'studio/dynamicFeeds',
               'httpMethod' => 'POST',
               'parameters' => [],
+            ],'retransform' => [
+              'path' => 'studio/dynamicFeeds/{+dynamicFeedId}/retransform',
+              'httpMethod' => 'POST',
+              'parameters' => [
+                'dynamicFeedId' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+              ],
+            ],'update' => [
+              'path' => 'studio/dynamicFeeds',
+              'httpMethod' => 'PUT',
+              'parameters' => [],
             ],
           ]
         ]
@@ -2324,7 +2341,17 @@ class Dfareporting extends \Google\Service
         'dynamicProfiles',
         [
           'methods' => [
-            'get' => [
+            'generateCode' => [
+              'path' => 'studio/dynamicProfiles/{+dynamicProfileId}/generateCode',
+              'httpMethod' => 'GET',
+              'parameters' => [
+                'dynamicProfileId' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+              ],
+            ],'get' => [
               'path' => 'studio/dynamicProfiles/{+dynamicProfileId}',
               'httpMethod' => 'GET',
               'parameters' => [
@@ -2338,6 +2365,16 @@ class Dfareporting extends \Google\Service
               'path' => 'studio/dynamicProfiles',
               'httpMethod' => 'POST',
               'parameters' => [],
+            ],'publish' => [
+              'path' => 'studio/dynamicProfiles/{+dynamicProfileId}/publish',
+              'httpMethod' => 'POST',
+              'parameters' => [
+                'dynamicProfileId' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+              ],
             ],'update' => [
               'path' => 'studio/dynamicProfiles',
               'httpMethod' => 'PUT',
@@ -3421,6 +3458,18 @@ class Dfareporting extends \Google\Service
                   'type' => 'string',
                   'repeated' => true,
                 ],
+                'tagProperties.dcDbmMacroIncluded' => [
+                  'location' => 'query',
+                  'type' => 'boolean',
+                ],
+                'tagProperties.gppMacrosIncluded' => [
+                  'location' => 'query',
+                  'type' => 'boolean',
+                ],
+                'tagProperties.tcfGdprMacrosIncluded' => [
+                  'location' => 'query',
+                  'type' => 'boolean',
+                ],
               ],
             ],'get' => [
               'path' => 'userprofiles/{+profileId}/placements/{+id}',
@@ -3829,6 +3878,26 @@ class Dfareporting extends \Google\Service
           ]
         ]
     );
+    $this->reportData = new Dfareporting\Resource\ReportData(
+        $this,
+        $this->serviceName,
+        'reportData',
+        [
+          'methods' => [
+            'query' => [
+              'path' => 'userprofiles/{profileId}/reportdata/query',
+              'httpMethod' => 'POST',
+              'parameters' => [
+                'profileId' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+              ],
+            ],
+          ]
+        ]
+    );
     $this->reports = new Dfareporting\Resource\Reports(
         $this,
         $this->serviceName,
@@ -4219,6 +4288,54 @@ class Dfareporting extends \Google\Service
           ]
         ]
     );
+    $this->studioCreativeAssets = new Dfareporting\Resource\StudioCreativeAssets(
+        $this,
+        $this->serviceName,
+        'studioCreativeAssets',
+        [
+          'methods' => [
+            'insert' => [
+              'path' => 'studio/creativeAssets',
+              'httpMethod' => 'POST',
+              'parameters' => [],
+            ],
+          ]
+        ]
+    );
+    $this->studioCreatives = new Dfareporting\Resource\StudioCreatives(
+        $this,
+        $this->serviceName,
+        'studioCreatives',
+        [
+          'methods' => [
+            'get' => [
+              'path' => 'studio/creatives/{+studioCreativeId}',
+              'httpMethod' => 'GET',
+              'parameters' => [
+                'studioCreativeId' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+              ],
+            ],'insert' => [
+              'path' => 'studio/creatives',
+              'httpMethod' => 'POST',
+              'parameters' => [],
+            ],'publish' => [
+              'path' => 'studio/creatives/{+studioCreativeId}/publish',
+              'httpMethod' => 'POST',
+              'parameters' => [
+                'studioCreativeId' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+              ],
+            ],
+          ]
+        ]
+    );
     $this->subaccounts = new Dfareporting\Resource\Subaccounts(
         $this,
         $this->serviceName,
@@ -4501,6 +4618,14 @@ class Dfareporting extends \Google\Service
                   'location' => 'query',
                   'type' => 'string',
                 ],
+                'countryDartId' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+                'tvDataProvider' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],
           ]
@@ -4525,7 +4650,15 @@ class Dfareporting extends \Google\Service
                   'location' => 'query',
                   'type' => 'string',
                 ],
+                'countryDartId' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
                 'name' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+                'tvDataProvider' => [
                   'location' => 'query',
                   'type' => 'string',
                 ],

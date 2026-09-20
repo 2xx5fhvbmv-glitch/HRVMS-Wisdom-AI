@@ -2,22 +2,17 @@
 
 namespace Laravel\Passport\Http\Controllers;
 
-use Illuminate\Http\Response;
+use Psr\Http\Message\ResponseInterface;
+use Symfony\Bridge\PsrHttpMessage\Factory\HttpFoundationFactory;
+use Symfony\Component\HttpFoundation\Response;
 
 trait ConvertsPsrResponses
 {
     /**
      * Convert a PSR7 response to a Illuminate Response.
-     *
-     * @param  \Psr\Http\Message\ResponseInterface  $psrResponse
-     * @return \Illuminate\Http\Response
      */
-    public function convertResponse($psrResponse)
+    public function convertResponse(ResponseInterface $psrResponse): Response
     {
-        return new Response(
-            $psrResponse->getBody(),
-            $psrResponse->getStatusCode(),
-            $psrResponse->getHeaders()
-        );
+        return (new HttpFoundationFactory)->createResponse($psrResponse);
     }
 }

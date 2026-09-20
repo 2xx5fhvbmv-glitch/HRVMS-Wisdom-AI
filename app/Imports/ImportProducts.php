@@ -8,7 +8,7 @@ class ImportProducts implements ToCollection
 {
     public $rows;
 
-    public function collection(Collection $rows)
+    public function collection(Collection $rows): void
     {
         // Skip header
         $this->rows = $rows->skip(1)->values();

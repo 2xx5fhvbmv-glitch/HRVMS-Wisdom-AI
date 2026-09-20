@@ -2,258 +2,252 @@
 
 namespace Laravel\Passport;
 
-use Carbon\Carbon;
+use Closure;
 use DateInterval;
 use DateTimeInterface;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Encryption\Encrypter;
-use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Date;
+use Laravel\Passport\Contracts\AuthorizationViewResponse;
+use Laravel\Passport\Contracts\DeviceAuthorizationViewResponse;
+use Laravel\Passport\Contracts\DeviceUserCodeViewResponse;
+use Laravel\Passport\Http\Responses\SimpleViewResponse;
 use League\OAuth2\Server\ResourceServer;
+use League\OAuth2\Server\ResponseTypes\ResponseTypeInterface;
 use Mockery;
 use Psr\Http\Message\ServerRequestInterface;
 
 class Passport
 {
     /**
-     * Indicates if the implicit grant type is enabled.
-     *
-     * @var bool|null
+     * Indicates if Passport should validate the permissions of its encryption keys.
      */
-    public static $implicitGrantEnabled = false;
+    public static bool $validateKeyPermissions = true;
+
+    /**
+     * Indicates if the refresh token should be revoked after use.
+     */
+    public static bool $revokeRefreshTokenAfterUse = true;
+
+    /**
+     * Indicates if the device authorization grant type is enabled.
+     */
+    public static bool $deviceCodeGrantEnabled = true;
+
+    /**
+     * Indicates if the implicit grant type is enabled.
+     */
+    public static bool $implicitGrantEnabled = false;
+
+    /**
+     * Indicates if the password grant type is enabled.
+     */
+    public static bool $passwordGrantEnabled = false;
 
     /**
      * The default scope.
-     *
-     * @var string
      */
-    public static $defaultScope;
+    public static string $defaultScope = '';
 
     /**
      * All of the scopes defined for the application.
      *
-     * @var array
+     * @var array<string, string>
      */
-    public static $scopes = [
+    public static array $scopes = [
         //
     ];
 
     /**
-     * The date when access tokens expire.
-     *
-     * @var \DateTimeInterface|null
-     *
-     * @deprecated Will be removed in the next major Passport release.
-     */
-    public static $tokensExpireAt;
-
-    /**
      * The interval when access tokens expire.
-     *
-     * @var \DateInterval|null
      */
-    public static $tokensExpireIn;
+    public static ?DateInterval $tokensExpireIn = null;
 
     /**
      * The date when refresh tokens expire.
-     *
-     * @var \DateTimeInterface|null
-     *
-     * @deprecated Will be removed in the next major Passport release.
      */
-    public static $refreshTokensExpireAt;
-
-    /**
-     * The date when refresh tokens expire.
-     *
-     * @var \DateInterval|null
-     */
-    public static $refreshTokensExpireIn;
+    public static ?DateInterval $refreshTokensExpireIn = null;
 
     /**
      * The date when personal access tokens expire.
-     *
-     * @var \DateTimeInterface|null
-     *
-     * @deprecated Will be removed in the next major Passport release.
      */
-    public static $personalAccessTokensExpireAt;
+    public static ?DateInterval $personalAccessTokensExpireIn = null;
 
     /**
-     * The date when personal access tokens expire.
-     *
-     * @var \DateInterval|null
+     * The interval when client credentials tokens expire.
      */
-    public static $personalAccessTokensExpireIn;
+    public static ?DateInterval $clientCredentialsTokensExpireIn = null;
 
     /**
      * The name for API token cookies.
-     *
-     * @var string
      */
-    public static $cookie = 'laravel_token';
+    public static string $cookie = 'laravel_token';
 
     /**
      * Indicates if Passport should ignore incoming CSRF tokens.
-     *
-     * @var bool
      */
-    public static $ignoreCsrfToken = false;
+    public static bool $ignoreCsrfToken = false;
 
     /**
      * The storage location of the encryption keys.
-     *
-     * @var string
      */
-    public static $keyPath;
+    public static ?string $keyPath = null;
+
+    /**
+     * The access token entity class name.
+     *
+     * @var class-string<\Laravel\Passport\Bridge\AccessToken>
+     */
+    public static string $accessTokenEntity = Bridge\AccessToken::class;
 
     /**
      * The auth code model class name.
      *
-     * @var string
+     * @var class-string<\Laravel\Passport\AuthCode>
      */
-    public static $authCodeModel = 'Laravel\Passport\AuthCode';
+    public static string $authCodeModel = AuthCode::class;
+
+    /**
+     * The device code model class name.
+     *
+     * @var class-string<\Laravel\Passport\DeviceCode>
+     */
+    public static string $deviceCodeModel = DeviceCode::class;
 
     /**
      * The client model class name.
      *
-     * @var string
+     * @var class-string<\Laravel\Passport\Client>
      */
-    public static $clientModel = 'Laravel\Passport\Client';
+    public static string $clientModel = Client::class;
 
     /**
-     * Indicates if client's are identified by UUIDs.
-     *
-     * @var bool
+     * Indicates if clients are identified by UUIDs.
      */
-    public static $clientUuids = false;
-
-    /**
-     * The personal access client model class name.
-     *
-     * @var string
-     */
-    public static $personalAccessClientModel = 'Laravel\Passport\PersonalAccessClient';
+    public static bool $clientUuids = true;
 
     /**
      * The token model class name.
      *
-     * @var string
+     * @var class-string<\Laravel\Passport\Token>
      */
-    public static $tokenModel = 'Laravel\Passport\Token';
+    public static string $tokenModel = Token::class;
 
     /**
      * The refresh token model class name.
      *
-     * @var string
+     * @var class-string<\Laravel\Passport\RefreshToken>
      */
-    public static $refreshTokenModel = 'Laravel\Passport\RefreshToken';
-
-    /**
-     * Indicates if Passport migrations will be run.
-     *
-     * @var bool
-     */
-    public static $runsMigrations = true;
+    public static string $refreshTokenModel = RefreshToken::class;
 
     /**
      * Indicates if Passport should unserializes cookies.
-     *
-     * @var bool
      */
-    public static $unserializesCookies = false;
+    public static bool $unserializesCookies = false;
 
     /**
-     * Indicates if client secrets will be hashed.
-     *
-     * @var bool
+     * Indicates if Passport should decrypt cookies.
      */
-    public static $hashesClientSecrets = false;
+    public static bool $decryptsCookies = true;
 
     /**
      * The callback that should be used to generate JWT encryption keys.
      *
-     * @var callable
+     * @var (\Closure(\Illuminate\Contracts\Encryption\Encrypter): string)|null
      */
-    public static $tokenEncryptionKeyCallback;
+    public static ?Closure $tokenEncryptionKeyCallback = null;
 
     /**
      * Indicates the scope should inherit its parent scope.
-     *
-     * @var bool
      */
-    public static $withInheritedScopes = false;
+    public static bool $withInheritedScopes = false;
 
     /**
      * The authorization server response type.
-     *
-     * @var \League\OAuth2\Server\ResponseTypes\ResponseTypeInterface|null
      */
-    public static $authorizationServerResponseType;
+    public static ?ResponseTypeInterface $authorizationServerResponseType = null;
+
+    /**
+     * Indicates if Passport routes will be registered.
+     */
+    public static bool $registersRoutes = true;
+
+    /**
+     * Indicates if Passport JSON API routes will be registered.
+     *
+     * @var bool
+     */
+    public static $registersJsonApiRoutes = false;
 
     /**
      * Enable the implicit grant type.
-     *
-     * @return static
      */
-    public static function enableImplicitGrant()
+    public static function enableImplicitGrant(): void
     {
         static::$implicitGrantEnabled = true;
-
-        return new static;
     }
 
     /**
-     * Binds the Passport routes into the controller.
-     *
-     * @param  callable|null  $callback
-     * @param  array  $options
-     * @return void
+     * Enable the password grant type.
      */
-    public static function routes($callback = null, array $options = [])
+    public static function enablePasswordGrant(): void
     {
-        $callback = $callback ?: function ($router) {
-            $router->all();
-        };
-
-        $defaultOptions = [
-            'prefix' => 'oauth',
-            'namespace' => '\Laravel\Passport\Http\Controllers',
-        ];
-
-        $options = array_merge($defaultOptions, $options);
-
-        Route::group($options, function ($router) use ($callback) {
-            $callback(new RouteRegistrar($router));
-        });
+        static::$passwordGrantEnabled = true;
     }
 
     /**
      * Set the default scope(s). Multiple scopes may be an array or specified delimited by spaces.
      *
-     * @param  array|string  $scope
-     * @return void
+     * @deprecated Use defaultScopes.
+     *
+     * @param  string[]|string  $scope
      */
-    public static function setDefaultScope($scope)
+    public static function setDefaultScope(array|string $scope): void
     {
         static::$defaultScope = is_array($scope) ? implode(' ', $scope) : $scope;
     }
 
     /**
+     * Set or get the default scopes.
+     *
+     * @param  string[]|string|null  $scopes
+     * @return string[]
+     */
+    public static function defaultScopes(array|string|null $scopes = null): array
+    {
+        if (! is_null($scopes)) {
+            static::$defaultScope = is_array($scopes) ? implode(' ', $scopes) : $scopes;
+        }
+
+        return static::$defaultScope ? explode(' ', static::$defaultScope) : [];
+    }
+
+    /**
+     * Return the scopes in the given list that are actually defined scopes for the application.
+     *
+     * @param  string[]  $scopes
+     * @return string[]
+     */
+    public static function validScopes(array $scopes): array
+    {
+        return array_values(array_unique(array_intersect($scopes, array_keys(static::$scopes))));
+    }
+
+    /**
      * Get all of the defined scope IDs.
      *
-     * @return array
+     * @return string[]
      */
-    public static function scopeIds()
+    public static function scopeIds(): array
     {
         return static::scopes()->pluck('id')->values()->all();
     }
 
     /**
      * Determine if the given scope has been defined.
-     *
-     * @param  string  $id
-     * @return bool
      */
-    public static function hasScope($id)
+    public static function hasScope(string $id): bool
     {
         return $id === '*' || array_key_exists($id, static::$scopes);
     }
@@ -261,140 +255,132 @@ class Passport
     /**
      * Get all of the scopes defined for the application.
      *
-     * @return \Illuminate\Support\Collection
+     * @return \Illuminate\Support\Collection<int, \Laravel\Passport\Scope>
      */
-    public static function scopes()
+    public static function scopes(): Collection
     {
-        return collect(static::$scopes)->map(function ($description, $id) {
-            return new Scope($id, $description);
-        })->values();
+        return collect(static::$scopes)->map(
+            fn (string $description, string $id): Scope => new Scope($id, $description)
+        )->values();
     }
 
     /**
      * Get all of the scopes matching the given IDs.
      *
-     * @param  array  $ids
-     * @return array
+     * @param  string[]  $ids
+     * @return \Laravel\Passport\Scope[]
      */
-    public static function scopesFor(array $ids)
+    public static function scopesFor(array $ids): array
     {
-        return collect($ids)->map(function ($id) {
-            if (isset(static::$scopes[$id])) {
-                return new Scope($id, static::$scopes[$id]);
-            }
-        })->filter()->values()->all();
+        return collect($ids)->map(
+            fn (string $id): ?Scope => isset(static::$scopes[$id]) ? new Scope($id, static::$scopes[$id]) : null
+        )->filter()->values()->all();
     }
 
     /**
      * Define the scopes for the application.
      *
-     * @param  array  $scopes
-     * @return void
+     * @param  array<string, string>  $scopes
      */
-    public static function tokensCan(array $scopes)
+    public static function tokensCan(array $scopes): void
     {
         static::$scopes = $scopes;
     }
 
     /**
      * Get or set when access tokens expire.
-     *
-     * @param  \DateTimeInterface|null  $date
-     * @return \DateInterval|static
      */
-    public static function tokensExpireIn(DateTimeInterface $date = null)
+    public static function tokensExpireIn(DateTimeInterface|DateInterval|null $date = null): DateInterval
     {
         if (is_null($date)) {
-            return static::$tokensExpireIn ?? new DateInterval('P1Y');
+            return static::$tokensExpireIn ??= new DateInterval('P1Y');
         }
 
-        static::$tokensExpireAt = $date;
-        static::$tokensExpireIn = Carbon::now()->diff($date);
-
-        return new static;
+        return static::$tokensExpireIn = $date instanceof DateTimeInterface
+            ? Date::now()->diff($date)
+            : $date;
     }
 
     /**
      * Get or set when refresh tokens expire.
-     *
-     * @param  \DateTimeInterface|null  $date
-     * @return \DateInterval|static
      */
-    public static function refreshTokensExpireIn(DateTimeInterface $date = null)
+    public static function refreshTokensExpireIn(DateTimeInterface|DateInterval|null $date = null): DateInterval
     {
         if (is_null($date)) {
-            return static::$refreshTokensExpireIn ?? new DateInterval('P1Y');
+            return static::$refreshTokensExpireIn ??= new DateInterval('P1Y');
         }
 
-        static::$refreshTokensExpireAt = $date;
-        static::$refreshTokensExpireIn = Carbon::now()->diff($date);
-
-        return new static;
+        return static::$refreshTokensExpireIn = $date instanceof DateTimeInterface
+            ? Date::now()->diff($date)
+            : $date;
     }
 
     /**
      * Get or set when personal access tokens expire.
-     *
-     * @param  \DateTimeInterface|null  $date
-     * @return \DateInterval|static
      */
-    public static function personalAccessTokensExpireIn(DateTimeInterface $date = null)
+    public static function personalAccessTokensExpireIn(DateTimeInterface|DateInterval|null $date = null): DateInterval
     {
         if (is_null($date)) {
-            return static::$personalAccessTokensExpireIn ?? new DateInterval('P1Y');
+            return static::$personalAccessTokensExpireIn ??= new DateInterval('P1Y');
         }
 
-        static::$personalAccessTokensExpireAt = $date;
-        static::$personalAccessTokensExpireIn = Carbon::now()->diff($date);
+        return static::$personalAccessTokensExpireIn = $date instanceof DateTimeInterface
+            ? Date::now()->diff($date)
+            : $date;
+    }
 
-        return new static;
+    /**
+     * Get or set when client credentials grant tokens expire.
+     */
+    public static function clientCredentialsTokensExpireIn(DateTimeInterface|DateInterval|null $date = null): ?DateInterval
+    {
+        if (is_null($date)) {
+            return static::$clientCredentialsTokensExpireIn;
+        }
+
+        return static::$clientCredentialsTokensExpireIn = $date instanceof DateTimeInterface
+            ? Date::now()->diff($date)
+            : $date;
     }
 
     /**
      * Get or set the name for API token cookies.
-     *
-     * @param  string|null  $cookie
-     * @return string|static
      */
-    public static function cookie($cookie = null)
+    public static function cookie(?string $cookie = null): string
     {
         if (is_null($cookie)) {
             return static::$cookie;
         }
 
-        static::$cookie = $cookie;
-
-        return new static;
+        return static::$cookie = $cookie;
     }
 
     /**
      * Indicate that Passport should ignore incoming CSRF tokens.
-     *
-     * @param  bool  $ignoreCsrfToken
-     * @return static
      */
-    public static function ignoreCsrfToken($ignoreCsrfToken = true)
+    public static function ignoreCsrfToken(bool $ignoreCsrfToken = true): void
     {
         static::$ignoreCsrfToken = $ignoreCsrfToken;
-
-        return new static;
     }
 
     /**
      * Set the current user for the application with the given scopes.
      *
-     * @param  \Illuminate\Contracts\Auth\Authenticatable|\Laravel\Passport\HasApiTokens  $user
-     * @param  array  $scopes
-     * @param  string  $guard
-     * @return \Illuminate\Contracts\Auth\Authenticatable
+     * @param  \Laravel\Passport\Contracts\OAuthenticatable  $user
+     * @param  string[]  $scopes
+     * @return \Laravel\Passport\Contracts\OAuthenticatable
      */
-    public static function actingAs($user, $scopes = [], $guard = 'api')
-    {
-        $token = Mockery::mock(self::tokenModel())->shouldIgnoreMissing(false);
-
-        foreach ($scopes as $scope) {
-            $token->shouldReceive('can')->with($scope)->andReturn(true);
-        }
+    public static function actingAs(
+        Authenticatable $user,
+        array $scopes = [],
+        ?string $guard = 'api',
+        ?Client $client = null,
+    ): Authenticatable {
+        $token = new AccessToken([
+            'oauth_client_id' => $client?->getKey(),
+            'oauth_user_id' => $user->getAuthIdentifier(),
+            'oauth_scopes' => $scopes,
+        ]);
 
         $user->withAccessToken($token);
 
@@ -412,70 +398,63 @@ class Passport
     /**
      * Set the current client for the application with the given scopes.
      *
-     * @param  \Laravel\Passport\Client  $client
-     * @param  array  $scopes
-     * @return \Laravel\Passport\Client
+     * @param  string[]  $scopes
      */
-    public static function actingAsClient($client, $scopes = [])
+    public static function actingAsClient(Client $client, array $scopes = [], ?string $guard = 'api'): Client
     {
-        $token = app(self::tokenModel());
-
-        $token->client_id = $client->id;
-        $token->setRelation('client', $client);
-
-        $token->scopes = $scopes;
-
         $mock = Mockery::mock(ResourceServer::class);
-        $mock->shouldReceive('validateAuthenticatedRequest')
-            ->andReturnUsing(function (ServerRequestInterface $request) use ($token) {
-                return $request->withAttribute('oauth_client_id', $token->client->id)
-                    ->withAttribute('oauth_access_token_id', $token->id)
-                    ->withAttribute('oauth_scopes', $token->scopes);
-            });
+        $mock->shouldReceive('validateAuthenticatedRequest')->andReturnUsing(
+            fn (ServerRequestInterface $request) => $request
+                ->withAttribute('oauth_client_id', $client->getKey())
+                ->withAttribute('oauth_scopes', $scopes)
+                ->withAttribute('oauth_user_id', null)
+        );
 
         app()->instance(ResourceServer::class, $mock);
 
-        $mock = Mockery::mock(TokenRepository::class);
-        $mock->shouldReceive('find')->andReturn($token);
+        app('auth')->guard($guard)->setClient($client);
 
-        app()->instance(TokenRepository::class, $mock);
+        app('auth')->shouldUse($guard);
 
         return $client;
     }
 
     /**
      * Set the storage location of the encryption keys.
-     *
-     * @param  string  $path
-     * @return void
      */
-    public static function loadKeysFrom($path)
+    public static function loadKeysFrom(string $path): void
     {
         static::$keyPath = $path;
     }
 
     /**
      * The location of the encryption keys.
-     *
-     * @param  string  $file
-     * @return string
      */
-    public static function keyPath($file)
+    public static function keyPath(string $file): string
     {
         $file = ltrim($file, '/\\');
 
-        return static::$keyPath
+        return isset(static::$keyPath)
             ? rtrim(static::$keyPath, '/\\').DIRECTORY_SEPARATOR.$file
             : storage_path($file);
     }
 
     /**
+     * Set the access token entity class name.
+     *
+     * @param  class-string<\Laravel\Passport\Bridge\AccessToken>  $accessTokenEntity
+     */
+    public static function useAccessTokenEntity(string $accessTokenEntity): void
+    {
+        static::$accessTokenEntity = $accessTokenEntity;
+    }
+
+    /**
      * Set the auth code model class name.
      *
-     * @param  string  $authCodeModel
-     * @return void
+     * @param  class-string<\Laravel\Passport\AuthCode>  $authCodeModel
      */
-    public static function useAuthCodeModel($authCodeModel)
+    public static function useAuthCodeModel(string $authCodeModel): void
     {
         static::$authCodeModel = $authCodeModel;
     }
@@ -483,30 +462,63 @@ class Passport
     /**
      * Get the auth code model class name.
      *
-     * @return string
+     * @return class-string<\Laravel\Passport\AuthCode>
      */
-    public static function authCodeModel()
+    public static function authCodeModel(): string
     {
         return static::$authCodeModel;
     }
 
     /**
      * Get a new auth code model instance.
-     *
-     * @return \Laravel\Passport\AuthCode
      */
-    public static function authCode()
+    public static function authCode(): AuthCode
     {
         return new static::$authCodeModel;
     }
 
     /**
+     * Set the default ResponseType that should be used by the authorization server.
+     */
+    public static function useAuthorizationServerResponseType(?ResponseTypeInterface $authorizationServerResponseType): void
+    {
+        static::$authorizationServerResponseType = $authorizationServerResponseType;
+    }
+
+    /**
+     * Set the device code model class name.
+     *
+     * @param  class-string<\Laravel\Passport\DeviceCode>  $deviceCodeModel
+     */
+    public static function useDeviceCodeModel(string $deviceCodeModel): void
+    {
+        static::$deviceCodeModel = $deviceCodeModel;
+    }
+
+    /**
+     * Get the device code model class name.
+     *
+     * @return class-string<\Laravel\Passport\DeviceCode>
+     */
+    public static function deviceCodeModel(): string
+    {
+        return static::$deviceCodeModel;
+    }
+
+    /**
+     * Get a new device code model instance.
+     */
+    public static function deviceCode(): DeviceCode
+    {
+        return new static::$deviceCodeModel;
+    }
+
+    /**
      * Set the client model class name.
      *
-     * @param  string  $clientModel
-     * @return void
+     * @param  class-string<\Laravel\Passport\Client>  $clientModel
      */
-    public static function useClientModel($clientModel)
+    public static function useClientModel(string $clientModel): void
     {
         static::$clientModel = $clientModel;
     }
@@ -514,82 +526,27 @@ class Passport
     /**
      * Get the client model class name.
      *
-     * @return string
+     * @return class-string<\Laravel\Passport\Client>
      */
-    public static function clientModel()
+    public static function clientModel(): string
     {
         return static::$clientModel;
     }
 
     /**
      * Get a new client model instance.
-     *
-     * @return \Laravel\Passport\Client
      */
-    public static function client()
+    public static function client(): Client
     {
         return new static::$clientModel;
     }
 
     /**
-     * Determine if clients are identified using UUIDs.
-     *
-     * @return bool
-     */
-    public static function clientUuids()
-    {
-        return static::$clientUuids;
-    }
-
-    /**
-     * Specify if clients are identified using UUIDs.
-     *
-     * @param  bool  $value
-     * @return void
-     */
-    public static function setClientUuids($value)
-    {
-        static::$clientUuids = $value;
-    }
-
-    /**
-     * Set the personal access client model class name.
-     *
-     * @param  string  $clientModel
-     * @return void
-     */
-    public static function usePersonalAccessClientModel($clientModel)
-    {
-        static::$personalAccessClientModel = $clientModel;
-    }
-
-    /**
-     * Get the personal access client model class name.
-     *
-     * @return string
-     */
-    public static function personalAccessClientModel()
-    {
-        return static::$personalAccessClientModel;
-    }
-
-    /**
-     * Get a new personal access client model instance.
-     *
-     * @return \Laravel\Passport\PersonalAccessClient
-     */
-    public static function personalAccessClient()
-    {
-        return new static::$personalAccessClientModel;
-    }
-
-    /**
      * Set the token model class name.
      *
-     * @param  string  $tokenModel
-     * @return void
+     * @param  class-string<\Laravel\Passport\Token>  $tokenModel
      */
-    public static function useTokenModel($tokenModel)
+    public static function useTokenModel(string $tokenModel): void
     {
         static::$tokenModel = $tokenModel;
     }
@@ -597,19 +554,17 @@ class Passport
     /**
      * Get the token model class name.
      *
-     * @return string
+     * @return class-string<\Laravel\Passport\Token>
      */
-    public static function tokenModel()
+    public static function tokenModel(): string
     {
         return static::$tokenModel;
     }
 
     /**
      * Get a new personal access client model instance.
-     *
-     * @return \Laravel\Passport\Token
      */
-    public static function token()
+    public static function token(): Token
     {
         return new static::$tokenModel;
     }
@@ -617,10 +572,9 @@ class Passport
     /**
      * Set the refresh token model class name.
      *
-     * @param  string  $refreshTokenModel
-     * @return void
+     * @param  class-string<\Laravel\Passport\RefreshToken>  $refreshTokenModel
      */
-    public static function useRefreshTokenModel($refreshTokenModel)
+    public static function useRefreshTokenModel(string $refreshTokenModel): void
     {
         static::$refreshTokenModel = $refreshTokenModel;
     }
@@ -628,94 +582,128 @@ class Passport
     /**
      * Get the refresh token model class name.
      *
-     * @return string
+     * @return class-string<\Laravel\Passport\RefreshToken>
      */
-    public static function refreshTokenModel()
+    public static function refreshTokenModel(): string
     {
         return static::$refreshTokenModel;
     }
 
     /**
      * Get a new refresh token model instance.
-     *
-     * @return \Laravel\Passport\RefreshToken
      */
-    public static function refreshToken()
+    public static function refreshToken(): RefreshToken
     {
         return new static::$refreshTokenModel;
     }
 
     /**
-     * Configure Passport to hash client credential secrets.
-     *
-     * @return static
-     */
-    public static function hashClientSecrets()
-    {
-        static::$hashesClientSecrets = true;
-
-        return new static;
-    }
-
-    /**
      * Specify the callback that should be invoked to generate encryption keys for encrypting JWT tokens.
      *
-     * @param  callable  $callback
-     * @return static
+     * @param  (\Closure(\Illuminate\Contracts\Encryption\Encrypter): string)|null  $callback
      */
-    public static function encryptTokensUsing($callback)
+    public static function encryptTokensUsing(?Closure $callback): void
     {
         static::$tokenEncryptionKeyCallback = $callback;
-
-        return new static;
     }
 
     /**
      * Generate an encryption key for encrypting JWT tokens.
-     *
-     * @param  \Illuminate\Contracts\Encryption\Encrypter  $encrypter
-     * @return string
      */
-    public static function tokenEncryptionKey(Encrypter $encrypter)
+    public static function tokenEncryptionKey(Encrypter $encrypter): string
     {
-        return is_callable(static::$tokenEncryptionKeyCallback) ?
-            (static::$tokenEncryptionKeyCallback)($encrypter) :
-            $encrypter->getKey();
+        return is_callable(static::$tokenEncryptionKeyCallback)
+            ? (static::$tokenEncryptionKeyCallback)($encrypter)
+            : $encrypter->getKey();
     }
 
     /**
-     * Configure Passport to not register its migrations.
-     *
-     * @return static
+     * Register the views for Passport using conventional names under the given namespace.
      */
-    public static function ignoreMigrations()
+    public static function viewNamespace(string $namespace): void
     {
-        static::$runsMigrations = false;
+        static::viewPrefix($namespace.'::');
+    }
 
-        return new static;
+    /**
+     * Register the views for Passport using conventional names under the given prefix.
+     */
+    public static function viewPrefix(string $prefix): void
+    {
+        $prefix = rtrim($prefix, '.');
+
+        static::authorizationView($prefix.'.authorize');
+        static::deviceAuthorizationView($prefix.'.device.authorize');
+        static::deviceUserCodeView($prefix.'.device.user-code');
+    }
+
+    /**
+     * Specify which view should be used as the authorization view.
+     *
+     * @param  (\Closure(array<string, mixed>): (\Symfony\Component\HttpFoundation\Response))|string  $view
+     */
+    public static function authorizationView(Closure|string $view): void
+    {
+        app()->singleton(AuthorizationViewResponse::class, fn () => new SimpleViewResponse($view));
+    }
+
+    /**
+     * Specify which view should be used as the device authorization view.
+     *
+     * @param  (\Closure(array<string, mixed>): (\Symfony\Component\HttpFoundation\Response))|string  $view
+     */
+    public static function deviceAuthorizationView(Closure|string $view): void
+    {
+        app()->singleton(DeviceAuthorizationViewResponse::class, fn () => new SimpleViewResponse($view));
+    }
+
+    /**
+     * Specify which view should be used as the device user code view.
+     *
+     * @param  (\Closure(array<string, mixed>): (\Symfony\Component\HttpFoundation\Response))|string  $view
+     */
+    public static function deviceUserCodeView(Closure|string $view): void
+    {
+        app()->singleton(DeviceUserCodeViewResponse::class, fn () => new SimpleViewResponse($view));
+    }
+
+    /**
+     * Configure Passport to not register its routes.
+     */
+    public static function ignoreRoutes(): void
+    {
+        static::$registersRoutes = false;
     }
 
     /**
      * Instruct Passport to enable cookie serialization.
-     *
-     * @return static
      */
-    public static function withCookieSerialization()
+    public static function withCookieSerialization(): void
     {
         static::$unserializesCookies = true;
-
-        return new static;
     }
 
     /**
      * Instruct Passport to disable cookie serialization.
-     *
-     * @return static
      */
-    public static function withoutCookieSerialization()
+    public static function withoutCookieSerialization(): void
     {
         static::$unserializesCookies = false;
+    }
 
-        return new static;
+    /**
+     * Instruct Passport to enable cookie encryption.
+     */
+    public static function withCookieEncryption(): void
+    {
+        static::$decryptsCookies = true;
+    }
+
+    /**
+     * Instruct Passport to disable cookie encryption.
+     */
+    public static function withoutCookieEncryption(): void
+    {
+        static::$decryptsCookies = false;
     }
 }

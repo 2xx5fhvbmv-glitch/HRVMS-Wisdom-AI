@@ -2,53 +2,31 @@
 
 namespace Laravel\Passport;
 
-use Carbon\Carbon;
 use Firebase\JWT\JWT;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Encryption\Encrypter;
+use Illuminate\Support\Facades\Date;
 use Symfony\Component\HttpFoundation\Cookie;
 
 class ApiTokenCookieFactory
 {
     /**
-     * The configuration repository implementation.
-     *
-     * @var \Illuminate\Contracts\Config\Repository
-     */
-    protected $config;
-
-    /**
-     * The encrypter implementation.
-     *
-     * @var \Illuminate\Contracts\Encryption\Encrypter
-     */
-    protected $encrypter;
-
-    /**
      * Create an API token cookie factory instance.
-     *
-     * @param  \Illuminate\Contracts\Config\Repository  $config
-     * @param  \Illuminate\Contracts\Encryption\Encrypter  $encrypter
-     * @return void
      */
-    public function __construct(Config $config, Encrypter $encrypter)
-    {
-        $this->config = $config;
-        $this->encrypter = $encrypter;
+    public function __construct(
+        protected Config $config,
+        protected Encrypter $encrypter,
+    ) {
     }
 
     /**
      * Create a new API token cookie.
-     *
-     * @param  mixed  $userId
-     * @param  string  $csrfToken
-     * @return \Symfony\Component\HttpFoundation\Cookie
      */
-    public function make($userId, $csrfToken)
+    public function make(string|int $userId, string $csrfToken): Cookie
     {
         $config = $this->config->get('session');
 
-        $expiration = Carbon::now()->addMinutes($config['lifetime']);
+        $expiration = Date::now()->addMinutes((int) $config['lifetime'])->getTimestamp();
 
         return new Cookie(
             Passport::cookie(),
@@ -59,24 +37,20 @@ class ApiTokenCookieFactory
             $config['secure'],
             true,
             false,
-            $config['same_site'] ?? null
+            $config['same_site'] ?? null,
+            $config['partitioned'] ?? false
         );
     }
 
     /**
      * Create a new JWT token for the given user ID and CSRF token.
-     *
-     * @param  mixed  $userId
-     * @param  string  $csrfToken
-     * @param  \Carbon\Carbon  $expiration
-     * @return string
      */
-    protected function createToken($userId, $csrfToken, Carbon $expiration)
+    protected function createToken(string|int $userId, string $csrfToken, int $expiration): string
     {
         return JWT::encode([
             'sub' => $userId,
             'csrf' => $csrfToken,
-            'expiry' => $expiration->getTimestamp(),
+            'exp' => $expiration,
         ], Passport::tokenEncryptionKey($this->encrypter), 'HS256');
     }
 }

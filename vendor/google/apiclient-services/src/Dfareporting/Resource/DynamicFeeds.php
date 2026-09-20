@@ -58,6 +58,37 @@ class DynamicFeeds extends \Google\Service\Resource
     $params = array_merge($params, $optParams);
     return $this->call('insert', [$params], DynamicFeed::class);
   }
+  /**
+   * Retransforms a dynamic feed. Only draft feeds can be retransformed (i.e. the
+   * feed has not been published). (dynamicFeeds.retransform)
+   *
+   * @param string $dynamicFeedId Required. Dynamic feed ID.
+   * @param array $optParams Optional parameters.
+   * @return DynamicFeed
+   * @throws \Google\Service\Exception
+   */
+  public function retransform($dynamicFeedId, $optParams = [])
+  {
+    $params = ['dynamicFeedId' => $dynamicFeedId];
+    $params = array_merge($params, $optParams);
+    return $this->call('retransform', [$params], DynamicFeed::class);
+  }
+  /**
+   * Updates a new dynamic feed. For draft feeds, only Element can be updated. For
+   * published feeds, only FeedSchedule can be updated. Other fields will be
+   * ignored. (dynamicFeeds.update)
+   *
+   * @param DynamicFeed $postBody
+   * @param array $optParams Optional parameters.
+   * @return DynamicFeed
+   * @throws \Google\Service\Exception
+   */
+  public function update(DynamicFeed $postBody, $optParams = [])
+  {
+    $params = ['postBody' => $postBody];
+    $params = array_merge($params, $optParams);
+    return $this->call('update', [$params], DynamicFeed::class);
+  }
 }
 
 // Adding a class alias for backwards compatibility with the previous class name.

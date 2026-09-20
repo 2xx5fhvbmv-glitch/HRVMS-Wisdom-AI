@@ -19,6 +19,20 @@ namespace Google\Service\DataManager;
 
 class ProductAccount extends \Google\Model
 {
+  public const ACCOUNT_TYPE_ACCOUNT_TYPE_UNSPECIFIED = 'ACCOUNT_TYPE_UNSPECIFIED';
+  public const ACCOUNT_TYPE_GOOGLE_ADS = 'GOOGLE_ADS';
+  public const ACCOUNT_TYPE_DISPLAY_VIDEO_PARTNER = 'DISPLAY_VIDEO_PARTNER';
+  public const ACCOUNT_TYPE_DISPLAY_VIDEO_ADVERTISER = 'DISPLAY_VIDEO_ADVERTISER';
+  public const ACCOUNT_TYPE_DATA_PARTNER = 'DATA_PARTNER';
+  public const ACCOUNT_TYPE_GOOGLE_ANALYTICS_PROPERTY = 'GOOGLE_ANALYTICS_PROPERTY';
+  public const ACCOUNT_TYPE_GOOGLE_AD_MANAGER_AUDIENCE_LINK = 'GOOGLE_AD_MANAGER_AUDIENCE_LINK';
+  public const ACCOUNT_TYPE_FLOODLIGHT_CONFIG = 'FLOODLIGHT_CONFIG';
+  public const ACCOUNT_TYPE_GOOGLE_AD_MANAGER = 'GOOGLE_AD_MANAGER';
+  public const PRODUCT_PRODUCT_UNSPECIFIED = 'PRODUCT_UNSPECIFIED';
+  public const PRODUCT_GOOGLE_ADS = 'GOOGLE_ADS';
+  public const PRODUCT_DISPLAY_VIDEO_PARTNER = 'DISPLAY_VIDEO_PARTNER';
+  public const PRODUCT_DISPLAY_VIDEO_ADVERTISER = 'DISPLAY_VIDEO_ADVERTISER';
+  public const PRODUCT_DATA_PARTNER = 'DATA_PARTNER';
   /**
    * @var string
    */
@@ -28,12 +42,13 @@ class ProductAccount extends \Google\Model
    */
   public $accountType;
   /**
+   * @deprecated
    * @var string
    */
   public $product;
 
   /**
-   * @param string
+   * @param string $accountId
    */
   public function setAccountId($accountId)
   {
@@ -47,28 +62,30 @@ class ProductAccount extends \Google\Model
     return $this->accountId;
   }
   /**
-   * @param string
+   * @param self::ACCOUNT_TYPE_* $accountType
    */
   public function setAccountType($accountType)
   {
     $this->accountType = $accountType;
   }
   /**
-   * @return string
+   * @return self::ACCOUNT_TYPE_*
    */
   public function getAccountType()
   {
     return $this->accountType;
   }
   /**
-   * @param string
+   * @deprecated
+   * @param self::PRODUCT_* $product
    */
   public function setProduct($product)
   {
     $this->product = $product;
   }
   /**
-   * @return string
+   * @deprecated
+   * @return self::PRODUCT_*
    */
   public function getProduct()
   {

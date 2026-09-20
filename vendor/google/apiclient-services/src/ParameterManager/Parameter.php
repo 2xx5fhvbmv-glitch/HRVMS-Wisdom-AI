@@ -20,34 +20,79 @@ namespace Google\Service\ParameterManager;
 class Parameter extends \Google\Model
 {
   /**
+   * The default / unset value. The API will default to the UNFORMATTED format.
+   */
+  public const FORMAT_PARAMETER_FORMAT_UNSPECIFIED = 'PARAMETER_FORMAT_UNSPECIFIED';
+  /**
+   * Unformatted.
+   */
+  public const FORMAT_UNFORMATTED = 'UNFORMATTED';
+  /**
+   * YAML format.
+   */
+  public const FORMAT_YAML = 'YAML';
+  /**
+   * JSON format.
+   */
+  public const FORMAT_JSON = 'JSON';
+  /**
+   * Output only. [Output only] Create time stamp
+   *
    * @var string
    */
   public $createTime;
   /**
+   * Optional. Specifies the format of a Parameter.
+   *
    * @var string
    */
   public $format;
   /**
+   * Optional. Customer managed encryption key (CMEK) to use for encrypting the
+   * Parameter Versions. If not set, the default Google-managed encryption key
+   * will be used. Cloud KMS CryptoKeys must reside in the same location as the
+   * Parameter. The expected format is `projects/locations/keyRings/cryptoKeys`.
+   *
    * @var string
    */
   public $kmsKey;
   /**
+   * Optional. Labels as key value pairs
+   *
    * @var string[]
    */
   public $labels;
   /**
+   * Identifier. [Output only] The resource name of the Parameter in the format
+   * `projects/locations/parameters`.
+   *
    * @var string
    */
   public $name;
   protected $policyMemberType = ResourcePolicyMember::class;
   protected $policyMemberDataType = '';
   /**
+   * Optional. Input only. Immutable. Tag keys and tag values that are bound to
+   * this Parameter. You must represent each item in the map as: `"" : ""`. For
+   * example, a single resource can have the following tags: ```
+   * "123/environment": "production", "123/costCenter": "marketing", ``` Tags
+   * are used to organize and group resources. Tags can be used to control
+   * policy evaluation for the resource.
+   *
+   * @var string[]
+   */
+  public $tags;
+  /**
+   * Output only. [Output only] Update time stamp
+   *
    * @var string
    */
   public $updateTime;
 
   /**
-   * @param string
+   * Output only. [Output only] Create time stamp
+   *
+   * @param string $createTime
    */
   public function setCreateTime($createTime)
   {
@@ -61,21 +106,30 @@ class Parameter extends \Google\Model
     return $this->createTime;
   }
   /**
-   * @param string
+   * Optional. Specifies the format of a Parameter.
+   *
+   * Accepted values: PARAMETER_FORMAT_UNSPECIFIED, UNFORMATTED, YAML, JSON
+   *
+   * @param self::FORMAT_* $format
    */
   public function setFormat($format)
   {
     $this->format = $format;
   }
   /**
-   * @return string
+   * @return self::FORMAT_*
    */
   public function getFormat()
   {
     return $this->format;
   }
   /**
-   * @param string
+   * Optional. Customer managed encryption key (CMEK) to use for encrypting the
+   * Parameter Versions. If not set, the default Google-managed encryption key
+   * will be used. Cloud KMS CryptoKeys must reside in the same location as the
+   * Parameter. The expected format is `projects/locations/keyRings/cryptoKeys`.
+   *
+   * @param string $kmsKey
    */
   public function setKmsKey($kmsKey)
   {
@@ -89,7 +143,9 @@ class Parameter extends \Google\Model
     return $this->kmsKey;
   }
   /**
-   * @param string[]
+   * Optional. Labels as key value pairs
+   *
+   * @param string[] $labels
    */
   public function setLabels($labels)
   {
@@ -103,7 +159,10 @@ class Parameter extends \Google\Model
     return $this->labels;
   }
   /**
-   * @param string
+   * Identifier. [Output only] The resource name of the Parameter in the format
+   * `projects/locations/parameters`.
+   *
+   * @param string $name
    */
   public function setName($name)
   {
@@ -117,7 +176,10 @@ class Parameter extends \Google\Model
     return $this->name;
   }
   /**
-   * @param ResourcePolicyMember
+   * Output only. [Output-only] policy member strings of a Google Cloud
+   * resource.
+   *
+   * @param ResourcePolicyMember $policyMember
    */
   public function setPolicyMember(ResourcePolicyMember $policyMember)
   {
@@ -131,7 +193,30 @@ class Parameter extends \Google\Model
     return $this->policyMember;
   }
   /**
-   * @param string
+   * Optional. Input only. Immutable. Tag keys and tag values that are bound to
+   * this Parameter. You must represent each item in the map as: `"" : ""`. For
+   * example, a single resource can have the following tags: ```
+   * "123/environment": "production", "123/costCenter": "marketing", ``` Tags
+   * are used to organize and group resources. Tags can be used to control
+   * policy evaluation for the resource.
+   *
+   * @param string[] $tags
+   */
+  public function setTags($tags)
+  {
+    $this->tags = $tags;
+  }
+  /**
+   * @return string[]
+   */
+  public function getTags()
+  {
+    return $this->tags;
+  }
+  /**
+   * Output only. [Output only] Update time stamp
+   *
+   * @param string $updateTime
    */
   public function setUpdateTime($updateTime)
   {

@@ -20,20 +20,55 @@ namespace Google\Service\Aiplatform;
 class GoogleCloudAiplatformV1OutputFieldSpec extends \Google\Model
 {
   /**
+   * The field type is not specified. Defaults to CONTENT.
+   */
+  public const FIELD_TYPE_FIELD_TYPE_UNSPECIFIED = 'FIELD_TYPE_UNSPECIFIED';
+  /**
+   * The field can contain any type of content, including text, images, and
+   * audio.
+   */
+  public const FIELD_TYPE_CONTENT = 'CONTENT';
+  /**
+   * The field contains only text.
+   */
+  public const FIELD_TYPE_TEXT = 'TEXT';
+  /**
+   * The field contains image data.
+   */
+  public const FIELD_TYPE_IMAGE = 'IMAGE';
+  /**
+   * The field contains audio data.
+   */
+  public const FIELD_TYPE_AUDIO = 'AUDIO';
+  /**
+   * Required. The name of this field in the generated synthetic data, such as
+   * "email_subject" or "customer_review".
+   *
    * @var string
    */
   public $fieldName;
   /**
+   * Optional. The data type of the field. Defaults to CONTENT if not set.
+   *
    * @var string
    */
   public $fieldType;
   /**
+   * Optional. Specific instructions for the large language model on how to
+   * generate content for this particular field. While the LLM can sometimes
+   * infer content from the field name, providing explicit guidance is
+   * preferred. For example, for a field named "review", the guidance could be
+   * "A positive review about a coffee maker."
+   *
    * @var string
    */
   public $guidance;
 
   /**
-   * @param string
+   * Required. The name of this field in the generated synthetic data, such as
+   * "email_subject" or "customer_review".
+   *
+   * @param string $fieldName
    */
   public function setFieldName($fieldName)
   {
@@ -47,21 +82,31 @@ class GoogleCloudAiplatformV1OutputFieldSpec extends \Google\Model
     return $this->fieldName;
   }
   /**
-   * @param string
+   * Optional. The data type of the field. Defaults to CONTENT if not set.
+   *
+   * Accepted values: FIELD_TYPE_UNSPECIFIED, CONTENT, TEXT, IMAGE, AUDIO
+   *
+   * @param self::FIELD_TYPE_* $fieldType
    */
   public function setFieldType($fieldType)
   {
     $this->fieldType = $fieldType;
   }
   /**
-   * @return string
+   * @return self::FIELD_TYPE_*
    */
   public function getFieldType()
   {
     return $this->fieldType;
   }
   /**
-   * @param string
+   * Optional. Specific instructions for the large language model on how to
+   * generate content for this particular field. While the LLM can sometimes
+   * infer content from the field name, providing explicit guidance is
+   * preferred. For example, for a field named "review", the guidance could be
+   * "A positive review about a coffee maker."
+   *
+   * @param string $guidance
    */
   public function setGuidance($guidance)
   {

@@ -19,6 +19,11 @@ namespace Google\Service\SecurityCommandCenter;
 
 class GoogleCloudSecuritycenterV2AiModel extends \Google\Model
 {
+  public const DEPLOYMENT_PLATFORM_DEPLOYMENT_PLATFORM_UNSPECIFIED = 'DEPLOYMENT_PLATFORM_UNSPECIFIED';
+  public const DEPLOYMENT_PLATFORM_VERTEX_AI = 'VERTEX_AI';
+  public const DEPLOYMENT_PLATFORM_GKE = 'GKE';
+  public const DEPLOYMENT_PLATFORM_GCE = 'GCE';
+  public const DEPLOYMENT_PLATFORM_FINE_TUNED_MODEL = 'FINE_TUNED_MODEL';
   /**
    * @var string
    */
@@ -47,23 +52,27 @@ class GoogleCloudSecuritycenterV2AiModel extends \Google\Model
    * @var string
    */
   public $publisher;
+  /**
+   * @var string
+   */
+  public $usageCategory;
 
   /**
-   * @param string
+   * @param self::DEPLOYMENT_PLATFORM_* $deploymentPlatform
    */
   public function setDeploymentPlatform($deploymentPlatform)
   {
     $this->deploymentPlatform = $deploymentPlatform;
   }
   /**
-   * @return string
+   * @return self::DEPLOYMENT_PLATFORM_*
    */
   public function getDeploymentPlatform()
   {
     return $this->deploymentPlatform;
   }
   /**
-   * @param string
+   * @param string $displayName
    */
   public function setDisplayName($displayName)
   {
@@ -77,7 +86,7 @@ class GoogleCloudSecuritycenterV2AiModel extends \Google\Model
     return $this->displayName;
   }
   /**
-   * @param string
+   * @param string $domain
    */
   public function setDomain($domain)
   {
@@ -91,7 +100,7 @@ class GoogleCloudSecuritycenterV2AiModel extends \Google\Model
     return $this->domain;
   }
   /**
-   * @param string
+   * @param string $library
    */
   public function setLibrary($library)
   {
@@ -105,7 +114,7 @@ class GoogleCloudSecuritycenterV2AiModel extends \Google\Model
     return $this->library;
   }
   /**
-   * @param string
+   * @param string $location
    */
   public function setLocation($location)
   {
@@ -119,7 +128,7 @@ class GoogleCloudSecuritycenterV2AiModel extends \Google\Model
     return $this->location;
   }
   /**
-   * @param string
+   * @param string $name
    */
   public function setName($name)
   {
@@ -133,7 +142,7 @@ class GoogleCloudSecuritycenterV2AiModel extends \Google\Model
     return $this->name;
   }
   /**
-   * @param string
+   * @param string $publisher
    */
   public function setPublisher($publisher)
   {
@@ -145,6 +154,20 @@ class GoogleCloudSecuritycenterV2AiModel extends \Google\Model
   public function getPublisher()
   {
     return $this->publisher;
+  }
+  /**
+   * @param string $usageCategory
+   */
+  public function setUsageCategory($usageCategory)
+  {
+    $this->usageCategory = $usageCategory;
+  }
+  /**
+   * @return string
+   */
+  public function getUsageCategory()
+  {
+    return $this->usageCategory;
   }
 }
 

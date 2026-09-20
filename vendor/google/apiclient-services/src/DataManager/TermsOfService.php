@@ -19,20 +19,23 @@ namespace Google\Service\DataManager;
 
 class TermsOfService extends \Google\Model
 {
+  public const CUSTOMER_MATCH_TERMS_OF_SERVICE_STATUS_TERMS_OF_SERVICE_STATUS_UNSPECIFIED = 'TERMS_OF_SERVICE_STATUS_UNSPECIFIED';
+  public const CUSTOMER_MATCH_TERMS_OF_SERVICE_STATUS_ACCEPTED = 'ACCEPTED';
+  public const CUSTOMER_MATCH_TERMS_OF_SERVICE_STATUS_REJECTED = 'REJECTED';
   /**
    * @var string
    */
   public $customerMatchTermsOfServiceStatus;
 
   /**
-   * @param string
+   * @param self::CUSTOMER_MATCH_TERMS_OF_SERVICE_STATUS_* $customerMatchTermsOfServiceStatus
    */
   public function setCustomerMatchTermsOfServiceStatus($customerMatchTermsOfServiceStatus)
   {
     $this->customerMatchTermsOfServiceStatus = $customerMatchTermsOfServiceStatus;
   }
   /**
-   * @return string
+   * @return self::CUSTOMER_MATCH_TERMS_OF_SERVICE_STATUS_*
    */
   public function getCustomerMatchTermsOfServiceStatus()
   {

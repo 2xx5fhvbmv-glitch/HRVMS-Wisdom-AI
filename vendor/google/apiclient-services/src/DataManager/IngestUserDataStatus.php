@@ -19,6 +19,17 @@ namespace Google\Service\DataManager;
 
 class IngestUserDataStatus extends \Google\Model
 {
+  public const UPLOAD_MATCH_RATE_RANGE_MATCH_RATE_RANGE_UNKNOWN = 'MATCH_RATE_RANGE_UNKNOWN';
+  public const UPLOAD_MATCH_RATE_RANGE_MATCH_RATE_RANGE_NOT_ELIGIBLE = 'MATCH_RATE_RANGE_NOT_ELIGIBLE';
+  public const UPLOAD_MATCH_RATE_RANGE_MATCH_RATE_RANGE_LESS_THAN_20 = 'MATCH_RATE_RANGE_LESS_THAN_20';
+  public const UPLOAD_MATCH_RATE_RANGE_MATCH_RATE_RANGE_20_TO_30 = 'MATCH_RATE_RANGE_20_TO_30';
+  public const UPLOAD_MATCH_RATE_RANGE_MATCH_RATE_RANGE_31_TO_40 = 'MATCH_RATE_RANGE_31_TO_40';
+  public const UPLOAD_MATCH_RATE_RANGE_MATCH_RATE_RANGE_41_TO_50 = 'MATCH_RATE_RANGE_41_TO_50';
+  public const UPLOAD_MATCH_RATE_RANGE_MATCH_RATE_RANGE_51_TO_60 = 'MATCH_RATE_RANGE_51_TO_60';
+  public const UPLOAD_MATCH_RATE_RANGE_MATCH_RATE_RANGE_61_TO_70 = 'MATCH_RATE_RANGE_61_TO_70';
+  public const UPLOAD_MATCH_RATE_RANGE_MATCH_RATE_RANGE_71_TO_80 = 'MATCH_RATE_RANGE_71_TO_80';
+  public const UPLOAD_MATCH_RATE_RANGE_MATCH_RATE_RANGE_81_TO_90 = 'MATCH_RATE_RANGE_81_TO_90';
+  public const UPLOAD_MATCH_RATE_RANGE_MATCH_RATE_RANGE_91_TO_100 = 'MATCH_RATE_RANGE_91_TO_100';
   /**
    * @var string
    */
@@ -33,7 +44,7 @@ class IngestUserDataStatus extends \Google\Model
   public $userIdentifierCount;
 
   /**
-   * @param string
+   * @param string $recordCount
    */
   public function setRecordCount($recordCount)
   {
@@ -47,21 +58,21 @@ class IngestUserDataStatus extends \Google\Model
     return $this->recordCount;
   }
   /**
-   * @param string
+   * @param self::UPLOAD_MATCH_RATE_RANGE_* $uploadMatchRateRange
    */
   public function setUploadMatchRateRange($uploadMatchRateRange)
   {
     $this->uploadMatchRateRange = $uploadMatchRateRange;
   }
   /**
-   * @return string
+   * @return self::UPLOAD_MATCH_RATE_RANGE_*
    */
   public function getUploadMatchRateRange()
   {
     return $this->uploadMatchRateRange;
   }
   /**
-   * @param string
+   * @param string $userIdentifierCount
    */
   public function setUserIdentifierCount($userIdentifierCount)
   {

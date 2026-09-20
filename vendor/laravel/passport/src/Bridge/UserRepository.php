@@ -4,34 +4,29 @@ namespace Laravel\Passport\Bridge;
 
 use Illuminate\Contracts\Hashing\Hasher;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
+use League\OAuth2\Server\Entities\UserEntityInterface;
 use League\OAuth2\Server\Repositories\UserRepositoryInterface;
 use RuntimeException;
 
 class UserRepository implements UserRepositoryInterface
 {
     /**
-     * The hasher implementation.
-     *
-     * @var \Illuminate\Contracts\Hashing\Hasher
-     */
-    protected $hasher;
-
-    /**
      * Create a new repository instance.
-     *
-     * @param  \Illuminate\Contracts\Hashing\Hasher  $hasher
-     * @return void
      */
-    public function __construct(Hasher $hasher)
-    {
-        $this->hasher = $hasher;
+    public function __construct(
+        protected Hasher $hasher,
+    ) {
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getUserEntityByUserCredentials($username, $password, $grantType, ClientEntityInterface $clientEntity)
-    {
+    public function getUserEntityByUserCredentials(
+        string $username,
+        string $password,
+        string $grantType,
+        ClientEntityInterface $clientEntity
+    ): ?UserEntityInterface {
         $provider = $clientEntity->provider ?: config('auth.guards.api.provider');
 
         if (is_null($model = config('auth.providers.'.$provider.'.model'))) {
@@ -39,31 +34,27 @@ class UserRepository implements UserRepositoryInterface
         }
 
         if (method_exists($model, 'findAndValidateForPassport')) {
-            $user = (new $model)->findAndValidateForPassport($username, $password);
+            $user = (new $model)->findAndValidateForPassport($username, $password, $clientEntity);
 
-            if (! $user) {
-                return;
-            }
-
-            return new User($user->getAuthIdentifier());
+            return $user ? new User($user->getAuthIdentifier()) : null;
         }
 
-        if (method_exists($model, 'findForPassport')) {
-            $user = (new $model)->findForPassport($username);
-        } else {
-            $user = (new $model)->where('email', $username)->first();
-        }
+        $user = method_exists($model, 'findForPassport')
+            ? (new $model)->findForPassport($username, $clientEntity)
+            : (new $model)->where('email', $username)->first();
 
         if (! $user) {
-            return;
-        } elseif (method_exists($user, 'validateForPassportPasswordGrant')) {
-            if (! $user->validateForPassportPasswordGrant($password)) {
-                return;
-            }
-        } elseif (! $this->hasher->check($password, $user->getAuthPassword())) {
-            return;
+            return null;
         }
 
-        return new User($user->getAuthIdentifier());
+        if (method_exists($user, 'validateForPassportPasswordGrant')) {
+            return $user->validateForPassportPasswordGrant($password)
+                ? new User($user->getAuthIdentifier())
+                : null;
+        }
+
+        return $this->hasher->check($password, $user->getAuthPassword())
+            ? new User($user->getAuthIdentifier())
+            : null;
     }
 }

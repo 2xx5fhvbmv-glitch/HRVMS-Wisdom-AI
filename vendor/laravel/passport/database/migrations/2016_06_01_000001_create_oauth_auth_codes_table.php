@@ -4,21 +4,17 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class() extends Migration
+return new class extends Migration
 {
     /**
      * Run the migrations.
-     *
-     * @return void
      */
-    public function up()
+    public function up(): void
     {
-        $schema = Schema::connection($this->getConnection());
-
-        $schema->create('oauth_auth_codes', function (Blueprint $table) {
-            $table->string('id', 100)->primary();
-            $table->unsignedBigInteger('user_id')->index();
-            $table->unsignedBigInteger('client_id');
+        Schema::create('oauth_auth_codes', function (Blueprint $table) {
+            $table->char('id', 80)->primary();
+            $table->foreignId('user_id')->index();
+            $table->foreignUuid('client_id');
             $table->text('scopes')->nullable();
             $table->boolean('revoked');
             $table->dateTime('expires_at')->nullable();
@@ -27,23 +23,17 @@ return new class() extends Migration
 
     /**
      * Reverse the migrations.
-     *
-     * @return void
      */
-    public function down()
+    public function down(): void
     {
-        $schema = Schema::connection($this->getConnection());
-
-        $schema->dropIfExists('oauth_auth_codes');
+        Schema::dropIfExists('oauth_auth_codes');
     }
 
     /**
      * Get the migration connection name.
-     *
-     * @return string|null
      */
-    public function getConnection()
+    public function getConnection(): ?string
     {
-        return config('passport.storage.database.connection');
+        return $this->connection ?? config('passport.connection');
     }
 };

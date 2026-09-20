@@ -20,27 +20,13 @@ namespace Google\Service\WorkloadManager;
 class ListRulesResponse extends \Google\Collection
 {
   protected $collection_key = 'rules';
-  protected $invalidRulesWrapperType = InvalidRulesWrapper::class;
-  protected $invalidRulesWrapperDataType = '';
   protected $rulesType = Rule::class;
   protected $rulesDataType = 'array';
 
   /**
-   * @param InvalidRulesWrapper
-   */
-  public function setInvalidRulesWrapper(InvalidRulesWrapper $invalidRulesWrapper)
-  {
-    $this->invalidRulesWrapper = $invalidRulesWrapper;
-  }
-  /**
-   * @return InvalidRulesWrapper
-   */
-  public function getInvalidRulesWrapper()
-  {
-    return $this->invalidRulesWrapper;
-  }
-  /**
-   * @param Rule[]
+   * All rules in response.
+   *
+   * @param Rule[] $rules
    */
   public function setRules($rules)
   {

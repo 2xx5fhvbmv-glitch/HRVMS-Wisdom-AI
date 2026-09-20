@@ -22,7 +22,7 @@ class ConsolidateBudgetImport implements ToCollection
         $this->resort = Auth::guard('resort-admin')->user();
     }
 
-    public function collection(Collection $collection)
+    public function collection(Collection $collection): void
     {
         // Fetch the headers
         $allHeaders = $collection->first()->toArray();

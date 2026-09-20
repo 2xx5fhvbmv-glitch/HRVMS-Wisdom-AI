@@ -29,7 +29,7 @@ class RemoveMobileDataStatus extends \Google\Model
   public $recordCount;
 
   /**
-   * @param string
+   * @param string $mobileIdCount
    */
   public function setMobileIdCount($mobileIdCount)
   {
@@ -43,7 +43,7 @@ class RemoveMobileDataStatus extends \Google\Model
     return $this->mobileIdCount;
   }
   /**
-   * @param string
+   * @param string $recordCount
    */
   public function setRecordCount($recordCount)
   {

@@ -19,6 +19,9 @@ namespace Google\Service\SecurityCommandCenter;
 
 class GoogleCloudSecuritycenterV2CloudControl extends \Google\Model
 {
+  public const TYPE_CLOUD_CONTROL_TYPE_UNSPECIFIED = 'CLOUD_CONTROL_TYPE_UNSPECIFIED';
+  public const TYPE_BUILT_IN = 'BUILT_IN';
+  public const TYPE_CUSTOM = 'CUSTOM';
   /**
    * @var string
    */
@@ -37,7 +40,7 @@ class GoogleCloudSecuritycenterV2CloudControl extends \Google\Model
   public $version;
 
   /**
-   * @param string
+   * @param string $cloudControlName
    */
   public function setCloudControlName($cloudControlName)
   {
@@ -51,7 +54,7 @@ class GoogleCloudSecuritycenterV2CloudControl extends \Google\Model
     return $this->cloudControlName;
   }
   /**
-   * @param string
+   * @param string $policyType
    */
   public function setPolicyType($policyType)
   {
@@ -65,21 +68,21 @@ class GoogleCloudSecuritycenterV2CloudControl extends \Google\Model
     return $this->policyType;
   }
   /**
-   * @param string
+   * @param self::TYPE_* $type
    */
   public function setType($type)
   {
     $this->type = $type;
   }
   /**
-   * @return string
+   * @return self::TYPE_*
    */
   public function getType()
   {
     return $this->type;
   }
   /**
-   * @param int
+   * @param int $version
    */
   public function setVersion($version)
   {

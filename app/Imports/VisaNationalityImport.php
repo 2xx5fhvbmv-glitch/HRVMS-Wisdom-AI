@@ -13,6 +13,7 @@ use App\Helpers\Common;
 use Hash;
 use DB;
 use App\Models\VisaNationality;
+use Illuminate\Database\Eloquent\Model;
 class VisaNationalityImport implements ToModel, WithHeadingRow
 {
    
@@ -30,7 +31,7 @@ class VisaNationalityImport implements ToModel, WithHeadingRow
     {
         return 2; // Assuming row 1 is headers
     }
-    public function model(array $row)
+    public function model(array $row): Model|array|null
     {
         $this->rowNumber++;
         $excelRowNumber = $this->rowNumber + $this->startRow() - 1;

@@ -29,7 +29,7 @@ class GoogleCloudDialogflowCxV3PlaybookTransition extends \Google\Model
   public $playbook;
 
   /**
-   * @param string
+   * @param string $displayName
    */
   public function setDisplayName($displayName)
   {
@@ -43,7 +43,7 @@ class GoogleCloudDialogflowCxV3PlaybookTransition extends \Google\Model
     return $this->displayName;
   }
   /**
-   * @param string
+   * @param string $playbook
    */
   public function setPlaybook($playbook)
   {

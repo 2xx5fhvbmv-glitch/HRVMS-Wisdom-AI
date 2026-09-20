@@ -7,6 +7,7 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Events\AfterSheet;
+use Illuminate\Support\Enumerable;
 use DB;
 use Auth;
 use App\Models\Employee;
@@ -36,7 +37,7 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithEven
         ];
     }
 
-    public function collection()
+    public function collection(): Enumerable
     {
         $result = collect();
 

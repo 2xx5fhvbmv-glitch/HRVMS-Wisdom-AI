@@ -4,63 +4,41 @@ namespace Laravel\Passport\Bridge;
 
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Entities\Traits\ClientTrait;
+use League\OAuth2\Server\Entities\Traits\EntityTrait;
 
 class Client implements ClientEntityInterface
 {
-    use ClientTrait;
-
-    /**
-     * The client identifier.
-     *
-     * @var string
-     */
-    protected $identifier;
-
-    /**
-     * The client's provider.
-     *
-     * @var string
-     */
-    public $provider;
+    use ClientTrait, EntityTrait;
 
     /**
      * Create a new client instance.
      *
-     * @param  string  $identifier
-     * @param  string  $name
-     * @param  string  $redirectUri
-     * @param  bool  $isConfidential
-     * @param  string|null  $provider
-     * @return void
+     * @param  non-empty-string  $identifier
+     * @param  string[]  $redirectUri
      */
-    public function __construct($identifier, $name, $redirectUri, $isConfidential = false, $provider = null)
-    {
-        $this->setIdentifier((string) $identifier);
+    public function __construct(
+        string $identifier,
+        ?string $name = null,
+        array $redirectUri = [],
+        bool $isConfidential = false,
+        public ?string $provider = null,
+        public array $grantTypes = [],
+    ) {
+        $this->setIdentifier($identifier);
 
-        $this->name = $name;
+        if (! is_null($name)) {
+            $this->name = $name;
+        }
+
         $this->isConfidential = $isConfidential;
-        $this->redirectUri = explode(',', $redirectUri);
-        $this->provider = $provider;
+        $this->redirectUri = $redirectUri;
     }
 
     /**
-     * Get the client's identifier.
-     *
-     * @return string
+     * {@inheritdoc}
      */
-    public function getIdentifier()
+    public function supportsGrantType(string $grantType): bool
     {
-        return (string) $this->identifier;
-    }
-
-    /**
-     * Set the client's identifier.
-     *
-     * @param  string  $identifier
-     * @return void
-     */
-    public function setIdentifier($identifier)
-    {
-        $this->identifier = $identifier;
+        return in_array($grantType, $this->grantTypes);
     }
 }

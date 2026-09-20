@@ -8,6 +8,7 @@ use App\Models\EmployeeLeave;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Illuminate\Database\Eloquent\Model;
 
 class ImportLeaves implements ToModel, WithHeadingRow
 {
@@ -103,7 +104,7 @@ class ImportLeaves implements ToModel, WithHeadingRow
         return null;
     }
 
-    public function model(array $row)
+    public function model(array $row): Model|array|null
     {
         $fromDate = $this->parseDate($this->getRowValue($row, 'from_date') ?? $row['from_date'] ?? null);
         $toDate   = $this->parseDate($this->getRowValue($row, 'to_date') ?? $row['to_date'] ?? null);

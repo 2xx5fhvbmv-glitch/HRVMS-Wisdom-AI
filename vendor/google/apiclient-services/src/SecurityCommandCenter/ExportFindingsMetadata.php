@@ -27,7 +27,7 @@ class ExportFindingsMetadata extends \Google\Model
   public $exportStartTime;
 
   /**
-   * @param BigQueryDestination
+   * @param BigQueryDestination $bigQueryDestination
    */
   public function setBigQueryDestination(BigQueryDestination $bigQueryDestination)
   {
@@ -41,7 +41,7 @@ class ExportFindingsMetadata extends \Google\Model
     return $this->bigQueryDestination;
   }
   /**
-   * @param string
+   * @param string $exportStartTime
    */
   public function setExportStartTime($exportStartTime)
   {

@@ -19,6 +19,12 @@ namespace Google\Service\Dialogflow;
 
 class GoogleCloudDialogflowV2AgentCoachingInstruction extends \Google\Model
 {
+  public const TRIGGERING_EVENT_TRIGGER_EVENT_UNSPECIFIED = 'TRIGGER_EVENT_UNSPECIFIED';
+  public const TRIGGERING_EVENT_END_OF_UTTERANCE = 'END_OF_UTTERANCE';
+  public const TRIGGERING_EVENT_MANUAL_CALL = 'MANUAL_CALL';
+  public const TRIGGERING_EVENT_CUSTOMER_MESSAGE = 'CUSTOMER_MESSAGE';
+  public const TRIGGERING_EVENT_AGENT_MESSAGE = 'AGENT_MESSAGE';
+  public const TRIGGERING_EVENT_TOOL_CALL_COMPLETION = 'TOOL_CALL_COMPLETION';
   /**
    * @var string
    */
@@ -41,9 +47,13 @@ class GoogleCloudDialogflowV2AgentCoachingInstruction extends \Google\Model
    * @var string
    */
   public $systemAction;
+  /**
+   * @var string
+   */
+  public $triggeringEvent;
 
   /**
-   * @param string
+   * @param string $agentAction
    */
   public function setAgentAction($agentAction)
   {
@@ -57,7 +67,7 @@ class GoogleCloudDialogflowV2AgentCoachingInstruction extends \Google\Model
     return $this->agentAction;
   }
   /**
-   * @param string
+   * @param string $condition
    */
   public function setCondition($condition)
   {
@@ -71,7 +81,7 @@ class GoogleCloudDialogflowV2AgentCoachingInstruction extends \Google\Model
     return $this->condition;
   }
   /**
-   * @param string
+   * @param string $displayDetails
    */
   public function setDisplayDetails($displayDetails)
   {
@@ -85,7 +95,7 @@ class GoogleCloudDialogflowV2AgentCoachingInstruction extends \Google\Model
     return $this->displayDetails;
   }
   /**
-   * @param string
+   * @param string $displayName
    */
   public function setDisplayName($displayName)
   {
@@ -99,7 +109,7 @@ class GoogleCloudDialogflowV2AgentCoachingInstruction extends \Google\Model
     return $this->displayName;
   }
   /**
-   * @param GoogleCloudDialogflowV2AgentCoachingInstructionDuplicateCheckResult
+   * @param GoogleCloudDialogflowV2AgentCoachingInstructionDuplicateCheckResult $duplicateCheckResult
    */
   public function setDuplicateCheckResult(GoogleCloudDialogflowV2AgentCoachingInstructionDuplicateCheckResult $duplicateCheckResult)
   {
@@ -113,7 +123,7 @@ class GoogleCloudDialogflowV2AgentCoachingInstruction extends \Google\Model
     return $this->duplicateCheckResult;
   }
   /**
-   * @param string
+   * @param string $systemAction
    */
   public function setSystemAction($systemAction)
   {
@@ -125,6 +135,20 @@ class GoogleCloudDialogflowV2AgentCoachingInstruction extends \Google\Model
   public function getSystemAction()
   {
     return $this->systemAction;
+  }
+  /**
+   * @param self::TRIGGERING_EVENT_* $triggeringEvent
+   */
+  public function setTriggeringEvent($triggeringEvent)
+  {
+    $this->triggeringEvent = $triggeringEvent;
+  }
+  /**
+   * @return self::TRIGGERING_EVENT_*
+   */
+  public function getTriggeringEvent()
+  {
+    return $this->triggeringEvent;
   }
 }
 

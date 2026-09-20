@@ -4,6 +4,7 @@ namespace Spatie\Sluggable;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Spatie\Sluggable\Exceptions\InvalidOption;
 
 trait HasSlug
 {
@@ -11,7 +12,7 @@ trait HasSlug
 
     abstract public function getSlugOptions(): SlugOptions;
 
-    protected static function bootHasSlug()
+    protected static function bootHasSlug(): void
     {
         static::creating(function (Model $model) {
             $model->generateSlugOnCreate();
@@ -22,9 +23,13 @@ trait HasSlug
         });
     }
 
-    protected function generateSlugOnCreate()
+    protected function generateSlugOnCreate(): void
     {
         $this->slugOptions = $this->getSlugOptions();
+
+        if ($this->slugOptions->skipGenerate) {
+            return;
+        }
 
         if (! $this->slugOptions->generateSlugsOnCreate) {
             return;
@@ -39,9 +44,13 @@ trait HasSlug
         $this->addSlug();
     }
 
-    protected function generateSlugOnUpdate()
+    protected function generateSlugOnUpdate(): void
     {
         $this->slugOptions = $this->getSlugOptions();
+
+        if ($this->slugOptions->skipGenerate) {
+            return;
+        }
 
         if (! $this->slugOptions->generateSlugsOnUpdate) {
             return;
@@ -56,14 +65,14 @@ trait HasSlug
         $this->addSlug();
     }
 
-    public function generateSlug()
+    public function generateSlug(): void
     {
         $this->slugOptions = $this->getSlugOptions();
 
         $this->addSlug();
     }
 
-    protected function addSlug()
+    protected function addSlug(): void
     {
         $this->ensureValidSlugOptions();
 
@@ -119,19 +128,37 @@ trait HasSlug
     protected function makeSlugUnique(string $slug): string
     {
         $originalSlug = $slug;
-        $i = 1;
+        $iteration = 0;
 
-        while ($this->otherRecordExistsWithSlug($slug) || $slug === '') {
-            $slug = $originalSlug.$this->slugOptions->slugSeparator.$i++;
+        while (
+            $slug === '' ||
+            $this->otherRecordExistsWithSlug($slug) ||
+            ($this->slugOptions->useSuffixOnFirstOccurrence && $iteration === 0)
+        ) {
+            $suffix = $this->generateSuffix($originalSlug, $iteration++);
+            $slug = $originalSlug . $this->slugOptions->slugSeparator . $suffix;
         }
 
         return $slug;
+    }
+
+    protected function generateSuffix(string $originalSlug, int $iteration): string
+    {
+        if ($this->slugOptions->suffixGenerator) {
+            return call_user_func($this->slugOptions->suffixGenerator, $originalSlug, $iteration);
+        }
+
+        return strval($this->slugOptions->startSlugSuffixFrom + $iteration);
     }
 
     protected function otherRecordExistsWithSlug(string $slug): bool
     {
         $query = static::where($this->slugOptions->slugField, $slug)
             ->withoutGlobalScopes();
+
+        if ($this->slugOptions->extraScopeCallback) {
+            $query->where($this->slugOptions->extraScopeCallback);
+        }
 
         if ($this->exists) {
             $query->where($this->getKeyName(), '!=', $this->getKey());
@@ -146,10 +173,10 @@ trait HasSlug
 
     protected function usesSoftDeletes(): bool
     {
-        return (bool) in_array('Illuminate\Database\Eloquent\SoftDeletes', class_uses($this));
+        return in_array('Illuminate\Database\Eloquent\SoftDeletes', class_uses($this), true);
     }
 
-    protected function ensureValidSlugOptions()
+    protected function ensureValidSlugOptions(): void
     {
         if (is_array($this->slugOptions->generateSlugFrom) && ! count($this->slugOptions->generateSlugFrom)) {
             throw InvalidOption::missingFromField();
@@ -175,5 +202,31 @@ trait HasSlug
         }
 
         return substr($slugSourceString, 0, $this->slugOptions->maximumLength);
+    }
+
+    public static function findBySlug(string $slug, array $columns = ['*'], ?callable $additionalQuery = null)
+    {
+        $modelInstance = new static();
+        $field = $modelInstance->getSlugOptions()->slugField;
+
+        $query = static::query();
+
+        if (in_array(HasTranslatableSlug::class, class_uses_recursive(static::class))) {
+            $currentLocale = $modelInstance->getLocale();
+            $fallbackLocale = config('app.fallback_locale');
+
+            $currentField = "{$field}->{$currentLocale}";
+            $fallbackField = "{$field}->{$fallbackLocale}";
+
+            $query->where(fn ($query) => $query->where($currentField, $slug)->orWhere($fallbackField, $slug));
+        } else {
+            $query->where($field, $slug);
+        }
+
+        if (is_callable($additionalQuery)) {
+            $additionalQuery($query);
+        }
+
+        return $query->first($columns);
     }
 }

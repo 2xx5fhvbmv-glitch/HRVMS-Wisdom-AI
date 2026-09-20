@@ -4,12 +4,13 @@ namespace App\Exports;
 use App\Models\EmployeePromotion;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
+use Illuminate\Support\Enumerable;
 
 class PromotionHistoryExport implements FromCollection, WithHeadings
 {
     protected $resortid;
 
-    public function collection()
+    public function collection(): Enumerable
     {
         return EmployeePromotion::with(['employee.position',
             'employee.department',

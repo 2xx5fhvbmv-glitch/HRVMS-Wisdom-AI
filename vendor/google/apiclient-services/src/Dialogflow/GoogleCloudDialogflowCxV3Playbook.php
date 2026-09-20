@@ -19,7 +19,12 @@ namespace Google\Service\Dialogflow;
 
 class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
 {
+  public const PLAYBOOK_TYPE_PLAYBOOK_TYPE_UNSPECIFIED = 'PLAYBOOK_TYPE_UNSPECIFIED';
+  public const PLAYBOOK_TYPE_TASK = 'TASK';
+  public const PLAYBOOK_TYPE_ROUTINE = 'ROUTINE';
   protected $collection_key = 'referencedTools';
+  protected $codeBlockType = GoogleCloudDialogflowCxV3CodeBlock::class;
+  protected $codeBlockDataType = '';
   /**
    * @var string
    */
@@ -34,6 +39,10 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
   public $goal;
   protected $handlersType = GoogleCloudDialogflowCxV3Handler::class;
   protected $handlersDataType = 'array';
+  /**
+   * @var string[]
+   */
+  public $inlineActions;
   protected $inputParameterDefinitionsType = GoogleCloudDialogflowCxV3ParameterDefinition::class;
   protected $inputParameterDefinitionsDataType = 'array';
   protected $instructionType = GoogleCloudDialogflowCxV3PlaybookInstruction::class;
@@ -72,7 +81,21 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
   public $updateTime;
 
   /**
-   * @param string
+   * @param GoogleCloudDialogflowCxV3CodeBlock $codeBlock
+   */
+  public function setCodeBlock(GoogleCloudDialogflowCxV3CodeBlock $codeBlock)
+  {
+    $this->codeBlock = $codeBlock;
+  }
+  /**
+   * @return GoogleCloudDialogflowCxV3CodeBlock
+   */
+  public function getCodeBlock()
+  {
+    return $this->codeBlock;
+  }
+  /**
+   * @param string $createTime
    */
   public function setCreateTime($createTime)
   {
@@ -86,7 +109,7 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
     return $this->createTime;
   }
   /**
-   * @param string
+   * @param string $displayName
    */
   public function setDisplayName($displayName)
   {
@@ -100,7 +123,7 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
     return $this->displayName;
   }
   /**
-   * @param string
+   * @param string $goal
    */
   public function setGoal($goal)
   {
@@ -114,7 +137,7 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
     return $this->goal;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3Handler[]
+   * @param GoogleCloudDialogflowCxV3Handler[] $handlers
    */
   public function setHandlers($handlers)
   {
@@ -128,7 +151,21 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
     return $this->handlers;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3ParameterDefinition[]
+   * @param string[] $inlineActions
+   */
+  public function setInlineActions($inlineActions)
+  {
+    $this->inlineActions = $inlineActions;
+  }
+  /**
+   * @return string[]
+   */
+  public function getInlineActions()
+  {
+    return $this->inlineActions;
+  }
+  /**
+   * @param GoogleCloudDialogflowCxV3ParameterDefinition[] $inputParameterDefinitions
    */
   public function setInputParameterDefinitions($inputParameterDefinitions)
   {
@@ -142,7 +179,7 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
     return $this->inputParameterDefinitions;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3PlaybookInstruction
+   * @param GoogleCloudDialogflowCxV3PlaybookInstruction $instruction
    */
   public function setInstruction(GoogleCloudDialogflowCxV3PlaybookInstruction $instruction)
   {
@@ -156,7 +193,7 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
     return $this->instruction;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3LlmModelSettings
+   * @param GoogleCloudDialogflowCxV3LlmModelSettings $llmModelSettings
    */
   public function setLlmModelSettings(GoogleCloudDialogflowCxV3LlmModelSettings $llmModelSettings)
   {
@@ -170,7 +207,7 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
     return $this->llmModelSettings;
   }
   /**
-   * @param string
+   * @param string $name
    */
   public function setName($name)
   {
@@ -184,7 +221,7 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
     return $this->name;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3ParameterDefinition[]
+   * @param GoogleCloudDialogflowCxV3ParameterDefinition[] $outputParameterDefinitions
    */
   public function setOutputParameterDefinitions($outputParameterDefinitions)
   {
@@ -198,21 +235,21 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
     return $this->outputParameterDefinitions;
   }
   /**
-   * @param string
+   * @param self::PLAYBOOK_TYPE_* $playbookType
    */
   public function setPlaybookType($playbookType)
   {
     $this->playbookType = $playbookType;
   }
   /**
-   * @return string
+   * @return self::PLAYBOOK_TYPE_*
    */
   public function getPlaybookType()
   {
     return $this->playbookType;
   }
   /**
-   * @param string[]
+   * @param string[] $referencedFlows
    */
   public function setReferencedFlows($referencedFlows)
   {
@@ -226,7 +263,7 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
     return $this->referencedFlows;
   }
   /**
-   * @param string[]
+   * @param string[] $referencedPlaybooks
    */
   public function setReferencedPlaybooks($referencedPlaybooks)
   {
@@ -240,7 +277,7 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
     return $this->referencedPlaybooks;
   }
   /**
-   * @param string[]
+   * @param string[] $referencedTools
    */
   public function setReferencedTools($referencedTools)
   {
@@ -254,7 +291,7 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
     return $this->referencedTools;
   }
   /**
-   * @param string
+   * @param string $tokenCount
    */
   public function setTokenCount($tokenCount)
   {
@@ -268,7 +305,7 @@ class GoogleCloudDialogflowCxV3Playbook extends \Google\Collection
     return $this->tokenCount;
   }
   /**
-   * @param string
+   * @param string $updateTime
    */
   public function setUpdateTime($updateTime)
   {

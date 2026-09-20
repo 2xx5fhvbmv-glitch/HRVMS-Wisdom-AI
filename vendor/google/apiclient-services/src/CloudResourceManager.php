@@ -55,6 +55,7 @@ class CloudResourceManager extends \Google\Service
   public $tagKeys;
   public $tagValues;
   public $tagValues_tagHolds;
+  public $v3;
   public $rootUrlTemplate;
 
   /**
@@ -358,14 +359,18 @@ class CloudResourceManager extends \Google\Service
                   'required' => true,
                 ],
               ],
-            ],'update' => [
+            ],'patch' => [
               'path' => 'v3/{+name}',
-              'httpMethod' => 'PUT',
+              'httpMethod' => 'PATCH',
               'parameters' => [
                 'name' => [
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'updateMask' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],
@@ -935,6 +940,25 @@ class CloudResourceManager extends \Google\Service
                   'type' => 'integer',
                 ],
                 'pageToken' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+              ],
+            ],
+          ]
+        ]
+    );
+    $this->v3 = new CloudResourceManager\Resource\V3(
+        $this,
+        $this->serviceName,
+        'v3',
+        [
+          'methods' => [
+            'fetchResourceSemantics' => [
+              'path' => 'v3:fetchResourceSemantics',
+              'httpMethod' => 'GET',
+              'parameters' => [
+                'fullResourceName' => [
                   'location' => 'query',
                   'type' => 'string',
                 ],

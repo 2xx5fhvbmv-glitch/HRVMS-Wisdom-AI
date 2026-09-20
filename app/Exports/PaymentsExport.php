@@ -6,6 +6,7 @@ use DB;
 use App\Models\Payment;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
+use Illuminate\Support\Enumerable;
 
 
 class PaymentsExport implements FromCollection, WithHeadings
@@ -27,7 +28,7 @@ class PaymentsExport implements FromCollection, WithHeadings
         $this->shopkeeper = Auth::guard('shopkeeper')->user();
     }
 
-    public function collection()
+    public function collection(): Enumerable
     {
         $query = Payment::join('employees as e', 'e.id', '=', 'payments.emp_id')
             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')

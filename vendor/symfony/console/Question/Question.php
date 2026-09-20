@@ -13,6 +13,7 @@ namespace Symfony\Component\Console\Question;
 
 use Symfony\Component\Console\Exception\InvalidArgumentException;
 use Symfony\Component\Console\Exception\LogicException;
+use Symfony\Component\Validator\Constraint;
 
 /**
  * Represents a Question.
@@ -21,43 +22,52 @@ use Symfony\Component\Console\Exception\LogicException;
  */
 class Question
 {
-    private $question;
-    private $attempts;
-    private $hidden = false;
-    private $hiddenFallback = true;
-    private $autocompleterCallback;
-    private $validator;
-    private $default;
-    private $normalizer;
-    private $trimmable = true;
-    private $multiline = false;
+    private ?int $attempts = null;
+    private bool $hidden = false;
+    private bool $hiddenFallback = true;
+    /**
+     * @var (\Closure(string):list<string>)|null
+     */
+    private ?\Closure $autocompleterCallback = null;
+    /**
+     * @var (\Closure(mixed):mixed)|null
+     */
+    private ?\Closure $validator = null;
+    /**
+     * @var (\Closure(mixed):mixed)|null
+     */
+    private ?\Closure $normalizer = null;
+    private bool $trimmable = true;
+    private bool $multiline = false;
+    private ?int $timeout = null;
+    /**
+     * @var Constraint[]
+     */
+    private array $constraints = [];
 
     /**
      * @param string                     $question The question to ask to the user
-     * @param string|bool|int|float|null $default  The default answer to return if the user enters nothing
+     * @param string|bool|int|float|null $default  The default answer to return if the user enters nothing.
+     *                                             Object defaults set on InputArgument/InputOption are not propagated here.
      */
-    public function __construct(string $question, $default = null)
-    {
-        $this->question = $question;
-        $this->default = $default;
+    public function __construct(
+        private string $question,
+        private string|bool|int|float|null $default = null,
+    ) {
     }
 
     /**
      * Returns the question.
-     *
-     * @return string
      */
-    public function getQuestion()
+    public function getQuestion(): string
     {
         return $this->question;
     }
 
     /**
      * Returns the default answer.
-     *
-     * @return string|bool|int|float|null
      */
-    public function getDefault()
+    public function getDefault(): string|bool|int|float|null
     {
         return $this->default;
     }
@@ -75,7 +85,7 @@ class Question
      *
      * @return $this
      */
-    public function setMultiline(bool $multiline): self
+    public function setMultiline(bool $multiline): static
     {
         $this->multiline = $multiline;
 
@@ -83,11 +93,30 @@ class Question
     }
 
     /**
-     * Returns whether the user response must be hidden.
-     *
-     * @return bool
+     * Returns the timeout in seconds.
      */
-    public function isHidden()
+    public function getTimeout(): ?int
+    {
+        return $this->timeout;
+    }
+
+    /**
+     * Sets the maximum time the user has to answer the question.
+     * If the user does not answer within this time, an exception will be thrown.
+     *
+     * @return $this
+     */
+    public function setTimeout(?int $seconds): static
+    {
+        $this->timeout = $seconds;
+
+        return $this;
+    }
+
+    /**
+     * Returns whether the user response must be hidden.
+     */
+    public function isHidden(): bool
     {
         return $this->hidden;
     }
@@ -99,7 +128,7 @@ class Question
      *
      * @throws LogicException In case the autocompleter is also used
      */
-    public function setHidden(bool $hidden)
+    public function setHidden(bool $hidden): static
     {
         if ($this->autocompleterCallback) {
             throw new LogicException('A hidden question cannot use the autocompleter.');
@@ -112,10 +141,8 @@ class Question
 
     /**
      * In case the response cannot be hidden, whether to fallback on non-hidden question or not.
-     *
-     * @return bool
      */
-    public function isHiddenFallback()
+    public function isHiddenFallback(): bool
     {
         return $this->hiddenFallback;
     }
@@ -125,7 +152,7 @@ class Question
      *
      * @return $this
      */
-    public function setHiddenFallback(bool $fallback)
+    public function setHiddenFallback(bool $fallback): static
     {
         $this->hiddenFallback = $fallback;
 
@@ -134,10 +161,8 @@ class Question
 
     /**
      * Gets values for the autocompleter.
-     *
-     * @return iterable|null
      */
-    public function getAutocompleterValues()
+    public function getAutocompleterValues(): ?iterable
     {
         $callback = $this->getAutocompleterCallback();
 
@@ -151,18 +176,17 @@ class Question
      *
      * @throws LogicException
      */
-    public function setAutocompleterValues(?iterable $values)
+    public function setAutocompleterValues(?iterable $values): static
     {
         if (\is_array($values)) {
             $values = $this->isAssoc($values) ? array_merge(array_keys($values), array_values($values)) : array_values($values);
 
-            $callback = static function () use ($values) {
-                return $values;
-            };
+            $callback = static fn () => $values;
         } elseif ($values instanceof \Traversable) {
-            $valueCache = null;
-            $callback = static function () use ($values, &$valueCache) {
-                return $valueCache ?? $valueCache = iterator_to_array($values, false);
+            $callback = static function () use ($values) {
+                static $valueCache;
+
+                return $valueCache ??= iterator_to_array($values, false);
             };
         } else {
             $callback = null;
@@ -173,6 +197,8 @@ class Question
 
     /**
      * Gets the callback function used for the autocompleter.
+     *
+     * @return (callable(string):list<string>)|null
      */
     public function getAutocompleterCallback(): ?callable
     {
@@ -182,17 +208,19 @@ class Question
     /**
      * Sets the callback function used for the autocompleter.
      *
-     * The callback is passed the user input as argument and should return an iterable of corresponding suggestions.
+     * The callback is passed the user input as argument and must return a list of corresponding suggestions.
+     *
+     * @param (callable(string):list<string>)|null $callback
      *
      * @return $this
      */
-    public function setAutocompleterCallback(?callable $callback = null): self
+    public function setAutocompleterCallback(?callable $callback): static
     {
         if ($this->hidden && null !== $callback) {
             throw new LogicException('A hidden question cannot use the autocompleter.');
         }
 
-        $this->autocompleterCallback = $callback;
+        $this->autocompleterCallback = null === $callback ? null : $callback(...);
 
         return $this;
     }
@@ -200,11 +228,13 @@ class Question
     /**
      * Sets a validator for the question.
      *
+     * @param (callable(mixed):mixed)|null $validator
+     *
      * @return $this
      */
-    public function setValidator(?callable $validator = null)
+    public function setValidator(?callable $validator): static
     {
-        $this->validator = $validator;
+        $this->validator = null === $validator ? null : $validator(...);
 
         return $this;
     }
@@ -212,9 +242,9 @@ class Question
     /**
      * Gets the validator for the question.
      *
-     * @return callable|null
+     * @return (callable(mixed):mixed)|null
      */
-    public function getValidator()
+    public function getValidator(): ?callable
     {
         return $this->validator;
     }
@@ -228,7 +258,7 @@ class Question
      *
      * @throws InvalidArgumentException in case the number of attempts is invalid
      */
-    public function setMaxAttempts(?int $attempts)
+    public function setMaxAttempts(?int $attempts): static
     {
         if (null !== $attempts && $attempts < 1) {
             throw new InvalidArgumentException('Maximum number of attempts must be a positive value.');
@@ -243,10 +273,8 @@ class Question
      * Gets the maximum number of attempts.
      *
      * Null means an unlimited number of attempts.
-     *
-     * @return int|null
      */
-    public function getMaxAttempts()
+    public function getMaxAttempts(): ?int
     {
         return $this->attempts;
     }
@@ -254,13 +282,13 @@ class Question
     /**
      * Sets a normalizer for the response.
      *
-     * The normalizer can be a callable (a string), a closure or a class implementing __invoke.
+     * @param callable(mixed):mixed $normalizer
      *
      * @return $this
      */
-    public function setNormalizer(callable $normalizer)
+    public function setNormalizer(callable $normalizer): static
     {
-        $this->normalizer = $normalizer;
+        $this->normalizer = $normalizer(...);
 
         return $this;
     }
@@ -268,16 +296,14 @@ class Question
     /**
      * Gets the normalizer for the response.
      *
-     * The normalizer can ba a callable (a string), a closure or a class implementing __invoke.
-     *
-     * @return callable|null
+     * @return (callable(mixed):mixed)|null
      */
-    public function getNormalizer()
+    public function getNormalizer(): ?callable
     {
         return $this->normalizer;
     }
 
-    protected function isAssoc(array $array)
+    protected function isAssoc(array $array): bool
     {
         return (bool) \count(array_filter(array_keys($array), 'is_string'));
     }
@@ -290,10 +316,30 @@ class Question
     /**
      * @return $this
      */
-    public function setTrimmable(bool $trimmable): self
+    public function setTrimmable(bool $trimmable): static
     {
         $this->trimmable = $trimmable;
 
         return $this;
+    }
+
+    /**
+     * @param Constraint[] $constraints
+     *
+     * @return $this
+     */
+    public function setConstraints(array $constraints): static
+    {
+        $this->constraints = $constraints;
+
+        return $this;
+    }
+
+    /**
+     * @return Constraint[]
+     */
+    public function getConstraints(): array
+    {
+        return $this->constraints;
     }
 }

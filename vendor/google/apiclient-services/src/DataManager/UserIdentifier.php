@@ -31,7 +31,7 @@ class UserIdentifier extends \Google\Model
   public $phoneNumber;
 
   /**
-   * @param AddressInfo
+   * @param AddressInfo $address
    */
   public function setAddress(AddressInfo $address)
   {
@@ -45,7 +45,7 @@ class UserIdentifier extends \Google\Model
     return $this->address;
   }
   /**
-   * @param string
+   * @param string $emailAddress
    */
   public function setEmailAddress($emailAddress)
   {
@@ -59,7 +59,7 @@ class UserIdentifier extends \Google\Model
     return $this->emailAddress;
   }
   /**
-   * @param string
+   * @param string $phoneNumber
    */
   public function setPhoneNumber($phoneNumber)
   {

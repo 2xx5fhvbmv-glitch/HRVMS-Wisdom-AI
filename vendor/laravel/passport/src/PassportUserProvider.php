@@ -8,78 +8,89 @@ use Illuminate\Contracts\Auth\UserProvider;
 class PassportUserProvider implements UserProvider
 {
     /**
-     * The user provider instance.
-     *
-     * @var \Illuminate\Contracts\Auth\UserProvider
-     */
-    protected $provider;
-
-    /**
-     * The user provider name.
-     *
-     * @var string
-     */
-    protected $providerName;
-
-    /**
      * Create a new passport user provider.
-     *
-     * @param  \Illuminate\Contracts\Auth\UserProvider  $provider
-     * @param  string  $providerName
-     * @return void
      */
-    public function __construct(UserProvider $provider, $providerName)
-    {
-        $this->provider = $provider;
-        $this->providerName = $providerName;
+    public function __construct(
+        protected UserProvider $provider,
+        protected string $providerName,
+    ) {
     }
 
     /**
-     * {@inheritdoc}
+     * Retrieve a user by their unique identifier.
+     *
+     * @param  string|int  $identifier
+     * @return \Laravel\Passport\Contracts\OAuthenticatable|null
      */
-    public function retrieveById($identifier)
+    public function retrieveById($identifier): ?Authenticatable
     {
         return $this->provider->retrieveById($identifier);
     }
 
     /**
-     * {@inheritdoc}
+     * Retrieve a user by their unique identifier and "remember me" token.
+     *
+     * @param  string|int  $identifier
+     * @param  string  $token
+     * @return \Laravel\Passport\Contracts\OAuthenticatable|null
      */
-    public function retrieveByToken($identifier, $token)
+    public function retrieveByToken($identifier, #[\SensitiveParameter] $token): ?Authenticatable
     {
         return $this->provider->retrieveByToken($identifier, $token);
     }
 
     /**
-     * {@inheritdoc}
+     * Update the "remember me" token for the given user in storage.
+     *
+     * @param  \Laravel\Passport\Contracts\OAuthenticatable  $user
+     * @param  string  $token
+     * @return void
      */
-    public function updateRememberToken(Authenticatable $user, $token)
+    public function updateRememberToken(Authenticatable $user, #[\SensitiveParameter] $token): void
     {
         $this->provider->updateRememberToken($user, $token);
     }
 
     /**
-     * {@inheritdoc}
+     * Retrieve a user by the given credentials.
+     *
+     * @param  array  $credentials
+     * @return \Laravel\Passport\Contracts\OAuthenticatable|null
      */
-    public function retrieveByCredentials(array $credentials)
+    public function retrieveByCredentials(#[\SensitiveParameter] array $credentials): ?Authenticatable
     {
         return $this->provider->retrieveByCredentials($credentials);
     }
 
     /**
-     * {@inheritdoc}
+     * Validate a user against the given credentials.
+     *
+     * @param  \Laravel\Passport\Contracts\OAuthenticatable  $user
+     * @param  array  $credentials
+     * @return bool
      */
-    public function validateCredentials(Authenticatable $user, array $credentials)
+    public function validateCredentials(Authenticatable $user, #[\SensitiveParameter] array $credentials): bool
     {
         return $this->provider->validateCredentials($user, $credentials);
     }
 
     /**
-     * Get the name of the user provider.
+     * Rehash the user's password if required and supported.
      *
-     * @return string
+     * @param  \Laravel\Passport\Contracts\OAuthenticatable  $user
+     * @param  array  $credentials
+     * @param  bool  $force
+     * @return void
      */
-    public function getProviderName()
+    public function rehashPasswordIfRequired(Authenticatable $user, #[\SensitiveParameter] array $credentials, bool $force = false): void
+    {
+        $this->provider->rehashPasswordIfRequired($user, $credentials, $force);
+    }
+
+    /**
+     * Get the name of the user provider.
+     */
+    public function getProviderName(): string
     {
         return $this->providerName;
     }

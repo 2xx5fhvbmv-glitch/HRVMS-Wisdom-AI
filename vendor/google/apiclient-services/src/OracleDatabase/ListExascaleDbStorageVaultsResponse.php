@@ -19,16 +19,30 @@ namespace Google\Service\OracleDatabase;
 
 class ListExascaleDbStorageVaultsResponse extends \Google\Collection
 {
-  protected $collection_key = 'exascaleDbStorageVaults';
+  protected $collection_key = 'unreachable';
   protected $exascaleDbStorageVaultsType = ExascaleDbStorageVault::class;
   protected $exascaleDbStorageVaultsDataType = 'array';
   /**
+   * A token identifying a page of results the server should return. If present,
+   * the next page token can be provided to a subsequent
+   * ListExascaleDbStorageVaults call to list the next page. If empty, there are
+   * no more pages.
+   *
    * @var string
    */
   public $nextPageToken;
+  /**
+   * Unreachable locations when listing resources across all locations using
+   * wildcard location '-'.
+   *
+   * @var string[]
+   */
+  public $unreachable;
 
   /**
-   * @param ExascaleDbStorageVault[]
+   * The ExascaleDbStorageVaults.
+   *
+   * @param ExascaleDbStorageVault[] $exascaleDbStorageVaults
    */
   public function setExascaleDbStorageVaults($exascaleDbStorageVaults)
   {
@@ -42,7 +56,12 @@ class ListExascaleDbStorageVaultsResponse extends \Google\Collection
     return $this->exascaleDbStorageVaults;
   }
   /**
-   * @param string
+   * A token identifying a page of results the server should return. If present,
+   * the next page token can be provided to a subsequent
+   * ListExascaleDbStorageVaults call to list the next page. If empty, there are
+   * no more pages.
+   *
+   * @param string $nextPageToken
    */
   public function setNextPageToken($nextPageToken)
   {
@@ -54,6 +73,23 @@ class ListExascaleDbStorageVaultsResponse extends \Google\Collection
   public function getNextPageToken()
   {
     return $this->nextPageToken;
+  }
+  /**
+   * Unreachable locations when listing resources across all locations using
+   * wildcard location '-'.
+   *
+   * @param string[] $unreachable
+   */
+  public function setUnreachable($unreachable)
+  {
+    $this->unreachable = $unreachable;
+  }
+  /**
+   * @return string[]
+   */
+  public function getUnreachable()
+  {
+    return $this->unreachable;
   }
 }
 

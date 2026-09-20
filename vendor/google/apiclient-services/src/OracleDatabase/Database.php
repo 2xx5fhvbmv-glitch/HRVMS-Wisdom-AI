@@ -20,62 +20,161 @@ namespace Google\Service\OracleDatabase;
 class Database extends \Google\Model
 {
   /**
+   * Default unspecified value.
+   */
+  public const OPS_INSIGHTS_STATUS_OPERATIONS_INSIGHTS_STATUS_UNSPECIFIED = 'OPERATIONS_INSIGHTS_STATUS_UNSPECIFIED';
+  /**
+   * Indicates that the operations insights are being enabled.
+   */
+  public const OPS_INSIGHTS_STATUS_ENABLING = 'ENABLING';
+  /**
+   * Indicates that the operations insights are enabled.
+   */
+  public const OPS_INSIGHTS_STATUS_ENABLED = 'ENABLED';
+  /**
+   * Indicates that the operations insights are being disabled.
+   */
+  public const OPS_INSIGHTS_STATUS_DISABLING = 'DISABLING';
+  /**
+   * Indicates that the operations insights are not enabled.
+   */
+  public const OPS_INSIGHTS_STATUS_NOT_ENABLED = 'NOT_ENABLED';
+  /**
+   * Indicates that the operations insights failed to enable.
+   */
+  public const OPS_INSIGHTS_STATUS_FAILED_ENABLING = 'FAILED_ENABLING';
+  /**
+   * Indicates that the operations insights failed to disable.
+   */
+  public const OPS_INSIGHTS_STATUS_FAILED_DISABLING = 'FAILED_DISABLING';
+  /**
+   * Optional. The password for the default ADMIN user. Note: Only one of
+   * `admin_password_secret_version` or `admin_password` can be populated.
+   *
    * @var string
    */
   public $adminPassword;
   /**
+   * Optional. The resource name of a secret version in Secret Manager which
+   * contains the database admin user's password. Format:
+   * projects/{project}/secrets/{secret}/versions/{version}. Note: Only one of
+   * `admin_password_secret_version` or `admin_password` can be populated.
+   *
+   * @var string
+   */
+  public $adminPasswordSecretVersion;
+  /**
+   * Optional. The character set for the database. The default is AL32UTF8.
+   *
    * @var string
    */
   public $characterSet;
   /**
+   * Output only. The date and time that the Database was created.
+   *
    * @var string
    */
   public $createTime;
   /**
+   * Optional. The database ID of the Database.
+   *
    * @var string
    */
   public $databaseId;
   /**
+   * Optional. The name of the DbHome resource associated with the Database.
+   *
    * @var string
    */
   public $dbHomeName;
   /**
+   * Optional. The database name. The name must begin with an alphabetic
+   * character and can contain a maximum of eight alphanumeric characters.
+   * Special characters are not permitted.
+   *
    * @var string
    */
   public $dbName;
   /**
+   * Optional. The DB_UNIQUE_NAME of the Oracle Database being backed up.
+   *
    * @var string
    */
   public $dbUniqueName;
   /**
+   * Output only. The GCP Oracle zone where the Database is created.
+   *
    * @var string
    */
   public $gcpOracleZone;
   /**
+   * Identifier. The name of the Database resource in the following format:
+   * projects/{project}/locations/{region}/databases/{database}
+   *
    * @var string
    */
   public $name;
   /**
+   * Optional. The national character set for the database. The default is
+   * AL16UTF16.
+   *
    * @var string
    */
   public $ncharacterSet;
   /**
+   * Output only. HTTPS link to OCI resources exposed to Customer via UI
+   * Interface.
+   *
    * @var string
    */
   public $ociUrl;
   /**
+   * Output only. The Status of Operations Insights for this Database.
+   *
    * @var string
    */
   public $opsInsightsStatus;
+  /**
+   * Optional. The ID of the pluggable database associated with the Database.
+   * The ID must be unique within the project and location.
+   *
+   * @var string
+   */
+  public $pluggableDatabaseId;
+  /**
+   * Optional. The pluggable database associated with the Database. The name
+   * must begin with an alphabetic character and can contain a maximum of thirty
+   * alphanumeric characters.
+   *
+   * @var string
+   */
+  public $pluggableDatabaseName;
   protected $propertiesType = DatabaseProperties::class;
   protected $propertiesDataType = '';
   /**
+   * Optional. The TDE wallet password for the database. Note: Only one of
+   * `tde_wallet_password_secret_version` or `tde_wallet_password` can be
+   * populated.
+   *
    * @var string
    */
   public $tdeWalletPassword;
+  /**
+   * Optional. The resource name of a secret version in Secret Manager which
+   * contains the TDE wallet password for the database. Format:
+   * projects/{project}/secrets/{secret}/versions/{version}. Note: Only one of
+   * `tde_wallet_password_secret_version` or `tde_wallet_password` can be
+   * populated.
+   *
+   * @var string
+   */
+  public $tdeWalletPasswordSecretVersion;
 
   /**
-   * @param string
+   * Optional. The password for the default ADMIN user. Note: Only one of
+   * `admin_password_secret_version` or `admin_password` can be populated.
+   *
+   * @param string $adminPassword
    */
   public function setAdminPassword($adminPassword)
   {
@@ -89,7 +188,28 @@ class Database extends \Google\Model
     return $this->adminPassword;
   }
   /**
-   * @param string
+   * Optional. The resource name of a secret version in Secret Manager which
+   * contains the database admin user's password. Format:
+   * projects/{project}/secrets/{secret}/versions/{version}. Note: Only one of
+   * `admin_password_secret_version` or `admin_password` can be populated.
+   *
+   * @param string $adminPasswordSecretVersion
+   */
+  public function setAdminPasswordSecretVersion($adminPasswordSecretVersion)
+  {
+    $this->adminPasswordSecretVersion = $adminPasswordSecretVersion;
+  }
+  /**
+   * @return string
+   */
+  public function getAdminPasswordSecretVersion()
+  {
+    return $this->adminPasswordSecretVersion;
+  }
+  /**
+   * Optional. The character set for the database. The default is AL32UTF8.
+   *
+   * @param string $characterSet
    */
   public function setCharacterSet($characterSet)
   {
@@ -103,7 +223,9 @@ class Database extends \Google\Model
     return $this->characterSet;
   }
   /**
-   * @param string
+   * Output only. The date and time that the Database was created.
+   *
+   * @param string $createTime
    */
   public function setCreateTime($createTime)
   {
@@ -117,7 +239,9 @@ class Database extends \Google\Model
     return $this->createTime;
   }
   /**
-   * @param string
+   * Optional. The database ID of the Database.
+   *
+   * @param string $databaseId
    */
   public function setDatabaseId($databaseId)
   {
@@ -131,7 +255,9 @@ class Database extends \Google\Model
     return $this->databaseId;
   }
   /**
-   * @param string
+   * Optional. The name of the DbHome resource associated with the Database.
+   *
+   * @param string $dbHomeName
    */
   public function setDbHomeName($dbHomeName)
   {
@@ -145,7 +271,11 @@ class Database extends \Google\Model
     return $this->dbHomeName;
   }
   /**
-   * @param string
+   * Optional. The database name. The name must begin with an alphabetic
+   * character and can contain a maximum of eight alphanumeric characters.
+   * Special characters are not permitted.
+   *
+   * @param string $dbName
    */
   public function setDbName($dbName)
   {
@@ -159,7 +289,9 @@ class Database extends \Google\Model
     return $this->dbName;
   }
   /**
-   * @param string
+   * Optional. The DB_UNIQUE_NAME of the Oracle Database being backed up.
+   *
+   * @param string $dbUniqueName
    */
   public function setDbUniqueName($dbUniqueName)
   {
@@ -173,7 +305,9 @@ class Database extends \Google\Model
     return $this->dbUniqueName;
   }
   /**
-   * @param string
+   * Output only. The GCP Oracle zone where the Database is created.
+   *
+   * @param string $gcpOracleZone
    */
   public function setGcpOracleZone($gcpOracleZone)
   {
@@ -187,7 +321,10 @@ class Database extends \Google\Model
     return $this->gcpOracleZone;
   }
   /**
-   * @param string
+   * Identifier. The name of the Database resource in the following format:
+   * projects/{project}/locations/{region}/databases/{database}
+   *
+   * @param string $name
    */
   public function setName($name)
   {
@@ -201,7 +338,10 @@ class Database extends \Google\Model
     return $this->name;
   }
   /**
-   * @param string
+   * Optional. The national character set for the database. The default is
+   * AL16UTF16.
+   *
+   * @param string $ncharacterSet
    */
   public function setNcharacterSet($ncharacterSet)
   {
@@ -215,7 +355,10 @@ class Database extends \Google\Model
     return $this->ncharacterSet;
   }
   /**
-   * @param string
+   * Output only. HTTPS link to OCI resources exposed to Customer via UI
+   * Interface.
+   *
+   * @param string $ociUrl
    */
   public function setOciUrl($ociUrl)
   {
@@ -229,21 +372,63 @@ class Database extends \Google\Model
     return $this->ociUrl;
   }
   /**
-   * @param string
+   * Output only. The Status of Operations Insights for this Database.
+   *
+   * Accepted values: OPERATIONS_INSIGHTS_STATUS_UNSPECIFIED, ENABLING, ENABLED,
+   * DISABLING, NOT_ENABLED, FAILED_ENABLING, FAILED_DISABLING
+   *
+   * @param self::OPS_INSIGHTS_STATUS_* $opsInsightsStatus
    */
   public function setOpsInsightsStatus($opsInsightsStatus)
   {
     $this->opsInsightsStatus = $opsInsightsStatus;
   }
   /**
-   * @return string
+   * @return self::OPS_INSIGHTS_STATUS_*
    */
   public function getOpsInsightsStatus()
   {
     return $this->opsInsightsStatus;
   }
   /**
-   * @param DatabaseProperties
+   * Optional. The ID of the pluggable database associated with the Database.
+   * The ID must be unique within the project and location.
+   *
+   * @param string $pluggableDatabaseId
+   */
+  public function setPluggableDatabaseId($pluggableDatabaseId)
+  {
+    $this->pluggableDatabaseId = $pluggableDatabaseId;
+  }
+  /**
+   * @return string
+   */
+  public function getPluggableDatabaseId()
+  {
+    return $this->pluggableDatabaseId;
+  }
+  /**
+   * Optional. The pluggable database associated with the Database. The name
+   * must begin with an alphabetic character and can contain a maximum of thirty
+   * alphanumeric characters.
+   *
+   * @param string $pluggableDatabaseName
+   */
+  public function setPluggableDatabaseName($pluggableDatabaseName)
+  {
+    $this->pluggableDatabaseName = $pluggableDatabaseName;
+  }
+  /**
+   * @return string
+   */
+  public function getPluggableDatabaseName()
+  {
+    return $this->pluggableDatabaseName;
+  }
+  /**
+   * Optional. The properties of the Database.
+   *
+   * @param DatabaseProperties $properties
    */
   public function setProperties(DatabaseProperties $properties)
   {
@@ -257,7 +442,11 @@ class Database extends \Google\Model
     return $this->properties;
   }
   /**
-   * @param string
+   * Optional. The TDE wallet password for the database. Note: Only one of
+   * `tde_wallet_password_secret_version` or `tde_wallet_password` can be
+   * populated.
+   *
+   * @param string $tdeWalletPassword
    */
   public function setTdeWalletPassword($tdeWalletPassword)
   {
@@ -269,6 +458,26 @@ class Database extends \Google\Model
   public function getTdeWalletPassword()
   {
     return $this->tdeWalletPassword;
+  }
+  /**
+   * Optional. The resource name of a secret version in Secret Manager which
+   * contains the TDE wallet password for the database. Format:
+   * projects/{project}/secrets/{secret}/versions/{version}. Note: Only one of
+   * `tde_wallet_password_secret_version` or `tde_wallet_password` can be
+   * populated.
+   *
+   * @param string $tdeWalletPasswordSecretVersion
+   */
+  public function setTdeWalletPasswordSecretVersion($tdeWalletPasswordSecretVersion)
+  {
+    $this->tdeWalletPasswordSecretVersion = $tdeWalletPasswordSecretVersion;
+  }
+  /**
+   * @return string
+   */
+  public function getTdeWalletPasswordSecretVersion()
+  {
+    return $this->tdeWalletPasswordSecretVersion;
   }
 }
 

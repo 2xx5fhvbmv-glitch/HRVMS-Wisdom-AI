@@ -221,8 +221,10 @@ class ProjectsLocationsInstances extends \Google\Service\Resource
    * Lists instances in a given project and location.
    * (instances.listProjectsLocationsInstances)
    *
-   * @param string $parent Required. Format:
-   * `parent=projects/{project_id}/locations/{location}`
+   * @param string $parent Required. The parent of the instance. Formats: -
+   * `projects/{project_id}/locations/{location}` to list instances in a specific
+   * zone. - `projects/{project_id}/locations/-` to list instances in all
+   * locations.
    * @param array $optParams Optional parameters.
    *
    * @opt_param string filter Optional. List filter.
@@ -243,7 +245,8 @@ class ProjectsLocationsInstances extends \Google\Service\Resource
   /**
    * UpdateInstance updates an Instance. (instances.patch)
    *
-   * @param string $name Output only. The name of this notebook instance. Format:
+   * @param string $name Output only. Identifier. The name of this notebook
+   * instance. Format:
    * `projects/{project_id}/locations/{location}/instances/{instance_id}`
    * @param Instance $postBody
    * @param array $optParams Optional parameters.
@@ -266,7 +269,11 @@ class ProjectsLocationsInstances extends \Google\Service\Resource
    * `gce_setup.reservation_affinity.values` * `gce_setup.tags` *
    * `gce_setup.container_image` * `gce_setup.container_image.repository` *
    * `gce_setup.container_image.tag` * `gce_setup.disable_public_ip` *
-   * `disable_proxy_access`
+   * `disable_proxy_access` Note: `gce_setup.disable_public_ip` and
+   * `disable_proxy_access` are one-way on update -- they can only be used to
+   * *disable* the feature (set the field to `true`). Requests that set either
+   * field back to `false` (re-enabling the external IP or proxy access) are
+   * rejected with `INVALID_ARGUMENT`.
    * @return Operation
    * @throws \Google\Service\Exception
    */

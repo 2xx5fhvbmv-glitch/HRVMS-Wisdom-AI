@@ -25,7 +25,7 @@ class RemoveAudienceMembersResponse extends \Google\Model
   public $requestId;
 
   /**
-   * @param string
+   * @param string $requestId
    */
   public function setRequestId($requestId)
   {

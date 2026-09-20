@@ -1,6 +1,8 @@
 <?php
 
-namespace Barryvdh\Debugbar\DataCollector;
+declare(strict_types=1);
+
+namespace Fruitcake\LaravelDebugbar\DataCollector;
 
 use DebugBar\DataCollector\DataCollector;
 use DebugBar\DataCollector\DataCollectorInterface;
@@ -8,35 +10,24 @@ use DebugBar\DataCollector\Renderable;
 
 class SessionCollector extends DataCollector implements DataCollectorInterface, Renderable
 {
-    /** @var  \Symfony\Component\HttpFoundation\Session\SessionInterface|\Illuminate\Contracts\Session\Session $session */
-    protected $session;
-
-    /**
-     * Create a new SessionCollector
-     *
-     * @param \Symfony\Component\HttpFoundation\Session\SessionInterface|\Illuminate\Contracts\Session\Session $session
-     */
-    public function __construct($session)
-    {
-        $this->session = $session;
-    }
-
     /**
      * {@inheritdoc}
      */
-    public function collect()
+    public function collect(): array
     {
-        $data = [];
-        foreach ($this->session->all() as $key => $value) {
-            $data[$key] = is_string($value) ? $value : $this->formatVar($value);
+        $data = $this->hideMaskedValues(session()->all());
+
+        foreach ($data as $key => $value) {
+            $data[$key] = is_string($value) ? $value : $this->getDataFormatter()->formatVar($value);
         }
+
         return $data;
     }
 
     /**
      * {@inheritDoc}
      */
-    public function getName()
+    public function getName(): string
     {
         return 'session';
     }
@@ -44,15 +35,21 @@ class SessionCollector extends DataCollector implements DataCollectorInterface, 
     /**
      * {@inheritDoc}
      */
-    public function getWidgets()
+    public function getWidgets(): array
     {
+        $widget = match (true) {
+            $this->isJsonVarDumperUsed() => "PhpDebugBar.Widgets.JsonVariableListWidget",
+            $this->isHtmlVarDumperUsed() => "PhpDebugBar.Widgets.HtmlVariableListWidget",
+            default => "PhpDebugBar.Widgets.VariableListWidget",
+        };
+
         return [
             "session" => [
                 "icon" => "archive",
-                "widget" => "PhpDebugBar.Widgets.VariableListWidget",
+                "widget" => $widget,
                 "map" => "session",
-                "default" => "{}"
-            ]
+                "default" => "{}",
+            ],
         ];
     }
 }

@@ -20,7 +20,7 @@ namespace Google\Service;
 use Google\Client;
 
 /**
- * Service definition for SaaSServiceManagement (v1beta1).
+ * Service definition for SaaSServiceManagement (v1).
  *
  * <p>
  * Model, deploy, and operate your SaaS at scale.</p>
@@ -37,10 +37,15 @@ class SaaSServiceManagement extends \Google\Service
   /** See, edit, configure, and delete your Google Cloud data and see the email address for your Google Account.. */
   const CLOUD_PLATFORM =
       "https://www.googleapis.com/auth/cloud-platform";
+  /** See, edit, configure, and delete your Google Cloud App Lifecycle Management data and see the email address for your Google Account. */
+  const SAASSERVICEMGMT_READ_WRITE =
+      "https://www.googleapis.com/auth/saasservicemgmt.read-write";
+  /** See your Google Cloud App Lifecycle Management data and the email address of your Google Account. */
+  const SAASSERVICEMGMT_READONLY =
+      "https://www.googleapis.com/auth/saasservicemgmt.readonly";
 
   public $projects_locations;
   public $projects_locations_releases;
-  public $projects_locations_replicationsInternal;
   public $projects_locations_rolloutKinds;
   public $projects_locations_rollouts;
   public $projects_locations_saas;
@@ -65,7 +70,7 @@ class SaaSServiceManagement extends \Google\Service
     $this->rootUrlTemplate = $rootUrl ?: 'https://saasservicemgmt.UNIVERSE_DOMAIN/';
     $this->servicePath = '';
     $this->batchPath = 'batch';
-    $this->version = 'v1beta1';
+    $this->version = 'v1';
     $this->serviceName = 'saasservicemgmt';
 
     $this->projects_locations = new SaaSServiceManagement\Resource\ProjectsLocations(
@@ -75,7 +80,7 @@ class SaaSServiceManagement extends \Google\Service
         [
           'methods' => [
             'get' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'GET',
               'parameters' => [
                 'name' => [
@@ -85,7 +90,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'list' => [
-              'path' => 'v1beta1/{+name}/locations',
+              'path' => 'v1/{+name}/locations',
               'httpMethod' => 'GET',
               'parameters' => [
                 'name' => [
@@ -122,7 +127,7 @@ class SaaSServiceManagement extends \Google\Service
         [
           'methods' => [
             'create' => [
-              'path' => 'v1beta1/{+parent}/releases',
+              'path' => 'v1/{+parent}/releases',
               'httpMethod' => 'POST',
               'parameters' => [
                 'parent' => [
@@ -144,7 +149,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'delete' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'DELETE',
               'parameters' => [
                 'name' => [
@@ -166,7 +171,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'get' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'GET',
               'parameters' => [
                 'name' => [
@@ -176,7 +181,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'list' => [
-              'path' => 'v1beta1/{+parent}/releases',
+              'path' => 'v1/{+parent}/releases',
               'httpMethod' => 'GET',
               'parameters' => [
                 'parent' => [
@@ -202,129 +207,13 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'patch' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'PATCH',
               'parameters' => [
                 'name' => [
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
-                ],
-                'requestId' => [
-                  'location' => 'query',
-                  'type' => 'string',
-                ],
-                'updateMask' => [
-                  'location' => 'query',
-                  'type' => 'string',
-                ],
-                'validateOnly' => [
-                  'location' => 'query',
-                  'type' => 'boolean',
-                ],
-              ],
-            ],
-          ]
-        ]
-    );
-    $this->projects_locations_replicationsInternal = new SaaSServiceManagement\Resource\ProjectsLocationsReplicationsInternal(
-        $this,
-        $this->serviceName,
-        'replicationsInternal',
-        [
-          'methods' => [
-            'create' => [
-              'path' => 'v1beta1/{+parent}/replicationsInternal',
-              'httpMethod' => 'POST',
-              'parameters' => [
-                'parent' => [
-                  'location' => 'path',
-                  'type' => 'string',
-                  'required' => true,
-                ],
-                'replicationInternalId' => [
-                  'location' => 'query',
-                  'type' => 'string',
-                ],
-                'requestId' => [
-                  'location' => 'query',
-                  'type' => 'string',
-                ],
-                'validateOnly' => [
-                  'location' => 'query',
-                  'type' => 'boolean',
-                ],
-              ],
-            ],'delete' => [
-              'path' => 'v1beta1/{+name}',
-              'httpMethod' => 'DELETE',
-              'parameters' => [
-                'name' => [
-                  'location' => 'path',
-                  'type' => 'string',
-                  'required' => true,
-                ],
-                'etag' => [
-                  'location' => 'query',
-                  'type' => 'string',
-                ],
-                'requestId' => [
-                  'location' => 'query',
-                  'type' => 'string',
-                ],
-                'validateOnly' => [
-                  'location' => 'query',
-                  'type' => 'boolean',
-                ],
-              ],
-            ],'get' => [
-              'path' => 'v1beta1/{+name}',
-              'httpMethod' => 'GET',
-              'parameters' => [
-                'name' => [
-                  'location' => 'path',
-                  'type' => 'string',
-                  'required' => true,
-                ],
-              ],
-            ],'list' => [
-              'path' => 'v1beta1/{+parent}/replicationsInternal',
-              'httpMethod' => 'GET',
-              'parameters' => [
-                'parent' => [
-                  'location' => 'path',
-                  'type' => 'string',
-                  'required' => true,
-                ],
-                'filter' => [
-                  'location' => 'query',
-                  'type' => 'string',
-                ],
-                'orderBy' => [
-                  'location' => 'query',
-                  'type' => 'string',
-                ],
-                'pageSize' => [
-                  'location' => 'query',
-                  'type' => 'integer',
-                ],
-                'pageToken' => [
-                  'location' => 'query',
-                  'type' => 'string',
-                ],
-              ],
-            ],'patch' => [
-              'path' => 'v1beta1/{+name}',
-              'httpMethod' => 'PATCH',
-              'parameters' => [
-                'name' => [
-                  'location' => 'path',
-                  'type' => 'string',
-                  'required' => true,
-                ],
-                'etag' => [
-                  'location' => 'query',
-                  'type' => 'string',
                 ],
                 'requestId' => [
                   'location' => 'query',
@@ -350,7 +239,7 @@ class SaaSServiceManagement extends \Google\Service
         [
           'methods' => [
             'create' => [
-              'path' => 'v1beta1/{+parent}/rolloutKinds',
+              'path' => 'v1/{+parent}/rolloutKinds',
               'httpMethod' => 'POST',
               'parameters' => [
                 'parent' => [
@@ -372,7 +261,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'delete' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'DELETE',
               'parameters' => [
                 'name' => [
@@ -394,7 +283,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'get' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'GET',
               'parameters' => [
                 'name' => [
@@ -404,7 +293,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'list' => [
-              'path' => 'v1beta1/{+parent}/rolloutKinds',
+              'path' => 'v1/{+parent}/rolloutKinds',
               'httpMethod' => 'GET',
               'parameters' => [
                 'parent' => [
@@ -430,7 +319,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'patch' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'PATCH',
               'parameters' => [
                 'name' => [
@@ -462,7 +351,7 @@ class SaaSServiceManagement extends \Google\Service
         [
           'methods' => [
             'create' => [
-              'path' => 'v1beta1/{+parent}/rollouts',
+              'path' => 'v1/{+parent}/rollouts',
               'httpMethod' => 'POST',
               'parameters' => [
                 'parent' => [
@@ -484,7 +373,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'delete' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'DELETE',
               'parameters' => [
                 'name' => [
@@ -506,7 +395,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'get' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'GET',
               'parameters' => [
                 'name' => [
@@ -516,7 +405,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'list' => [
-              'path' => 'v1beta1/{+parent}/rollouts',
+              'path' => 'v1/{+parent}/rollouts',
               'httpMethod' => 'GET',
               'parameters' => [
                 'parent' => [
@@ -542,7 +431,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'patch' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'PATCH',
               'parameters' => [
                 'name' => [
@@ -574,7 +463,7 @@ class SaaSServiceManagement extends \Google\Service
         [
           'methods' => [
             'create' => [
-              'path' => 'v1beta1/{+parent}/saas',
+              'path' => 'v1/{+parent}/saas',
               'httpMethod' => 'POST',
               'parameters' => [
                 'parent' => [
@@ -596,7 +485,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'delete' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'DELETE',
               'parameters' => [
                 'name' => [
@@ -618,7 +507,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'get' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'GET',
               'parameters' => [
                 'name' => [
@@ -628,7 +517,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'list' => [
-              'path' => 'v1beta1/{+parent}/saas',
+              'path' => 'v1/{+parent}/saas',
               'httpMethod' => 'GET',
               'parameters' => [
                 'parent' => [
@@ -654,7 +543,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'patch' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'PATCH',
               'parameters' => [
                 'name' => [
@@ -686,7 +575,7 @@ class SaaSServiceManagement extends \Google\Service
         [
           'methods' => [
             'create' => [
-              'path' => 'v1beta1/{+parent}/tenants',
+              'path' => 'v1/{+parent}/tenants',
               'httpMethod' => 'POST',
               'parameters' => [
                 'parent' => [
@@ -708,7 +597,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'delete' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'DELETE',
               'parameters' => [
                 'name' => [
@@ -730,7 +619,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'get' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'GET',
               'parameters' => [
                 'name' => [
@@ -740,7 +629,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'list' => [
-              'path' => 'v1beta1/{+parent}/tenants',
+              'path' => 'v1/{+parent}/tenants',
               'httpMethod' => 'GET',
               'parameters' => [
                 'parent' => [
@@ -766,7 +655,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'patch' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'PATCH',
               'parameters' => [
                 'name' => [
@@ -798,7 +687,7 @@ class SaaSServiceManagement extends \Google\Service
         [
           'methods' => [
             'create' => [
-              'path' => 'v1beta1/{+parent}/unitKinds',
+              'path' => 'v1/{+parent}/unitKinds',
               'httpMethod' => 'POST',
               'parameters' => [
                 'parent' => [
@@ -820,7 +709,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'delete' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'DELETE',
               'parameters' => [
                 'name' => [
@@ -842,7 +731,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'get' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'GET',
               'parameters' => [
                 'name' => [
@@ -852,7 +741,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'list' => [
-              'path' => 'v1beta1/{+parent}/unitKinds',
+              'path' => 'v1/{+parent}/unitKinds',
               'httpMethod' => 'GET',
               'parameters' => [
                 'parent' => [
@@ -878,7 +767,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'patch' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'PATCH',
               'parameters' => [
                 'name' => [
@@ -910,7 +799,7 @@ class SaaSServiceManagement extends \Google\Service
         [
           'methods' => [
             'create' => [
-              'path' => 'v1beta1/{+parent}/unitOperations',
+              'path' => 'v1/{+parent}/unitOperations',
               'httpMethod' => 'POST',
               'parameters' => [
                 'parent' => [
@@ -932,7 +821,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'delete' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'DELETE',
               'parameters' => [
                 'name' => [
@@ -954,7 +843,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'get' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'GET',
               'parameters' => [
                 'name' => [
@@ -964,7 +853,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'list' => [
-              'path' => 'v1beta1/{+parent}/unitOperations',
+              'path' => 'v1/{+parent}/unitOperations',
               'httpMethod' => 'GET',
               'parameters' => [
                 'parent' => [
@@ -990,7 +879,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'patch' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'PATCH',
               'parameters' => [
                 'name' => [
@@ -1022,7 +911,7 @@ class SaaSServiceManagement extends \Google\Service
         [
           'methods' => [
             'create' => [
-              'path' => 'v1beta1/{+parent}/units',
+              'path' => 'v1/{+parent}/units',
               'httpMethod' => 'POST',
               'parameters' => [
                 'parent' => [
@@ -1044,7 +933,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'delete' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'DELETE',
               'parameters' => [
                 'name' => [
@@ -1066,7 +955,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'get' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'GET',
               'parameters' => [
                 'name' => [
@@ -1076,7 +965,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'list' => [
-              'path' => 'v1beta1/{+parent}/units',
+              'path' => 'v1/{+parent}/units',
               'httpMethod' => 'GET',
               'parameters' => [
                 'parent' => [
@@ -1102,7 +991,7 @@ class SaaSServiceManagement extends \Google\Service
                 ],
               ],
             ],'patch' => [
-              'path' => 'v1beta1/{+name}',
+              'path' => 'v1/{+name}',
               'httpMethod' => 'PATCH',
               'parameters' => [
                 'name' => [

@@ -34,20 +34,16 @@ class RequestDataCollector extends DataCollector implements EventSubscriberInter
     /**
      * @var \SplObjectStorage<Request, callable>
      */
-    private $controllers;
-    private $sessionUsages = [];
-    private $requestStack;
+    private \SplObjectStorage $controllers;
+    private array $sessionUsages = [];
 
-    public function __construct(?RequestStack $requestStack = null)
-    {
+    public function __construct(
+        private ?RequestStack $requestStack = null,
+    ) {
         $this->controllers = new \SplObjectStorage();
-        $this->requestStack = $requestStack;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function collect(Request $request, Response $response, ?\Throwable $exception = null)
+    public function collect(Request $request, Response $response, ?\Throwable $exception = null): void
     {
         // attributes are serialized and as they can be anything, they need to be converted to strings.
         $attributes = [];
@@ -110,7 +106,7 @@ class RequestDataCollector extends DataCollector implements EventSubscriberInter
             'session_metadata' => $sessionMetadata,
             'session_attributes' => $sessionAttributes,
             'session_usages' => array_values($this->sessionUsages),
-            'stateless_check' => $this->requestStack && ($mainRequest = $this->requestStack->getMainRequest()) && $mainRequest->attributes->get('_stateless', false),
+            'stateless_check' => $this->requestStack?->getMainRequest()?->attributes->get('_stateless') ?? false,
             'flashes' => $flashes,
             'path_info' => $request->getPathInfo(),
             'controller' => 'n/a',
@@ -134,12 +130,14 @@ class RequestDataCollector extends DataCollector implements EventSubscriberInter
 
         $this->data['content'] = $content;
 
+        $this->data['curlCommand'] = $this->computeCurlCommand($request, $content);
+
         foreach ($this->data as $key => $value) {
             if (!\is_array($value)) {
                 continue;
             }
             if ('request_headers' === $key || 'response_headers' === $key) {
-                $this->data[$key] = array_map(function ($v) { return isset($v[0]) && !isset($v[1]) ? $v[0] : $v; }, $value);
+                $this->data[$key] = array_map(static fn ($v) => isset($v[0]) && !isset($v[1]) ? $v[0] : $v, $value);
             }
         }
 
@@ -176,141 +174,144 @@ class RequestDataCollector extends DataCollector implements EventSubscriberInter
         }
     }
 
-    public function lateCollect()
+    public function lateCollect(): void
     {
         $this->data = $this->cloneVar($this->data);
     }
 
-    public function reset()
+    public function reset(): void
     {
-        $this->data = [];
+        parent::reset();
         $this->controllers = new \SplObjectStorage();
         $this->sessionUsages = [];
     }
 
-    public function getMethod()
+    public function getMethod(): string
     {
         return $this->data['method'];
     }
 
-    public function getPathInfo()
+    public function getPathInfo(): string
     {
         return $this->data['path_info'];
     }
 
-    public function getRequestRequest()
+    public function getRequestRequest(): ParameterBag
     {
         return new ParameterBag($this->data['request_request']->getValue());
     }
 
-    public function getRequestQuery()
+    public function getRequestQuery(): ParameterBag
     {
         return new ParameterBag($this->data['request_query']->getValue());
     }
 
-    public function getRequestFiles()
+    public function getRequestFiles(): ParameterBag
     {
         return new ParameterBag($this->data['request_files']->getValue());
     }
 
-    public function getRequestHeaders()
+    public function getRequestHeaders(): ParameterBag
     {
         return new ParameterBag($this->data['request_headers']->getValue());
     }
 
-    public function getRequestServer(bool $raw = false)
+    public function getRequestServer(bool $raw = false): ParameterBag
     {
         return new ParameterBag($this->data['request_server']->getValue($raw));
     }
 
-    public function getRequestCookies(bool $raw = false)
+    public function getRequestCookies(bool $raw = false): ParameterBag
     {
         return new ParameterBag($this->data['request_cookies']->getValue($raw));
     }
 
-    public function getRequestAttributes()
+    public function getRequestAttributes(): ParameterBag
     {
         return new ParameterBag($this->data['request_attributes']->getValue());
     }
 
-    public function getResponseHeaders()
+    public function getResponseHeaders(): ParameterBag
     {
         return new ParameterBag($this->data['response_headers']->getValue());
     }
 
-    public function getResponseCookies()
+    public function getResponseCookies(): ParameterBag
     {
         return new ParameterBag($this->data['response_cookies']->getValue());
     }
 
-    public function getSessionMetadata()
+    public function getSessionMetadata(): array
     {
         return $this->data['session_metadata']->getValue();
     }
 
-    public function getSessionAttributes()
+    public function getSessionAttributes(): array
     {
         return $this->data['session_attributes']->getValue();
     }
 
-    public function getStatelessCheck()
+    public function getStatelessCheck(): bool
     {
         return $this->data['stateless_check'];
     }
 
-    public function getSessionUsages()
+    public function getSessionUsages(): Data|array
     {
         return $this->data['session_usages'];
     }
 
-    public function getFlashes()
+    public function getFlashes(): array
     {
         return $this->data['flashes']->getValue();
     }
 
+    /**
+     * @return string|resource
+     */
     public function getContent()
     {
         return $this->data['content'];
     }
 
-    public function isJsonRequest()
+    public function isJsonRequest(): bool
     {
         return 1 === preg_match('{^application/(?:\w+\++)*json$}i', $this->data['request_headers']['content-type']);
     }
 
-    public function getPrettyJson()
+    public function getPrettyJson(): ?string
     {
         $decoded = json_decode($this->getContent());
 
         return \JSON_ERROR_NONE === json_last_error() ? json_encode($decoded, \JSON_PRETTY_PRINT) : null;
     }
 
-    public function getContentType()
+    public function getContentType(): string
     {
         return $this->data['content_type'];
     }
 
-    public function getStatusText()
+    public function getStatusText(): string
     {
         return $this->data['status_text'];
     }
 
-    public function getStatusCode()
+    public function getStatusCode(): int
     {
         return $this->data['status_code'];
     }
 
-    public function getFormat()
+    public function getFormat(): string
     {
         return $this->data['format'];
     }
 
-    public function getLocale()
+    public function getLocale(): string
     {
         return $this->data['locale'];
     }
 
-    public function getDotenvVars()
+    public function getDotenvVars(): ParameterBag
     {
         return new ParameterBag($this->data['dotenv_vars']->getValue());
     }
@@ -325,7 +326,7 @@ class RequestDataCollector extends DataCollector implements EventSubscriberInter
         return $this->data['route'];
     }
 
-    public function getIdentifier()
+    public function getIdentifier(): string
     {
         return $this->data['identifier'];
     }
@@ -346,7 +347,7 @@ class RequestDataCollector extends DataCollector implements EventSubscriberInter
      * @return array|string|Data The controller as a string or array of data
      *                           with keys 'class', 'method', 'file' and 'line'
      */
-    public function getController()
+    public function getController(): array|string|Data
     {
         return $this->data['controller'];
     }
@@ -357,22 +358,22 @@ class RequestDataCollector extends DataCollector implements EventSubscriberInter
      * @return array|Data|false A legacy array of data from the previous redirection response
      *                          or false otherwise
      */
-    public function getRedirect()
+    public function getRedirect(): array|Data|false
     {
         return $this->data['redirect'] ?? false;
     }
 
-    public function getForwardToken()
+    public function getForwardToken(): ?string
     {
         return $this->data['forward_token'] ?? null;
     }
 
-    public function onKernelController(ControllerEvent $event)
+    public function onKernelController(ControllerEvent $event): void
     {
         $this->controllers[$event->getRequest()] = $event->getController();
     }
 
-    public function onKernelResponse(ResponseEvent $event)
+    public function onKernelResponse(ResponseEvent $event): void
     {
         if (!$event->isMainRequest()) {
             return;
@@ -391,9 +392,6 @@ class RequestDataCollector extends DataCollector implements EventSubscriberInter
         ];
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getName(): string
     {
         return 'request';
@@ -419,7 +417,7 @@ class RequestDataCollector extends DataCollector implements EventSubscriberInter
         array_splice($trace, 0, $traceEndIndex);
 
         // Merge identical backtraces generated by internal call reports
-        $name = sprintf('%s:%s', $trace[1]['class'] ?? $trace[0]['file'], $trace[0]['line']);
+        $name = \sprintf('%s:%s', $trace[1]['class'] ?? $trace[0]['file'], $trace[0]['line']);
         if (!\array_key_exists($name, $this->sessionUsages)) {
             $this->sessionUsages[$name] = [
                 'name' => $name,
@@ -431,11 +429,9 @@ class RequestDataCollector extends DataCollector implements EventSubscriberInter
     }
 
     /**
-     * @param string|object|array|null $controller The controller to parse
-     *
      * @return array|string An array of controller data or a simple string
      */
-    private function parseController($controller)
+    private function parseController(array|object|string|null $controller): array|string
     {
         if (\is_string($controller) && str_contains($controller, '::')) {
             $controller = explode('::', $controller);
@@ -451,7 +447,7 @@ class RequestDataCollector extends DataCollector implements EventSubscriberInter
                     'file' => $r->getFileName(),
                     'line' => $r->getStartLine(),
                 ];
-            } catch (\ReflectionException $e) {
+            } catch (\ReflectionException) {
                 if (\is_callable($controller)) {
                     // using __call or  __callStatic
                     return [
@@ -474,12 +470,12 @@ class RequestDataCollector extends DataCollector implements EventSubscriberInter
                 'line' => $r->getStartLine(),
             ];
 
-            if (str_contains($r->name, '{closure')) {
+            if ($r->isAnonymous()) {
                 return $controller;
             }
             $controller['method'] = $r->name;
 
-            if ($class = \PHP_VERSION_ID >= 80111 ? $r->getClosureCalledClass() : $r->getClosureScopeClass()) {
+            if ($class = $r->getClosureCalledClass()) {
                 $controller['class'] = $class->name;
             } else {
                 return $r->name;
@@ -500,5 +496,80 @@ class RequestDataCollector extends DataCollector implements EventSubscriberInter
         }
 
         return \is_string($controller) ? $controller : 'n/a';
+    }
+
+    private function computeCurlCommand(Request $request, ?string $content): string
+    {
+        $command = ['curl', '--compressed'];
+
+        $method = $request->getMethod();
+
+        if (Request::METHOD_HEAD === $method) {
+            $command[] = '--head';
+        } elseif (Request::METHOD_GET !== $method) {
+            $command[] = \sprintf('--request %s', $method);
+        }
+
+        $command[] = \sprintf('--url %s', $this->escapeArgument($request->getUri()));
+
+        foreach ($request->headers->all() as $name => $values) {
+            if (\in_array(strtolower($name), ['host', 'cookie'], true)) {
+                continue;
+            }
+
+            $command[] = '--header '.$this->escapeArgument(ucwords($name, '-').': '.implode(', ', $values));
+        }
+
+        if ($cookies = $this->flattenCookieArrayForCurl($request->cookies->all())) {
+            $command[] = '--cookie '.$this->escapeArgument(implode('; ', array_map(
+                static fn ($name, $value) => $name.'='.$value,
+                array_keys($cookies),
+                $cookies
+            )));
+        }
+
+        if ($content && \in_array($method, [Request::METHOD_POST, Request::METHOD_PUT, Request::METHOD_PATCH, Request::METHOD_DELETE], true)) {
+            $command[] = '--data-raw '.$this->escapeArgument($content);
+        }
+
+        return implode(" \\\n  ", $command);
+    }
+
+    public function getCurlCommand(): string
+    {
+        return $this->data['curlCommand'] ?? '';
+    }
+
+    /**
+     * The command joins its arguments with "\" line continuations, so it targets a POSIX
+     * shell on every platform. escapeshellarg() cannot be used: it drops bytes that are
+     * not valid in the current locale, and turns "%" into a space on Windows.
+     */
+    private function escapeArgument(string $value): string
+    {
+        return "'".str_replace("'", "'\\''", $value)."'";
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     *
+     * @return array<array-key, string>
+     */
+    private function flattenCookieArrayForCurl(array $data, string $prefix = ''): array
+    {
+        $pairs = [];
+
+        foreach ($data as $key => $value) {
+            $key = rawurlencode((string) $key);
+            $name = '' === $prefix ? $key : $prefix.'['.$key.']';
+
+            if (\is_array($value)) {
+                $pairs += $this->flattenCookieArrayForCurl($value, $name);
+            } else {
+                $pairs[$name] = rawurlencode((string) $value);
+            }
+        }
+
+        return $pairs;
     }
 }

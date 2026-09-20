@@ -19,6 +19,12 @@ namespace Google\Service\DataManager;
 
 class Consent extends \Google\Model
 {
+  public const AD_PERSONALIZATION_CONSENT_STATUS_UNSPECIFIED = 'CONSENT_STATUS_UNSPECIFIED';
+  public const AD_PERSONALIZATION_CONSENT_GRANTED = 'CONSENT_GRANTED';
+  public const AD_PERSONALIZATION_CONSENT_DENIED = 'CONSENT_DENIED';
+  public const AD_USER_DATA_CONSENT_STATUS_UNSPECIFIED = 'CONSENT_STATUS_UNSPECIFIED';
+  public const AD_USER_DATA_CONSENT_GRANTED = 'CONSENT_GRANTED';
+  public const AD_USER_DATA_CONSENT_DENIED = 'CONSENT_DENIED';
   /**
    * @var string
    */
@@ -29,28 +35,28 @@ class Consent extends \Google\Model
   public $adUserData;
 
   /**
-   * @param string
+   * @param self::AD_PERSONALIZATION_* $adPersonalization
    */
   public function setAdPersonalization($adPersonalization)
   {
     $this->adPersonalization = $adPersonalization;
   }
   /**
-   * @return string
+   * @return self::AD_PERSONALIZATION_*
    */
   public function getAdPersonalization()
   {
     return $this->adPersonalization;
   }
   /**
-   * @param string
+   * @param self::AD_USER_DATA_* $adUserData
    */
   public function setAdUserData($adUserData)
   {
     $this->adUserData = $adUserData;
   }
   /**
-   * @return string
+   * @return self::AD_USER_DATA_*
    */
   public function getAdUserData()
   {

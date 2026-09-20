@@ -124,9 +124,27 @@ class DataPortability extends \Google\Service
   /** Move a copy of the maps you created in My Maps. */
   const DATAPORTABILITY_MYMAPS_MAPS =
       "https://www.googleapis.com/auth/dataportability.mymaps.maps";
+  /** Copy Nest camera event data. */
+  const DATAPORTABILITY_NEST_CAMERA_EVENT =
+      "https://www.googleapis.com/auth/dataportability.nest.camera_event";
+  /** Copy Nest camera feature data. */
+  const DATAPORTABILITY_NEST_CAMERA_FEATURE =
+      "https://www.googleapis.com/auth/dataportability.nest.camera_feature";
+  /** Copy Nest camera footage. */
+  const DATAPORTABILITY_NEST_CAMERA_VIDEO =
+      "https://www.googleapis.com/auth/dataportability.nest.camera_video";
+  /** Copy your Nest Store and Nest Renew billing and payment information. */
+  const DATAPORTABILITY_NEST_STORE =
+      "https://www.googleapis.com/auth/dataportability.nest.store";
+  /** Copy your Nest user information. */
+  const DATAPORTABILITY_NEST_USER =
+      "https://www.googleapis.com/auth/dataportability.nest.user";
   /** Move a copy of your food purchase and reservation activity. */
   const DATAPORTABILITY_ORDER_RESERVE_PURCHASES_RESERVATIONS =
       "https://www.googleapis.com/auth/dataportability.order_reserve.purchases_reservations";
+  /** Usage and diagnostic data from your Pixel devices.. */
+  const DATAPORTABILITY_PIXEL_DEVICE_DATA =
+      "https://www.googleapis.com/auth/dataportability.pixel.device_data";
   /** Move a copy of information about your devices with Google Play Store installed. */
   const DATAPORTABILITY_PLAY_DEVICES =
       "https://www.googleapis.com/auth/dataportability.play.devices";
@@ -199,6 +217,9 @@ class DataPortability extends \Google\Service
   /** Move a copy of your YouTube comments. */
   const DATAPORTABILITY_YOUTUBE_COMMENTS =
       "https://www.googleapis.com/auth/dataportability.youtube.comments";
+  /** Move a copy of all your YouTube messages. */
+  const DATAPORTABILITY_YOUTUBE_CONVERSATIONS =
+      "https://www.googleapis.com/auth/dataportability.youtube.conversations";
   /** Move a copy of your YouTube messages in live chat. */
   const DATAPORTABILITY_YOUTUBE_LIVE_CHAT =
       "https://www.googleapis.com/auth/dataportability.youtube.live_chat";

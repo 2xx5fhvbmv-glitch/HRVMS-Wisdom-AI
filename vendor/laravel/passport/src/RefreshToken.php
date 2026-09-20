@@ -3,6 +3,7 @@
 namespace Laravel\Passport;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RefreshToken extends Model
 {
@@ -30,26 +31,18 @@ class RefreshToken extends Model
     /**
      * The guarded attributes on the model.
      *
-     * @var array
+     * @var array<string>|bool
      */
-    protected $guarded = [];
+    protected $guarded = false;
 
     /**
      * The attributes that should be cast to native types.
      *
-     * @var array
+     * @var array<string, string>
      */
     protected $casts = [
         'revoked' => 'bool',
-    ];
-
-    /**
-     * The attributes that should be mutated to dates.
-     *
-     * @var array
-     */
-    protected $dates = [
-        'expires_at',
+        'expires_at' => 'datetime',
     ];
 
     /**
@@ -62,40 +55,26 @@ class RefreshToken extends Model
     /**
      * Get the access token that the refresh token belongs to.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\Laravel\Passport\Token, $this>
      */
-    public function accessToken()
+    public function accessToken(): BelongsTo
     {
         return $this->belongsTo(Passport::tokenModel());
     }
 
     /**
      * Revoke the token instance.
-     *
-     * @return bool
      */
-    public function revoke()
+    public function revoke(): bool
     {
         return $this->forceFill(['revoked' => true])->save();
     }
 
     /**
-     * Determine if the token is a transient JWT token.
-     *
-     * @return bool
-     */
-    public function transient()
-    {
-        return false;
-    }
-
-    /**
      * Get the current connection name for the model.
-     *
-     * @return string|null
      */
-    public function getConnectionName()
+    public function getConnectionName(): ?string
     {
-        return config('passport.storage.database.connection') ?? $this->connection;
+        return parent::getConnectionName() ?? config('passport.connection');
     }
 }

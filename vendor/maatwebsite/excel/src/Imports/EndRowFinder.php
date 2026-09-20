@@ -1,18 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Maatwebsite\Excel\Imports;
 
+use Maatwebsite\Excel\Concerns\Import;
 use Maatwebsite\Excel\Concerns\WithLimit;
 
 class EndRowFinder
 {
-    /**
-     * @param  object|WithLimit  $import
-     * @param  int  $startRow
-     * @param  int|null  $highestRow
-     * @return int|null
-     */
-    public static function find($import, ?int $startRow = null, ?int $highestRow = null)
+    public static function find(?Import $import, ?int $startRow = null, ?int $highestRow = null): ?int
     {
         if (!$import instanceof WithLimit) {
             return null;
@@ -26,7 +23,7 @@ class EndRowFinder
 
         // When no start row given,
         // use the first row as start row.
-        $startRow = $startRow ?? 1;
+        $startRow ??= 1;
 
         // Subtract 1 row from the start row, so a limit
         // of 1 row, will have the same start and end row.

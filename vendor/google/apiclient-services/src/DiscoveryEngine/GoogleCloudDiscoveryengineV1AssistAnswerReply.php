@@ -19,11 +19,35 @@ namespace Google\Service\DiscoveryEngine;
 
 class GoogleCloudDiscoveryengineV1AssistAnswerReply extends \Google\Model
 {
+  /**
+   * The time when the reply was created.
+   *
+   * @var string
+   */
+  public $createTime;
   protected $groundedContentType = GoogleCloudDiscoveryengineV1AssistantGroundedContent::class;
   protected $groundedContentDataType = '';
 
   /**
-   * @param GoogleCloudDiscoveryengineV1AssistantGroundedContent
+   * The time when the reply was created.
+   *
+   * @param string $createTime
+   */
+  public function setCreateTime($createTime)
+  {
+    $this->createTime = $createTime;
+  }
+  /**
+   * @return string
+   */
+  public function getCreateTime()
+  {
+    return $this->createTime;
+  }
+  /**
+   * Possibly grounded response text or media from the assistant.
+   *
+   * @param GoogleCloudDiscoveryengineV1AssistantGroundedContent $groundedContent
    */
   public function setGroundedContent(GoogleCloudDiscoveryengineV1AssistantGroundedContent $groundedContent)
   {

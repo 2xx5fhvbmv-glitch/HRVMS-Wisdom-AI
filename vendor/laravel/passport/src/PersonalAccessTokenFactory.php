@@ -2,134 +2,61 @@
 
 namespace Laravel\Passport;
 
-use Lcobucci\JWT\Parser as JwtParser;
 use League\OAuth2\Server\AuthorizationServer;
-use Nyholm\Psr7\Response;
-use Nyholm\Psr7\ServerRequest;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
+use Symfony\Component\HttpFoundation\Request;
 
 class PersonalAccessTokenFactory
 {
     /**
-     * The authorization server instance.
-     *
-     * @var \League\OAuth2\Server\AuthorizationServer
-     */
-    protected $server;
-
-    /**
-     * The client repository instance.
-     *
-     * @var \Laravel\Passport\ClientRepository
-     */
-    protected $clients;
-
-    /**
-     * The token repository instance.
-     *
-     * @var \Laravel\Passport\TokenRepository
-     */
-    protected $tokens;
-
-    /**
-     * The JWT token parser instance.
-     *
-     * @var \Lcobucci\JWT\Parser
-     *
-     * @deprecated This property will be removed in a future Passport version.
-     */
-    protected $jwt;
-
-    /**
      * Create a new personal access token factory instance.
-     *
-     * @param  \League\OAuth2\Server\AuthorizationServer  $server
-     * @param  \Laravel\Passport\ClientRepository  $clients
-     * @param  \Laravel\Passport\TokenRepository  $tokens
-     * @param  \Lcobucci\JWT\Parser  $jwt
-     * @return void
      */
-    public function __construct(AuthorizationServer $server,
-                                ClientRepository $clients,
-                                TokenRepository $tokens,
-                                JwtParser $jwt)
-    {
-        $this->jwt = $jwt;
-        $this->tokens = $tokens;
-        $this->server = $server;
-        $this->clients = $clients;
+    public function __construct(
+        protected AuthorizationServer $server,
+    ) {
     }
 
     /**
      * Create a new personal access token.
      *
-     * @param  mixed  $userId
-     * @param  string  $name
-     * @param  array  $scopes
-     * @return \Laravel\Passport\PersonalAccessTokenResult
+     * @param  string[]  $scopes
      */
-    public function make($userId, $name, array $scopes = [])
+    public function make(string|int $userId, string $name, array $scopes, string $provider): PersonalAccessTokenResult
     {
-        $response = $this->dispatchRequestToAuthorizationServer(
-            $this->createRequest($this->clients->personalAccessClient(), $userId, $scopes)
-        );
-
-        $token = tap($this->findAccessToken($response), function ($token) use ($userId, $name) {
-            $this->tokens->save($token->forceFill([
-                'user_id' => $userId,
-                'name' => $name,
-            ]));
-        });
-
         return new PersonalAccessTokenResult(
-            $response['access_token'], $token
+            $this->dispatchRequestToAuthorizationServer(
+                $this->createRequest($userId, $name, $scopes, $provider)
+            )
         );
     }
 
     /**
      * Create a request instance for the given client.
      *
-     * @param  \Laravel\Passport\Client  $client
-     * @param  mixed  $userId
-     * @param  array  $scopes
-     * @return \Psr\Http\Message\ServerRequestInterface
+     * @param  string[]  $scopes
      */
-    protected function createRequest($client, $userId, array $scopes)
+    protected function createRequest(string|int $userId, string $name, array $scopes, string $provider): ServerRequestInterface
     {
-        $secret = Passport::$hashesClientSecrets ? $this->clients->getPersonalAccessClientSecret() : $client->secret;
-
-        return (new ServerRequest('POST', 'not-important'))->withParsedBody([
+        return (new PsrHttpFactory)->createRequest(Request::create(config('app.url'), 'POST', [
             'grant_type' => 'personal_access',
-            'client_id' => $client->id,
-            'client_secret' => $secret,
+            'provider' => $provider,
             'user_id' => $userId,
             'scope' => implode(' ', $scopes),
-        ]);
+            'name' => $name,
+        ]));
     }
 
     /**
      * Dispatch the given request to the authorization server.
      *
-     * @param  \Psr\Http\Message\ServerRequestInterface  $request
-     * @return array
+     * @return array<string, mixed>
      */
-    protected function dispatchRequestToAuthorizationServer(ServerRequestInterface $request)
+    protected function dispatchRequestToAuthorizationServer(ServerRequestInterface $request): array
     {
         return json_decode($this->server->respondToAccessTokenRequest(
-            $request, new Response
+            $request, app(ResponseInterface::class)
         )->getBody()->__toString(), true);
-    }
-
-    /**
-     * Get the access token instance for the parsed response.
-     *
-     * @param  array  $response
-     * @return \Laravel\Passport\Token
-     */
-    protected function findAccessToken(array $response)
-    {
-        return $this->tokens->find(
-            $this->jwt->parse($response['access_token'])->claims()->get('jti')
-        );
     }
 }

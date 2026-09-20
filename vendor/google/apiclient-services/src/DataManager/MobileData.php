@@ -26,7 +26,7 @@ class MobileData extends \Google\Collection
   public $mobileIds;
 
   /**
-   * @param string[]
+   * @param string[] $mobileIds
    */
   public function setMobileIds($mobileIds)
   {

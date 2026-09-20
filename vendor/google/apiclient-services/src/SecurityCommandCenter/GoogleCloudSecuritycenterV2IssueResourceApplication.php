@@ -19,13 +19,29 @@ namespace Google\Service\SecurityCommandCenter;
 
 class GoogleCloudSecuritycenterV2IssueResourceApplication extends \Google\Model
 {
+  protected $attributesType = GoogleCloudSecuritycenterV2IssueResourceApplicationAttributes::class;
+  protected $attributesDataType = '';
   /**
    * @var string
    */
   public $name;
 
   /**
-   * @param string
+   * @param GoogleCloudSecuritycenterV2IssueResourceApplicationAttributes $attributes
+   */
+  public function setAttributes(GoogleCloudSecuritycenterV2IssueResourceApplicationAttributes $attributes)
+  {
+    $this->attributes = $attributes;
+  }
+  /**
+   * @return GoogleCloudSecuritycenterV2IssueResourceApplicationAttributes
+   */
+  public function getAttributes()
+  {
+    return $this->attributes;
+  }
+  /**
+   * @param string $name
    */
   public function setName($name)
   {

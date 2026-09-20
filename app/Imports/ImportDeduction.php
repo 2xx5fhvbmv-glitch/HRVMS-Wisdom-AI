@@ -14,6 +14,7 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Carbon\Carbon;
 use DateTime;
 use App\Models\Deduction;
+use Illuminate\Database\Eloquent\Model;
 
 class ImportDeduction implements  ToModel, WithHeadingRow
 {
@@ -24,8 +25,8 @@ class ImportDeduction implements  ToModel, WithHeadingRow
         $this->resort= Auth::guard('resort-admin')->user();
     }
 
-    public function model(array $row)
-    {   
+    public function model(array $row): Model|array|null
+    {
         // dd($row);
         // Update or create the record
         return Deduction::updateOrCreate(

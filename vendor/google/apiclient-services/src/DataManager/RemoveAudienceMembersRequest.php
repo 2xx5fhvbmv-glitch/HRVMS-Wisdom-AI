@@ -19,6 +19,9 @@ namespace Google\Service\DataManager;
 
 class RemoveAudienceMembersRequest extends \Google\Collection
 {
+  public const ENCODING_ENCODING_UNSPECIFIED = 'ENCODING_UNSPECIFIED';
+  public const ENCODING_HEX = 'HEX';
+  public const ENCODING_BASE64 = 'BASE64';
   protected $collection_key = 'destinations';
   protected $audienceMembersType = AudienceMember::class;
   protected $audienceMembersDataType = 'array';
@@ -36,7 +39,7 @@ class RemoveAudienceMembersRequest extends \Google\Collection
   public $validateOnly;
 
   /**
-   * @param AudienceMember[]
+   * @param AudienceMember[] $audienceMembers
    */
   public function setAudienceMembers($audienceMembers)
   {
@@ -50,7 +53,7 @@ class RemoveAudienceMembersRequest extends \Google\Collection
     return $this->audienceMembers;
   }
   /**
-   * @param Destination[]
+   * @param Destination[] $destinations
    */
   public function setDestinations($destinations)
   {
@@ -64,21 +67,21 @@ class RemoveAudienceMembersRequest extends \Google\Collection
     return $this->destinations;
   }
   /**
-   * @param string
+   * @param self::ENCODING_* $encoding
    */
   public function setEncoding($encoding)
   {
     $this->encoding = $encoding;
   }
   /**
-   * @return string
+   * @return self::ENCODING_*
    */
   public function getEncoding()
   {
     return $this->encoding;
   }
   /**
-   * @param EncryptionInfo
+   * @param EncryptionInfo $encryptionInfo
    */
   public function setEncryptionInfo(EncryptionInfo $encryptionInfo)
   {
@@ -92,7 +95,7 @@ class RemoveAudienceMembersRequest extends \Google\Collection
     return $this->encryptionInfo;
   }
   /**
-   * @param bool
+   * @param bool $validateOnly
    */
   public function setValidateOnly($validateOnly)
   {

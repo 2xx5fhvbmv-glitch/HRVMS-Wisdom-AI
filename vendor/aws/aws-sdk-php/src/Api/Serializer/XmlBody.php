@@ -99,10 +99,8 @@ class XmlBody
             // Default to member name
             $elementName = $k;
 
-            // Only use locationName for non-structure members
-            if (!($definition['member'] instanceof StructureShape)
-                && $definition['member']['locationName']
-            ) {
+            if ($definition['member']['locationName']
+                && !isset($definition['member']['locationNameAtStructureLevel'])) {
                 $elementName = $definition['member']['locationName'];
             }
 
@@ -207,7 +205,9 @@ class XmlBody
         $timestampFormat = !empty($shape['timestampFormat'])
             ? $shape['timestampFormat']
             : 'iso8601';
-        $xml->writeRaw(TimestampShape::format($value, $timestampFormat));
+        $xml->writeRaw(
+            TimestampShape::formatAsString($value, $timestampFormat)
+        );
         $xml->endElement();
     }
 

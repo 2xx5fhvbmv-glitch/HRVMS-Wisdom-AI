@@ -17,15 +17,32 @@
 
 namespace Google\Service\DataManager;
 
-class IngestAudienceMembersResponse extends \Google\Model
+class IngestAudienceMembersResponse extends \Google\Collection
 {
+  protected $collection_key = 'fieldWarnings';
+  protected $fieldWarningsType = FieldWarning::class;
+  protected $fieldWarningsDataType = 'array';
   /**
    * @var string
    */
   public $requestId;
 
   /**
-   * @param string
+   * @param FieldWarning[] $fieldWarnings
+   */
+  public function setFieldWarnings($fieldWarnings)
+  {
+    $this->fieldWarnings = $fieldWarnings;
+  }
+  /**
+   * @return FieldWarning[]
+   */
+  public function getFieldWarnings()
+  {
+    return $this->fieldWarnings;
+  }
+  /**
+   * @param string $requestId
    */
   public function setRequestId($requestId)
   {

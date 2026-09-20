@@ -36,7 +36,7 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
         Route::get('/admins/edit/{id}', 'AdminController@edit')->name('admin.edit');
         Route::post('/admins/update/{id}', 'AdminController@update')->name('admin.update');
         Route::delete('/admins/destroy/{id}', 'AdminController@destroy')->name('admin.destroy');
-        Route::get('/admins/inactive/{id}', 'AdminController@block')->name('admin.block');
+        Route::get('/admins/inactive/{id}', 'AdminController@block')->name('admin.inactive');
         Route::get('/admins/active/{id}', 'AdminController@active')->name('admin.active');
         Route::get('/admins/massremove', 'AdminController@massremove')->name('admin.massremove');
 

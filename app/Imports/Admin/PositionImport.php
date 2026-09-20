@@ -14,7 +14,7 @@ class PositionImport implements ToCollection, WithHeadingRow
     public int $skipped = 0;
     public array $errors = [];
 
-    public function collection(Collection $rows)
+    public function collection(Collection $rows): void
     {
         $deptIndex = Department::pluck('id', 'name')->mapWithKeys(fn ($id, $name) => [strtolower(trim($name)) => $id]);
 

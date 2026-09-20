@@ -11,6 +11,7 @@ use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use Illuminate\Support\Enumerable;
 use Auth;
 use App\Models\ResortBudgetCost;
 
@@ -19,9 +20,9 @@ class ConslidateBudgetData  implements FromCollection, WithHeadings, WithEvents
     protected $resortid;
     protected $counts;
 
-public function collection()
+public function collection(): Enumerable
 {
- 
+
     return $this->getActionItems(); // Directly return the action items
 }
 

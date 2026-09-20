@@ -26,7 +26,7 @@ class ServiceChargeExport implements FromCollection, WithHeadings, WithEvents
         ];
     }
 
-    public function collection()
+    public function collection(): Collection
     {
         // Provide a sample empty row for user reference
         return new Collection([

@@ -4,43 +4,24 @@ namespace Laravel\Passport\Bridge;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Laravel\Passport\Events\RefreshTokenCreated;
-use Laravel\Passport\RefreshTokenRepository as PassportRefreshTokenRepository;
+use Laravel\Passport\Passport;
 use League\OAuth2\Server\Entities\RefreshTokenEntityInterface;
 use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
 
 class RefreshTokenRepository implements RefreshTokenRepositoryInterface
 {
     /**
-     * The refresh token repository instance.
-     *
-     * @var \Illuminate\Database\Connection
-     */
-    protected $refreshTokenRepository;
-
-    /**
-     * The event dispatcher instance.
-     *
-     * @var \Illuminate\Contracts\Events\Dispatcher
-     */
-    protected $events;
-
-    /**
      * Create a new repository instance.
-     *
-     * @param  \Laravel\Passport\RefreshTokenRepository  $refreshTokenRepository
-     * @param  \Illuminate\Contracts\Events\Dispatcher  $events
-     * @return void
      */
-    public function __construct(PassportRefreshTokenRepository $refreshTokenRepository, Dispatcher $events)
-    {
-        $this->events = $events;
-        $this->refreshTokenRepository = $refreshTokenRepository;
+    public function __construct(
+        protected Dispatcher $events,
+    ) {
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getNewRefreshToken()
+    public function getNewRefreshToken(): ?RefreshTokenEntityInterface
     {
         return new RefreshToken;
     }
@@ -48,14 +29,14 @@ class RefreshTokenRepository implements RefreshTokenRepositoryInterface
     /**
      * {@inheritdoc}
      */
-    public function persistNewRefreshToken(RefreshTokenEntityInterface $refreshTokenEntity)
+    public function persistNewRefreshToken(RefreshTokenEntityInterface $refreshTokenEntity): void
     {
-        $this->refreshTokenRepository->create([
+        Passport::refreshToken()->forceFill([
             'id' => $id = $refreshTokenEntity->getIdentifier(),
             'access_token_id' => $accessTokenId = $refreshTokenEntity->getAccessToken()->getIdentifier(),
             'revoked' => false,
             'expires_at' => $refreshTokenEntity->getExpiryDateTime(),
-        ]);
+        ])->save();
 
         $this->events->dispatch(new RefreshTokenCreated($id, $accessTokenId));
     }
@@ -63,16 +44,16 @@ class RefreshTokenRepository implements RefreshTokenRepositoryInterface
     /**
      * {@inheritdoc}
      */
-    public function revokeRefreshToken($tokenId)
+    public function revokeRefreshToken(string $tokenId): void
     {
-        $this->refreshTokenRepository->revokeRefreshToken($tokenId);
+        Passport::refreshToken()->newQuery()->whereKey($tokenId)->update(['revoked' => true]);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function isRefreshTokenRevoked($tokenId)
+    public function isRefreshTokenRevoked(string $tokenId): bool
     {
-        return $this->refreshTokenRepository->isRefreshTokenRevoked($tokenId);
+        return Passport::refreshToken()->newQuery()->whereKey($tokenId)->where('revoked', false)->doesntExist();
     }
 }

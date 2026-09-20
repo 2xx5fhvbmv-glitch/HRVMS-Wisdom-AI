@@ -19,23 +19,104 @@ namespace Google\Service\DiscoveryEngine;
 
 class GoogleCloudDiscoveryengineV1Assistant extends \Google\Model
 {
+  /**
+   * Default, unspecified setting. This is the same as disabled.
+   */
+  public const WEB_GROUNDING_TYPE_WEB_GROUNDING_TYPE_UNSPECIFIED = 'WEB_GROUNDING_TYPE_UNSPECIFIED';
+  /**
+   * Web grounding is disabled.
+   */
+  public const WEB_GROUNDING_TYPE_WEB_GROUNDING_TYPE_DISABLED = 'WEB_GROUNDING_TYPE_DISABLED';
+  /**
+   * Grounding with Google Search is enabled.
+   */
+  public const WEB_GROUNDING_TYPE_WEB_GROUNDING_TYPE_GOOGLE_SEARCH = 'WEB_GROUNDING_TYPE_GOOGLE_SEARCH';
+  /**
+   * Grounding with Enterprise Web Search is enabled.
+   */
+  public const WEB_GROUNDING_TYPE_WEB_GROUNDING_TYPE_ENTERPRISE_WEB_SEARCH = 'WEB_GROUNDING_TYPE_ENTERPRISE_WEB_SEARCH';
+  /**
+   * Output only. Represents the time when this Assistant was created.
+   *
+   * @var string
+   */
+  public $createTime;
   protected $customerPolicyType = GoogleCloudDiscoveryengineV1AssistantCustomerPolicy::class;
   protected $customerPolicyDataType = '';
+  /**
+   * Optional. This field controls the default web grounding toggle for end
+   * users if `web_grounding_type` is set to `WEB_GROUNDING_TYPE_GOOGLE_SEARCH`
+   * or `WEB_GROUNDING_TYPE_ENTERPRISE_WEB_SEARCH`. By default, this field is
+   * set to false. If `web_grounding_type` is `WEB_GROUNDING_TYPE_GOOGLE_SEARCH`
+   * or `WEB_GROUNDING_TYPE_ENTERPRISE_WEB_SEARCH`, end users will have web
+   * grounding enabled by default on UI. If true, grounding toggle will be
+   * disabled by default on UI. End users can still enable web grounding in the
+   * UI if web grounding is enabled.
+   *
+   * @var bool
+   */
+  public $defaultWebGroundingToggleOff;
+  /**
+   * Optional. Description for additional information. Expected to be shown on
+   * the configuration UI, not to the users of the assistant.
+   *
+   * @var string
+   */
+  public $description;
+  /**
+   * Required. The assistant display name. It must be a UTF-8 encoded string
+   * with a length limit of 128 characters.
+   *
+   * @var string
+   */
+  public $displayName;
   protected $enabledToolsType = GoogleCloudDiscoveryengineV1AssistantToolList::class;
   protected $enabledToolsDataType = 'map';
   protected $generationConfigType = GoogleCloudDiscoveryengineV1AssistantGenerationConfig::class;
   protected $generationConfigDataType = '';
   /**
+   * Immutable. Resource name of the assistant. Format: `projects/{project}/loca
+   * tions/{location}/collections/{collection}/engines/{engine}/assistants/{assi
+   * stant}` It must be a UTF-8 encoded string with a length limit of 1024
+   * characters.
+   *
    * @var string
    */
   public $name;
   /**
+   * Output only. Represents the time when this Assistant was most recently
+   * updated.
+   *
+   * @var string
+   */
+  public $updateTime;
+  /**
+   * Optional. The type of web grounding to use.
+   *
    * @var string
    */
   public $webGroundingType;
 
   /**
-   * @param GoogleCloudDiscoveryengineV1AssistantCustomerPolicy
+   * Output only. Represents the time when this Assistant was created.
+   *
+   * @param string $createTime
+   */
+  public function setCreateTime($createTime)
+  {
+    $this->createTime = $createTime;
+  }
+  /**
+   * @return string
+   */
+  public function getCreateTime()
+  {
+    return $this->createTime;
+  }
+  /**
+   * Optional. Customer policy for the assistant.
+   *
+   * @param GoogleCloudDiscoveryengineV1AssistantCustomerPolicy $customerPolicy
    */
   public function setCustomerPolicy(GoogleCloudDiscoveryengineV1AssistantCustomerPolicy $customerPolicy)
   {
@@ -49,7 +130,73 @@ class GoogleCloudDiscoveryengineV1Assistant extends \Google\Model
     return $this->customerPolicy;
   }
   /**
-   * @param GoogleCloudDiscoveryengineV1AssistantToolList[]
+   * Optional. This field controls the default web grounding toggle for end
+   * users if `web_grounding_type` is set to `WEB_GROUNDING_TYPE_GOOGLE_SEARCH`
+   * or `WEB_GROUNDING_TYPE_ENTERPRISE_WEB_SEARCH`. By default, this field is
+   * set to false. If `web_grounding_type` is `WEB_GROUNDING_TYPE_GOOGLE_SEARCH`
+   * or `WEB_GROUNDING_TYPE_ENTERPRISE_WEB_SEARCH`, end users will have web
+   * grounding enabled by default on UI. If true, grounding toggle will be
+   * disabled by default on UI. End users can still enable web grounding in the
+   * UI if web grounding is enabled.
+   *
+   * @param bool $defaultWebGroundingToggleOff
+   */
+  public function setDefaultWebGroundingToggleOff($defaultWebGroundingToggleOff)
+  {
+    $this->defaultWebGroundingToggleOff = $defaultWebGroundingToggleOff;
+  }
+  /**
+   * @return bool
+   */
+  public function getDefaultWebGroundingToggleOff()
+  {
+    return $this->defaultWebGroundingToggleOff;
+  }
+  /**
+   * Optional. Description for additional information. Expected to be shown on
+   * the configuration UI, not to the users of the assistant.
+   *
+   * @param string $description
+   */
+  public function setDescription($description)
+  {
+    $this->description = $description;
+  }
+  /**
+   * @return string
+   */
+  public function getDescription()
+  {
+    return $this->description;
+  }
+  /**
+   * Required. The assistant display name. It must be a UTF-8 encoded string
+   * with a length limit of 128 characters.
+   *
+   * @param string $displayName
+   */
+  public function setDisplayName($displayName)
+  {
+    $this->displayName = $displayName;
+  }
+  /**
+   * @return string
+   */
+  public function getDisplayName()
+  {
+    return $this->displayName;
+  }
+  /**
+   * Optional. Note: not implemented yet. Use enabled_actions instead. The
+   * enabled tools on this assistant. The keys are connector name, for example "
+   * projects/{projectId}/locations/{locationId}/collections/{collectionId}/data
+   * connector The values consist of admin enabled tools towards the connector
+   * instance. Admin can selectively enable multiple tools on any of the
+   * connector instances that they created in the project. For example
+   * {"jira1ConnectorName": [(toolId1, "createTicket"), (toolId2,
+   * "transferTicket")], "gmail1ConnectorName": [(toolId3, "sendEmail"),..] }
+   *
+   * @param GoogleCloudDiscoveryengineV1AssistantToolList[] $enabledTools
    */
   public function setEnabledTools($enabledTools)
   {
@@ -63,7 +210,9 @@ class GoogleCloudDiscoveryengineV1Assistant extends \Google\Model
     return $this->enabledTools;
   }
   /**
-   * @param GoogleCloudDiscoveryengineV1AssistantGenerationConfig
+   * Optional. Configuration for the generation of the assistant response.
+   *
+   * @param GoogleCloudDiscoveryengineV1AssistantGenerationConfig $generationConfig
    */
   public function setGenerationConfig(GoogleCloudDiscoveryengineV1AssistantGenerationConfig $generationConfig)
   {
@@ -77,7 +226,12 @@ class GoogleCloudDiscoveryengineV1Assistant extends \Google\Model
     return $this->generationConfig;
   }
   /**
-   * @param string
+   * Immutable. Resource name of the assistant. Format: `projects/{project}/loca
+   * tions/{location}/collections/{collection}/engines/{engine}/assistants/{assi
+   * stant}` It must be a UTF-8 encoded string with a length limit of 1024
+   * characters.
+   *
+   * @param string $name
    */
   public function setName($name)
   {
@@ -91,14 +245,37 @@ class GoogleCloudDiscoveryengineV1Assistant extends \Google\Model
     return $this->name;
   }
   /**
-   * @param string
+   * Output only. Represents the time when this Assistant was most recently
+   * updated.
+   *
+   * @param string $updateTime
+   */
+  public function setUpdateTime($updateTime)
+  {
+    $this->updateTime = $updateTime;
+  }
+  /**
+   * @return string
+   */
+  public function getUpdateTime()
+  {
+    return $this->updateTime;
+  }
+  /**
+   * Optional. The type of web grounding to use.
+   *
+   * Accepted values: WEB_GROUNDING_TYPE_UNSPECIFIED,
+   * WEB_GROUNDING_TYPE_DISABLED, WEB_GROUNDING_TYPE_GOOGLE_SEARCH,
+   * WEB_GROUNDING_TYPE_ENTERPRISE_WEB_SEARCH
+   *
+   * @param self::WEB_GROUNDING_TYPE_* $webGroundingType
    */
   public function setWebGroundingType($webGroundingType)
   {
     $this->webGroundingType = $webGroundingType;
   }
   /**
-   * @return string
+   * @return self::WEB_GROUNDING_TYPE_*
    */
   public function getWebGroundingType()
   {

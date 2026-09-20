@@ -19,33 +19,58 @@ namespace Google\Service\DiscoveryEngine;
 
 class GoogleCloudDiscoveryengineV1alphaAssistantGroundedContentTextGroundingMetadataReferenceDocumentMetadata extends \Google\Model
 {
+  public const LANGUAGE_LANGUAGE_UNSPECIFIED = 'LANGUAGE_UNSPECIFIED';
+  public const LANGUAGE_PYTHON = 'PYTHON';
+  public const LANGUAGE_SQL = 'SQL';
   /**
+   * Document resource name.
+   *
    * @var string
    */
   public $document;
   /**
+   * Domain name from the document URI. Note that the `uri` field may contain a
+   * URL that redirects to the actual website, in which case this will contain
+   * the domain name of the target site.
+   *
    * @var string
    */
   public $domain;
   /**
    * @var string
    */
+  public $language;
+  /**
+   * The mime type of the document. https://www.iana.org/assignments/media-
+   * types/media-types.xhtml.
+   *
+   * @var string
+   */
   public $mimeType;
   /**
+   * Page identifier.
+   *
    * @var string
    */
   public $pageIdentifier;
   /**
+   * Title.
+   *
    * @var string
    */
   public $title;
   /**
+   * URI for the document. It may contain a URL that redirects to the actual
+   * website.
+   *
    * @var string
    */
   public $uri;
 
   /**
-   * @param string
+   * Document resource name.
+   *
+   * @param string $document
    */
   public function setDocument($document)
   {
@@ -59,7 +84,11 @@ class GoogleCloudDiscoveryengineV1alphaAssistantGroundedContentTextGroundingMeta
     return $this->document;
   }
   /**
-   * @param string
+   * Domain name from the document URI. Note that the `uri` field may contain a
+   * URL that redirects to the actual website, in which case this will contain
+   * the domain name of the target site.
+   *
+   * @param string $domain
    */
   public function setDomain($domain)
   {
@@ -73,7 +102,24 @@ class GoogleCloudDiscoveryengineV1alphaAssistantGroundedContentTextGroundingMeta
     return $this->domain;
   }
   /**
-   * @param string
+   * @param self::LANGUAGE_* $language
+   */
+  public function setLanguage($language)
+  {
+    $this->language = $language;
+  }
+  /**
+   * @return self::LANGUAGE_*
+   */
+  public function getLanguage()
+  {
+    return $this->language;
+  }
+  /**
+   * The mime type of the document. https://www.iana.org/assignments/media-
+   * types/media-types.xhtml.
+   *
+   * @param string $mimeType
    */
   public function setMimeType($mimeType)
   {
@@ -87,7 +133,9 @@ class GoogleCloudDiscoveryengineV1alphaAssistantGroundedContentTextGroundingMeta
     return $this->mimeType;
   }
   /**
-   * @param string
+   * Page identifier.
+   *
+   * @param string $pageIdentifier
    */
   public function setPageIdentifier($pageIdentifier)
   {
@@ -101,7 +149,9 @@ class GoogleCloudDiscoveryengineV1alphaAssistantGroundedContentTextGroundingMeta
     return $this->pageIdentifier;
   }
   /**
-   * @param string
+   * Title.
+   *
+   * @param string $title
    */
   public function setTitle($title)
   {
@@ -115,7 +165,10 @@ class GoogleCloudDiscoveryengineV1alphaAssistantGroundedContentTextGroundingMeta
     return $this->title;
   }
   /**
-   * @param string
+   * URI for the document. It may contain a URL that redirects to the actual
+   * website.
+   *
+   * @param string $uri
    */
   public function setUri($uri)
   {

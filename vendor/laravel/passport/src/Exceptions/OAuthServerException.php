@@ -2,51 +2,68 @@
 
 namespace Laravel\Passport\Exceptions;
 
-use Exception;
-use Illuminate\Http\Response;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Arr;
+use Laravel\Passport\Http\Controllers\ConvertsPsrResponses;
 use League\OAuth2\Server\Exception\OAuthServerException as LeagueException;
+use League\OAuth2\Server\RequestTypes\AuthorizationRequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
-class OAuthServerException extends Exception
+class OAuthServerException extends HttpResponseException
 {
-    /**
-     * The response to render.
-     *
-     * @var \Illuminate\Http\Response
-     */
-    protected $response;
+    use ConvertsPsrResponses;
 
     /**
      * Create a new OAuthServerException.
-     *
-     * @param  \League\OAuth2\Server\Exception\OAuthServerException  $e
-     * @param  \Illuminate\Http\Response  $response
-     * @return void
      */
-    public function __construct(LeagueException $e, Response $response)
+    public function __construct(LeagueException $e, bool $useFragment = false)
     {
-        parent::__construct($e->getMessage(), $e->getCode(), $e);
-
-        $this->response = $response;
+        parent::__construct($this->convertResponse(
+            $e->generateHttpResponse(app(ResponseInterface::class), $useFragment)
+        ), $e);
     }
 
     /**
-     * Render the exception into an HTTP response.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
+     * Create a new OAuthServerException for when login is required.
      */
-    public function render($request)
+    public static function loginRequired(AuthorizationRequestInterface $authRequest): static
     {
-        return $this->response;
+        $exception = new LeagueException(
+            'The authorization server requires end-user authentication.',
+            9,
+            'login_required',
+            401,
+            'The user is not authenticated',
+            $authRequest->getRedirectUri() ?? Arr::wrap($authRequest->getClient()->getRedirectUri())[0]
+        );
+
+        $exception->setPayload([
+            'state' => $authRequest->getState(),
+            ...$exception->getPayload(),
+        ]);
+
+        return new static($exception, $authRequest->getGrantTypeId() === 'implicit');
     }
 
     /**
-     * Get the HTTP response status code.
-     *
-     * @return int
+     * Create a new OAuthServerException for when consent is required.
      */
-    public function statusCode()
+    public static function consentRequired(AuthorizationRequestInterface $authRequest): static
     {
-        return $this->response->getStatusCode();
+        $exception = new LeagueException(
+            'The authorization server requires end-user consent.',
+            9,
+            'consent_required',
+            401,
+            null,
+            $authRequest->getRedirectUri() ?? Arr::wrap($authRequest->getClient()->getRedirectUri())[0]
+        );
+
+        $exception->setPayload([
+            'state' => $authRequest->getState(),
+            ...$exception->getPayload(),
+        ]);
+
+        return new static($exception, $authRequest->getGrantTypeId() === 'implicit');
     }
 }

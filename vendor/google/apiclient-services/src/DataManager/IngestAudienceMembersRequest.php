@@ -19,6 +19,9 @@ namespace Google\Service\DataManager;
 
 class IngestAudienceMembersRequest extends \Google\Collection
 {
+  public const ENCODING_ENCODING_UNSPECIFIED = 'ENCODING_UNSPECIFIED';
+  public const ENCODING_HEX = 'HEX';
+  public const ENCODING_BASE64 = 'BASE64';
   protected $collection_key = 'destinations';
   protected $audienceMembersType = AudienceMember::class;
   protected $audienceMembersDataType = 'array';
@@ -40,7 +43,7 @@ class IngestAudienceMembersRequest extends \Google\Collection
   public $validateOnly;
 
   /**
-   * @param AudienceMember[]
+   * @param AudienceMember[] $audienceMembers
    */
   public function setAudienceMembers($audienceMembers)
   {
@@ -54,7 +57,7 @@ class IngestAudienceMembersRequest extends \Google\Collection
     return $this->audienceMembers;
   }
   /**
-   * @param Consent
+   * @param Consent $consent
    */
   public function setConsent(Consent $consent)
   {
@@ -68,7 +71,7 @@ class IngestAudienceMembersRequest extends \Google\Collection
     return $this->consent;
   }
   /**
-   * @param Destination[]
+   * @param Destination[] $destinations
    */
   public function setDestinations($destinations)
   {
@@ -82,21 +85,21 @@ class IngestAudienceMembersRequest extends \Google\Collection
     return $this->destinations;
   }
   /**
-   * @param string
+   * @param self::ENCODING_* $encoding
    */
   public function setEncoding($encoding)
   {
     $this->encoding = $encoding;
   }
   /**
-   * @return string
+   * @return self::ENCODING_*
    */
   public function getEncoding()
   {
     return $this->encoding;
   }
   /**
-   * @param EncryptionInfo
+   * @param EncryptionInfo $encryptionInfo
    */
   public function setEncryptionInfo(EncryptionInfo $encryptionInfo)
   {
@@ -110,7 +113,7 @@ class IngestAudienceMembersRequest extends \Google\Collection
     return $this->encryptionInfo;
   }
   /**
-   * @param TermsOfService
+   * @param TermsOfService $termsOfService
    */
   public function setTermsOfService(TermsOfService $termsOfService)
   {
@@ -124,7 +127,7 @@ class IngestAudienceMembersRequest extends \Google\Collection
     return $this->termsOfService;
   }
   /**
-   * @param bool
+   * @param bool $validateOnly
    */
   public function setValidateOnly($validateOnly)
   {

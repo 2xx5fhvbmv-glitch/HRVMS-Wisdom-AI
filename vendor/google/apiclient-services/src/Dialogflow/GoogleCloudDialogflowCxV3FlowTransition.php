@@ -29,7 +29,7 @@ class GoogleCloudDialogflowCxV3FlowTransition extends \Google\Model
   public $flow;
 
   /**
-   * @param string
+   * @param string $displayName
    */
   public function setDisplayName($displayName)
   {
@@ -43,7 +43,7 @@ class GoogleCloudDialogflowCxV3FlowTransition extends \Google\Model
     return $this->displayName;
   }
   /**
-   * @param string
+   * @param string $flow
    */
   public function setFlow($flow)
   {

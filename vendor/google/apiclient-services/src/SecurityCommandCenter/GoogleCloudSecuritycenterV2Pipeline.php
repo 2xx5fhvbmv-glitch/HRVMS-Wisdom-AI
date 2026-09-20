@@ -29,7 +29,7 @@ class GoogleCloudSecuritycenterV2Pipeline extends \Google\Model
   public $name;
 
   /**
-   * @param string
+   * @param string $displayName
    */
   public function setDisplayName($displayName)
   {
@@ -43,7 +43,7 @@ class GoogleCloudSecuritycenterV2Pipeline extends \Google\Model
     return $this->displayName;
   }
   /**
-   * @param string
+   * @param string $name
    */
   public function setName($name)
   {

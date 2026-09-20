@@ -2,58 +2,26 @@
 
 namespace Laravel\Passport;
 
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 use RuntimeException;
 
 class ClientRepository
 {
     /**
-     * The personal access client ID.
-     *
-     * @var int|string|null
-     */
-    protected $personalAccessClientId;
-
-    /**
-     * The personal access client secret.
-     *
-     * @var string|null
-     */
-    protected $personalAccessClientSecret;
-
-    /**
-     * Create a new client repository.
-     *
-     * @param  int|string|null  $personalAccessClientId
-     * @param  string|null  $personalAccessClientSecret
-     * @return void
-     */
-    public function __construct($personalAccessClientId = null, $personalAccessClientSecret = null)
-    {
-        $this->personalAccessClientId = $personalAccessClientId;
-        $this->personalAccessClientSecret = $personalAccessClientSecret;
-    }
-
-    /**
      * Get a client by the given ID.
-     *
-     * @param  int  $id
-     * @return \Laravel\Passport\Client|null
      */
-    public function find($id)
+    public function find(string|int $id): ?Client
     {
-        $client = Passport::client();
-
-        return $client->where($client->getKeyName(), $id)->first();
+        return once(fn () => Passport::client()->newQuery()->find($id));
     }
 
     /**
      * Get an active client by the given ID.
-     *
-     * @param  int  $id
-     * @return \Laravel\Passport\Client|null
      */
-    public function findActive($id)
+    public function findActive(string|int $id): ?Client
     {
         $client = $this->find($id);
 
@@ -63,204 +31,208 @@ class ClientRepository
     /**
      * Get a client instance for the given ID and user ID.
      *
-     * @param  int  $clientId
-     * @param  mixed  $userId
-     * @return \Laravel\Passport\Client|null
+     * @deprecated Use $user->oauthApps()->find()
+     *
+     * @param  \Laravel\Passport\Contracts\OAuthenticatable  $user
      */
-    public function findForUser($clientId, $userId)
+    public function findForUser(string|int $clientId, Authenticatable $user): ?Client
     {
-        $client = Passport::client();
-
-        return $client
-                    ->where($client->getKeyName(), $clientId)
-                    ->where('user_id', $userId)
-                    ->first();
+        return $user->clients()->where('revoked', false)->find($clientId);
     }
 
     /**
      * Get the client instances for the given user ID.
      *
-     * @param  mixed  $userId
-     * @return \Illuminate\Database\Eloquent\Collection
+     * @deprecated Use $user->oauthApps()
+     *
+     * @param  \Laravel\Passport\Contracts\OAuthenticatable  $user
+     * @return \Illuminate\Database\Eloquent\Collection<int, \Laravel\Passport\Client>
      */
-    public function forUser($userId)
+    public function forUser(Authenticatable $user): Collection
     {
-        return Passport::client()
-                    ->where('user_id', $userId)
-                    ->orderBy('name', 'asc')->get();
+        return $user->clients()->where('revoked', false)->orderBy('name')->get();
     }
 
-    /**
-     * Get the active client instances for the given user ID.
-     *
-     * @param  mixed  $userId
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public function activeForUser($userId)
-    {
-        return $this->forUser($userId)->reject(function ($client) {
-            return $client->revoked;
-        })->values();
-    }
-
-    /**
-     * Get the personal access token client for the application.
-     *
-     * @return \Laravel\Passport\Client
+    /*
+     * Get the latest active personal access client for the given user provider.
      *
      * @throws \RuntimeException
      */
-    public function personalAccessClient()
+    public function personalAccessClient(string $provider): Client
     {
-        if ($this->personalAccessClientId) {
-            return $this->find($this->personalAccessClientId);
-        }
-
-        $client = Passport::personalAccessClient();
-
-        if (! $client->exists()) {
-            throw new RuntimeException('Personal access client not found. Please create one.');
-        }
-
-        return $client->orderBy($client->getKeyName(), 'desc')->first()->client;
+        return Passport::client()
+            ->newQuery()
+            ->where('revoked', false)
+            ->where(function (Builder $query) use ($provider): void {
+                $query->when($provider === config('auth.guards.api.provider'), function (Builder $query): void {
+                    $query->orWhereNull('provider');
+                })->orWhere('provider', $provider);
+            })
+            ->latest()
+            ->get()
+            ->first(fn (Client $client): bool => $client->hasGrantType('personal_access'))
+            ?? throw new RuntimeException(
+                "Personal access client not found for '$provider' user provider. Please create one."
+            );
     }
 
     /**
      * Store a new client.
      *
-     * @param  int  $userId
-     * @param  string  $name
-     * @param  string  $redirect
-     * @param  string|null  $provider
-     * @param  bool  $personalAccess
-     * @param  bool  $password
-     * @param  bool  $confidential
-     * @return \Laravel\Passport\Client
+     * @param  string[]  $grantTypes
+     * @param  string[]  $redirectUris
+     * @param  \Laravel\Passport\Contracts\OAuthenticatable|null  $user
      */
-    public function create($userId, $name, $redirect, $provider = null, $personalAccess = false, $password = false, $confidential = true)
-    {
-        $client = Passport::client()->forceFill([
-            'user_id' => $userId,
+    protected function create(
+        string $name,
+        array $grantTypes,
+        array $redirectUris = [],
+        ?string $provider = null,
+        bool $confidential = true,
+        ?Authenticatable $user = null
+    ): Client {
+        $client = Passport::client();
+        $columns = $client->getConnection()->getSchemaBuilder()->getColumnListing($client->getTable());
+
+        $attributes = [
             'name' => $name,
-            'secret' => ($confidential || $personalAccess) ? Str::random(40) : null,
+            'secret' => $confidential ? Str::random(40) : null,
             'provider' => $provider,
-            'redirect' => $redirect,
-            'personal_access_client' => $personalAccess,
-            'password_client' => $password,
             'revoked' => false,
-        ]);
+            ...(in_array('redirect_uris', $columns) ? [
+                'redirect_uris' => $redirectUris,
+            ] : [
+                'redirect' => implode(',', $redirectUris),
+            ]),
+            ...(in_array('grant_types', $columns) ? [
+                'grant_types' => $grantTypes,
+            ] : [
+                'personal_access_client' => in_array('personal_access', $grantTypes),
+                'password_client' => in_array('password', $grantTypes),
+            ]),
+        ];
 
-        $client->save();
-
-        return $client;
+        return match (true) {
+            ! is_null($user) && in_array('user_id', $columns) => $user->clients()->forceCreate($attributes),
+            ! is_null($user) => $user->oauthApps()->forceCreate($attributes),
+            default => $client->newQuery()->forceCreate($attributes),
+        };
     }
 
     /**
      * Store a new personal access token client.
-     *
-     * @param  int  $userId
-     * @param  string  $name
-     * @param  string  $redirect
-     * @return \Laravel\Passport\Client
      */
-    public function createPersonalAccessClient($userId, $name, $redirect)
+    public function createPersonalAccessGrantClient(string $name, ?string $provider = null): Client
     {
-        return tap($this->create($userId, $name, $redirect, null, true), function ($client) {
-            $accessClient = Passport::personalAccessClient();
-            $accessClient->client_id = $client->id;
-            $accessClient->save();
-        });
+        return $this->create($name, ['personal_access'], [], $provider);
     }
 
     /**
      * Store a new password grant client.
-     *
-     * @param  int  $userId
-     * @param  string  $name
-     * @param  string  $redirect
-     * @param  string|null  $provider
-     * @return \Laravel\Passport\Client
      */
-    public function createPasswordGrantClient($userId, $name, $redirect, $provider = null)
+    public function createPasswordGrantClient(string $name, ?string $provider = null, bool $confidential = false): Client
     {
-        return $this->create($userId, $name, $redirect, $provider, false, true);
+        return $this->create($name, ['password', 'refresh_token'], [], $provider, $confidential);
+    }
+
+    /**
+     * Store a new client credentials grant client.
+     */
+    public function createClientCredentialsGrantClient(string $name): Client
+    {
+        return $this->create($name, ['client_credentials']);
+    }
+
+    /**
+     * Store a new implicit grant client.
+     *
+     * @param  string[]  $redirectUris
+     */
+    public function createImplicitGrantClient(string $name, array $redirectUris): Client
+    {
+        return $this->create($name, ['implicit'], $redirectUris, null, false);
+    }
+
+    /**
+     * Store a new device authorization grant client.
+     *
+     * @param  \Laravel\Passport\Contracts\OAuthenticatable|null  $user
+     */
+    public function createDeviceAuthorizationGrantClient(
+        string $name,
+        bool $confidential = true,
+        ?Authenticatable $user = null
+    ): Client {
+        return $this->create(
+            $name, ['urn:ietf:params:oauth:grant-type:device_code', 'refresh_token'], [], null, $confidential, $user
+        );
+    }
+
+    /**
+     * Store a new authorization code grant client.
+     *
+     * @param  string[]  $redirectUris
+     * @param  \Laravel\Passport\Contracts\OAuthenticatable|null  $user
+     */
+    public function createAuthorizationCodeGrantClient(
+        string $name,
+        array $redirectUris,
+        bool $confidential = true,
+        ?Authenticatable $user = null,
+        bool $enableDeviceFlow = false
+    ): Client {
+        $grantTypes = ['authorization_code', 'refresh_token'];
+
+        if ($enableDeviceFlow) {
+            $grantTypes[] = 'urn:ietf:params:oauth:grant-type:device_code';
+        }
+
+        return $this->create($name, $grantTypes, $redirectUris, null, $confidential, $user);
     }
 
     /**
      * Update the given client.
      *
-     * @param  \Laravel\Passport\Client  $client
-     * @param  string  $name
-     * @param  string  $redirect
-     * @return \Laravel\Passport\Client
+     * @deprecated Will be removed in a future Laravel version.
+     *
+     * @param  string[]  $redirectUris
      */
-    public function update(Client $client, $name, $redirect)
+    public function update(Client $client, string $name, array $redirectUris): bool
     {
-        $client->forceFill([
-            'name' => $name, 'redirect' => $redirect,
-        ])->save();
+        $columns = $client->getConnection()->getSchemaBuilder()->getColumnListing($client->getTable());
 
-        return $client;
+        return $client->forceFill([
+            'name' => $name,
+            ...(in_array('redirect_uris', $columns) ? [
+                'redirect_uris' => $redirectUris,
+            ] : [
+                'redirect' => implode(',', $redirectUris),
+            ]),
+        ])->save();
     }
 
     /**
      * Regenerate the client secret.
-     *
-     * @param  \Laravel\Passport\Client  $client
-     * @return \Laravel\Passport\Client
      */
-    public function regenerateSecret(Client $client)
+    public function regenerateSecret(Client $client): bool
     {
-        $client->forceFill([
+        return $client->forceFill([
             'secret' => Str::random(40),
         ])->save();
-
-        return $client;
     }
 
     /**
-     * Determine if the given client is revoked.
+     * Revoke the given client and its tokens.
      *
-     * @param  int  $id
-     * @return bool
+     * @deprecated Will be removed in a future Laravel version.
      */
-    public function revoked($id)
+    public function delete(Client $client): void
     {
-        $client = $this->find($id);
-
-        return is_null($client) || $client->revoked;
-    }
-
-    /**
-     * Delete the given client.
-     *
-     * @param  \Laravel\Passport\Client  $client
-     * @return void
-     */
-    public function delete(Client $client)
-    {
-        $client->tokens()->update(['revoked' => true]);
+        $client->tokens()->with('refreshToken')->each(function (Token $token): void {
+            $token->refreshToken?->revoke();
+            $token->revoke();
+        });
 
         $client->forceFill(['revoked' => true])->save();
-    }
-
-    /**
-     * Get the personal access client id.
-     *
-     * @return int|string|null
-     */
-    public function getPersonalAccessClientId()
-    {
-        return $this->personalAccessClientId;
-    }
-
-    /**
-     * Get the personal access client secret.
-     *
-     * @return string|null
-     */
-    public function getPersonalAccessClientSecret()
-    {
-        return $this->personalAccessClientSecret;
     }
 }

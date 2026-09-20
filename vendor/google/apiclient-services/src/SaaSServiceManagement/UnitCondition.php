@@ -20,28 +20,92 @@ namespace Google\Service\SaaSServiceManagement;
 class UnitCondition extends \Google\Model
 {
   /**
+   * Condition status is unspecified.
+   */
+  public const STATUS_STATUS_UNSPECIFIED = 'STATUS_UNSPECIFIED';
+  /**
+   * Condition is unknown.
+   */
+  public const STATUS_STATUS_UNKNOWN = 'STATUS_UNKNOWN';
+  /**
+   * Condition is true.
+   */
+  public const STATUS_STATUS_TRUE = 'STATUS_TRUE';
+  /**
+   * Condition is false.
+   */
+  public const STATUS_STATUS_FALSE = 'STATUS_FALSE';
+  /**
+   * Condition type is unspecified.
+   */
+  public const TYPE_TYPE_UNSPECIFIED = 'TYPE_UNSPECIFIED';
+  /**
+   * Condition type is ready.
+   */
+  public const TYPE_TYPE_READY = 'TYPE_READY';
+  /**
+   * Condition type is updating.
+   */
+  public const TYPE_TYPE_UPDATING = 'TYPE_UPDATING';
+  /**
+   * Condition type is provisioned.
+   */
+  public const TYPE_TYPE_PROVISIONED = 'TYPE_PROVISIONED';
+  /**
+   * Condition type is operationError. True when the last unit operation fails
+   * with a non-ignorable error.
+   */
+  public const TYPE_TYPE_OPERATION_ERROR = 'TYPE_OPERATION_ERROR';
+  /**
+   * Condition type is flagsConfigInitialized. True when the flags configuration
+   * is synchronized and ready to be served.
+   */
+  public const TYPE_TYPE_FLAGS_CONFIG_INITIALIZED = 'TYPE_FLAGS_CONFIG_INITIALIZED';
+  /**
+   * Indicates if AppHub app has been created or if Apphub app has already
+   * existed.
+   */
+  public const TYPE_TYPE_APP_CREATED_OR_ALREADY_EXISTS = 'TYPE_APP_CREATED_OR_ALREADY_EXISTS';
+  /**
+   * Indicates if services and workloads have been registered with AppHub.
+   */
+  public const TYPE_TYPE_APP_COMPONENTS_REGISTERED = 'TYPE_APP_COMPONENTS_REGISTERED';
+  /**
+   * Required. Last time the condition transited from one status to another.
+   *
    * @var string
    */
   public $lastTransitionTime;
   /**
+   * Required. Human readable message indicating details about the last
+   * transition.
+   *
    * @var string
    */
   public $message;
   /**
+   * Required. Brief reason for the condition's last transition.
+   *
    * @var string
    */
   public $reason;
   /**
+   * Required. Status of the condition.
+   *
    * @var string
    */
   public $status;
   /**
+   * Required. Type of the condition.
+   *
    * @var string
    */
   public $type;
 
   /**
-   * @param string
+   * Required. Last time the condition transited from one status to another.
+   *
+   * @param string $lastTransitionTime
    */
   public function setLastTransitionTime($lastTransitionTime)
   {
@@ -55,7 +119,10 @@ class UnitCondition extends \Google\Model
     return $this->lastTransitionTime;
   }
   /**
-   * @param string
+   * Required. Human readable message indicating details about the last
+   * transition.
+   *
+   * @param string $message
    */
   public function setMessage($message)
   {
@@ -69,7 +136,9 @@ class UnitCondition extends \Google\Model
     return $this->message;
   }
   /**
-   * @param string
+   * Required. Brief reason for the condition's last transition.
+   *
+   * @param string $reason
    */
   public function setReason($reason)
   {
@@ -83,28 +152,39 @@ class UnitCondition extends \Google\Model
     return $this->reason;
   }
   /**
-   * @param string
+   * Required. Status of the condition.
+   *
+   * Accepted values: STATUS_UNSPECIFIED, STATUS_UNKNOWN, STATUS_TRUE,
+   * STATUS_FALSE
+   *
+   * @param self::STATUS_* $status
    */
   public function setStatus($status)
   {
     $this->status = $status;
   }
   /**
-   * @return string
+   * @return self::STATUS_*
    */
   public function getStatus()
   {
     return $this->status;
   }
   /**
-   * @param string
+   * Required. Type of the condition.
+   *
+   * Accepted values: TYPE_UNSPECIFIED, TYPE_READY, TYPE_UPDATING,
+   * TYPE_PROVISIONED, TYPE_OPERATION_ERROR, TYPE_FLAGS_CONFIG_INITIALIZED,
+   * TYPE_APP_CREATED_OR_ALREADY_EXISTS, TYPE_APP_COMPONENTS_REGISTERED
+   *
+   * @param self::TYPE_* $type
    */
   public function setType($type)
   {
     $this->type = $type;
   }
   /**
-   * @return string
+   * @return self::TYPE_*
    */
   public function getType()
   {

@@ -20,6 +20,10 @@ namespace Google\Service\DataManager;
 class CartData extends \Google\Collection
 {
   protected $collection_key = 'items';
+  /**
+   * @var string[]
+   */
+  public $couponCodes;
   protected $itemsType = Item::class;
   protected $itemsDataType = 'array';
   /**
@@ -37,7 +41,21 @@ class CartData extends \Google\Collection
   public $transactionDiscount;
 
   /**
-   * @param Item[]
+   * @param string[] $couponCodes
+   */
+  public function setCouponCodes($couponCodes)
+  {
+    $this->couponCodes = $couponCodes;
+  }
+  /**
+   * @return string[]
+   */
+  public function getCouponCodes()
+  {
+    return $this->couponCodes;
+  }
+  /**
+   * @param Item[] $items
    */
   public function setItems($items)
   {
@@ -51,7 +69,7 @@ class CartData extends \Google\Collection
     return $this->items;
   }
   /**
-   * @param string
+   * @param string $merchantFeedLabel
    */
   public function setMerchantFeedLabel($merchantFeedLabel)
   {
@@ -65,7 +83,7 @@ class CartData extends \Google\Collection
     return $this->merchantFeedLabel;
   }
   /**
-   * @param string
+   * @param string $merchantFeedLanguageCode
    */
   public function setMerchantFeedLanguageCode($merchantFeedLanguageCode)
   {
@@ -79,7 +97,7 @@ class CartData extends \Google\Collection
     return $this->merchantFeedLanguageCode;
   }
   /**
-   * @param string
+   * @param string $merchantId
    */
   public function setMerchantId($merchantId)
   {

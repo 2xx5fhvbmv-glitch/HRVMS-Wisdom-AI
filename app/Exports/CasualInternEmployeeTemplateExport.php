@@ -7,6 +7,7 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Events\AfterSheet;
+use Illuminate\Support\Enumerable;
 use Auth;
 use App\Models\Employee;
 use App\Models\ResortDepartment;
@@ -46,7 +47,7 @@ class CasualInternEmployeeTemplateExport implements FromCollection, WithHeadings
         ];
     }
 
-    public function collection()
+    public function collection(): Enumerable
     {
         return collect([[
             'firstname' => '', 'lastname' => '', 'passportidnumber' => '', 'nationality' => '',

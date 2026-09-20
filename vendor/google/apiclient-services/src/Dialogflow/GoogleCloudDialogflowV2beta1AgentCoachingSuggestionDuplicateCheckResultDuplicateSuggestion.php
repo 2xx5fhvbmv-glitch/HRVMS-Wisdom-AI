@@ -35,7 +35,7 @@ class GoogleCloudDialogflowV2beta1AgentCoachingSuggestionDuplicateCheckResultDup
   public $suggestionIndex;
 
   /**
-   * @param string
+   * @param string $answerRecord
    */
   public function setAnswerRecord($answerRecord)
   {
@@ -49,7 +49,7 @@ class GoogleCloudDialogflowV2beta1AgentCoachingSuggestionDuplicateCheckResultDup
     return $this->answerRecord;
   }
   /**
-   * @param float
+   * @param float $similarityScore
    */
   public function setSimilarityScore($similarityScore)
   {
@@ -63,7 +63,7 @@ class GoogleCloudDialogflowV2beta1AgentCoachingSuggestionDuplicateCheckResultDup
     return $this->similarityScore;
   }
   /**
-   * @param GoogleCloudDialogflowV2beta1AgentCoachingSuggestionSources
+   * @param GoogleCloudDialogflowV2beta1AgentCoachingSuggestionSources $sources
    */
   public function setSources(GoogleCloudDialogflowV2beta1AgentCoachingSuggestionSources $sources)
   {
@@ -77,7 +77,7 @@ class GoogleCloudDialogflowV2beta1AgentCoachingSuggestionDuplicateCheckResultDup
     return $this->sources;
   }
   /**
-   * @param int
+   * @param int $suggestionIndex
    */
   public function setSuggestionIndex($suggestionIndex)
   {

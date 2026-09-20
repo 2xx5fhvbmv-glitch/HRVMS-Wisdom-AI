@@ -2,7 +2,7 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/spatie/laravel-sluggable.svg?style=flat-square)](https://packagist.org/packages/spatie/laravel-sluggable)
 [![MIT Licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE.md)
-[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/spatie/laravel-sluggable/run-tests?label=tests)](https://github.com/spatie/laravel-sluggable/actions)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/spatie/laravel-sluggable/run-tests.yml)](https://github.com/spatie/laravel-sluggable/actions)
 [![Total Downloads](https://img.shields.io/packagist/dt/spatie/laravel-sluggable.svg?style=flat-square)](https://packagist.org/packages/spatie/laravel-sluggable)
 
 This package provides a trait that will generate a unique slug when saving any Eloquent model.
@@ -30,7 +30,8 @@ We highly appreciate you sending us a postcard from your hometown, mentioning wh
 ## Installation
 
 You can install the package via composer:
-``` bash
+
+```bash
 composer require spatie/laravel-sluggable
 ```
 
@@ -76,11 +77,6 @@ use Illuminate\Support\Facades\Schema;
 
 class CreateYourEloquentModelTable extends Migration
 {
-    /**
-     * Run the migrations.
-     *
-     * @return void
-     */
     public function up()
     {
         Schema::create('your_eloquent_models', function (Blueprint $table) {
@@ -94,7 +90,9 @@ class CreateYourEloquentModelTable extends Migration
 
 ```
 
-To use the generated slug in routes, remember to use Laravel's [implicit route model binding](https://laravel.com/docs/5.8/routing#implicit-binding):
+### Using slugs in routes
+
+To use the generated slug in routes, remember to use Laravel's [implicit route model binding](https://laravel.com/docs/routing#implicit-binding):
 
 ```php
 namespace App;
@@ -129,6 +127,8 @@ class YourEloquentModel extends Model
 }
 ```
 
+### Using multiple fields to create the slug
+
 Want to use multiple field as the basis for a slug? No problem!
 
 ```php
@@ -139,6 +139,8 @@ public function getSlugOptions() : SlugOptions
         ->saveSlugsTo('slug');
 }
 ```
+
+### Customizing slug generation
 
 You can also pass a `callable` to `generateSlugsFrom`.
 
@@ -155,6 +157,8 @@ public function getSlugOptions() : SlugOptions
         ->allowDuplicateSlugs();
 }
 ```
+
+### Limiting the length of a slug
 
 You can also put a maximum size limit on the created slug:
 
@@ -182,6 +186,8 @@ public function getSlugOptions() : SlugOptions
 }
 ```
 
+### Setting the slug language
+
 To set the language used by `Str::slug` you may call `usingLanguage`
 
 ```php
@@ -194,6 +200,8 @@ public function getSlugOptions() : SlugOptions
 }
 ```
 
+### Overriding slugs
+
 You can also override the generated slug just by setting it to another value than the generated slug.
 
 ```php
@@ -201,6 +209,22 @@ $model = EloquentModel::create(['name' => 'my name']); //slug is now "my-name";
 $model->slug = 'my-custom-url';
 $model->save(); //slug is now "my-custom-url";
 ```
+
+## Prevents slugs from being generated on some conditions
+
+If you don't want to create the slug when the model has a state, you can use the `skipGenerateWhen` function.
+
+```php
+public function getSlugOptions() : SlugOptions
+{
+    return SlugOptions::create()
+        ->generateSlugsFrom('name')
+        ->saveSlugsTo('slug')
+        ->skipGenerateWhen(fn () => $this->state === 'draft');
+}
+```
+
+### Prevent slugs from being generated on creation
 
 If you don't want to create the slug when the model is initially created you can set use the `doNotGenerateSlugsOnCreate()` function.
 
@@ -213,6 +237,8 @@ public function getSlugOptions() : SlugOptions
         ->doNotGenerateSlugsOnCreate();
 }
 ```
+
+### Prevent slug updates
 
 Similarly, if you want to prevent the slug from being updated on model updates, call `doNotGenerateSlugsOnUpdate()`.
 
@@ -236,8 +262,11 @@ $model->name = 'changed name';
 $model->save(); //slug stays "my-name"
 ```
 
+### Regenerating slugs
+
 If you want to explicitly update the slug on the model you can call `generateSlug()` on your model at any time to make the slug according to your other options. Don't forget to `save()` the model to persist the update to your database.
 
+### Preventing overwrites
 
 You can prevent slugs from being overwritten.
 
@@ -248,6 +277,68 @@ public function getSlugOptions() : SlugOptions
         ->generateSlugsFrom('name')
         ->saveSlugsTo('slug')
         ->preventOverwrite();
+}
+```
+
+### Using scopes
+
+If you have a global scope that should be taken into account, you can define this as well with `extraScope`. For example if you have a pages table containing pages of multiple websites and every website has it's own unique slugs.
+
+```php
+public function getSlugOptions() : SlugOptions
+{
+    return SlugOptions::create()
+        ->generateSlugsFrom('name')
+        ->saveSlugsTo('slug')
+        ->extraScope(fn ($builder) => $builder->where('scope_id', $this->scope_id));
+}
+```
+
+### Setting the slug suffix starting index
+
+By default, suffix index starts from 1, you can set starting number.
+
+```php
+public function getSlugOptions() : SlugOptions
+{
+    return SlugOptions::create()
+        ->generateSlugsFrom('name')
+        ->saveSlugsTo('slug')
+        ->startSlugSuffixFrom(2);
+}
+```
+
+### Generating slug suffix on first occurrence
+
+With the default behavior (assuming that we haven't disabled slug uniqueness with `allowDuplicateSlugs`), the generated slugs for two records with the same source values would be `this-is-an-example` and `this-is-an-example-1`.
+
+When using this option, we are forcing the first occurence to also have a suffix so, even if the slug is unique as it is, it will be suffixed, resulting in `this-is-an-example-1` and `this-is-an-example-2`.
+
+```php
+public function getSlugOptions() : SlugOptions
+{
+    return SlugOptions::create()
+        ->generateSlugsFrom('name')
+        ->saveSlugsTo('slug')
+        ->useSuffixOnFirstOccurrence();
+}
+```
+
+### Generating a custom slug suffix
+
+By default, the mechanism to make slugs unique is to append an autoincremental value to the slug. You can generate a custom slug suffix such as a random string or hash with `usingSuffixGenerator`.
+
+It accepts a callable that receives the base slug (without any suffix) and the iteration number, which represents how many times the suffix generation process has been run to ensure uniqueness. This number could be useful to monitor the collision rate of the generation process.
+
+```php
+public function getSlugOptions() : SlugOptions
+{
+    return SlugOptions::create()
+        ->generateSlugsFrom('name')
+        ->saveSlugsTo('slug')
+        ->usingSuffixGenerator(
+            fn(string $slug, int $iteration) => bin2hex(random_bytes(4))
+        ); // Sample dummy method to generate a random hex code of length 8
 }
 ```
 
@@ -309,7 +400,58 @@ class YourEloquentModel extends Model
             ->saveSlugsTo('slug');
     }
 }
+
 ```
+
+#### Implicit route model binding
+
+You can also use Laravels [implicit route model binding](https://laravel.com/docs/routing#implicit-binding) inside your controller to automatically resolve the model. To use this feature, make sure that the slug column matches the `routeNameKey`.  
+Currently, only some database types support JSON operations. Further information about which databases support JSON can be found in the [Laravel docs](https://laravel.com/docs/queries#json-where-clauses).
+
+```php
+namespace App;
+
+use Spatie\Sluggable\HasSlug;
+use Spatie\Sluggable\SlugOptions;
+use Illuminate\Database\Eloquent\Model;
+
+class YourEloquentModel extends Model
+{
+    use HasTranslations, HasTranslatableSlug;
+
+    public $translatable = ['name', 'slug'];
+
+    /**
+     * Get the options for generating the slug.
+     */
+    public function getSlugOptions() : SlugOptions
+    {
+        return SlugOptions::create()
+            ->generateSlugsFrom('name')
+            ->saveSlugsTo('slug');
+    }
+
+    /**
+     * Get the route key for the model.
+     *
+     * @return string
+     */
+    public function getRouteKeyName()
+    {
+        return 'slug';
+    }
+}
+```
+
+### Find models by slug
+
+For convenience, you can use the alias `findBySlug` to retrieve a model. The query will compare against the field passed to `saveSlugsTo` when defining the `SlugOptions`.
+
+```php
+$model = Article::findBySlug('my-article');
+```
+
+`findBySlug` also accepts a second parameter `$columns` just like the default Eloquent `find` method.
 
 ## Changelog
 
@@ -323,11 +465,11 @@ composer test
 
 ## Contributing
 
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
+Please see [CONTRIBUTING](https://github.com/spatie/.github/blob/main/CONTRIBUTING.md) for details.
 
 ## Security
 
-If you discover any security related issues, please email freek@spatie.be instead of using the issue tracker.
+If you've found a bug regarding security please mail [security@spatie.be](mailto:security@spatie.be) instead of using the issue tracker.
 
 ## Credits
 

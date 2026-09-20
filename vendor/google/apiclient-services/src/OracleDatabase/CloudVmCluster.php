@@ -20,52 +20,98 @@ namespace Google\Service\OracleDatabase;
 class CloudVmCluster extends \Google\Model
 {
   /**
+   * Optional. The name of the backup OdbSubnet associated with the VM Cluster.
+   * Format: projects/{project}/locations/{location}/odbNetworks/{odb_network}/o
+   * dbSubnets/{odb_subnet}
+   *
    * @var string
    */
   public $backupOdbSubnet;
   /**
+   * Optional. CIDR range of the backup subnet.
+   *
    * @var string
    */
   public $backupSubnetCidr;
   /**
+   * Optional. Network settings. CIDR to use for cluster IP allocation.
+   *
    * @var string
    */
   public $cidr;
   /**
+   * Output only. The date and time that the VM cluster was created.
+   *
    * @var string
    */
   public $createTime;
   /**
+   * Optional. User friendly name for this resource.
+   *
    * @var string
    */
   public $displayName;
   /**
+   * Required. The name of the Exadata Infrastructure resource on which VM
+   * cluster resource is created, in the following format: projects/{project}/lo
+   * cations/{region}/cloudExadataInfrastuctures/{cloud_extradata_infrastructure
+   * }
+   *
    * @var string
    */
   public $exadataInfrastructure;
   /**
+   * Optional. The name of ExascaleDbStorageVault associated with the VM
+   * Cluster. Format: projects/{project}/locations/{location}/exascaleDbStorageV
+   * aults/{exascale_db_storage_vault}
+   *
+   * @var string
+   */
+  public $exascaleDbStorageVault;
+  /**
+   * Output only. The GCP Oracle zone where Oracle CloudVmCluster is hosted.
+   * This will be the same as the gcp_oracle_zone of the
+   * CloudExadataInfrastructure. Example: us-east4-b-r2.
+   *
    * @var string
    */
   public $gcpOracleZone;
   protected $identityConnectorType = IdentityConnector::class;
   protected $identityConnectorDataType = '';
   /**
+   * Optional. Labels or tags associated with the VM Cluster.
+   *
    * @var string[]
    */
   public $labels;
   /**
+   * Identifier. The name of the VM Cluster resource with the format:
+   * projects/{project}/locations/{region}/cloudVmClusters/{cloud_vm_cluster}
+   *
    * @var string
    */
   public $name;
   /**
+   * Optional. The name of the VPC network. Format:
+   * projects/{project}/global/networks/{network}
+   *
    * @var string
    */
   public $network;
   /**
+   * Optional. The name of the OdbNetwork associated with the VM Cluster.
+   * Format: projects/{project}/locations/{location}/odbNetworks/{odb_network}
+   * It is optional but if specified, this should match the parent ODBNetwork of
+   * the odb_subnet and backup_odb_subnet.
+   *
    * @var string
    */
   public $odbNetwork;
   /**
+   * Optional. The name of the OdbSubnet associated with the VM Cluster for IP
+   * allocation. Format: projects/{project}/locations/{location}/odbNetworks/{od
+   * b_network}/odbSubnets/{odb_subnet}
+   *
    * @var string
    */
   public $odbSubnet;
@@ -73,7 +119,11 @@ class CloudVmCluster extends \Google\Model
   protected $propertiesDataType = '';
 
   /**
-   * @param string
+   * Optional. The name of the backup OdbSubnet associated with the VM Cluster.
+   * Format: projects/{project}/locations/{location}/odbNetworks/{odb_network}/o
+   * dbSubnets/{odb_subnet}
+   *
+   * @param string $backupOdbSubnet
    */
   public function setBackupOdbSubnet($backupOdbSubnet)
   {
@@ -87,7 +137,9 @@ class CloudVmCluster extends \Google\Model
     return $this->backupOdbSubnet;
   }
   /**
-   * @param string
+   * Optional. CIDR range of the backup subnet.
+   *
+   * @param string $backupSubnetCidr
    */
   public function setBackupSubnetCidr($backupSubnetCidr)
   {
@@ -101,7 +153,9 @@ class CloudVmCluster extends \Google\Model
     return $this->backupSubnetCidr;
   }
   /**
-   * @param string
+   * Optional. Network settings. CIDR to use for cluster IP allocation.
+   *
+   * @param string $cidr
    */
   public function setCidr($cidr)
   {
@@ -115,7 +169,9 @@ class CloudVmCluster extends \Google\Model
     return $this->cidr;
   }
   /**
-   * @param string
+   * Output only. The date and time that the VM cluster was created.
+   *
+   * @param string $createTime
    */
   public function setCreateTime($createTime)
   {
@@ -129,7 +185,9 @@ class CloudVmCluster extends \Google\Model
     return $this->createTime;
   }
   /**
-   * @param string
+   * Optional. User friendly name for this resource.
+   *
+   * @param string $displayName
    */
   public function setDisplayName($displayName)
   {
@@ -143,7 +201,12 @@ class CloudVmCluster extends \Google\Model
     return $this->displayName;
   }
   /**
-   * @param string
+   * Required. The name of the Exadata Infrastructure resource on which VM
+   * cluster resource is created, in the following format: projects/{project}/lo
+   * cations/{region}/cloudExadataInfrastuctures/{cloud_extradata_infrastructure
+   * }
+   *
+   * @param string $exadataInfrastructure
    */
   public function setExadataInfrastructure($exadataInfrastructure)
   {
@@ -157,7 +220,29 @@ class CloudVmCluster extends \Google\Model
     return $this->exadataInfrastructure;
   }
   /**
-   * @param string
+   * Optional. The name of ExascaleDbStorageVault associated with the VM
+   * Cluster. Format: projects/{project}/locations/{location}/exascaleDbStorageV
+   * aults/{exascale_db_storage_vault}
+   *
+   * @param string $exascaleDbStorageVault
+   */
+  public function setExascaleDbStorageVault($exascaleDbStorageVault)
+  {
+    $this->exascaleDbStorageVault = $exascaleDbStorageVault;
+  }
+  /**
+   * @return string
+   */
+  public function getExascaleDbStorageVault()
+  {
+    return $this->exascaleDbStorageVault;
+  }
+  /**
+   * Output only. The GCP Oracle zone where Oracle CloudVmCluster is hosted.
+   * This will be the same as the gcp_oracle_zone of the
+   * CloudExadataInfrastructure. Example: us-east4-b-r2.
+   *
+   * @param string $gcpOracleZone
    */
   public function setGcpOracleZone($gcpOracleZone)
   {
@@ -171,7 +256,10 @@ class CloudVmCluster extends \Google\Model
     return $this->gcpOracleZone;
   }
   /**
-   * @param IdentityConnector
+   * Output only. The identity connector details which will allow OCI to
+   * securely access the resources in the customer project.
+   *
+   * @param IdentityConnector $identityConnector
    */
   public function setIdentityConnector(IdentityConnector $identityConnector)
   {
@@ -185,7 +273,9 @@ class CloudVmCluster extends \Google\Model
     return $this->identityConnector;
   }
   /**
-   * @param string[]
+   * Optional. Labels or tags associated with the VM Cluster.
+   *
+   * @param string[] $labels
    */
   public function setLabels($labels)
   {
@@ -199,7 +289,10 @@ class CloudVmCluster extends \Google\Model
     return $this->labels;
   }
   /**
-   * @param string
+   * Identifier. The name of the VM Cluster resource with the format:
+   * projects/{project}/locations/{region}/cloudVmClusters/{cloud_vm_cluster}
+   *
+   * @param string $name
    */
   public function setName($name)
   {
@@ -213,7 +306,10 @@ class CloudVmCluster extends \Google\Model
     return $this->name;
   }
   /**
-   * @param string
+   * Optional. The name of the VPC network. Format:
+   * projects/{project}/global/networks/{network}
+   *
+   * @param string $network
    */
   public function setNetwork($network)
   {
@@ -227,7 +323,12 @@ class CloudVmCluster extends \Google\Model
     return $this->network;
   }
   /**
-   * @param string
+   * Optional. The name of the OdbNetwork associated with the VM Cluster.
+   * Format: projects/{project}/locations/{location}/odbNetworks/{odb_network}
+   * It is optional but if specified, this should match the parent ODBNetwork of
+   * the odb_subnet and backup_odb_subnet.
+   *
+   * @param string $odbNetwork
    */
   public function setOdbNetwork($odbNetwork)
   {
@@ -241,7 +342,11 @@ class CloudVmCluster extends \Google\Model
     return $this->odbNetwork;
   }
   /**
-   * @param string
+   * Optional. The name of the OdbSubnet associated with the VM Cluster for IP
+   * allocation. Format: projects/{project}/locations/{location}/odbNetworks/{od
+   * b_network}/odbSubnets/{odb_subnet}
+   *
+   * @param string $odbSubnet
    */
   public function setOdbSubnet($odbSubnet)
   {
@@ -255,7 +360,9 @@ class CloudVmCluster extends \Google\Model
     return $this->odbSubnet;
   }
   /**
-   * @param CloudVmClusterProperties
+   * Optional. Various properties of the VM Cluster.
+   *
+   * @param CloudVmClusterProperties $properties
    */
   public function setProperties(CloudVmClusterProperties $properties)
   {

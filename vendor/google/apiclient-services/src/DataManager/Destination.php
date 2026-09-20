@@ -35,7 +35,7 @@ class Destination extends \Google\Model
   public $reference;
 
   /**
-   * @param ProductAccount
+   * @param ProductAccount $linkedAccount
    */
   public function setLinkedAccount(ProductAccount $linkedAccount)
   {
@@ -49,7 +49,7 @@ class Destination extends \Google\Model
     return $this->linkedAccount;
   }
   /**
-   * @param ProductAccount
+   * @param ProductAccount $loginAccount
    */
   public function setLoginAccount(ProductAccount $loginAccount)
   {
@@ -63,7 +63,7 @@ class Destination extends \Google\Model
     return $this->loginAccount;
   }
   /**
-   * @param ProductAccount
+   * @param ProductAccount $operatingAccount
    */
   public function setOperatingAccount(ProductAccount $operatingAccount)
   {
@@ -77,7 +77,7 @@ class Destination extends \Google\Model
     return $this->operatingAccount;
   }
   /**
-   * @param string
+   * @param string $productDestinationId
    */
   public function setProductDestinationId($productDestinationId)
   {
@@ -91,7 +91,7 @@ class Destination extends \Google\Model
     return $this->productDestinationId;
   }
   /**
-   * @param string
+   * @param string $reference
    */
   public function setReference($reference)
   {

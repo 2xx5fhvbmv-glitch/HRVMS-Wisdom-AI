@@ -19,6 +19,8 @@ namespace Google\Service\DataManager;
 
 class GcpWrappedKeyInfo extends \Google\Model
 {
+  public const KEY_TYPE_KEY_TYPE_UNSPECIFIED = 'KEY_TYPE_UNSPECIFIED';
+  public const KEY_TYPE_XCHACHA20_POLY1305 = 'XCHACHA20_POLY1305';
   /**
    * @var string
    */
@@ -37,7 +39,7 @@ class GcpWrappedKeyInfo extends \Google\Model
   public $wipProvider;
 
   /**
-   * @param string
+   * @param string $encryptedDek
    */
   public function setEncryptedDek($encryptedDek)
   {
@@ -51,7 +53,7 @@ class GcpWrappedKeyInfo extends \Google\Model
     return $this->encryptedDek;
   }
   /**
-   * @param string
+   * @param string $kekUri
    */
   public function setKekUri($kekUri)
   {
@@ -65,21 +67,21 @@ class GcpWrappedKeyInfo extends \Google\Model
     return $this->kekUri;
   }
   /**
-   * @param string
+   * @param self::KEY_TYPE_* $keyType
    */
   public function setKeyType($keyType)
   {
     $this->keyType = $keyType;
   }
   /**
-   * @return string
+   * @return self::KEY_TYPE_*
    */
   public function getKeyType()
   {
     return $this->keyType;
   }
   /**
-   * @param string
+   * @param string $wipProvider
    */
   public function setWipProvider($wipProvider)
   {

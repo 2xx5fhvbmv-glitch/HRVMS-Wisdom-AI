@@ -26,7 +26,7 @@ class GoogleCloudSecuritycenterV2VertexAi extends \Google\Collection
   protected $pipelinesDataType = 'array';
 
   /**
-   * @param GoogleCloudSecuritycenterV2Dataset[]
+   * @param GoogleCloudSecuritycenterV2Dataset[] $datasets
    */
   public function setDatasets($datasets)
   {
@@ -40,7 +40,7 @@ class GoogleCloudSecuritycenterV2VertexAi extends \Google\Collection
     return $this->datasets;
   }
   /**
-   * @param GoogleCloudSecuritycenterV2Pipeline[]
+   * @param GoogleCloudSecuritycenterV2Pipeline[] $pipelines
    */
   public function setPipelines($pipelines)
   {

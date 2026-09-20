@@ -19,15 +19,45 @@ namespace Google\Service\DiscoveryEngine;
 
 class GoogleCloudDiscoveryengineV1alphaAssistAnswerReply extends \Google\Model
 {
+  /**
+   * The time when the reply was created.
+   *
+   * @var string
+   */
+  public $createTime;
   protected $groundedContentType = GoogleCloudDiscoveryengineV1alphaAssistantGroundedContent::class;
   protected $groundedContentDataType = '';
   /**
+   * Output only. When set, uniquely identifies a reply within the
+   * `AssistAnswer` resource. During an AssistantService.StreamAssist call,
+   * multiple `Reply` messages with the same ID can occur within the response
+   * stream (across multiple StreamAssistResponse messages). These represent
+   * parts of a single `Reply` message in the final `AssistAnswer` resource.
+   *
    * @var string
    */
   public $replyId;
 
   /**
-   * @param GoogleCloudDiscoveryengineV1alphaAssistantGroundedContent
+   * The time when the reply was created.
+   *
+   * @param string $createTime
+   */
+  public function setCreateTime($createTime)
+  {
+    $this->createTime = $createTime;
+  }
+  /**
+   * @return string
+   */
+  public function getCreateTime()
+  {
+    return $this->createTime;
+  }
+  /**
+   * Possibly grounded response text or media from the assistant.
+   *
+   * @param GoogleCloudDiscoveryengineV1alphaAssistantGroundedContent $groundedContent
    */
   public function setGroundedContent(GoogleCloudDiscoveryengineV1alphaAssistantGroundedContent $groundedContent)
   {
@@ -41,7 +71,13 @@ class GoogleCloudDiscoveryengineV1alphaAssistAnswerReply extends \Google\Model
     return $this->groundedContent;
   }
   /**
-   * @param string
+   * Output only. When set, uniquely identifies a reply within the
+   * `AssistAnswer` resource. During an AssistantService.StreamAssist call,
+   * multiple `Reply` messages with the same ID can occur within the response
+   * stream (across multiple StreamAssistResponse messages). These represent
+   * parts of a single `Reply` message in the final `AssistAnswer` resource.
+   *
+   * @param string $replyId
    */
   public function setReplyId($replyId)
   {

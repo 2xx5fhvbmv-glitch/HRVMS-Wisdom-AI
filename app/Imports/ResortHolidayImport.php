@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use App\Helpers\Common;
 use App\Models\ResortHoliday;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
+use Illuminate\Database\Eloquent\Model;
 
 use Hash;
 use DB;
@@ -26,7 +27,7 @@ class ResortHolidayImport implements ToModel, WithHeadingRow
     {
            $this->resort= $resort_id;
     }
-    public function model(array $row)
+    public function model(array $row): Model|array|null
     {
 
 

@@ -29,15 +29,17 @@ use Symfony\Component\HttpKernel\HttpKernelInterface;
  */
 final class ExceptionEvent extends RequestEvent
 {
-    private $throwable;
+    private \Throwable $throwable;
+    private bool $allowCustomResponseCode = false;
 
-    /**
-     * @var bool
-     */
-    private $allowCustomResponseCode = false;
-
-    public function __construct(HttpKernelInterface $kernel, Request $request, int $requestType, \Throwable $e)
-    {
+    public function __construct(
+        HttpKernelInterface $kernel,
+        Request $request,
+        int $requestType,
+        \Throwable $e,
+        private bool $isKernelTerminating = false,
+        public readonly ?ControllerMetadata $controllerMetadata = null,
+    ) {
         parent::__construct($kernel, $request, $requestType);
 
         $this->setThrowable($e);
@@ -72,5 +74,10 @@ final class ExceptionEvent extends RequestEvent
     public function isAllowingCustomResponseCode(): bool
     {
         return $this->allowCustomResponseCode;
+    }
+
+    public function isKernelTerminating(): bool
+    {
+        return $this->isKernelTerminating;
     }
 }

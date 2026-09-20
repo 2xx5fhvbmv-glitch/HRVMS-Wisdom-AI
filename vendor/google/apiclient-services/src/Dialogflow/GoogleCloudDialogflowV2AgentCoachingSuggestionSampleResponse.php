@@ -29,7 +29,7 @@ class GoogleCloudDialogflowV2AgentCoachingSuggestionSampleResponse extends \Goog
   protected $sourcesDataType = '';
 
   /**
-   * @param GoogleCloudDialogflowV2AgentCoachingSuggestionDuplicateCheckResult
+   * @param GoogleCloudDialogflowV2AgentCoachingSuggestionDuplicateCheckResult $duplicateCheckResult
    */
   public function setDuplicateCheckResult(GoogleCloudDialogflowV2AgentCoachingSuggestionDuplicateCheckResult $duplicateCheckResult)
   {
@@ -43,7 +43,7 @@ class GoogleCloudDialogflowV2AgentCoachingSuggestionSampleResponse extends \Goog
     return $this->duplicateCheckResult;
   }
   /**
-   * @param string
+   * @param string $responseText
    */
   public function setResponseText($responseText)
   {
@@ -57,7 +57,7 @@ class GoogleCloudDialogflowV2AgentCoachingSuggestionSampleResponse extends \Goog
     return $this->responseText;
   }
   /**
-   * @param GoogleCloudDialogflowV2AgentCoachingSuggestionSources
+   * @param GoogleCloudDialogflowV2AgentCoachingSuggestionSources $sources
    */
   public function setSources(GoogleCloudDialogflowV2AgentCoachingSuggestionSources $sources)
   {

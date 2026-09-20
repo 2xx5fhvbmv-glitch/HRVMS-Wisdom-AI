@@ -8,12 +8,10 @@ use League\OAuth2\Server\Repositories\AuthCodeRepositoryInterface;
 
 class AuthCodeRepository implements AuthCodeRepositoryInterface
 {
-    use FormatsScopesForStorage;
-
     /**
      * {@inheritdoc}
      */
-    public function getNewAuthCode()
+    public function getNewAuthCode(): AuthCodeEntityInterface
     {
         return new AuthCode;
     }
@@ -21,33 +19,31 @@ class AuthCodeRepository implements AuthCodeRepositoryInterface
     /**
      * {@inheritdoc}
      */
-    public function persistNewAuthCode(AuthCodeEntityInterface $authCodeEntity)
+    public function persistNewAuthCode(AuthCodeEntityInterface $authCodeEntity): void
     {
-        $attributes = [
+        Passport::authCode()->forceFill([
             'id' => $authCodeEntity->getIdentifier(),
             'user_id' => $authCodeEntity->getUserIdentifier(),
             'client_id' => $authCodeEntity->getClient()->getIdentifier(),
-            'scopes' => $this->formatScopesForStorage($authCodeEntity->getScopes()),
+            'scopes' => json_encode($authCodeEntity->getScopes()),
             'revoked' => false,
             'expires_at' => $authCodeEntity->getExpiryDateTime(),
-        ];
-
-        Passport::authCode()->forceFill($attributes)->save();
+        ])->save();
     }
 
     /**
      * {@inheritdoc}
      */
-    public function revokeAuthCode($codeId)
+    public function revokeAuthCode(string $codeId): void
     {
-        Passport::authCode()->where('id', $codeId)->update(['revoked' => true]);
+        Passport::authCode()->newQuery()->whereKey($codeId)->update(['revoked' => true]);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function isAuthCodeRevoked($codeId)
+    public function isAuthCodeRevoked(string $codeId): bool
     {
-        return Passport::authCode()->where('id', $codeId)->where('revoked', 1)->exists();
+        return Passport::authCode()->newQuery()->whereKey($codeId)->where('revoked', false)->doesntExist();
     }
 }

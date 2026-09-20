@@ -19,6 +19,9 @@ namespace Google\Service\DataManager;
 
 class IngestEventsRequest extends \Google\Collection
 {
+  public const ENCODING_ENCODING_UNSPECIFIED = 'ENCODING_UNSPECIFIED';
+  public const ENCODING_HEX = 'HEX';
+  public const ENCODING_BASE64 = 'BASE64';
   protected $collection_key = 'events';
   protected $consentType = Consent::class;
   protected $consentDataType = '';
@@ -38,7 +41,7 @@ class IngestEventsRequest extends \Google\Collection
   public $validateOnly;
 
   /**
-   * @param Consent
+   * @param Consent $consent
    */
   public function setConsent(Consent $consent)
   {
@@ -52,7 +55,7 @@ class IngestEventsRequest extends \Google\Collection
     return $this->consent;
   }
   /**
-   * @param Destination[]
+   * @param Destination[] $destinations
    */
   public function setDestinations($destinations)
   {
@@ -66,21 +69,21 @@ class IngestEventsRequest extends \Google\Collection
     return $this->destinations;
   }
   /**
-   * @param string
+   * @param self::ENCODING_* $encoding
    */
   public function setEncoding($encoding)
   {
     $this->encoding = $encoding;
   }
   /**
-   * @return string
+   * @return self::ENCODING_*
    */
   public function getEncoding()
   {
     return $this->encoding;
   }
   /**
-   * @param EncryptionInfo
+   * @param EncryptionInfo $encryptionInfo
    */
   public function setEncryptionInfo(EncryptionInfo $encryptionInfo)
   {
@@ -94,7 +97,7 @@ class IngestEventsRequest extends \Google\Collection
     return $this->encryptionInfo;
   }
   /**
-   * @param Event[]
+   * @param Event[] $events
    */
   public function setEvents($events)
   {
@@ -108,7 +111,7 @@ class IngestEventsRequest extends \Google\Collection
     return $this->events;
   }
   /**
-   * @param bool
+   * @param bool $validateOnly
    */
   public function setValidateOnly($validateOnly)
   {

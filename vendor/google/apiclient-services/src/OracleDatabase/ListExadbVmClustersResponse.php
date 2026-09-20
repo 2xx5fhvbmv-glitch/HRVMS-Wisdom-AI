@@ -19,16 +19,27 @@ namespace Google\Service\OracleDatabase;
 
 class ListExadbVmClustersResponse extends \Google\Collection
 {
-  protected $collection_key = 'exadbVmClusters';
+  protected $collection_key = 'unreachable';
   protected $exadbVmClustersType = ExadbVmCluster::class;
   protected $exadbVmClustersDataType = 'array';
   /**
+   * A token identifying a page of results the server should return.
+   *
    * @var string
    */
   public $nextPageToken;
+  /**
+   * Unreachable locations when listing resources across all locations using
+   * wildcard location '-'.
+   *
+   * @var string[]
+   */
+  public $unreachable;
 
   /**
-   * @param ExadbVmCluster[]
+   * The list of ExadbVmClusters.
+   *
+   * @param ExadbVmCluster[] $exadbVmClusters
    */
   public function setExadbVmClusters($exadbVmClusters)
   {
@@ -42,7 +53,9 @@ class ListExadbVmClustersResponse extends \Google\Collection
     return $this->exadbVmClusters;
   }
   /**
-   * @param string
+   * A token identifying a page of results the server should return.
+   *
+   * @param string $nextPageToken
    */
   public function setNextPageToken($nextPageToken)
   {
@@ -54,6 +67,23 @@ class ListExadbVmClustersResponse extends \Google\Collection
   public function getNextPageToken()
   {
     return $this->nextPageToken;
+  }
+  /**
+   * Unreachable locations when listing resources across all locations using
+   * wildcard location '-'.
+   *
+   * @param string[] $unreachable
+   */
+  public function setUnreachable($unreachable)
+  {
+    $this->unreachable = $unreachable;
+  }
+  /**
+   * @return string[]
+   */
+  public function getUnreachable()
+  {
+    return $this->unreachable;
   }
 }
 

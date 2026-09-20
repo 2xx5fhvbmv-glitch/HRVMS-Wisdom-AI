@@ -20,21 +20,45 @@ namespace Google\Service\DataManager;
 class AudienceMember extends \Google\Collection
 {
   protected $collection_key = 'destinationReferences';
+  protected $compositeDataType = CompositeData::class;
+  protected $compositeDataDataType = '';
   protected $consentType = Consent::class;
   protected $consentDataType = '';
   /**
    * @var string[]
    */
   public $destinationReferences;
+  protected $googleUserIdDataType = GoogleUserIdData::class;
+  protected $googleUserIdDataDataType = '';
   protected $mobileDataType = MobileData::class;
   protected $mobileDataDataType = '';
   protected $pairDataType = PairData::class;
   protected $pairDataDataType = '';
+  protected $partnerProvidedIdDataType = PartnerProvidedIdData::class;
+  protected $partnerProvidedIdDataDataType = '';
+  protected $ppidDataType = PpidData::class;
+  protected $ppidDataDataType = '';
   protected $userDataType = UserData::class;
   protected $userDataDataType = '';
+  protected $userIdDataType = UserIdData::class;
+  protected $userIdDataDataType = '';
 
   /**
-   * @param Consent
+   * @param CompositeData $compositeData
+   */
+  public function setCompositeData(CompositeData $compositeData)
+  {
+    $this->compositeData = $compositeData;
+  }
+  /**
+   * @return CompositeData
+   */
+  public function getCompositeData()
+  {
+    return $this->compositeData;
+  }
+  /**
+   * @param Consent $consent
    */
   public function setConsent(Consent $consent)
   {
@@ -48,7 +72,7 @@ class AudienceMember extends \Google\Collection
     return $this->consent;
   }
   /**
-   * @param string[]
+   * @param string[] $destinationReferences
    */
   public function setDestinationReferences($destinationReferences)
   {
@@ -62,7 +86,21 @@ class AudienceMember extends \Google\Collection
     return $this->destinationReferences;
   }
   /**
-   * @param MobileData
+   * @param GoogleUserIdData $googleUserIdData
+   */
+  public function setGoogleUserIdData(GoogleUserIdData $googleUserIdData)
+  {
+    $this->googleUserIdData = $googleUserIdData;
+  }
+  /**
+   * @return GoogleUserIdData
+   */
+  public function getGoogleUserIdData()
+  {
+    return $this->googleUserIdData;
+  }
+  /**
+   * @param MobileData $mobileData
    */
   public function setMobileData(MobileData $mobileData)
   {
@@ -76,7 +114,7 @@ class AudienceMember extends \Google\Collection
     return $this->mobileData;
   }
   /**
-   * @param PairData
+   * @param PairData $pairData
    */
   public function setPairData(PairData $pairData)
   {
@@ -90,7 +128,35 @@ class AudienceMember extends \Google\Collection
     return $this->pairData;
   }
   /**
-   * @param UserData
+   * @param PartnerProvidedIdData $partnerProvidedIdData
+   */
+  public function setPartnerProvidedIdData(PartnerProvidedIdData $partnerProvidedIdData)
+  {
+    $this->partnerProvidedIdData = $partnerProvidedIdData;
+  }
+  /**
+   * @return PartnerProvidedIdData
+   */
+  public function getPartnerProvidedIdData()
+  {
+    return $this->partnerProvidedIdData;
+  }
+  /**
+   * @param PpidData $ppidData
+   */
+  public function setPpidData(PpidData $ppidData)
+  {
+    $this->ppidData = $ppidData;
+  }
+  /**
+   * @return PpidData
+   */
+  public function getPpidData()
+  {
+    return $this->ppidData;
+  }
+  /**
+   * @param UserData $userData
    */
   public function setUserData(UserData $userData)
   {
@@ -102,6 +168,20 @@ class AudienceMember extends \Google\Collection
   public function getUserData()
   {
     return $this->userData;
+  }
+  /**
+   * @param UserIdData $userIdData
+   */
+  public function setUserIdData(UserIdData $userIdData)
+  {
+    $this->userIdData = $userIdData;
+  }
+  /**
+   * @return UserIdData
+   */
+  public function getUserIdData()
+  {
+    return $this->userIdData;
   }
 }
 

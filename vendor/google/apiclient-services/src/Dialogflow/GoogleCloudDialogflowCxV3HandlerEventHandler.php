@@ -31,7 +31,7 @@ class GoogleCloudDialogflowCxV3HandlerEventHandler extends \Google\Model
   protected $fulfillmentDataType = '';
 
   /**
-   * @param string
+   * @param string $condition
    */
   public function setCondition($condition)
   {
@@ -45,7 +45,7 @@ class GoogleCloudDialogflowCxV3HandlerEventHandler extends \Google\Model
     return $this->condition;
   }
   /**
-   * @param string
+   * @param string $event
    */
   public function setEvent($event)
   {
@@ -59,7 +59,7 @@ class GoogleCloudDialogflowCxV3HandlerEventHandler extends \Google\Model
     return $this->event;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3Fulfillment
+   * @param GoogleCloudDialogflowCxV3Fulfillment $fulfillment
    */
   public function setFulfillment(GoogleCloudDialogflowCxV3Fulfillment $fulfillment)
   {

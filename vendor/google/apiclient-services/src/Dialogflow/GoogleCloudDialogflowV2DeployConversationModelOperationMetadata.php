@@ -33,7 +33,7 @@ class GoogleCloudDialogflowV2DeployConversationModelOperationMetadata extends \G
   public $doneTime;
 
   /**
-   * @param string
+   * @param string $conversationModel
    */
   public function setConversationModel($conversationModel)
   {
@@ -47,7 +47,7 @@ class GoogleCloudDialogflowV2DeployConversationModelOperationMetadata extends \G
     return $this->conversationModel;
   }
   /**
-   * @param string
+   * @param string $createTime
    */
   public function setCreateTime($createTime)
   {
@@ -61,7 +61,7 @@ class GoogleCloudDialogflowV2DeployConversationModelOperationMetadata extends \G
     return $this->createTime;
   }
   /**
-   * @param string
+   * @param string $doneTime
    */
   public function setDoneTime($doneTime)
   {

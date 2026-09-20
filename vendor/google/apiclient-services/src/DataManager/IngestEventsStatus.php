@@ -25,7 +25,7 @@ class IngestEventsStatus extends \Google\Model
   public $recordCount;
 
   /**
-   * @param string
+   * @param string $recordCount
    */
   public function setRecordCount($recordCount)
   {

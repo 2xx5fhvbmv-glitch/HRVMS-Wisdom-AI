@@ -20,7 +20,7 @@ class PaymentRequestExport implements FromCollection, WithHeadings, WithEvents
         $this->paymentRequestChildren = $paymentRequestChildren;
     }
 
-    public function collection()
+    public function collection(): Collection
     {
         $data = [];
 

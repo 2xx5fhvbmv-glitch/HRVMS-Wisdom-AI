@@ -20,12 +20,28 @@ namespace Google\Service\Compute;
 class BackendServiceHAPolicyLeaderNetworkEndpoint extends \Google\Model
 {
   /**
+   * The name of the VM instance of the leader network endpoint. The instance
+   * must already be attached to the NEG specified in the
+   * haPolicy.leader.backendGroup.
+   *
+   * The value must be a valid RFC1035 name (1-63 characters) or a valid
+   * instance URL. Authorization requires the following IAM permission on the
+   * specified resource instance: compute.instances.use
+   *
    * @var string
    */
   public $instance;
 
   /**
-   * @param string
+   * The name of the VM instance of the leader network endpoint. The instance
+   * must already be attached to the NEG specified in the
+   * haPolicy.leader.backendGroup.
+   *
+   * The value must be a valid RFC1035 name (1-63 characters) or a valid
+   * instance URL. Authorization requires the following IAM permission on the
+   * specified resource instance: compute.instances.use
+   *
+   * @param string $instance
    */
   public function setInstance($instance)
   {

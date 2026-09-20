@@ -17,6 +17,7 @@ use Maatwebsite\Excel\Concerns\ToModel;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
 
 
 use App\Models\ShiftSettings;
@@ -38,7 +39,7 @@ class ImportAttandance implements  ToModel, WithHeadingRow
         $this->resort= Auth::guard('resort-admin')->user();
     }
 
-    public function model(array $row)
+    public function model(array $row): Model|array|null
     {
 
         // Check if the date is a numeric Excel date or a string date

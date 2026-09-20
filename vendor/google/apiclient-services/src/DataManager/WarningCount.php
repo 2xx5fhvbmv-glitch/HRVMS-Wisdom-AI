@@ -19,6 +19,16 @@ namespace Google\Service\DataManager;
 
 class WarningCount extends \Google\Model
 {
+  public const REASON_PROCESSING_WARNING_REASON_UNSPECIFIED = 'PROCESSING_WARNING_REASON_UNSPECIFIED';
+  public const REASON_PROCESSING_WARNING_REASON_KEK_PERMISSION_DENIED = 'PROCESSING_WARNING_REASON_KEK_PERMISSION_DENIED';
+  public const REASON_PROCESSING_WARNING_REASON_DEK_DECRYPTION_ERROR = 'PROCESSING_WARNING_REASON_DEK_DECRYPTION_ERROR';
+  public const REASON_PROCESSING_WARNING_REASON_DECRYPTION_ERROR = 'PROCESSING_WARNING_REASON_DECRYPTION_ERROR';
+  public const REASON_PROCESSING_WARNING_REASON_WIP_AUTH_FAILED = 'PROCESSING_WARNING_REASON_WIP_AUTH_FAILED';
+  public const REASON_PROCESSING_WARNING_REASON_INVALID_WIP = 'PROCESSING_WARNING_REASON_INVALID_WIP';
+  public const REASON_PROCESSING_WARNING_REASON_INVALID_KEK = 'PROCESSING_WARNING_REASON_INVALID_KEK';
+  public const REASON_PROCESSING_WARNING_REASON_USER_IDENTIFIER_DECRYPTION_ERROR = 'PROCESSING_WARNING_REASON_USER_IDENTIFIER_DECRYPTION_ERROR';
+  public const REASON_PROCESSING_WARNING_REASON_INTERNAL_ERROR = 'PROCESSING_WARNING_REASON_INTERNAL_ERROR';
+  public const REASON_PROCESSING_WARNING_REASON_AWS_AUTH_FAILED = 'PROCESSING_WARNING_REASON_AWS_AUTH_FAILED';
   /**
    * @var string
    */
@@ -29,21 +39,21 @@ class WarningCount extends \Google\Model
   public $recordCount;
 
   /**
-   * @param string
+   * @param self::REASON_* $reason
    */
   public function setReason($reason)
   {
     $this->reason = $reason;
   }
   /**
-   * @return string
+   * @return self::REASON_*
    */
   public function getReason()
   {
     return $this->reason;
   }
   /**
-   * @param string
+   * @param string $recordCount
    */
   public function setRecordCount($recordCount)
   {

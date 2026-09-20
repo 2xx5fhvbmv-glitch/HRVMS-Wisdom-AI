@@ -23,9 +23,13 @@ class GoogleCloudDialogflowV2beta1ToolCallResultError extends \Google\Model
    * @var string
    */
   public $message;
+  /**
+   * @var bool
+   */
+  public $retryable;
 
   /**
-   * @param string
+   * @param string $message
    */
   public function setMessage($message)
   {
@@ -37,6 +41,20 @@ class GoogleCloudDialogflowV2beta1ToolCallResultError extends \Google\Model
   public function getMessage()
   {
     return $this->message;
+  }
+  /**
+   * @param bool $retryable
+   */
+  public function setRetryable($retryable)
+  {
+    $this->retryable = $retryable;
+  }
+  /**
+   * @return bool
+   */
+  public function getRetryable()
+  {
+    return $this->retryable;
   }
 }
 

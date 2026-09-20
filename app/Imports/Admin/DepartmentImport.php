@@ -14,7 +14,7 @@ class DepartmentImport implements ToCollection, WithHeadingRow
     public int $skipped = 0;
     public array $errors = [];
 
-    public function collection(Collection $rows)
+    public function collection(Collection $rows): void
     {
         // Cache divisions by lowercased name to skip per-row queries.
         $divIndex = Division::pluck('id', 'name')->mapWithKeys(fn ($id, $name) => [strtolower(trim($name)) => $id]);

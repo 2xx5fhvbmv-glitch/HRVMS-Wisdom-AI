@@ -14,6 +14,7 @@ use App\Models\Employee;
 use App\Models\LeaveCategory;
 use App\Models\ResortBenifitGridChild;
 use Carbon\Carbon;
+use Illuminate\Support\Enumerable;
 
 class EmployeeAttendanceExport implements FromCollection, WithHeadings, WithEvents
 {
@@ -57,7 +58,7 @@ class EmployeeAttendanceExport implements FromCollection, WithHeadings, WithEven
         }
     }
 
-    public function collection()
+    public function collection(): Enumerable
     {
         $startCarbon = $this->parseDate($this->startDate);
         $endCarbon = $this->parseDate($this->endDate);

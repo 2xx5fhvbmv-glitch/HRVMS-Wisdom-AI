@@ -24,7 +24,7 @@ class UserData extends \Google\Collection
   protected $userIdentifiersDataType = 'array';
 
   /**
-   * @param UserIdentifier[]
+   * @param UserIdentifier[] $userIdentifiers
    */
   public function setUserIdentifiers($userIdentifiers)
   {

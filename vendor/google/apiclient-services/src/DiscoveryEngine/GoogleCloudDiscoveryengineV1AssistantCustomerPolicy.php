@@ -22,11 +22,15 @@ class GoogleCloudDiscoveryengineV1AssistantCustomerPolicy extends \Google\Collec
   protected $collection_key = 'bannedPhrases';
   protected $bannedPhrasesType = GoogleCloudDiscoveryengineV1AssistantCustomerPolicyBannedPhrase::class;
   protected $bannedPhrasesDataType = 'array';
+  protected $dataProtectionPolicyType = GoogleCloudDiscoveryengineV1DataProtectionPolicy::class;
+  protected $dataProtectionPolicyDataType = '';
   protected $modelArmorConfigType = GoogleCloudDiscoveryengineV1AssistantCustomerPolicyModelArmorConfig::class;
   protected $modelArmorConfigDataType = '';
 
   /**
-   * @param GoogleCloudDiscoveryengineV1AssistantCustomerPolicyBannedPhrase[]
+   * Optional. List of banned phrases.
+   *
+   * @param GoogleCloudDiscoveryengineV1AssistantCustomerPolicyBannedPhrase[] $bannedPhrases
    */
   public function setBannedPhrases($bannedPhrases)
   {
@@ -40,7 +44,26 @@ class GoogleCloudDiscoveryengineV1AssistantCustomerPolicy extends \Google\Collec
     return $this->bannedPhrases;
   }
   /**
-   * @param GoogleCloudDiscoveryengineV1AssistantCustomerPolicyModelArmorConfig
+   * Optional. Data protection policy to be used for sanitizing file uploads.
+   *
+   * @param GoogleCloudDiscoveryengineV1DataProtectionPolicy $dataProtectionPolicy
+   */
+  public function setDataProtectionPolicy(GoogleCloudDiscoveryengineV1DataProtectionPolicy $dataProtectionPolicy)
+  {
+    $this->dataProtectionPolicy = $dataProtectionPolicy;
+  }
+  /**
+   * @return GoogleCloudDiscoveryengineV1DataProtectionPolicy
+   */
+  public function getDataProtectionPolicy()
+  {
+    return $this->dataProtectionPolicy;
+  }
+  /**
+   * Optional. Model Armor configuration to be used for sanitizing user prompts
+   * and assistant responses.
+   *
+   * @param GoogleCloudDiscoveryengineV1AssistantCustomerPolicyModelArmorConfig $modelArmorConfig
    */
   public function setModelArmorConfig(GoogleCloudDiscoveryengineV1AssistantCustomerPolicyModelArmorConfig $modelArmorConfig)
   {

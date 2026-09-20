@@ -30,7 +30,7 @@ class ComplianceDetails extends \Google\Collection
   protected $frameworksDataType = 'array';
 
   /**
-   * @param CloudControl
+   * @param CloudControl $cloudControl
    */
   public function setCloudControl(CloudControl $cloudControl)
   {
@@ -44,7 +44,7 @@ class ComplianceDetails extends \Google\Collection
     return $this->cloudControl;
   }
   /**
-   * @param string[]
+   * @param string[] $cloudControlDeploymentNames
    */
   public function setCloudControlDeploymentNames($cloudControlDeploymentNames)
   {
@@ -58,7 +58,7 @@ class ComplianceDetails extends \Google\Collection
     return $this->cloudControlDeploymentNames;
   }
   /**
-   * @param Framework[]
+   * @param Framework[] $frameworks
    */
   public function setFrameworks($frameworks)
   {

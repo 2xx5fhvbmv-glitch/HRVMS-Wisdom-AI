@@ -65,6 +65,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
    */
   public $payload;
   /**
+   * @deprecated
    * @var bool
    */
   public $populateDataStoreConnectionSignals;
@@ -86,7 +87,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
   public $webhookHeaders;
 
   /**
-   * @param bool
+   * @param bool $analyzeQueryTextSentiment
    */
   public function setAnalyzeQueryTextSentiment($analyzeQueryTextSentiment)
   {
@@ -100,7 +101,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->analyzeQueryTextSentiment;
   }
   /**
-   * @param string
+   * @param string $channel
    */
   public function setChannel($channel)
   {
@@ -114,7 +115,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->channel;
   }
   /**
-   * @param string
+   * @param string $currentPage
    */
   public function setCurrentPage($currentPage)
   {
@@ -128,7 +129,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->currentPage;
   }
   /**
-   * @param string
+   * @param string $currentPlaybook
    */
   public function setCurrentPlaybook($currentPlaybook)
   {
@@ -142,7 +143,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->currentPlaybook;
   }
   /**
-   * @param bool
+   * @param bool $disableWebhook
    */
   public function setDisableWebhook($disableWebhook)
   {
@@ -156,7 +157,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->disableWebhook;
   }
   /**
-   * @param array[]
+   * @param array[] $endUserMetadata
    */
   public function setEndUserMetadata($endUserMetadata)
   {
@@ -170,7 +171,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->endUserMetadata;
   }
   /**
-   * @param string[]
+   * @param string[] $flowVersions
    */
   public function setFlowVersions($flowVersions)
   {
@@ -184,7 +185,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->flowVersions;
   }
   /**
-   * @param GoogleTypeLatLng
+   * @param GoogleTypeLatLng $geoLocation
    */
   public function setGeoLocation(GoogleTypeLatLng $geoLocation)
   {
@@ -198,7 +199,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->geoLocation;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3LlmModelSettings
+   * @param GoogleCloudDialogflowCxV3LlmModelSettings $llmModelSettings
    */
   public function setLlmModelSettings(GoogleCloudDialogflowCxV3LlmModelSettings $llmModelSettings)
   {
@@ -212,7 +213,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->llmModelSettings;
   }
   /**
-   * @param string
+   * @param string $parameterScope
    */
   public function setParameterScope($parameterScope)
   {
@@ -226,7 +227,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->parameterScope;
   }
   /**
-   * @param array[]
+   * @param array[] $parameters
    */
   public function setParameters($parameters)
   {
@@ -240,7 +241,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->parameters;
   }
   /**
-   * @param array[]
+   * @param array[] $payload
    */
   public function setPayload($payload)
   {
@@ -254,13 +255,15 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->payload;
   }
   /**
-   * @param bool
+   * @deprecated
+   * @param bool $populateDataStoreConnectionSignals
    */
   public function setPopulateDataStoreConnectionSignals($populateDataStoreConnectionSignals)
   {
     $this->populateDataStoreConnectionSignals = $populateDataStoreConnectionSignals;
   }
   /**
+   * @deprecated
    * @return bool
    */
   public function getPopulateDataStoreConnectionSignals()
@@ -268,7 +271,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->populateDataStoreConnectionSignals;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3SearchConfig
+   * @param GoogleCloudDialogflowCxV3SearchConfig $searchConfig
    */
   public function setSearchConfig(GoogleCloudDialogflowCxV3SearchConfig $searchConfig)
   {
@@ -282,7 +285,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->searchConfig;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3SessionEntityType[]
+   * @param GoogleCloudDialogflowCxV3SessionEntityType[] $sessionEntityTypes
    */
   public function setSessionEntityTypes($sessionEntityTypes)
   {
@@ -296,7 +299,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->sessionEntityTypes;
   }
   /**
-   * @param string
+   * @param string $sessionTtl
    */
   public function setSessionTtl($sessionTtl)
   {
@@ -310,7 +313,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->sessionTtl;
   }
   /**
-   * @param string
+   * @param string $timeZone
    */
   public function setTimeZone($timeZone)
   {
@@ -324,7 +327,7 @@ class GoogleCloudDialogflowCxV3QueryParameters extends \Google\Collection
     return $this->timeZone;
   }
   /**
-   * @param string[]
+   * @param string[] $webhookHeaders
    */
   public function setWebhookHeaders($webhookHeaders)
   {

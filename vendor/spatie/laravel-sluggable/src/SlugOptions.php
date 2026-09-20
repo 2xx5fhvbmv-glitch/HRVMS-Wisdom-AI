@@ -7,11 +7,19 @@ class SlugOptions
     /** @var array|callable */
     public $generateSlugFrom;
 
+    /** @var callable */
+    public $extraScopeCallback;
+
+    /** @var (callable(string, int): string)|null */
+    public $suffixGenerator;
+
     public string $slugField;
 
     public bool $generateUniqueSlugs = true;
 
     public int $maximumLength = 250;
+
+    public bool $skipGenerate = false;
 
     public bool $generateSlugsOnCreate = true;
 
@@ -25,12 +33,16 @@ class SlugOptions
 
     public array $translatableLocales = [];
 
-    public static function create(): self
+    public int $startSlugSuffixFrom = 1;
+
+    public bool $useSuffixOnFirstOccurrence = false;
+
+    public static function create(): static
     {
         return new static();
     }
 
-    public static function createWithLocales(array $locales): self
+    public static function createWithLocales(array $locales): static
     {
         $slugOptions = static::create();
 
@@ -39,12 +51,7 @@ class SlugOptions
         return $slugOptions;
     }
 
-    /**
-     * @param string|array|callable $fieldName
-     *
-     * @return \Spatie\Sluggable\SlugOptions
-     */
-    public function generateSlugsFrom($fieldName): self
+    public function generateSlugsFrom(string | array | callable $fieldName): self
     {
         if (is_string($fieldName)) {
             $fieldName = [$fieldName];
@@ -72,6 +79,13 @@ class SlugOptions
     public function slugsShouldBeNoLongerThan(int $maximumLength): self
     {
         $this->maximumLength = $maximumLength;
+
+        return $this;
+    }
+
+    public function skipGenerateWhen(callable $callable): self
+    {
+        $this->skipGenerate = $callable() === true;
 
         return $this;
     }
@@ -107,6 +121,38 @@ class SlugOptions
     public function usingLanguage(string $language): self
     {
         $this->slugLanguage = $language;
+
+        return $this;
+    }
+
+    public function extraScope(callable $callbackMethod): self
+    {
+        $this->extraScopeCallback = $callbackMethod;
+
+        return $this;
+    }
+
+    public function startSlugSuffixFrom(int $startSlugSuffixFrom): self
+    {
+        $this->startSlugSuffixFrom = max(1, $startSlugSuffixFrom);
+
+        return $this;
+    }
+
+    public function useSuffixOnFirstOccurrence(): self
+    {
+        $this->useSuffixOnFirstOccurrence = true;
+
+        return $this;
+    }
+
+
+    /**
+     * @param callable(string $slug, int $iteration): string $generator
+     */
+    public function usingSuffixGenerator(callable $generator): self
+    {
+        $this->suffixGenerator = $generator;
 
         return $this;
     }

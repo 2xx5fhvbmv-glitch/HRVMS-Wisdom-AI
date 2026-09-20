@@ -21,16 +21,37 @@ class InstancesRestoreBackupRequest extends \Google\Collection
 {
   protected $collection_key = 'restoreInstanceClearOverridesFieldNames';
   /**
+   * The name of the backup that's used to restore a Cloud SQL instance: Format:
+   * projects/{project-id}/backups/{backup-uid}. Only one of
+   * restore_backup_context, backup, backupdr_backup can be passed to the input.
+   *
    * @var string
    */
   public $backup;
   /**
+   * The name of the backup that's used to restore a Cloud SQL instance: Format:
+   * "projects/{project-id}/locations/{location}/backupVaults/{backupvault}/data
+   * Sources/{datasource}/backups/{backup-uid}". Only one of
+   * restore_backup_context, backup, backupdr_backup can be passed to the input.
+   *
    * @var string
    */
   public $backupdrBackup;
+  /**
+   * Optional. If true, the restore operation proceeds even if the target
+   * instance's maintenance version is older than the source instance's
+   * maintenance version.
+   *
+   * @var bool
+   */
+  public $ignoreMaintenanceVersion;
   protected $restoreBackupContextType = RestoreBackupContext::class;
   protected $restoreBackupContextDataType = '';
   /**
+   * Optional. This field has the same purpose as restore_instance_settings,
+   * changes any instance settings stored in the backup you are restoring from.
+   * With the difference that these fields are cleared in the settings.
+   *
    * @var string[]
    */
   public $restoreInstanceClearOverridesFieldNames;
@@ -38,7 +59,11 @@ class InstancesRestoreBackupRequest extends \Google\Collection
   protected $restoreInstanceSettingsDataType = '';
 
   /**
-   * @param string
+   * The name of the backup that's used to restore a Cloud SQL instance: Format:
+   * projects/{project-id}/backups/{backup-uid}. Only one of
+   * restore_backup_context, backup, backupdr_backup can be passed to the input.
+   *
+   * @param string $backup
    */
   public function setBackup($backup)
   {
@@ -52,7 +77,12 @@ class InstancesRestoreBackupRequest extends \Google\Collection
     return $this->backup;
   }
   /**
-   * @param string
+   * The name of the backup that's used to restore a Cloud SQL instance: Format:
+   * "projects/{project-id}/locations/{location}/backupVaults/{backupvault}/data
+   * Sources/{datasource}/backups/{backup-uid}". Only one of
+   * restore_backup_context, backup, backupdr_backup can be passed to the input.
+   *
+   * @param string $backupdrBackup
    */
   public function setBackupdrBackup($backupdrBackup)
   {
@@ -66,7 +96,27 @@ class InstancesRestoreBackupRequest extends \Google\Collection
     return $this->backupdrBackup;
   }
   /**
-   * @param RestoreBackupContext
+   * Optional. If true, the restore operation proceeds even if the target
+   * instance's maintenance version is older than the source instance's
+   * maintenance version.
+   *
+   * @param bool $ignoreMaintenanceVersion
+   */
+  public function setIgnoreMaintenanceVersion($ignoreMaintenanceVersion)
+  {
+    $this->ignoreMaintenanceVersion = $ignoreMaintenanceVersion;
+  }
+  /**
+   * @return bool
+   */
+  public function getIgnoreMaintenanceVersion()
+  {
+    return $this->ignoreMaintenanceVersion;
+  }
+  /**
+   * Parameters required to perform the restore backup operation.
+   *
+   * @param RestoreBackupContext $restoreBackupContext
    */
   public function setRestoreBackupContext(RestoreBackupContext $restoreBackupContext)
   {
@@ -80,7 +130,11 @@ class InstancesRestoreBackupRequest extends \Google\Collection
     return $this->restoreBackupContext;
   }
   /**
-   * @param string[]
+   * Optional. This field has the same purpose as restore_instance_settings,
+   * changes any instance settings stored in the backup you are restoring from.
+   * With the difference that these fields are cleared in the settings.
+   *
+   * @param string[] $restoreInstanceClearOverridesFieldNames
    */
   public function setRestoreInstanceClearOverridesFieldNames($restoreInstanceClearOverridesFieldNames)
   {
@@ -94,7 +148,13 @@ class InstancesRestoreBackupRequest extends \Google\Collection
     return $this->restoreInstanceClearOverridesFieldNames;
   }
   /**
-   * @param DatabaseInstance
+   * Optional. By using this parameter, Cloud SQL overrides any instance
+   * settings stored in the backup you are restoring from. You can't change the
+   * instance's major database version and you can only increase the disk size.
+   * You can use this field to restore new instances only. This field is not
+   * applicable for restore to existing instances.
+   *
+   * @param DatabaseInstance $restoreInstanceSettings
    */
   public function setRestoreInstanceSettings(DatabaseInstance $restoreInstanceSettings)
   {

@@ -37,7 +37,7 @@ class GoogleCloudDialogflowCxV3DataStoreConnectionSignalsSearchSnippet extends \
   public $text;
 
   /**
-   * @param string
+   * @param string $documentTitle
    */
   public function setDocumentTitle($documentTitle)
   {
@@ -51,7 +51,7 @@ class GoogleCloudDialogflowCxV3DataStoreConnectionSignalsSearchSnippet extends \
     return $this->documentTitle;
   }
   /**
-   * @param string
+   * @param string $documentUri
    */
   public function setDocumentUri($documentUri)
   {
@@ -65,7 +65,7 @@ class GoogleCloudDialogflowCxV3DataStoreConnectionSignalsSearchSnippet extends \
     return $this->documentUri;
   }
   /**
-   * @param array[]
+   * @param array[] $metadata
    */
   public function setMetadata($metadata)
   {
@@ -79,7 +79,7 @@ class GoogleCloudDialogflowCxV3DataStoreConnectionSignalsSearchSnippet extends \
     return $this->metadata;
   }
   /**
-   * @param string
+   * @param string $text
    */
   public function setText($text)
   {

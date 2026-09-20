@@ -23,7 +23,7 @@ use Google\Client;
  * Service definition for SQLAdmin (v1).
  *
  * <p>
- * API for Cloud SQL database instance management</p>
+ * Cloud SQL Admin API</p>
  *
  * <p>
  * For more information about this service, see the API
@@ -43,6 +43,7 @@ class SQLAdmin extends \Google\Service
 
   public $Backups;
   public $backupRuns;
+  public $blueGreenDeployments;
   public $connect;
   public $databases;
   public $flags;
@@ -235,6 +236,94 @@ class SQLAdmin extends \Google\Service
           ]
         ]
     );
+    $this->blueGreenDeployments = new SQLAdmin\Resource\BlueGreenDeployments(
+        $this,
+        $this->serviceName,
+        'blueGreenDeployments',
+        [
+          'methods' => [
+            'create' => [
+              'path' => 'v1/{+parent}/blueGreenDeployments',
+              'httpMethod' => 'POST',
+              'parameters' => [
+                'parent' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+                'blueGreenDeploymentId' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+              ],
+            ],'delete' => [
+              'path' => 'v1/{+name}',
+              'httpMethod' => 'DELETE',
+              'parameters' => [
+                'name' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+                'deleteOldSource' => [
+                  'location' => 'query',
+                  'type' => 'boolean',
+                ],
+              ],
+            ],'get' => [
+              'path' => 'v1/{+name}',
+              'httpMethod' => 'GET',
+              'parameters' => [
+                'name' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+                'view' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+              ],
+            ],'list' => [
+              'path' => 'v1/{+parent}/blueGreenDeployments',
+              'httpMethod' => 'GET',
+              'parameters' => [
+                'parent' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+                'filter' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+                'orderBy' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+                'pageSize' => [
+                  'location' => 'query',
+                  'type' => 'integer',
+                ],
+                'pageToken' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+              ],
+            ],'switchover' => [
+              'path' => 'v1/{+name}:switchover',
+              'httpMethod' => 'POST',
+              'parameters' => [
+                'name' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+              ],
+            ],
+          ]
+        ]
+    );
     $this->connect = new SQLAdmin\Resource\Connect(
         $this,
         $this->serviceName,
@@ -275,6 +364,21 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                 ],
               ],
+            ],'resolve' => [
+              'path' => 'v1/locations/{location}/dns/{dnsName}:resolveConnectSettings',
+              'httpMethod' => 'GET',
+              'parameters' => [
+                'location' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+                'dnsName' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+              ],
             ],
           ]
         ]
@@ -304,6 +408,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'get' => [
               'path' => 'v1/projects/{project}/instances/{instance}/databases/{database}',
@@ -324,6 +432,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'insert' => [
               'path' => 'v1/projects/{project}/instances/{instance}/databases',
@@ -339,6 +451,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'list' => [
               'path' => 'v1/projects/{project}/instances/{instance}/databases',
@@ -353,6 +469,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'patch' => [
@@ -374,6 +494,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'update' => [
               'path' => 'v1/projects/{project}/instances/{instance}/databases/{database}',
@@ -393,6 +517,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],
@@ -428,7 +556,26 @@ class SQLAdmin extends \Google\Service
         'instances',
         [
           'methods' => [
-            'ListServerCertificates' => [
+            'ListEntraIdCertificates' => [
+              'path' => 'v1/projects/{project}/instances/{instance}/listEntraIdCertificates',
+              'httpMethod' => 'GET',
+              'parameters' => [
+                'project' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+                'instance' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+              ],
+            ],'ListServerCertificates' => [
               'path' => 'v1/projects/{project}/instances/{instance}/listServerCertificates',
               'httpMethod' => 'GET',
               'parameters' => [
@@ -441,6 +588,29 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+              ],
+            ],'RotateEntraIdCertificate' => [
+              'path' => 'v1/projects/{project}/instances/{instance}/rotateEntraIdCertificate',
+              'httpMethod' => 'POST',
+              'parameters' => [
+                'project' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+                'instance' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'RotateServerCertificate' => [
@@ -457,6 +627,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'acquireSsrsLease' => [
               'path' => 'v1/projects/{project}/instances/{instance}/acquireSsrsLease',
@@ -471,6 +645,29 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+              ],
+            ],'addEntraIdCertificate' => [
+              'path' => 'v1/projects/{project}/instances/{instance}/addEntraIdCertificate',
+              'httpMethod' => 'POST',
+              'parameters' => [
+                'project' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+                'instance' => [
+                  'location' => 'path',
+                  'type' => 'string',
+                  'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'addServerCa' => [
@@ -487,6 +684,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'addServerCertificate' => [
               'path' => 'v1/projects/{project}/instances/{instance}/addServerCertificate',
@@ -502,6 +703,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'clone' => [
               'path' => 'v1/projects/{project}/instances/{instance}/clone',
@@ -516,6 +721,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'delete' => [
@@ -548,6 +757,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'query',
                   'type' => 'string',
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'demote' => [
               'path' => 'v1/projects/{project}/instances/{instance}/demote',
@@ -562,6 +775,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'demoteMaster' => [
@@ -578,6 +795,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'executeSql' => [
               'path' => 'v1/projects/{project}/instances/{instance}/executeSql',
@@ -592,6 +813,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'export' => [
@@ -608,6 +833,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'failover' => [
               'path' => 'v1/projects/{project}/instances/{instance}/failover',
@@ -622,6 +851,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'get' => [
@@ -638,6 +871,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'import' => [
               'path' => 'v1/projects/{project}/instances/{instance}/import',
@@ -653,6 +890,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'insert' => [
               'path' => 'v1/projects/{project}/instances',
@@ -662,6 +903,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'list' => [
@@ -674,6 +919,10 @@ class SQLAdmin extends \Google\Service
                   'required' => true,
                 ],
                 'filter' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+                'location' => [
                   'location' => 'query',
                   'type' => 'string',
                 ],
@@ -700,6 +949,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'patch' => [
               'path' => 'v1/projects/{project}/instances/{instance}',
@@ -714,6 +967,18 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+                'reconcilePscNetworking' => [
+                  'location' => 'query',
+                  'type' => 'boolean',
+                ],
+                'reconcilePscNetworkingForce' => [
+                  'location' => 'query',
+                  'type' => 'boolean',
                 ],
               ],
             ],'pointInTimeRestore' => [
@@ -740,6 +1005,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'promoteReplica' => [
               'path' => 'v1/projects/{project}/instances/{instance}/promoteReplica',
@@ -759,6 +1028,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'query',
                   'type' => 'boolean',
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'reencrypt' => [
               'path' => 'v1/projects/{project}/instances/{instance}/reencrypt',
@@ -773,6 +1046,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'releaseSsrsLease' => [
@@ -789,6 +1066,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'resetSslConfig' => [
               'path' => 'v1/projects/{project}/instances/{instance}/resetSslConfig',
@@ -803,6 +1084,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
                 'mode' => [
                   'location' => 'query',
@@ -823,6 +1108,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'restoreBackup' => [
               'path' => 'v1/projects/{project}/instances/{instance}/restoreBackup',
@@ -837,6 +1126,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'rotateServerCa' => [
@@ -853,6 +1146,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'startReplica' => [
               'path' => 'v1/projects/{project}/instances/{instance}/startReplica',
@@ -868,6 +1165,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'stopReplica' => [
               'path' => 'v1/projects/{project}/instances/{instance}/stopReplica',
@@ -882,6 +1183,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'switchover' => [
@@ -902,6 +1207,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'query',
                   'type' => 'string',
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'truncateLog' => [
               'path' => 'v1/projects/{project}/instances/{instance}/truncateLog',
@@ -917,6 +1226,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'update' => [
               'path' => 'v1/projects/{project}/instances/{instance}',
@@ -931,6 +1244,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],
@@ -957,6 +1274,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'get' => [
               'path' => 'v1/projects/{project}/operations/{operation}',
@@ -972,6 +1293,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'list' => [
               'path' => 'v1/projects/{project}/operations',
@@ -983,6 +1308,10 @@ class SQLAdmin extends \Google\Service
                   'required' => true,
                 ],
                 'instance' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+                'location' => [
                   'location' => 'query',
                   'type' => 'string',
                 ],
@@ -1019,6 +1348,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'getLatestRecoveryTime' => [
               'path' => 'v1/projects/{project}/instances/{instance}/getLatestRecoveryTime',
@@ -1033,6 +1366,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
                 'sourceInstanceDeletionTime' => [
                   'location' => 'query',
@@ -1053,6 +1390,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'rescheduleMaintenance' => [
               'path' => 'v1/projects/{project}/instances/{instance}/rescheduleMaintenance',
@@ -1067,6 +1408,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'resetReplicaSize' => [
@@ -1137,6 +1482,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'delete' => [
@@ -1257,6 +1606,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'query',
                   'type' => 'string',
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
                 'name' => [
                   'location' => 'query',
                   'type' => 'string',
@@ -1285,6 +1638,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'query',
                   'type' => 'string',
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'insert' => [
               'path' => 'v1/projects/{project}/instances/{instance}/users',
@@ -1299,6 +1656,10 @@ class SQLAdmin extends \Google\Service
                   'location' => 'path',
                   'type' => 'string',
                   'required' => true,
+                ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
                 ],
               ],
             ],'list' => [
@@ -1315,6 +1676,10 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'location' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
               ],
             ],'update' => [
               'path' => 'v1/projects/{project}/instances/{instance}/users',
@@ -1330,13 +1695,35 @@ class SQLAdmin extends \Google\Service
                   'type' => 'string',
                   'required' => true,
                 ],
+                'databaseRoles' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                  'repeated' => true,
+                ],
                 'host' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                ],
+                'location' => [
                   'location' => 'query',
                   'type' => 'string',
                 ],
                 'name' => [
                   'location' => 'query',
                   'type' => 'string',
+                ],
+                'revokeExistingRoles' => [
+                  'location' => 'query',
+                  'type' => 'boolean',
+                ],
+                'revokeExistingServerRoles' => [
+                  'location' => 'query',
+                  'type' => 'boolean',
+                ],
+                'serverRoles' => [
+                  'location' => 'query',
+                  'type' => 'string',
+                  'repeated' => true,
                 ],
               ],
             ],

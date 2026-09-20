@@ -20,26 +20,80 @@ namespace Google\Service\CloudAlloyDBAdmin;
 class StorageDatabasecenterPartnerapiV1mainConfigBasedSignalData extends \Google\Model
 {
   /**
+   * Disable validation warnings
+   */
+  public const SIGNAL_TYPE_SIGNAL_TYPE_UNSPECIFIED = 'SIGNAL_TYPE_UNSPECIFIED';
+  /**
+   * Disable validation warnings
+   */
+  public const SIGNAL_TYPE_SIGNAL_TYPE_OUTDATED_MINOR_VERSION = 'SIGNAL_TYPE_OUTDATED_MINOR_VERSION';
+  /**
+   * Disable validation warnings
+   */
+  public const SIGNAL_TYPE_SIGNAL_TYPE_DATABASE_AUDITING_DISABLED = 'SIGNAL_TYPE_DATABASE_AUDITING_DISABLED';
+  /**
+   * Disable validation warnings
+   */
+  public const SIGNAL_TYPE_SIGNAL_TYPE_NO_ROOT_PASSWORD = 'SIGNAL_TYPE_NO_ROOT_PASSWORD';
+  /**
+   * Disable validation warnings
+   */
+  public const SIGNAL_TYPE_SIGNAL_TYPE_EXPOSED_TO_PUBLIC_ACCESS = 'SIGNAL_TYPE_EXPOSED_TO_PUBLIC_ACCESS';
+  /**
+   * Disable validation warnings
+   */
+  public const SIGNAL_TYPE_SIGNAL_TYPE_UNENCRYPTED_CONNECTIONS = 'SIGNAL_TYPE_UNENCRYPTED_CONNECTIONS';
+  /**
+   * Disable validation warnings
+   */
+  public const SIGNAL_TYPE_SIGNAL_TYPE_EXTENDED_SUPPORT = 'SIGNAL_TYPE_EXTENDED_SUPPORT';
+  /**
+   * Disable validation warnings
+   */
+  public const SIGNAL_TYPE_SIGNAL_TYPE_NO_AUTOMATED_BACKUP_POLICY = 'SIGNAL_TYPE_NO_AUTOMATED_BACKUP_POLICY';
+  /**
+   * Disable validation warnings
+   */
+  public const SIGNAL_TYPE_SIGNAL_TYPE_VERSION_NEARING_END_OF_LIFE = 'SIGNAL_TYPE_VERSION_NEARING_END_OF_LIFE';
+  /**
+   * Disable validation warnings
+   */
+  public const SIGNAL_TYPE_SIGNAL_TYPE_LAST_BACKUP_OLD = 'SIGNAL_TYPE_LAST_BACKUP_OLD';
+  /**
+   * Disable validation warnings
+   */
+  public const SIGNAL_TYPE_SIGNAL_TYPE_NOT_PROTECTED_BY_AUTOMATIC_FAILOVER = 'SIGNAL_TYPE_NOT_PROTECTED_BY_AUTOMATIC_FAILOVER';
+  /**
+   * Required. Disable validation warnings
+   *
    * @var string
    */
   public $fullResourceName;
   /**
+   * Required. Disable validation warnings
+   *
    * @var string
    */
   public $lastRefreshTime;
   protected $resourceIdType = StorageDatabasecenterPartnerapiV1mainDatabaseResourceId::class;
   protected $resourceIdDataType = '';
   /**
+   * Disable validation warnings
+   *
    * @var bool
    */
   public $signalBoolValue;
   /**
+   * Required. Disable validation warnings
+   *
    * @var string
    */
   public $signalType;
 
   /**
-   * @param string
+   * Required. Disable validation warnings
+   *
+   * @param string $fullResourceName
    */
   public function setFullResourceName($fullResourceName)
   {
@@ -53,7 +107,9 @@ class StorageDatabasecenterPartnerapiV1mainConfigBasedSignalData extends \Google
     return $this->fullResourceName;
   }
   /**
-   * @param string
+   * Required. Disable validation warnings
+   *
+   * @param string $lastRefreshTime
    */
   public function setLastRefreshTime($lastRefreshTime)
   {
@@ -67,7 +123,9 @@ class StorageDatabasecenterPartnerapiV1mainConfigBasedSignalData extends \Google
     return $this->lastRefreshTime;
   }
   /**
-   * @param StorageDatabasecenterPartnerapiV1mainDatabaseResourceId
+   * Disable validation warnings
+   *
+   * @param StorageDatabasecenterPartnerapiV1mainDatabaseResourceId $resourceId
    */
   public function setResourceId(StorageDatabasecenterPartnerapiV1mainDatabaseResourceId $resourceId)
   {
@@ -81,7 +139,9 @@ class StorageDatabasecenterPartnerapiV1mainConfigBasedSignalData extends \Google
     return $this->resourceId;
   }
   /**
-   * @param bool
+   * Disable validation warnings
+   *
+   * @param bool $signalBoolValue
    */
   public function setSignalBoolValue($signalBoolValue)
   {
@@ -95,14 +155,24 @@ class StorageDatabasecenterPartnerapiV1mainConfigBasedSignalData extends \Google
     return $this->signalBoolValue;
   }
   /**
-   * @param string
+   * Required. Disable validation warnings
+   *
+   * Accepted values: SIGNAL_TYPE_UNSPECIFIED,
+   * SIGNAL_TYPE_OUTDATED_MINOR_VERSION, SIGNAL_TYPE_DATABASE_AUDITING_DISABLED,
+   * SIGNAL_TYPE_NO_ROOT_PASSWORD, SIGNAL_TYPE_EXPOSED_TO_PUBLIC_ACCESS,
+   * SIGNAL_TYPE_UNENCRYPTED_CONNECTIONS, SIGNAL_TYPE_EXTENDED_SUPPORT,
+   * SIGNAL_TYPE_NO_AUTOMATED_BACKUP_POLICY,
+   * SIGNAL_TYPE_VERSION_NEARING_END_OF_LIFE, SIGNAL_TYPE_LAST_BACKUP_OLD,
+   * SIGNAL_TYPE_NOT_PROTECTED_BY_AUTOMATIC_FAILOVER
+   *
+   * @param self::SIGNAL_TYPE_* $signalType
    */
   public function setSignalType($signalType)
   {
     $this->signalType = $signalType;
   }
   /**
-   * @return string
+   * @return self::SIGNAL_TYPE_*
    */
   public function getSignalType()
   {

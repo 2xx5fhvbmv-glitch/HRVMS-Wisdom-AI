@@ -29,7 +29,7 @@ class RemoveUserDataStatus extends \Google\Model
   public $userIdentifierCount;
 
   /**
-   * @param string
+   * @param string $recordCount
    */
   public function setRecordCount($recordCount)
   {
@@ -43,7 +43,7 @@ class RemoveUserDataStatus extends \Google\Model
     return $this->recordCount;
   }
   /**
-   * @param string
+   * @param string $userIdentifierCount
    */
   public function setUserIdentifierCount($userIdentifierCount)
   {

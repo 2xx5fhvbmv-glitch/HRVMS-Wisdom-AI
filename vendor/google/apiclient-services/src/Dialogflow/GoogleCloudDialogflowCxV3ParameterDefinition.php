@@ -19,6 +19,13 @@ namespace Google\Service\Dialogflow;
 
 class GoogleCloudDialogflowCxV3ParameterDefinition extends \Google\Model
 {
+  public const TYPE_PARAMETER_TYPE_UNSPECIFIED = 'PARAMETER_TYPE_UNSPECIFIED';
+  public const TYPE_STRING = 'STRING';
+  public const TYPE_NUMBER = 'NUMBER';
+  public const TYPE_BOOLEAN = 'BOOLEAN';
+  public const TYPE_NULL = 'NULL';
+  public const TYPE_OBJECT = 'OBJECT';
+  public const TYPE_LIST = 'LIST';
   /**
    * @var string
    */
@@ -28,6 +35,7 @@ class GoogleCloudDialogflowCxV3ParameterDefinition extends \Google\Model
    */
   public $name;
   /**
+   * @deprecated
    * @var string
    */
   public $type;
@@ -35,7 +43,7 @@ class GoogleCloudDialogflowCxV3ParameterDefinition extends \Google\Model
   protected $typeSchemaDataType = '';
 
   /**
-   * @param string
+   * @param string $description
    */
   public function setDescription($description)
   {
@@ -49,7 +57,7 @@ class GoogleCloudDialogflowCxV3ParameterDefinition extends \Google\Model
     return $this->description;
   }
   /**
-   * @param string
+   * @param string $name
    */
   public function setName($name)
   {
@@ -63,21 +71,23 @@ class GoogleCloudDialogflowCxV3ParameterDefinition extends \Google\Model
     return $this->name;
   }
   /**
-   * @param string
+   * @deprecated
+   * @param self::TYPE_* $type
    */
   public function setType($type)
   {
     $this->type = $type;
   }
   /**
-   * @return string
+   * @deprecated
+   * @return self::TYPE_*
    */
   public function getType()
   {
     return $this->type;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3TypeSchema
+   * @param GoogleCloudDialogflowCxV3TypeSchema $typeSchema
    */
   public function setTypeSchema(GoogleCloudDialogflowCxV3TypeSchema $typeSchema)
   {

@@ -26,7 +26,7 @@ class PairData extends \Google\Collection
   public $pairIds;
 
   /**
-   * @param string[]
+   * @param string[] $pairIds
    */
   public function setPairIds($pairIds)
   {

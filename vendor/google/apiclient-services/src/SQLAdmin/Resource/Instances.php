@@ -26,12 +26,14 @@ use Google\Service\SQLAdmin\InstancesDemoteRequest;
 use Google\Service\SQLAdmin\InstancesExportRequest;
 use Google\Service\SQLAdmin\InstancesFailoverRequest;
 use Google\Service\SQLAdmin\InstancesImportRequest;
+use Google\Service\SQLAdmin\InstancesListEntraIdCertificatesResponse;
 use Google\Service\SQLAdmin\InstancesListResponse;
 use Google\Service\SQLAdmin\InstancesListServerCasResponse;
 use Google\Service\SQLAdmin\InstancesListServerCertificatesResponse;
 use Google\Service\SQLAdmin\InstancesPreCheckMajorVersionUpgradeRequest;
 use Google\Service\SQLAdmin\InstancesReencryptRequest;
 use Google\Service\SQLAdmin\InstancesRestoreBackupRequest;
+use Google\Service\SQLAdmin\InstancesRotateEntraIdCertificateRequest;
 use Google\Service\SQLAdmin\InstancesRotateServerCaRequest;
 use Google\Service\SQLAdmin\InstancesRotateServerCertificateRequest;
 use Google\Service\SQLAdmin\InstancesTruncateLogRequest;
@@ -52,6 +54,29 @@ use Google\Service\SQLAdmin\SqlInstancesReleaseSsrsLeaseResponse;
 class Instances extends \Google\Service\Resource
 {
   /**
+   * Lists all versions of EntraID certificates for the specified instance. There
+   * can be up to three sets of certificates listed: the certificate that is
+   * currently in use, a future that has been added but not yet used to sign a
+   * certificate, and a certificate that has been rotated out.
+   * (instances.ListEntraIdCertificates)
+   *
+   * @param string $project Required. Project ID of the project that contains the
+   * instance.
+   * @param string $instance Required. Cloud SQL instance ID. This does not
+   * include the project ID.
+   * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
+   * @return InstancesListEntraIdCertificatesResponse
+   * @throws \Google\Service\Exception
+   */
+  public function ListEntraIdCertificates($project, $instance, $optParams = [])
+  {
+    $params = ['project' => $project, 'instance' => $instance];
+    $params = array_merge($params, $optParams);
+    return $this->call('ListEntraIdCertificates', [$params], InstancesListEntraIdCertificatesResponse::class);
+  }
+  /**
    * Lists all versions of server certificates and certificate authorities (CAs)
    * for the specified instance. There can be up to three sets of certs listed:
    * the certificate that is currently in use, a future that has been added but
@@ -64,6 +89,8 @@ class Instances extends \Google\Service\Resource
    * @param string $instance Required. Cloud SQL instance ID. This does not
    * include the project ID.
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return InstancesListServerCertificatesResponse
    * @throws \Google\Service\Exception
    */
@@ -72,6 +99,27 @@ class Instances extends \Google\Service\Resource
     $params = ['project' => $project, 'instance' => $instance];
     $params = array_merge($params, $optParams);
     return $this->call('ListServerCertificates', [$params], InstancesListServerCertificatesResponse::class);
+  }
+  /**
+   * Rotates the server certificate version to one previously added with the
+   * addEntraIdCertificate method. (instances.RotateEntraIdCertificate)
+   *
+   * @param string $project Required. Project ID of the project that contains the
+   * instance.
+   * @param string $instance Required. Cloud SQL instance ID. This does not
+   * include the project ID.
+   * @param InstancesRotateEntraIdCertificateRequest $postBody
+   * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
+   * @return Operation
+   * @throws \Google\Service\Exception
+   */
+  public function RotateEntraIdCertificate($project, $instance, InstancesRotateEntraIdCertificateRequest $postBody, $optParams = [])
+  {
+    $params = ['project' => $project, 'instance' => $instance, 'postBody' => $postBody];
+    $params = array_merge($params, $optParams);
+    return $this->call('RotateEntraIdCertificate', [$params], Operation::class);
   }
   /**
    * Rotates the server certificate version to one previously added with the
@@ -85,6 +133,8 @@ class Instances extends \Google\Service\Resource
    * include the project ID.
    * @param InstancesRotateServerCertificateRequest $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -106,6 +156,8 @@ class Instances extends \Google\Service\Resource
    * (Example: instance-id).
    * @param InstancesAcquireSsrsLeaseRequest $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return SqlInstancesAcquireSsrsLeaseResponse
    * @throws \Google\Service\Exception
    */
@@ -114,6 +166,27 @@ class Instances extends \Google\Service\Resource
     $params = ['project' => $project, 'instance' => $instance, 'postBody' => $postBody];
     $params = array_merge($params, $optParams);
     return $this->call('acquireSsrsLease', [$params], SqlInstancesAcquireSsrsLeaseResponse::class);
+  }
+  /**
+   * Adds a new Entra ID certificate for the specified instance. If an Entra ID
+   * certificate was previously added but never used in a certificate rotation,
+   * this operation replaces that version. (instances.addEntraIdCertificate)
+   *
+   * @param string $project Required. Project ID of the project that contains the
+   * instance.
+   * @param string $instance Required. Cloud SQL instance ID. This does not
+   * include the project ID.
+   * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
+   * @return Operation
+   * @throws \Google\Service\Exception
+   */
+  public function addEntraIdCertificate($project, $instance, $optParams = [])
+  {
+    $params = ['project' => $project, 'instance' => $instance];
+    $params = array_merge($params, $optParams);
+    return $this->call('addEntraIdCertificate', [$params], Operation::class);
   }
   /**
    * Adds a new trusted Certificate Authority (CA) version for the specified
@@ -128,6 +201,8 @@ class Instances extends \Google\Service\Resource
    * @param string $instance Cloud SQL instance ID. This does not include the
    * project ID.
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -150,6 +225,8 @@ class Instances extends \Google\Service\Resource
    * @param string $instance Cloud SQL instance ID. This does not include the
    * project ID.
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -163,12 +240,13 @@ class Instances extends \Google\Service\Resource
    * Creates a Cloud SQL instance as a clone of the source instance. Using this
    * operation might cause your instance to restart. (instances.cloneInstances)
    *
-   * @param string $project Project ID of the source as well as the clone Cloud
-   * SQL instance.
-   * @param string $instance The ID of the Cloud SQL instance to be cloned
-   * (source). This does not include the project ID.
+   * @param string $project Required. Project ID of the source Cloud SQL instance.
+   * @param string $instance Required. The ID of the Cloud SQL instance to be
+   * cloned (source). This does not include the project ID.
    * @param InstancesCloneRequest $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -195,6 +273,7 @@ class Instances extends \Google\Service\Resource
    * time. Timestamp in UTC of when this resource is considered expired.
    * @opt_param string finalBackupTtlDays Optional. Retention period of the final
    * backup.
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -213,6 +292,8 @@ class Instances extends \Google\Service\Resource
    * @param string $instance Required. Cloud SQL instance name.
    * @param InstancesDemoteRequest $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -230,6 +311,8 @@ class Instances extends \Google\Service\Resource
    * @param string $instance Cloud SQL instance name.
    * @param InstancesDemoteMasterRequest $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -248,6 +331,8 @@ class Instances extends \Google\Service\Resource
    * the project ID.
    * @param ExecuteSqlPayload $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return SqlInstancesExecuteSqlResponse
    * @throws \Google\Service\Exception
    */
@@ -267,6 +352,8 @@ class Instances extends \Google\Service\Resource
    * project ID.
    * @param InstancesExportRequest $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -290,6 +377,8 @@ class Instances extends \Google\Service\Resource
    * project ID.
    * @param InstancesFailoverRequest $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -308,6 +397,8 @@ class Instances extends \Google\Service\Resource
    * @param string $instance Required. Database instance ID. This does not include
    * the project ID.
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return DatabaseInstance
    * @throws \Google\Service\Exception
    */
@@ -326,6 +417,8 @@ class Instances extends \Google\Service\Resource
    * project ID.
    * @param InstancesImportRequest $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -342,6 +435,8 @@ class Instances extends \Google\Service\Resource
    * Cloud SQL instances should belong.
    * @param DatabaseInstance $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -365,6 +460,7 @@ class Instances extends \Google\Service\Resource
    * Multiple filter queries are space-separated. For example. 'state:RUNNABLE
    * instanceType:CLOUD_SQL_INSTANCE'. By default, each expression is an AND
    * expression. However, you can include AND and OR expressions explicitly.
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @opt_param string maxResults The maximum number of instances to return. The
    * service may return fewer than this value. If unspecified, at most 500
    * instances are returned. The maximum value is 1000; values above 1000 are
@@ -391,6 +487,8 @@ class Instances extends \Google\Service\Resource
    * @param string $instance Cloud SQL instance ID. This does not include the
    * project ID.
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return InstancesListServerCasResponse
    * @throws \Google\Service\Exception
    */
@@ -410,6 +508,12 @@ class Instances extends \Google\Service\Resource
    * project ID.
    * @param DatabaseInstance $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
+   * @opt_param bool reconcilePscNetworking Optional. Set PSC config to the same
+   * value as the existing config to reconcile the PSC networking.
+   * @opt_param bool reconcilePscNetworkingForce Optional. Set PSC config to the
+   * same value as the existing config and force reconcile the PSC networking.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -445,6 +549,8 @@ class Instances extends \Google\Service\Resource
    * include the project ID.
    * @param InstancesPreCheckMajorVersionUpgradeRequest $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -469,6 +575,7 @@ class Instances extends \Google\Service\Resource
    * the original primary instance comes back online. If set to false or not
    * specified, then the original primary instance becomes an independent Cloud
    * SQL primary instance.
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -486,6 +593,8 @@ class Instances extends \Google\Service\Resource
    * project ID.
    * @param InstancesReencryptRequest $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -505,6 +614,8 @@ class Instances extends \Google\Service\Resource
    * and hyphens, and it must start with a letter. This ID can have a maximum
    * length of 98 characters.
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return SqlInstancesReleaseSsrsLeaseResponse
    * @throws \Google\Service\Exception
    */
@@ -523,6 +634,7 @@ class Instances extends \Google\Service\Resource
    * project ID.
    * @param array $optParams Optional parameters.
    *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @opt_param string mode Optional. Reset SSL mode to use.
    * @return Operation
    * @throws \Google\Service\Exception
@@ -541,6 +653,8 @@ class Instances extends \Google\Service\Resource
    * @param string $instance Cloud SQL instance ID. This does not include the
    * project ID.
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -559,6 +673,8 @@ class Instances extends \Google\Service\Resource
    * project ID.
    * @param InstancesRestoreBackupRequest $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -580,6 +696,8 @@ class Instances extends \Google\Service\Resource
    * project ID.
    * @param InstancesRotateServerCaRequest $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -595,6 +713,8 @@ class Instances extends \Google\Service\Resource
    * @param string $project ID of the project that contains the read replica.
    * @param string $instance Cloud SQL read replica instance name.
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -610,6 +730,8 @@ class Instances extends \Google\Service\Resource
    * @param string $project ID of the project that contains the read replica.
    * @param string $instance Cloud SQL read replica instance name.
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -631,6 +753,7 @@ class Instances extends \Google\Service\Resource
    * instance operations timeout, which is a sum of all database operations.
    * Default value is 10 minutes and can be modified to a maximum value of 24
    * hours.
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -649,6 +772,8 @@ class Instances extends \Google\Service\Resource
    * project ID.
    * @param InstancesTruncateLogRequest $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */
@@ -667,6 +792,8 @@ class Instances extends \Google\Service\Resource
    * project ID.
    * @param DatabaseInstance $postBody
    * @param array $optParams Optional parameters.
+   *
+   * @opt_param string location Optional. Region of the Cloud SQL instance.
    * @return Operation
    * @throws \Google\Service\Exception
    */

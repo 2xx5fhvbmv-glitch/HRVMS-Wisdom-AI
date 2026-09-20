@@ -24,7 +24,7 @@ class DisciplineryCodeOfConduct implements FromCollection, WithHeadings, WithEve
         return ['Category', 'Offense', 'Action', 'Severity Level'];
     }
 
-    public function collection()
+    public function collection(): Collection
     {
         // Fetch data and join necessary tables
         $records = CodeOfCounduct::join('disciplinary_categories_models', 'disciplinary_categories_models.id', '=', 'code_of_counducts.Deciplinery_cat_id')

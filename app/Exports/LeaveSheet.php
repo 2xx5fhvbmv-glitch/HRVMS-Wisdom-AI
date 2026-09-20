@@ -12,6 +12,7 @@ use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use Illuminate\Support\Enumerable;
 
 class LeaveSheet implements FromCollection, WithHeadings, WithEvents
 {
@@ -28,7 +29,7 @@ class LeaveSheet implements FromCollection, WithHeadings, WithEvents
         $this->end_date = $end_date;
     }
 
-    public function collection()
+    public function collection(): Enumerable
     {
         // Template download: add one placeholder row so user sees date format and can fill data
         if (!$this->start_date || !$this->end_date) {

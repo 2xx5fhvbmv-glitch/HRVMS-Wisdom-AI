@@ -29,7 +29,7 @@ class ExperimentalField extends \Google\Model
   public $value;
 
   /**
-   * @param string
+   * @param string $field
    */
   public function setField($field)
   {
@@ -43,7 +43,7 @@ class ExperimentalField extends \Google\Model
     return $this->field;
   }
   /**
-   * @param string
+   * @param string $value
    */
   public function setValue($value)
   {

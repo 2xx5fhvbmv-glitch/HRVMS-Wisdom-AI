@@ -28,7 +28,7 @@ class GoogleCloudDialogflowV2AgentCoachingSuggestion extends \Google\Collection
   protected $sampleResponsesDataType = 'array';
 
   /**
-   * @param GoogleCloudDialogflowV2AgentCoachingSuggestionAgentActionSuggestion[]
+   * @param GoogleCloudDialogflowV2AgentCoachingSuggestionAgentActionSuggestion[] $agentActionSuggestions
    */
   public function setAgentActionSuggestions($agentActionSuggestions)
   {
@@ -42,7 +42,7 @@ class GoogleCloudDialogflowV2AgentCoachingSuggestion extends \Google\Collection
     return $this->agentActionSuggestions;
   }
   /**
-   * @param GoogleCloudDialogflowV2AgentCoachingInstruction[]
+   * @param GoogleCloudDialogflowV2AgentCoachingInstruction[] $applicableInstructions
    */
   public function setApplicableInstructions($applicableInstructions)
   {
@@ -56,7 +56,7 @@ class GoogleCloudDialogflowV2AgentCoachingSuggestion extends \Google\Collection
     return $this->applicableInstructions;
   }
   /**
-   * @param GoogleCloudDialogflowV2AgentCoachingSuggestionSampleResponse[]
+   * @param GoogleCloudDialogflowV2AgentCoachingSuggestionSampleResponse[] $sampleResponses
    */
   public function setSampleResponses($sampleResponses)
   {

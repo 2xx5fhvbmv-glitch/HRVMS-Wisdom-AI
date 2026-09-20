@@ -19,11 +19,41 @@ namespace Google\Service\DiscoveryEngine;
 
 class GoogleCloudDiscoveryengineV1betaProjectCustomerProvidedConfigNotebooklmConfig extends \Google\Model
 {
+  protected $dataProtectionPolicyType = GoogleCloudDiscoveryengineV1betaProjectCustomerProvidedConfigNotebooklmConfigDataProtectionPolicy::class;
+  protected $dataProtectionPolicyDataType = '';
   protected $modelArmorConfigType = GoogleCloudDiscoveryengineV1betaProjectCustomerProvidedConfigNotebooklmConfigModelArmorConfig::class;
   protected $modelArmorConfigDataType = '';
+  protected $observabilityConfigType = GoogleCloudDiscoveryengineV1betaObservabilityConfig::class;
+  protected $observabilityConfigDataType = '';
+  /**
+   * Optional. Whether to disable the notebook sharing feature for the project.
+   * Default to false if not specified.
+   *
+   * @var bool
+   */
+  public $optOutNotebookSharing;
 
   /**
-   * @param GoogleCloudDiscoveryengineV1betaProjectCustomerProvidedConfigNotebooklmConfigModelArmorConfig
+   * Optional. Specifies the data protection policy for NotebookLM.
+   *
+   * @param GoogleCloudDiscoveryengineV1betaProjectCustomerProvidedConfigNotebooklmConfigDataProtectionPolicy $dataProtectionPolicy
+   */
+  public function setDataProtectionPolicy(GoogleCloudDiscoveryengineV1betaProjectCustomerProvidedConfigNotebooklmConfigDataProtectionPolicy $dataProtectionPolicy)
+  {
+    $this->dataProtectionPolicy = $dataProtectionPolicy;
+  }
+  /**
+   * @return GoogleCloudDiscoveryengineV1betaProjectCustomerProvidedConfigNotebooklmConfigDataProtectionPolicy
+   */
+  public function getDataProtectionPolicy()
+  {
+    return $this->dataProtectionPolicy;
+  }
+  /**
+   * Model Armor configuration to be used for sanitizing user prompts and LLM
+   * responses.
+   *
+   * @param GoogleCloudDiscoveryengineV1betaProjectCustomerProvidedConfigNotebooklmConfigModelArmorConfig $modelArmorConfig
    */
   public function setModelArmorConfig(GoogleCloudDiscoveryengineV1betaProjectCustomerProvidedConfigNotebooklmConfigModelArmorConfig $modelArmorConfig)
   {
@@ -35,6 +65,39 @@ class GoogleCloudDiscoveryengineV1betaProjectCustomerProvidedConfigNotebooklmCon
   public function getModelArmorConfig()
   {
     return $this->modelArmorConfig;
+  }
+  /**
+   * Optional. Observability config for NotebookLM.
+   *
+   * @param GoogleCloudDiscoveryengineV1betaObservabilityConfig $observabilityConfig
+   */
+  public function setObservabilityConfig(GoogleCloudDiscoveryengineV1betaObservabilityConfig $observabilityConfig)
+  {
+    $this->observabilityConfig = $observabilityConfig;
+  }
+  /**
+   * @return GoogleCloudDiscoveryengineV1betaObservabilityConfig
+   */
+  public function getObservabilityConfig()
+  {
+    return $this->observabilityConfig;
+  }
+  /**
+   * Optional. Whether to disable the notebook sharing feature for the project.
+   * Default to false if not specified.
+   *
+   * @param bool $optOutNotebookSharing
+   */
+  public function setOptOutNotebookSharing($optOutNotebookSharing)
+  {
+    $this->optOutNotebookSharing = $optOutNotebookSharing;
+  }
+  /**
+   * @return bool
+   */
+  public function getOptOutNotebookSharing()
+  {
+    return $this->optOutNotebookSharing;
   }
 }
 

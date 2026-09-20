@@ -29,7 +29,7 @@ class GoogleCloudDialogflowCxV3TypeSchemaSchemaReference extends \Google\Model
   public $tool;
 
   /**
-   * @param string
+   * @param string $schema
    */
   public function setSchema($schema)
   {
@@ -43,7 +43,7 @@ class GoogleCloudDialogflowCxV3TypeSchemaSchemaReference extends \Google\Model
     return $this->schema;
   }
   /**
-   * @param string
+   * @param string $tool
    */
   public function setTool($tool)
   {

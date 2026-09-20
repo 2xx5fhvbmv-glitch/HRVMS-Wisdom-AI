@@ -58,7 +58,7 @@ class GoogleCloudDialogflowCxV3Flow extends \Google\Collection
   protected $transitionRoutesDataType = 'array';
 
   /**
-   * @param GoogleCloudDialogflowCxV3AdvancedSettings
+   * @param GoogleCloudDialogflowCxV3AdvancedSettings $advancedSettings
    */
   public function setAdvancedSettings(GoogleCloudDialogflowCxV3AdvancedSettings $advancedSettings)
   {
@@ -72,7 +72,7 @@ class GoogleCloudDialogflowCxV3Flow extends \Google\Collection
     return $this->advancedSettings;
   }
   /**
-   * @param string
+   * @param string $description
    */
   public function setDescription($description)
   {
@@ -86,7 +86,7 @@ class GoogleCloudDialogflowCxV3Flow extends \Google\Collection
     return $this->description;
   }
   /**
-   * @param string
+   * @param string $displayName
    */
   public function setDisplayName($displayName)
   {
@@ -100,7 +100,7 @@ class GoogleCloudDialogflowCxV3Flow extends \Google\Collection
     return $this->displayName;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3EventHandler[]
+   * @param GoogleCloudDialogflowCxV3EventHandler[] $eventHandlers
    */
   public function setEventHandlers($eventHandlers)
   {
@@ -114,7 +114,7 @@ class GoogleCloudDialogflowCxV3Flow extends \Google\Collection
     return $this->eventHandlers;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3ParameterDefinition[]
+   * @param GoogleCloudDialogflowCxV3ParameterDefinition[] $inputParameterDefinitions
    */
   public function setInputParameterDefinitions($inputParameterDefinitions)
   {
@@ -128,7 +128,7 @@ class GoogleCloudDialogflowCxV3Flow extends \Google\Collection
     return $this->inputParameterDefinitions;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3KnowledgeConnectorSettings
+   * @param GoogleCloudDialogflowCxV3KnowledgeConnectorSettings $knowledgeConnectorSettings
    */
   public function setKnowledgeConnectorSettings(GoogleCloudDialogflowCxV3KnowledgeConnectorSettings $knowledgeConnectorSettings)
   {
@@ -142,7 +142,7 @@ class GoogleCloudDialogflowCxV3Flow extends \Google\Collection
     return $this->knowledgeConnectorSettings;
   }
   /**
-   * @param bool
+   * @param bool $locked
    */
   public function setLocked($locked)
   {
@@ -156,7 +156,7 @@ class GoogleCloudDialogflowCxV3Flow extends \Google\Collection
     return $this->locked;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3FlowMultiLanguageSettings
+   * @param GoogleCloudDialogflowCxV3FlowMultiLanguageSettings $multiLanguageSettings
    */
   public function setMultiLanguageSettings(GoogleCloudDialogflowCxV3FlowMultiLanguageSettings $multiLanguageSettings)
   {
@@ -170,7 +170,7 @@ class GoogleCloudDialogflowCxV3Flow extends \Google\Collection
     return $this->multiLanguageSettings;
   }
   /**
-   * @param string
+   * @param string $name
    */
   public function setName($name)
   {
@@ -184,7 +184,7 @@ class GoogleCloudDialogflowCxV3Flow extends \Google\Collection
     return $this->name;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3NluSettings
+   * @param GoogleCloudDialogflowCxV3NluSettings $nluSettings
    */
   public function setNluSettings(GoogleCloudDialogflowCxV3NluSettings $nluSettings)
   {
@@ -198,7 +198,7 @@ class GoogleCloudDialogflowCxV3Flow extends \Google\Collection
     return $this->nluSettings;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3ParameterDefinition[]
+   * @param GoogleCloudDialogflowCxV3ParameterDefinition[] $outputParameterDefinitions
    */
   public function setOutputParameterDefinitions($outputParameterDefinitions)
   {
@@ -212,7 +212,7 @@ class GoogleCloudDialogflowCxV3Flow extends \Google\Collection
     return $this->outputParameterDefinitions;
   }
   /**
-   * @param string[]
+   * @param string[] $transitionRouteGroups
    */
   public function setTransitionRouteGroups($transitionRouteGroups)
   {
@@ -226,7 +226,7 @@ class GoogleCloudDialogflowCxV3Flow extends \Google\Collection
     return $this->transitionRouteGroups;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3TransitionRoute[]
+   * @param GoogleCloudDialogflowCxV3TransitionRoute[] $transitionRoutes
    */
   public function setTransitionRoutes($transitionRoutes)
   {

@@ -6,6 +6,7 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Events\AfterSheet;
+use Illuminate\Support\Enumerable;
 use DB;
 use Auth;
 use Common;
@@ -21,7 +22,7 @@ class AllowanceTemplateExport implements FromCollection, WithHeadings, WithEvent
         ];
     }
 
-    public function collection()
+    public function collection(): Enumerable
     {
         // Map employees to date range with shift info
         $result = collect();

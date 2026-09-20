@@ -25,7 +25,7 @@ class GoogleCloudDialogflowCxV3SafetySettingsPromptSecuritySettings extends \Goo
   public $enablePromptSecurity;
 
   /**
-   * @param bool
+   * @param bool $enablePromptSecurity
    */
   public function setEnablePromptSecurity($enablePromptSecurity)
   {

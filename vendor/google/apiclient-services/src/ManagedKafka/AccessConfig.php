@@ -22,9 +22,15 @@ class AccessConfig extends \Google\Collection
   protected $collection_key = 'networkConfigs';
   protected $networkConfigsType = NetworkConfig::class;
   protected $networkConfigsDataType = 'array';
+  protected $publicClusterConfigType = PublicClusterConfig::class;
+  protected $publicClusterConfigDataType = '';
 
   /**
-   * @param NetworkConfig[]
+   * Required. Virtual Private Cloud (VPC) networks that must be granted direct
+   * access to the Kafka cluster. Minimum of 1 network is required. Maximum 10
+   * networks can be specified.
+   *
+   * @param NetworkConfig[] $networkConfigs
    */
   public function setNetworkConfigs($networkConfigs)
   {
@@ -36,6 +42,22 @@ class AccessConfig extends \Google\Collection
   public function getNetworkConfigs()
   {
     return $this->networkConfigs;
+  }
+  /**
+   * Optional. The configuration for public connectivity to the Kafka cluster.
+   *
+   * @param PublicClusterConfig $publicClusterConfig
+   */
+  public function setPublicClusterConfig(PublicClusterConfig $publicClusterConfig)
+  {
+    $this->publicClusterConfig = $publicClusterConfig;
+  }
+  /**
+   * @return PublicClusterConfig
+   */
+  public function getPublicClusterConfig()
+  {
+    return $this->publicClusterConfig;
   }
 }
 

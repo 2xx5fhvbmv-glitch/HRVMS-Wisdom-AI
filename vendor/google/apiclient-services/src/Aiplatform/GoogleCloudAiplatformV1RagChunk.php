@@ -19,15 +19,63 @@ namespace Google\Service\Aiplatform;
 
 class GoogleCloudAiplatformV1RagChunk extends \Google\Model
 {
+  /**
+   * The ID of the chunk.
+   *
+   * @var string
+   */
+  public $chunkId;
+  /**
+   * The ID of the file that the chunk belongs to.
+   *
+   * @var string
+   */
+  public $fileId;
   protected $pageSpanType = GoogleCloudAiplatformV1RagChunkPageSpan::class;
   protected $pageSpanDataType = '';
   /**
+   * The content of the chunk.
+   *
    * @var string
    */
   public $text;
 
   /**
-   * @param GoogleCloudAiplatformV1RagChunkPageSpan
+   * The ID of the chunk.
+   *
+   * @param string $chunkId
+   */
+  public function setChunkId($chunkId)
+  {
+    $this->chunkId = $chunkId;
+  }
+  /**
+   * @return string
+   */
+  public function getChunkId()
+  {
+    return $this->chunkId;
+  }
+  /**
+   * The ID of the file that the chunk belongs to.
+   *
+   * @param string $fileId
+   */
+  public function setFileId($fileId)
+  {
+    $this->fileId = $fileId;
+  }
+  /**
+   * @return string
+   */
+  public function getFileId()
+  {
+    return $this->fileId;
+  }
+  /**
+   * If populated, represents where the chunk starts and ends in the document.
+   *
+   * @param GoogleCloudAiplatformV1RagChunkPageSpan $pageSpan
    */
   public function setPageSpan(GoogleCloudAiplatformV1RagChunkPageSpan $pageSpan)
   {
@@ -41,7 +89,9 @@ class GoogleCloudAiplatformV1RagChunk extends \Google\Model
     return $this->pageSpan;
   }
   /**
-   * @param string
+   * The content of the chunk.
+   *
+   * @param string $text
    */
   public function setText($text)
   {

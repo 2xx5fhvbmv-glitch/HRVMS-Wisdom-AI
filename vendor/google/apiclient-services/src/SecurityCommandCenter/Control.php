@@ -29,7 +29,7 @@ class Control extends \Google\Model
   public $displayName;
 
   /**
-   * @param string
+   * @param string $controlName
    */
   public function setControlName($controlName)
   {
@@ -43,7 +43,7 @@ class Control extends \Google\Model
     return $this->controlName;
   }
   /**
-   * @param string
+   * @param string $displayName
    */
   public function setDisplayName($displayName)
   {

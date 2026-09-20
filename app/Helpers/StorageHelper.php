@@ -129,9 +129,20 @@ class StorageHelper
                 if (!file_exists($directory)) {
                     mkdir($directory, 0755, true);
                 }
-                $disk->put($filePath, $contents);
+                $written = $disk->put($filePath, $contents);
             } else {
-                self::disk()->put($filePath, $contents);
+                $written = self::disk()->put($filePath, $contents);
+            }
+
+            // Flysystem 3 (Laravel 9+) returns false instead of throwing on
+            // a failed put() — a thrown-exception-only check here would
+            // silently report success on a failed upload.
+            if ($written === false) {
+                \Log::error('StorageHelper::uploadFile failed: put() returned false for ' . $filePath);
+                return [
+                    'status' => false,
+                    'msg'    => 'Failed to upload file: storage write returned false',
+                ];
             }
 
             return [

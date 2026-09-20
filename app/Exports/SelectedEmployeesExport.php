@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Illuminate\Support\Enumerable;
 
 /**
  * Wide-format export covering every section of the employee profile
@@ -29,7 +30,7 @@ class SelectedEmployeesExport implements FromCollection, WithHeadings, ShouldAut
         $this->ids = $ids;
     }
 
-    public function collection()
+    public function collection(): Enumerable
     {
         return Employee::whereIn('id', $this->ids)
             ->where('resort_id', auth()->user()->resort_id)

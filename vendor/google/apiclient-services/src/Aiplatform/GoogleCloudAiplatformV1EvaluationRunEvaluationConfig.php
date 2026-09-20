@@ -22,6 +22,12 @@ class GoogleCloudAiplatformV1EvaluationRunEvaluationConfig extends \Google\Colle
   protected $collection_key = 'rubricConfigs';
   protected $autoraterConfigType = GoogleCloudAiplatformV1EvaluationRunEvaluationConfigAutoraterConfig::class;
   protected $autoraterConfigDataType = '';
+  protected $cloudLoggingConfigType = GoogleCloudAiplatformV1CloudLoggingConfig::class;
+  protected $cloudLoggingConfigDataType = '';
+  protected $datasetCustomMetricsType = GoogleCloudAiplatformV1DatasetCustomMetric::class;
+  protected $datasetCustomMetricsDataType = 'array';
+  protected $lossAnalysisConfigType = GoogleCloudAiplatformV1LossAnalysisConfig::class;
+  protected $lossAnalysisConfigDataType = 'array';
   protected $metricsType = GoogleCloudAiplatformV1EvaluationRunMetric::class;
   protected $metricsDataType = 'array';
   protected $outputConfigType = GoogleCloudAiplatformV1EvaluationRunEvaluationConfigOutputConfig::class;
@@ -32,7 +38,9 @@ class GoogleCloudAiplatformV1EvaluationRunEvaluationConfig extends \Google\Colle
   protected $rubricConfigsDataType = 'array';
 
   /**
-   * @param GoogleCloudAiplatformV1EvaluationRunEvaluationConfigAutoraterConfig
+   * Optional. The autorater config for the evaluation run.
+   *
+   * @param GoogleCloudAiplatformV1EvaluationRunEvaluationConfigAutoraterConfig $autoraterConfig
    */
   public function setAutoraterConfig(GoogleCloudAiplatformV1EvaluationRunEvaluationConfigAutoraterConfig $autoraterConfig)
   {
@@ -46,7 +54,59 @@ class GoogleCloudAiplatformV1EvaluationRunEvaluationConfig extends \Google\Colle
     return $this->autoraterConfig;
   }
   /**
-   * @param GoogleCloudAiplatformV1EvaluationRunMetric[]
+   * Optional. Configuration for exporting evaluation results to Cloud Logging.
+   *
+   * @param GoogleCloudAiplatformV1CloudLoggingConfig $cloudLoggingConfig
+   */
+  public function setCloudLoggingConfig(GoogleCloudAiplatformV1CloudLoggingConfig $cloudLoggingConfig)
+  {
+    $this->cloudLoggingConfig = $cloudLoggingConfig;
+  }
+  /**
+   * @return GoogleCloudAiplatformV1CloudLoggingConfig
+   */
+  public function getCloudLoggingConfig()
+  {
+    return $this->cloudLoggingConfig;
+  }
+  /**
+   * Optional. Specifications for custom dataset-level aggregations.
+   *
+   * @param GoogleCloudAiplatformV1DatasetCustomMetric[] $datasetCustomMetrics
+   */
+  public function setDatasetCustomMetrics($datasetCustomMetrics)
+  {
+    $this->datasetCustomMetrics = $datasetCustomMetrics;
+  }
+  /**
+   * @return GoogleCloudAiplatformV1DatasetCustomMetric[]
+   */
+  public function getDatasetCustomMetrics()
+  {
+    return $this->datasetCustomMetrics;
+  }
+  /**
+   * Optional. Specifications for loss analysis. Each config can be specified
+   * for one metric.
+   *
+   * @param GoogleCloudAiplatformV1LossAnalysisConfig[] $lossAnalysisConfig
+   */
+  public function setLossAnalysisConfig($lossAnalysisConfig)
+  {
+    $this->lossAnalysisConfig = $lossAnalysisConfig;
+  }
+  /**
+   * @return GoogleCloudAiplatformV1LossAnalysisConfig[]
+   */
+  public function getLossAnalysisConfig()
+  {
+    return $this->lossAnalysisConfig;
+  }
+  /**
+   * Optional. The metrics to be calculated in the evaluation run. Required when
+   * analysis_configs is not set.
+   *
+   * @param GoogleCloudAiplatformV1EvaluationRunMetric[] $metrics
    */
   public function setMetrics($metrics)
   {
@@ -60,7 +120,9 @@ class GoogleCloudAiplatformV1EvaluationRunEvaluationConfig extends \Google\Colle
     return $this->metrics;
   }
   /**
-   * @param GoogleCloudAiplatformV1EvaluationRunEvaluationConfigOutputConfig
+   * Optional. The output config for the evaluation run.
+   *
+   * @param GoogleCloudAiplatformV1EvaluationRunEvaluationConfigOutputConfig $outputConfig
    */
   public function setOutputConfig(GoogleCloudAiplatformV1EvaluationRunEvaluationConfigOutputConfig $outputConfig)
   {
@@ -74,7 +136,11 @@ class GoogleCloudAiplatformV1EvaluationRunEvaluationConfig extends \Google\Colle
     return $this->outputConfig;
   }
   /**
-   * @param GoogleCloudAiplatformV1EvaluationRunEvaluationConfigPromptTemplate
+   * The prompt template used for inference. The values for variables in the
+   * prompt template are defined in
+   * EvaluationItem.EvaluationPrompt.PromptTemplateData.values.
+   *
+   * @param GoogleCloudAiplatformV1EvaluationRunEvaluationConfigPromptTemplate $promptTemplate
    */
   public function setPromptTemplate(GoogleCloudAiplatformV1EvaluationRunEvaluationConfigPromptTemplate $promptTemplate)
   {
@@ -88,7 +154,15 @@ class GoogleCloudAiplatformV1EvaluationRunEvaluationConfig extends \Google\Colle
     return $this->promptTemplate;
   }
   /**
-   * @param GoogleCloudAiplatformV1EvaluationRubricConfig[]
+   * Optional. The rubric configs for the evaluation run. They are used to
+   * generate rubrics which can be used by rubric-based metrics. Multiple rubric
+   * configs can be specified for rubric generation but only one rubric config
+   * can be used for a rubric-based metric. If more than one rubric config is
+   * provided, the evaluation metric must specify a rubric group key. Note that
+   * if a generation spec is specified on both a rubric config and an evaluation
+   * metric, the rubrics generated for the metric will be used for evaluation.
+   *
+   * @param GoogleCloudAiplatformV1EvaluationRubricConfig[] $rubricConfigs
    */
   public function setRubricConfigs($rubricConfigs)
   {

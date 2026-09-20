@@ -19,6 +19,11 @@ namespace Google\Service\DataManager;
 
 class RequestStatusPerDestination extends \Google\Model
 {
+  public const REQUEST_STATUS_REQUEST_STATUS_UNKNOWN = 'REQUEST_STATUS_UNKNOWN';
+  public const REQUEST_STATUS_SUCCESS = 'SUCCESS';
+  public const REQUEST_STATUS_PROCESSING = 'PROCESSING';
+  public const REQUEST_STATUS_FAILED = 'FAILED';
+  public const REQUEST_STATUS_PARTIAL_SUCCESS = 'PARTIAL_SUCCESS';
   protected $audienceMembersIngestionStatusType = IngestAudienceMembersStatus::class;
   protected $audienceMembersIngestionStatusDataType = '';
   protected $audienceMembersRemovalStatusType = RemoveAudienceMembersStatus::class;
@@ -29,6 +34,8 @@ class RequestStatusPerDestination extends \Google\Model
   protected $errorInfoDataType = '';
   protected $eventsIngestionStatusType = IngestEventsStatus::class;
   protected $eventsIngestionStatusDataType = '';
+  protected $removeAllAudienceMembersStatusType = RemoveAllAudienceMembersStatus::class;
+  protected $removeAllAudienceMembersStatusDataType = '';
   /**
    * @var string
    */
@@ -37,7 +44,7 @@ class RequestStatusPerDestination extends \Google\Model
   protected $warningInfoDataType = '';
 
   /**
-   * @param IngestAudienceMembersStatus
+   * @param IngestAudienceMembersStatus $audienceMembersIngestionStatus
    */
   public function setAudienceMembersIngestionStatus(IngestAudienceMembersStatus $audienceMembersIngestionStatus)
   {
@@ -51,7 +58,7 @@ class RequestStatusPerDestination extends \Google\Model
     return $this->audienceMembersIngestionStatus;
   }
   /**
-   * @param RemoveAudienceMembersStatus
+   * @param RemoveAudienceMembersStatus $audienceMembersRemovalStatus
    */
   public function setAudienceMembersRemovalStatus(RemoveAudienceMembersStatus $audienceMembersRemovalStatus)
   {
@@ -65,7 +72,7 @@ class RequestStatusPerDestination extends \Google\Model
     return $this->audienceMembersRemovalStatus;
   }
   /**
-   * @param Destination
+   * @param Destination $destination
    */
   public function setDestination(Destination $destination)
   {
@@ -79,7 +86,7 @@ class RequestStatusPerDestination extends \Google\Model
     return $this->destination;
   }
   /**
-   * @param ErrorInfo
+   * @param ErrorInfo $errorInfo
    */
   public function setErrorInfo(ErrorInfo $errorInfo)
   {
@@ -93,7 +100,7 @@ class RequestStatusPerDestination extends \Google\Model
     return $this->errorInfo;
   }
   /**
-   * @param IngestEventsStatus
+   * @param IngestEventsStatus $eventsIngestionStatus
    */
   public function setEventsIngestionStatus(IngestEventsStatus $eventsIngestionStatus)
   {
@@ -107,21 +114,35 @@ class RequestStatusPerDestination extends \Google\Model
     return $this->eventsIngestionStatus;
   }
   /**
-   * @param string
+   * @param RemoveAllAudienceMembersStatus $removeAllAudienceMembersStatus
+   */
+  public function setRemoveAllAudienceMembersStatus(RemoveAllAudienceMembersStatus $removeAllAudienceMembersStatus)
+  {
+    $this->removeAllAudienceMembersStatus = $removeAllAudienceMembersStatus;
+  }
+  /**
+   * @return RemoveAllAudienceMembersStatus
+   */
+  public function getRemoveAllAudienceMembersStatus()
+  {
+    return $this->removeAllAudienceMembersStatus;
+  }
+  /**
+   * @param self::REQUEST_STATUS_* $requestStatus
    */
   public function setRequestStatus($requestStatus)
   {
     $this->requestStatus = $requestStatus;
   }
   /**
-   * @return string
+   * @return self::REQUEST_STATUS_*
    */
   public function getRequestStatus()
   {
     return $this->requestStatus;
   }
   /**
-   * @param WarningInfo
+   * @param WarningInfo $warningInfo
    */
   public function setWarningInfo(WarningInfo $warningInfo)
   {

@@ -17,8 +17,30 @@
 
 namespace Google\Service\DataManager;
 
-class Item extends \Google\Model
+class Item extends \Google\Collection
 {
+  protected $collection_key = 'customVariables';
+  protected $additionalItemParametersType = ItemParameter::class;
+  protected $additionalItemParametersDataType = 'array';
+  public $conversionValue;
+  protected $customVariablesType = ItemCustomVariable::class;
+  protected $customVariablesDataType = 'array';
+  /**
+   * @var string
+   */
+  public $itemId;
+  /**
+   * @var string
+   */
+  public $merchantFeedLabel;
+  /**
+   * @var string
+   */
+  public $merchantFeedLanguageCode;
+  /**
+   * @var string
+   */
+  public $merchantId;
   /**
    * @var string
    */
@@ -30,7 +52,99 @@ class Item extends \Google\Model
   public $unitPrice;
 
   /**
-   * @param string
+   * @param ItemParameter[] $additionalItemParameters
+   */
+  public function setAdditionalItemParameters($additionalItemParameters)
+  {
+    $this->additionalItemParameters = $additionalItemParameters;
+  }
+  /**
+   * @return ItemParameter[]
+   */
+  public function getAdditionalItemParameters()
+  {
+    return $this->additionalItemParameters;
+  }
+  public function setConversionValue($conversionValue)
+  {
+    $this->conversionValue = $conversionValue;
+  }
+  public function getConversionValue()
+  {
+    return $this->conversionValue;
+  }
+  /**
+   * @param ItemCustomVariable[] $customVariables
+   */
+  public function setCustomVariables($customVariables)
+  {
+    $this->customVariables = $customVariables;
+  }
+  /**
+   * @return ItemCustomVariable[]
+   */
+  public function getCustomVariables()
+  {
+    return $this->customVariables;
+  }
+  /**
+   * @param string $itemId
+   */
+  public function setItemId($itemId)
+  {
+    $this->itemId = $itemId;
+  }
+  /**
+   * @return string
+   */
+  public function getItemId()
+  {
+    return $this->itemId;
+  }
+  /**
+   * @param string $merchantFeedLabel
+   */
+  public function setMerchantFeedLabel($merchantFeedLabel)
+  {
+    $this->merchantFeedLabel = $merchantFeedLabel;
+  }
+  /**
+   * @return string
+   */
+  public function getMerchantFeedLabel()
+  {
+    return $this->merchantFeedLabel;
+  }
+  /**
+   * @param string $merchantFeedLanguageCode
+   */
+  public function setMerchantFeedLanguageCode($merchantFeedLanguageCode)
+  {
+    $this->merchantFeedLanguageCode = $merchantFeedLanguageCode;
+  }
+  /**
+   * @return string
+   */
+  public function getMerchantFeedLanguageCode()
+  {
+    return $this->merchantFeedLanguageCode;
+  }
+  /**
+   * @param string $merchantId
+   */
+  public function setMerchantId($merchantId)
+  {
+    $this->merchantId = $merchantId;
+  }
+  /**
+   * @return string
+   */
+  public function getMerchantId()
+  {
+    return $this->merchantId;
+  }
+  /**
+   * @param string $merchantProductId
    */
   public function setMerchantProductId($merchantProductId)
   {
@@ -44,7 +158,7 @@ class Item extends \Google\Model
     return $this->merchantProductId;
   }
   /**
-   * @param string
+   * @param string $quantity
    */
   public function setQuantity($quantity)
   {

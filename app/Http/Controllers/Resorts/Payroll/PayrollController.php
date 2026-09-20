@@ -4219,7 +4219,7 @@ class PayrollController extends Controller
                         public function array(): array {
                             return array_map(fn($r) => [$r['emp_id'], $r['name'], $r['position'], $r['present'], $r['absent'], $r['day_off'], $r['leave_types']], $this->rows);
                         }
-                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet) { return [1 => ['font' => ['bold' => true]]]; }
+                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet): ?array { return [1 => ['font' => ['bold' => true]]]; }
                     },
 
                     'Overtime' => new class($rows, $s) implements \Maatwebsite\Excel\Concerns\FromArray, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithTitle, \Maatwebsite\Excel\Concerns\WithStyles, \Maatwebsite\Excel\Concerns\ShouldAutoSize {
@@ -4230,7 +4230,7 @@ class PayrollController extends Controller
                         public function array(): array {
                             return array_map(fn($r) => [$r['emp_id'], $r['name'], $r['position'], $r['regular_ot'], $r['friday_ot'], $r['holiday_ot'], $r['total_ot_pay']], $this->rows);
                         }
-                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet) { return [1 => ['font' => ['bold' => true]]]; }
+                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet): ?array { return [1 => ['font' => ['bold' => true]]]; }
                     },
 
                     'Earnings' => new class($rows, $s, $aTypes) implements \Maatwebsite\Excel\Concerns\FromArray, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithTitle, \Maatwebsite\Excel\Concerns\WithStyles, \Maatwebsite\Excel\Concerns\ShouldAutoSize {
@@ -4251,7 +4251,7 @@ class PayrollController extends Controller
                                 return $row;
                             }, $this->rows);
                         }
-                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet) { return [1 => ['font' => ['bold' => true]]]; }
+                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet): ?array { return [1 => ['font' => ['bold' => true]]]; }
                     },
 
                     'Deductions' => new class($rows, $s) implements \Maatwebsite\Excel\Concerns\FromArray, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithTitle, \Maatwebsite\Excel\Concerns\WithStyles, \Maatwebsite\Excel\Concerns\ShouldAutoSize {
@@ -4262,7 +4262,7 @@ class PayrollController extends Controller
                         public function array(): array {
                             return array_map(fn($r) => [$r['emp_id'], $r['name'], $r['position'], $r['attendance_ded'], $r['city_ledger'], $r['staff_shop'], $r['pension'], $r['ewt'], $r['other_ded'], $r['total_deductions']], $this->rows);
                         }
-                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet) { return [1 => ['font' => ['bold' => true]]]; }
+                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet): ?array { return [1 => ['font' => ['bold' => true]]]; }
                     },
 
                     'Summary' => new class($rows, $s) implements \Maatwebsite\Excel\Concerns\FromArray, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithTitle, \Maatwebsite\Excel\Concerns\WithStyles, \Maatwebsite\Excel\Concerns\ShouldAutoSize {
@@ -4273,7 +4273,7 @@ class PayrollController extends Controller
                         public function array(): array {
                             return array_map(fn($r) => [$r['emp_id'], $r['name'], $r['position'], $r['total_earnings'], $r['total_deductions'], $r['net_salary']], $this->rows);
                         }
-                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet) { return [1 => ['font' => ['bold' => true]]]; }
+                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet): ?array { return [1 => ['font' => ['bold' => true]]]; }
                     },
                 ];
             }

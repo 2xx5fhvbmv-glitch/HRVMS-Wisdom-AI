@@ -20,16 +20,45 @@ namespace Google\Service\Compute;
 class InstancePropertiesPatch extends \Google\Model
 {
   /**
+   * This optional flag exposes the hashed physical host ID.
+   *
+   * @var bool
+   */
+  public $exposeHostTopology;
+  /**
+   * The label key-value pairs that you want to patch onto the instance.
+   *
    * @var string[]
    */
   public $labels;
   /**
+   * The metadata key-value pairs that you want to patch onto the instance. For
+   * more information, see Project and instance metadata.
+   *
    * @var string[]
    */
   public $metadata;
 
   /**
-   * @param string[]
+   * This optional flag exposes the hashed physical host ID.
+   *
+   * @param bool $exposeHostTopology
+   */
+  public function setExposeHostTopology($exposeHostTopology)
+  {
+    $this->exposeHostTopology = $exposeHostTopology;
+  }
+  /**
+   * @return bool
+   */
+  public function getExposeHostTopology()
+  {
+    return $this->exposeHostTopology;
+  }
+  /**
+   * The label key-value pairs that you want to patch onto the instance.
+   *
+   * @param string[] $labels
    */
   public function setLabels($labels)
   {
@@ -43,7 +72,10 @@ class InstancePropertiesPatch extends \Google\Model
     return $this->labels;
   }
   /**
-   * @param string[]
+   * The metadata key-value pairs that you want to patch onto the instance. For
+   * more information, see Project and instance metadata.
+   *
+   * @param string[] $metadata
    */
   public function setMetadata($metadata)
   {

@@ -4,57 +4,100 @@ namespace Laravel\Passport;
 
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
+use Illuminate\Support\Str;
+use JsonSerializable;
 
-class PersonalAccessTokenResult implements Arrayable, Jsonable
+/**
+ * @template TValue
+ *
+ * @implements \Illuminate\Contracts\Support\Arrayable<string, TValue>
+ *
+ * @property string $accessTokenId
+ * @property string $accessToken
+ * @property string $tokenType
+ * @property int $expiresIn
+ */
+class PersonalAccessTokenResult implements Arrayable, Jsonable, JsonSerializable
 {
     /**
-     * The access token.
-     *
-     * @var string
+     * The token instance.
      */
-    public $accessToken;
+    protected ?Token $token = null;
 
     /**
-     * The token model instance.
+     * All the attributes set on the personal access token response.
      *
-     * @var \Laravel\Passport\Token
+     * @var array<string, TValue>
      */
-    public $token;
+    protected array $attributes = [];
 
     /**
      * Create a new result instance.
      *
-     * @param  string  $accessToken
-     * @param  \Laravel\Passport\Token  $token
-     * @return void
+     * @param  array<string, TValue>  $attributes
      */
-    public function __construct($accessToken, $token)
+    public function __construct(array $attributes = [])
     {
-        $this->token = $token;
-        $this->accessToken = $accessToken;
+        foreach ($attributes as $key => $value) {
+            $this->attributes[Str::camel($key)] = $value;
+        }
+    }
+
+    /**
+     * Get the token instance.
+     */
+    public function getToken(): ?Token
+    {
+        return $this->token ??= Passport::token()->newQuery()->find($this->accessTokenId);
     }
 
     /**
      * Get the instance as an array.
      *
-     * @return array
+     * @return array<string, TValue>
      */
-    public function toArray()
+    public function toArray(): array
     {
-        return [
-            'accessToken' => $this->accessToken,
-            'token' => $this->token,
-        ];
+        return $this->attributes;
+    }
+
+    /**
+     * Convert the object into something JSON serializable.
+     *
+     * @return array<string, TValue>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 
     /**
      * Convert the object to its JSON representation.
      *
      * @param  int  $options
-     * @return string
      */
-    public function toJson($options = 0)
+    public function toJson($options = 0): string
     {
-        return json_encode($this->toArray(), $options);
+        return json_encode($this->jsonSerialize(), $options);
+    }
+
+    /**
+     * Dynamically determine if an attribute is set.
+     */
+    public function __isset(string $key): bool
+    {
+        return isset($this->attributes[$key]);
+    }
+
+    /**
+     * Dynamically retrieve the value of an attribute.
+     */
+    public function __get(string $key): mixed
+    {
+        if ($key === 'token') {
+            return $this->getToken();
+        }
+
+        return $this->attributes[$key] ?? null;
     }
 }

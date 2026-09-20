@@ -20,12 +20,18 @@ namespace Google\Service\PaymentsResellerSubscription;
 class FiniteBillingCycleDetails extends \Google\Model
 {
   /**
+   * The number of a subscription line item billing cycles after which billing
+   * will stop automatically.
+   *
    * @var string
    */
   public $billingCycleCountLimit;
 
   /**
-   * @param string
+   * The number of a subscription line item billing cycles after which billing
+   * will stop automatically.
+   *
+   * @param string $billingCycleCountLimit
    */
   public function setBillingCycleCountLimit($billingCycleCountLimit)
   {

@@ -1,10 +1,13 @@
 <?php
 
-namespace Barryvdh\Debugbar\Support\Clockwork;
+declare(strict_types=1);
+
+namespace Fruitcake\LaravelDebugbar\Support\Clockwork;
 
 use DebugBar\DataCollector\DataCollector;
 use DebugBar\DataCollector\DataCollectorInterface;
 use DebugBar\DataCollector\Renderable;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -14,31 +17,21 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ClockworkCollector extends DataCollector implements DataCollectorInterface, Renderable
 {
-    /** @var \Symfony\Component\HttpFoundation\Request $request */
-    protected $request;
-    /** @var  \Symfony\Component\HttpFoundation\Request $response */
-    protected $response;
-    /** @var  \Symfony\Component\HttpFoundation\Session\SessionInterface $session */
-    protected $session;
+    protected Request $request;
+    protected Response $response;
 
-    /**
-     * Create a new SymfonyRequestCollector
-     *
-     * @param \Symfony\Component\HttpFoundation\Request $request
-     * @param \Symfony\Component\HttpFoundation\Request $response
-     * @param \Symfony\Component\HttpFoundation\Session\SessionInterface $session
-     */
-    public function __construct($request, $response, $session = null)
-    {
+    public function __construct(
+        Request $request,
+        Response $response
+    ) {
         $this->request = $request;
         $this->response = $response;
-        $this->session = $session;
     }
 
     /**
      * {@inheritDoc}
      */
-    public function getName()
+    public function getName(): string
     {
         return 'clockwork';
     }
@@ -46,15 +39,15 @@ class ClockworkCollector extends DataCollector implements DataCollectorInterface
     /**
      * {@inheritDoc}
      */
-    public function getWidgets()
+    public function getWidgets(): array
     {
-        return null;
+        return [];
     }
 
     /**
      * {@inheritdoc}
      */
-    public function collect()
+    public function collect(): array
     {
         $request = $this->request;
         $response = $this->response;
@@ -69,22 +62,14 @@ class ClockworkCollector extends DataCollector implements DataCollectorInterface
             'responseStatus' => $response->getStatusCode(),
         ];
 
-        if ($this->session) {
-            $sessionAttributes = [];
-            foreach ($this->session->all() as $key => $value) {
-                $sessionAttributes[$key] = $value;
-            }
-            $data['sessionData'] = $sessionAttributes;
+        if ($this->request->hasSession()) {
+            $data['sessionData'] = $this->request->getSession()->all();
         }
 
-        if (isset($data['postData']['php-auth-pw'])) {
-            $data['postData']['php-auth-pw'] = '******';
+        if (isset($data['headers']['authorization'][0])) {
+            $data['headers']['authorization'][0] = substr($data['headers']['authorization'][0], 0, 12) . '******';
         }
 
-        if (isset($data['postData']['PHP_AUTH_PW'])) {
-            $data['postData']['PHP_AUTH_PW'] = '******';
-        }
-
-        return $data;
+        return $this->hideMaskedValues($data);
     }
 }

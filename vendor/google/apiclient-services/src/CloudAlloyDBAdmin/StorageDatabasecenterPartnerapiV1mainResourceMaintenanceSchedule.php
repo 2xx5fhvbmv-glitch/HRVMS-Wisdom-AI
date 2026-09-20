@@ -20,10 +20,66 @@ namespace Google\Service\CloudAlloyDBAdmin;
 class StorageDatabasecenterPartnerapiV1mainResourceMaintenanceSchedule extends \Google\Model
 {
   /**
+   * The day of the week is unspecified.
+   */
+  public const DAY_DAY_OF_WEEK_UNSPECIFIED = 'DAY_OF_WEEK_UNSPECIFIED';
+  /**
+   * Monday
+   */
+  public const DAY_MONDAY = 'MONDAY';
+  /**
+   * Tuesday
+   */
+  public const DAY_TUESDAY = 'TUESDAY';
+  /**
+   * Wednesday
+   */
+  public const DAY_WEDNESDAY = 'WEDNESDAY';
+  /**
+   * Thursday
+   */
+  public const DAY_THURSDAY = 'THURSDAY';
+  /**
+   * Friday
+   */
+  public const DAY_FRIDAY = 'FRIDAY';
+  /**
+   * Saturday
+   */
+  public const DAY_SATURDAY = 'SATURDAY';
+  /**
+   * Sunday
+   */
+  public const DAY_SUNDAY = 'SUNDAY';
+  /**
+   * Disable validation warnings
+   */
+  public const PHASE_PHASE_UNSPECIFIED = 'PHASE_UNSPECIFIED';
+  /**
+   * Disable validation warnings
+   */
+  public const PHASE_ANY = 'ANY';
+  /**
+   * Disable validation warnings
+   */
+  public const PHASE_WEEK1 = 'WEEK1';
+  /**
+   * Disable validation warnings
+   */
+  public const PHASE_WEEK2 = 'WEEK2';
+  /**
+   * Disable validation warnings
+   */
+  public const PHASE_WEEK5 = 'WEEK5';
+  /**
+   * Optional. Disable validation warnings
+   *
    * @var string
    */
   public $day;
   /**
+   * Optional. Disable validation warnings
+   *
    * @var string
    */
   public $phase;
@@ -31,35 +87,46 @@ class StorageDatabasecenterPartnerapiV1mainResourceMaintenanceSchedule extends \
   protected $timeDataType = '';
 
   /**
-   * @param string
+   * Optional. Disable validation warnings
+   *
+   * Accepted values: DAY_OF_WEEK_UNSPECIFIED, MONDAY, TUESDAY, WEDNESDAY,
+   * THURSDAY, FRIDAY, SATURDAY, SUNDAY
+   *
+   * @param self::DAY_* $day
    */
   public function setDay($day)
   {
     $this->day = $day;
   }
   /**
-   * @return string
+   * @return self::DAY_*
    */
   public function getDay()
   {
     return $this->day;
   }
   /**
-   * @param string
+   * Optional. Disable validation warnings
+   *
+   * Accepted values: PHASE_UNSPECIFIED, ANY, WEEK1, WEEK2, WEEK5
+   *
+   * @param self::PHASE_* $phase
    */
   public function setPhase($phase)
   {
     $this->phase = $phase;
   }
   /**
-   * @return string
+   * @return self::PHASE_*
    */
   public function getPhase()
   {
     return $this->phase;
   }
   /**
-   * @param GoogleTypeTimeOfDay
+   * Optional. Disable validation warnings
+   *
+   * @param GoogleTypeTimeOfDay $time
    */
   public function setTime(GoogleTypeTimeOfDay $time)
   {

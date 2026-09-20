@@ -6,6 +6,7 @@ use App\Models\Payment;
 use DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
+use Illuminate\Support\Enumerable;
 
 class ResortShopkeeperPaymentsExport implements FromCollection, WithHeadings
 {
@@ -22,7 +23,7 @@ class ResortShopkeeperPaymentsExport implements FromCollection, WithHeadings
         $this->searchTerm = $searchTerm;
     }
 
-    public function collection()
+    public function collection(): Enumerable
     {
         $query = Payment::join('employees as e', 'e.id', '=', 'payments.emp_id')
             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')

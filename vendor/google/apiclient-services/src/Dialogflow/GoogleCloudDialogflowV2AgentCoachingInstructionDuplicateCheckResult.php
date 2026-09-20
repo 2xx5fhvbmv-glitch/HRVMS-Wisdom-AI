@@ -24,7 +24,7 @@ class GoogleCloudDialogflowV2AgentCoachingInstructionDuplicateCheckResult extend
   protected $duplicateSuggestionsDataType = 'array';
 
   /**
-   * @param GoogleCloudDialogflowV2AgentCoachingInstructionDuplicateCheckResultDuplicateSuggestion[]
+   * @param GoogleCloudDialogflowV2AgentCoachingInstructionDuplicateCheckResultDuplicateSuggestion[] $duplicateSuggestions
    */
   public function setDuplicateSuggestions($duplicateSuggestions)
   {

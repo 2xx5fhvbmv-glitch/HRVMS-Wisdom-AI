@@ -29,7 +29,7 @@ class GoogleCloudDialogflowV2AgentCoachingSuggestionAgentActionSuggestion extend
   protected $sourcesDataType = '';
 
   /**
-   * @param string
+   * @param string $agentAction
    */
   public function setAgentAction($agentAction)
   {
@@ -43,7 +43,7 @@ class GoogleCloudDialogflowV2AgentCoachingSuggestionAgentActionSuggestion extend
     return $this->agentAction;
   }
   /**
-   * @param GoogleCloudDialogflowV2AgentCoachingSuggestionDuplicateCheckResult
+   * @param GoogleCloudDialogflowV2AgentCoachingSuggestionDuplicateCheckResult $duplicateCheckResult
    */
   public function setDuplicateCheckResult(GoogleCloudDialogflowV2AgentCoachingSuggestionDuplicateCheckResult $duplicateCheckResult)
   {
@@ -57,7 +57,7 @@ class GoogleCloudDialogflowV2AgentCoachingSuggestionAgentActionSuggestion extend
     return $this->duplicateCheckResult;
   }
   /**
-   * @param GoogleCloudDialogflowV2AgentCoachingSuggestionSources
+   * @param GoogleCloudDialogflowV2AgentCoachingSuggestionSources $sources
    */
   public function setSources(GoogleCloudDialogflowV2AgentCoachingSuggestionSources $sources)
   {

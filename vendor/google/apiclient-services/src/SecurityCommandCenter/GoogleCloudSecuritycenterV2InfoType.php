@@ -31,7 +31,7 @@ class GoogleCloudSecuritycenterV2InfoType extends \Google\Model
   public $version;
 
   /**
-   * @param string
+   * @param string $name
    */
   public function setName($name)
   {
@@ -45,7 +45,7 @@ class GoogleCloudSecuritycenterV2InfoType extends \Google\Model
     return $this->name;
   }
   /**
-   * @param GoogleCloudSecuritycenterV2SensitivityScore
+   * @param GoogleCloudSecuritycenterV2SensitivityScore $sensitivityScore
    */
   public function setSensitivityScore(GoogleCloudSecuritycenterV2SensitivityScore $sensitivityScore)
   {
@@ -59,7 +59,7 @@ class GoogleCloudSecuritycenterV2InfoType extends \Google\Model
     return $this->sensitivityScore;
   }
   /**
-   * @param string
+   * @param string $version
    */
   public function setVersion($version)
   {

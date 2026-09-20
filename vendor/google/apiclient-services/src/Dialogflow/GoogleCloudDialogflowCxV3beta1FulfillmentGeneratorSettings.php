@@ -33,7 +33,7 @@ class GoogleCloudDialogflowCxV3beta1FulfillmentGeneratorSettings extends \Google
   public $outputParameter;
 
   /**
-   * @param string
+   * @param string $generator
    */
   public function setGenerator($generator)
   {
@@ -47,7 +47,7 @@ class GoogleCloudDialogflowCxV3beta1FulfillmentGeneratorSettings extends \Google
     return $this->generator;
   }
   /**
-   * @param string[]
+   * @param string[] $inputParameters
    */
   public function setInputParameters($inputParameters)
   {
@@ -61,7 +61,7 @@ class GoogleCloudDialogflowCxV3beta1FulfillmentGeneratorSettings extends \Google
     return $this->inputParameters;
   }
   /**
-   * @param string
+   * @param string $outputParameter
    */
   public function setOutputParameter($outputParameter)
   {

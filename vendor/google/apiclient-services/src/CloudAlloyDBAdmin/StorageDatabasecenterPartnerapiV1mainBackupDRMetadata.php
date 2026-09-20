@@ -26,10 +26,14 @@ class StorageDatabasecenterPartnerapiV1mainBackupDRMetadata extends \Google\Mode
   protected $backupdrConfigurationType = StorageDatabasecenterPartnerapiV1mainBackupDRConfiguration::class;
   protected $backupdrConfigurationDataType = '';
   /**
+   * Required. Disable validation warnings
+   *
    * @var string
    */
   public $fullResourceName;
   /**
+   * Required. Disable validation warnings
+   *
    * @var string
    */
   public $lastRefreshTime;
@@ -37,7 +41,9 @@ class StorageDatabasecenterPartnerapiV1mainBackupDRMetadata extends \Google\Mode
   protected $resourceIdDataType = '';
 
   /**
-   * @param StorageDatabasecenterPartnerapiV1mainBackupConfiguration
+   * Disable validation warnings
+   *
+   * @param StorageDatabasecenterPartnerapiV1mainBackupConfiguration $backupConfiguration
    */
   public function setBackupConfiguration(StorageDatabasecenterPartnerapiV1mainBackupConfiguration $backupConfiguration)
   {
@@ -51,7 +57,9 @@ class StorageDatabasecenterPartnerapiV1mainBackupDRMetadata extends \Google\Mode
     return $this->backupConfiguration;
   }
   /**
-   * @param StorageDatabasecenterPartnerapiV1mainBackupRun
+   * Disable validation warnings
+   *
+   * @param StorageDatabasecenterPartnerapiV1mainBackupRun $backupRun
    */
   public function setBackupRun(StorageDatabasecenterPartnerapiV1mainBackupRun $backupRun)
   {
@@ -65,7 +73,9 @@ class StorageDatabasecenterPartnerapiV1mainBackupDRMetadata extends \Google\Mode
     return $this->backupRun;
   }
   /**
-   * @param StorageDatabasecenterPartnerapiV1mainBackupDRConfiguration
+   * Disable validation warnings
+   *
+   * @param StorageDatabasecenterPartnerapiV1mainBackupDRConfiguration $backupdrConfiguration
    */
   public function setBackupdrConfiguration(StorageDatabasecenterPartnerapiV1mainBackupDRConfiguration $backupdrConfiguration)
   {
@@ -79,7 +89,9 @@ class StorageDatabasecenterPartnerapiV1mainBackupDRMetadata extends \Google\Mode
     return $this->backupdrConfiguration;
   }
   /**
-   * @param string
+   * Required. Disable validation warnings
+   *
+   * @param string $fullResourceName
    */
   public function setFullResourceName($fullResourceName)
   {
@@ -93,7 +105,9 @@ class StorageDatabasecenterPartnerapiV1mainBackupDRMetadata extends \Google\Mode
     return $this->fullResourceName;
   }
   /**
-   * @param string
+   * Required. Disable validation warnings
+   *
+   * @param string $lastRefreshTime
    */
   public function setLastRefreshTime($lastRefreshTime)
   {
@@ -107,7 +121,9 @@ class StorageDatabasecenterPartnerapiV1mainBackupDRMetadata extends \Google\Mode
     return $this->lastRefreshTime;
   }
   /**
-   * @param StorageDatabasecenterPartnerapiV1mainDatabaseResourceId
+   * Required. Disable validation warnings
+   *
+   * @param StorageDatabasecenterPartnerapiV1mainDatabaseResourceId $resourceId
    */
   public function setResourceId(StorageDatabasecenterPartnerapiV1mainDatabaseResourceId $resourceId)
   {

@@ -22,6 +22,18 @@ class AddressInfo extends \Google\Model
   /**
    * @var string
    */
+  public $addressLine;
+  /**
+   * @var string
+   */
+  public $administrativeArea;
+  /**
+   * @var string
+   */
+  public $city;
+  /**
+   * @var string
+   */
   public $familyName;
   /**
    * @var string
@@ -37,7 +49,49 @@ class AddressInfo extends \Google\Model
   public $regionCode;
 
   /**
-   * @param string
+   * @param string $addressLine
+   */
+  public function setAddressLine($addressLine)
+  {
+    $this->addressLine = $addressLine;
+  }
+  /**
+   * @return string
+   */
+  public function getAddressLine()
+  {
+    return $this->addressLine;
+  }
+  /**
+   * @param string $administrativeArea
+   */
+  public function setAdministrativeArea($administrativeArea)
+  {
+    $this->administrativeArea = $administrativeArea;
+  }
+  /**
+   * @return string
+   */
+  public function getAdministrativeArea()
+  {
+    return $this->administrativeArea;
+  }
+  /**
+   * @param string $city
+   */
+  public function setCity($city)
+  {
+    $this->city = $city;
+  }
+  /**
+   * @return string
+   */
+  public function getCity()
+  {
+    return $this->city;
+  }
+  /**
+   * @param string $familyName
    */
   public function setFamilyName($familyName)
   {
@@ -51,7 +105,7 @@ class AddressInfo extends \Google\Model
     return $this->familyName;
   }
   /**
-   * @param string
+   * @param string $givenName
    */
   public function setGivenName($givenName)
   {
@@ -65,7 +119,7 @@ class AddressInfo extends \Google\Model
     return $this->givenName;
   }
   /**
-   * @param string
+   * @param string $postalCode
    */
   public function setPostalCode($postalCode)
   {
@@ -79,7 +133,7 @@ class AddressInfo extends \Google\Model
     return $this->postalCode;
   }
   /**
-   * @param string
+   * @param string $regionCode
    */
   public function setRegionCode($regionCode)
   {

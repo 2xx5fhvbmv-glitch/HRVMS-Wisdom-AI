@@ -285,12 +285,12 @@ class JobAdvertisementController extends Controller
                 ->header('Content-Disposition', 'attachment; filename="job-advertisement.' . $extension . '"');
         }
 
-        $poster = \Image::make($imageBytes);
+        $poster = \Image::read($imageBytes);
 
         $qrSize = 120;
         $padding = 20;
-        $canvas = \Image::canvas($poster->width(), $poster->height() + $qrSize + $padding * 2, '#ffffff');
-        $canvas->insert($poster, 'top-left', 0, 0);
+        $canvas = \Image::create($poster->width(), $poster->height() + $qrSize + $padding * 2)->fill('#ffffff');
+        $canvas->place($poster, 'top-left', 0, 0);
 
         // Drawn by hand instead of via simplesoftwareio/simple-qrcode: that
         // package's PNG output needs Imagick (see the 'svg'-only QR
@@ -311,13 +311,12 @@ class JobAdvertisementController extends Controller
         for ($y = 0; $y < $moduleCount; $y++) {
             for ($x = 0; $x < $moduleCount; $x++) {
                 if ($matrix->get($x, $y) === 1) {
-                    $canvas->rectangle(
+                    $canvas->drawRectangle(
                         $qrX + $x * $moduleSize,
                         $qrY + $y * $moduleSize,
-                        $qrX + ($x + 1) * $moduleSize - 1,
-                        $qrY + ($y + 1) * $moduleSize - 1,
-                        function ($draw) {
-                            $draw->background('#000000');
+                        function ($rect) use ($moduleSize) {
+                            $rect->size($moduleSize, $moduleSize);
+                            $rect->background('#000000');
                         }
                     );
                 }
@@ -331,7 +330,8 @@ class JobAdvertisementController extends Controller
             $font->valign('top');
         });
 
-        return $canvas->response('png')
+        return response((string) $canvas->toPng(), 200)
+            ->header('Content-Type', 'image/png')
             ->header('Content-Disposition', 'attachment; filename="job-advertisement.png"');
     }
 

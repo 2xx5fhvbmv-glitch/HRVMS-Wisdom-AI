@@ -31,7 +31,7 @@ class GoogleCloudDialogflowCxV3HandlerLifecycleHandler extends \Google\Model
   public $lifecycleStage;
 
   /**
-   * @param string
+   * @param string $condition
    */
   public function setCondition($condition)
   {
@@ -45,7 +45,7 @@ class GoogleCloudDialogflowCxV3HandlerLifecycleHandler extends \Google\Model
     return $this->condition;
   }
   /**
-   * @param GoogleCloudDialogflowCxV3Fulfillment
+   * @param GoogleCloudDialogflowCxV3Fulfillment $fulfillment
    */
   public function setFulfillment(GoogleCloudDialogflowCxV3Fulfillment $fulfillment)
   {
@@ -59,7 +59,7 @@ class GoogleCloudDialogflowCxV3HandlerLifecycleHandler extends \Google\Model
     return $this->fulfillment;
   }
   /**
-   * @param string
+   * @param string $lifecycleStage
    */
   public function setLifecycleStage($lifecycleStage)
   {

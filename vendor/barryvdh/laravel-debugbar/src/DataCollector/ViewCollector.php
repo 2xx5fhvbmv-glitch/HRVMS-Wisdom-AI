@@ -1,107 +1,117 @@
 <?php
 
-namespace Barryvdh\Debugbar\DataCollector;
+declare(strict_types=1);
 
-use Barryvdh\Debugbar\DataFormatter\SimpleFormatter;
-use DebugBar\Bridge\Twig\TwigCollector;
+namespace Fruitcake\LaravelDebugbar\DataCollector;
+
+use DebugBar\DataCollector\TemplateCollector;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
-use Symfony\Component\VarDumper\Cloner\VarCloner;
 
-class ViewCollector extends TwigCollector
+class ViewCollector extends TemplateCollector
 {
-    protected $templates = [];
-    protected $collect_data;
-
-    /**
-     * Create a ViewCollector
-     *
-     * @param bool $collectData Collects view data when tru
-     */
-    public function __construct($collectData = true)
-    {
-        $this->setDataFormatter(new SimpleFormatter());
-        $this->collect_data = $collectData;
-        $this->name = 'views';
-        $this->templates = [];
-    }
-
-    public function getName()
+    public function getName(): string
     {
         return 'views';
     }
 
-    public function getWidgets()
-    {
-        return [
-            'views' => [
-                'icon' => 'leaf',
-                'widget' => 'PhpDebugBar.Widgets.TemplatesWidget',
-                'map' => 'views',
-                'default' => '[]'
-            ],
-            'views:badge' => [
-                'map' => 'views.nb_templates',
-                'default' => 0
-            ]
-        ];
-    }
-
     /**
      * Add a View instance to the Collector
-     *
-     * @param \Illuminate\View\View $view
      */
-    public function addView(View $view)
+    public function addView(View $view): void
     {
         $name = $view->getName();
+        $type = null;
+        $data = $view->getData();
         $path = $view->getPath();
 
-        if (!is_object($path)) {
-            if ($path) {
-                $path = ltrim(str_replace(base_path(), '', realpath($path)), '/');
+        // Skip View files from strings
+        if (Str::startsWith($name, '__components::')) {
+            if ($source = $this->getRenderSource($name, $path)) {
+                [$name, $type, $data, $path] = $source;
             }
+        }
 
-            if (substr($path, -10) == '.blade.php') {
-                $type = 'blade';
-            } else {
-                $type = pathinfo($path, PATHINFO_EXTENSION);
-            }
-        } else {
+        if (is_object($path)) {
             $type = get_class($view);
-            $path = '';
+            $path = null;
         }
 
-        if (!$this->collect_data) {
-            $params = array_keys($view->getData());
-        } else {
-            $data = [];
-            foreach ($view->getData() as $key => $value) {
-                $data[$key] = $this->getDataFormatter()->formatVar($value);
+        if ($path && $type !== 'livewire') {
+            if (!$type) {
+                if (substr($path, -10) === '.blade.php') {
+                    $type = 'blade';
+                } else {
+                    $type = pathinfo($path, PATHINFO_EXTENSION);
+                }
             }
-            $params = $data;
+
+            $shortPath = $this->normalizeFilePath($path);
+            foreach ($this->exclude_paths as $excludePath) {
+                if (str_starts_with($shortPath, $excludePath)) {
+                    return;
+                }
+            }
         }
 
-        $template = [
-            'name' => $path ? sprintf('%s (%s)', $name, $path) : $name,
-            'param_count' => count($params),
-            'params' => $params,
-            'type' => $type,
-        ];
-
-        if ($this->getXdebugLink($path)) {
-            $template['xdebug_link'] = $this->getXdebugLink(realpath($view->getPath()));
-        }
-
-        $this->templates[] = $template;
+        $this->addTemplate($name, $data, $type, $path);
     }
 
-    public function collect()
+    private function getRenderSource(string $name, ?string $path): ?array
     {
-        $templates = $this->templates;
+        $backtrace = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, 20);
 
-        return [
-            'nb_templates' => count($templates),
-            'templates' => $templates,
-        ];
+        $component = null;
+        $render = null;
+        $view = null;
+        foreach ($backtrace as $trace) {
+            $function = $trace['function'] ?? null; //@phpstan-ignore-line
+            $class = $trace['class'] ?? null;
+            $file = $trace['file'] ?? null;
+            $object = $trace['object'] ?? null;
+            // Found an invokable class
+            if (
+                $function === '__invoke'
+                && $class === 'Livewire\Component'
+                && $object
+                && !$component
+            ) {
+                /** @var \Livewire\Component $component */
+                $component = $trace['object'];
+                $name = get_class($component);
+                $type = 'livewire';
+                $path = (new \ReflectionClass($component))->getFileName();
+                $component = [$name, $type, [], $path];
+            }
+            if (
+                (
+                    ($function === 'render' && $class === 'Illuminate\View\Compilers\BladeCompiler')
+                    || ($function === '__callStatic' && $class === 'Illuminate\Support\Facades\Facade' && ($trace['args'][0] ?? null) === 'render')
+                )
+                && !str_contains($file, '/Illuminate/')
+                && !$render
+            ) {
+                $render = [$name, 'render', [], $file];
+            }
+
+            if (!$view && $class === 'Illuminate\View\View' && $object instanceof View && !str_starts_with($object->getName(), '__components::')
+            ) {
+                $view  = [$object->getName(), null, $object->getData(), $object->getPath()];
+            }
+        }
+
+        if ($component) {
+            return $component;
+        }
+
+        if ($render) {
+            return $render;
+        }
+
+        if ($view) {
+            return $view;
+        }
+
+        return null;
     }
 }

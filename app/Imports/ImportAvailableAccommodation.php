@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToModel;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Illuminate\Database\Eloquent\Model;
 use App\Models\InventoryModule;
 use App\Models\BuildingModel;
 use App\Models\AccommodationType;
@@ -24,7 +25,7 @@ class ImportAvailableAccommodation implements  ToModel, WithHeadingRow
         $this->resort= Auth::guard('resort-admin')->user();
     }
 
-    public function model(array $row)
+    public function model(array $row): Model|array|null
     {
         $buildingname = $row['buildingname'] ?? null;
         $floor = $row['floor'] ?? null;

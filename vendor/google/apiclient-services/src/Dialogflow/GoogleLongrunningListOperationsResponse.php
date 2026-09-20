@@ -32,7 +32,7 @@ class GoogleLongrunningListOperationsResponse extends \Google\Collection
   public $unreachable;
 
   /**
-   * @param string
+   * @param string $nextPageToken
    */
   public function setNextPageToken($nextPageToken)
   {
@@ -46,7 +46,7 @@ class GoogleLongrunningListOperationsResponse extends \Google\Collection
     return $this->nextPageToken;
   }
   /**
-   * @param GoogleLongrunningOperation[]
+   * @param GoogleLongrunningOperation[] $operations
    */
   public function setOperations($operations)
   {
@@ -60,7 +60,7 @@ class GoogleLongrunningListOperationsResponse extends \Google\Collection
     return $this->operations;
   }
   /**
-   * @param string[]
+   * @param string[] $unreachable
    */
   public function setUnreachable($unreachable)
   {

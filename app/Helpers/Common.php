@@ -10508,18 +10508,16 @@ class Common
      */
     public static function removeSignatureBackground(string $rawImageContents): string
     {
-        $image = \Intervention\Image\Facades\Image::make($rawImageContents);
+        $image = \Intervention\Image\Laravel\Facades\Image::read($rawImageContents);
 
         // Bound the pixel-loop cost below — a signature doesn't need to be
-        // huge, and this runs synchronously in the request.
+        // huge, and this runs synchronously in the request. scaleDown()
+        // never upsizes (matches the old resize()+upsize() constraint).
         if ($image->width() > 900) {
-            $image->resize(900, null, function ($constraint) {
-                $constraint->aspectRatio();
-                $constraint->upsize();
-            });
+            $image->scaleDown(width: 900);
         }
 
-        $gd = $image->getCore();
+        $gd = $image->core()->native();
         imagealphablending($gd, false);
         imagesavealpha($gd, true);
         $width = imagesx($gd);

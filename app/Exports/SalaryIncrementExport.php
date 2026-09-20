@@ -7,6 +7,7 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use App\Helpers\Common;
+use Illuminate\Support\Enumerable;
 
 class SalaryIncrementExport implements FromCollection, WithHeadings, WithMapping
 {
@@ -15,7 +16,7 @@ class SalaryIncrementExport implements FromCollection, WithHeadings, WithMapping
      *
      * @return \Illuminate\Support\Collection
      */
-    public function collection()
+    public function collection(): Enumerable
     {
         return PeopleSalaryIncrement::where('resort_id',auth()->guard('resort-admin')->user()->resort_id)->with([
             'employee.resortAdmin:id,first_name,last_name',
@@ -30,7 +31,7 @@ class SalaryIncrementExport implements FromCollection, WithHeadings, WithMapping
         ->get();
     }
 
-    public function map($row): array
+    public function map(mixed $row): array
     {
         $dateFormat = Common::getDateFormateFromSettings();
         return [

@@ -19,6 +19,9 @@ namespace Google\Service\SecurityCommandCenter;
 
 class Framework extends \Google\Collection
 {
+  public const TYPE_FRAMEWORK_TYPE_UNSPECIFIED = 'FRAMEWORK_TYPE_UNSPECIFIED';
+  public const TYPE_FRAMEWORK_TYPE_BUILT_IN = 'FRAMEWORK_TYPE_BUILT_IN';
+  public const TYPE_FRAMEWORK_TYPE_CUSTOM = 'FRAMEWORK_TYPE_CUSTOM';
   protected $collection_key = 'controls';
   /**
    * @var string[]
@@ -40,7 +43,7 @@ class Framework extends \Google\Collection
   public $type;
 
   /**
-   * @param string[]
+   * @param string[] $category
    */
   public function setCategory($category)
   {
@@ -54,7 +57,7 @@ class Framework extends \Google\Collection
     return $this->category;
   }
   /**
-   * @param Control[]
+   * @param Control[] $controls
    */
   public function setControls($controls)
   {
@@ -68,7 +71,7 @@ class Framework extends \Google\Collection
     return $this->controls;
   }
   /**
-   * @param string
+   * @param string $displayName
    */
   public function setDisplayName($displayName)
   {
@@ -82,7 +85,7 @@ class Framework extends \Google\Collection
     return $this->displayName;
   }
   /**
-   * @param string
+   * @param string $name
    */
   public function setName($name)
   {
@@ -96,14 +99,14 @@ class Framework extends \Google\Collection
     return $this->name;
   }
   /**
-   * @param string
+   * @param self::TYPE_* $type
    */
   public function setType($type)
   {
     $this->type = $type;
   }
   /**
-   * @return string
+   * @return self::TYPE_*
    */
   public function getType()
   {

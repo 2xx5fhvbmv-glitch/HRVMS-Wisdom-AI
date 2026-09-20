@@ -21,12 +21,16 @@ class LocationMetadata extends \Google\Collection
 {
   protected $collection_key = 'unsupportedFeatures';
   /**
+   * List of features that are not supported in the location.
+   *
    * @var string[]
    */
   public $unsupportedFeatures;
 
   /**
-   * @param string[]
+   * List of features that are not supported in the location.
+   *
+   * @param string[] $unsupportedFeatures
    */
   public function setUnsupportedFeatures($unsupportedFeatures)
   {

@@ -4,6 +4,7 @@ namespace App\Imports;
 
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Illuminate\Database\Eloquent\Model;
 use Auth;
 use App\Models\Employee;
 use App\Models\ResortAdmin;
@@ -53,7 +54,7 @@ class EmployeeImport implements ToModel, WithHeadingRow
         return 2; // Assuming row 1 is headers
     }
 
-    public function model(array $row)
+    public function model(array $row): Model|array|null
     {
         $this->rowNumber++;
         $excelRowNumber = $this->rowNumber + $this->startRow() - 1;

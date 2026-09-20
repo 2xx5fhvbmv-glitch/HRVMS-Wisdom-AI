@@ -20,24 +20,65 @@ namespace Google\Service\Networkconnectivity;
 class AutoCreatedSubnetworkInfo extends \Google\Model
 {
   /**
+   * Output only. Indicates whether the subnetwork is delinked from the Service
+   * Connection Policy. Only set if the subnetwork mode is AUTO_CREATED during
+   * creation.
+   *
+   * @var bool
+   */
+  public $delinked;
+  /**
+   * Output only. URI of the automatically created Internal Range. Only set if
+   * the subnetwork mode is AUTO_CREATED during creation.
+   *
    * @var string
    */
   public $internalRange;
   /**
+   * Output only. URI of the automatically created Internal Range reference.
+   * Only set if the subnetwork mode is AUTO_CREATED during creation.
+   *
    * @var string
    */
   public $internalRangeRef;
   /**
+   * Output only. URI of the automatically created subnetwork. Only set if the
+   * subnetwork mode is AUTO_CREATED during creation.
+   *
    * @var string
    */
   public $subnetwork;
   /**
+   * Output only. URI of the automatically created subnetwork reference. Only
+   * set if the subnetwork mode is AUTO_CREATED during creation.
+   *
    * @var string
    */
   public $subnetworkRef;
 
   /**
-   * @param string
+   * Output only. Indicates whether the subnetwork is delinked from the Service
+   * Connection Policy. Only set if the subnetwork mode is AUTO_CREATED during
+   * creation.
+   *
+   * @param bool $delinked
+   */
+  public function setDelinked($delinked)
+  {
+    $this->delinked = $delinked;
+  }
+  /**
+   * @return bool
+   */
+  public function getDelinked()
+  {
+    return $this->delinked;
+  }
+  /**
+   * Output only. URI of the automatically created Internal Range. Only set if
+   * the subnetwork mode is AUTO_CREATED during creation.
+   *
+   * @param string $internalRange
    */
   public function setInternalRange($internalRange)
   {
@@ -51,7 +92,10 @@ class AutoCreatedSubnetworkInfo extends \Google\Model
     return $this->internalRange;
   }
   /**
-   * @param string
+   * Output only. URI of the automatically created Internal Range reference.
+   * Only set if the subnetwork mode is AUTO_CREATED during creation.
+   *
+   * @param string $internalRangeRef
    */
   public function setInternalRangeRef($internalRangeRef)
   {
@@ -65,7 +109,10 @@ class AutoCreatedSubnetworkInfo extends \Google\Model
     return $this->internalRangeRef;
   }
   /**
-   * @param string
+   * Output only. URI of the automatically created subnetwork. Only set if the
+   * subnetwork mode is AUTO_CREATED during creation.
+   *
+   * @param string $subnetwork
    */
   public function setSubnetwork($subnetwork)
   {
@@ -79,7 +126,10 @@ class AutoCreatedSubnetworkInfo extends \Google\Model
     return $this->subnetwork;
   }
   /**
-   * @param string
+   * Output only. URI of the automatically created subnetwork reference. Only
+   * set if the subnetwork mode is AUTO_CREATED during creation.
+   *
+   * @param string $subnetworkRef
    */
   public function setSubnetworkRef($subnetworkRef)
   {

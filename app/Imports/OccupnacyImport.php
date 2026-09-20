@@ -17,6 +17,7 @@ use DateTime;
 use App\Models\ResortDepartment;
 use  App\Models\Occuplany;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
+use Illuminate\Database\Eloquent\Model;
 
 
 use Illuminate\Support\Facades\Session;
@@ -32,7 +33,7 @@ class OccupnacyImport implements ToModel, WithHeadingRow
         $this->resort = Auth::guard('resort-admin')->user();
     }
 
-    public function model(array $row)
+    public function model(array $row): Model|array|null
     {
         $this->rowCount++;
 

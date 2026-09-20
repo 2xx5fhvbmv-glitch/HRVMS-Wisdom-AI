@@ -20,26 +20,43 @@ namespace Google\Service\FirebaseAppHosting;
 class SourceUserMetadata extends \Google\Model
 {
   /**
+   * Output only. Deprecated: Not used. The user-chosen displayname. May be
+   * empty.
+   *
+   * @deprecated
    * @var string
    */
   public $displayName;
   /**
+   * Output only. Deprecated: Not used. The account email linked to the EUC that
+   * created the build. May be a service account or other robot account.
+   *
+   * @deprecated
    * @var string
    */
   public $email;
   /**
+   * Output only. Deprecated: Not used. The URI of a profile photo associated
+   * with the user who created the build.
+   *
+   * @deprecated
    * @var string
    */
   public $imageUri;
 
   /**
-   * @param string
+   * Output only. Deprecated: Not used. The user-chosen displayname. May be
+   * empty.
+   *
+   * @deprecated
+   * @param string $displayName
    */
   public function setDisplayName($displayName)
   {
     $this->displayName = $displayName;
   }
   /**
+   * @deprecated
    * @return string
    */
   public function getDisplayName()
@@ -47,13 +64,18 @@ class SourceUserMetadata extends \Google\Model
     return $this->displayName;
   }
   /**
-   * @param string
+   * Output only. Deprecated: Not used. The account email linked to the EUC that
+   * created the build. May be a service account or other robot account.
+   *
+   * @deprecated
+   * @param string $email
    */
   public function setEmail($email)
   {
     $this->email = $email;
   }
   /**
+   * @deprecated
    * @return string
    */
   public function getEmail()
@@ -61,13 +83,18 @@ class SourceUserMetadata extends \Google\Model
     return $this->email;
   }
   /**
-   * @param string
+   * Output only. Deprecated: Not used. The URI of a profile photo associated
+   * with the user who created the build.
+   *
+   * @deprecated
+   * @param string $imageUri
    */
   public function setImageUri($imageUri)
   {
     $this->imageUri = $imageUri;
   }
   /**
+   * @deprecated
    * @return string
    */
   public function getImageUri()

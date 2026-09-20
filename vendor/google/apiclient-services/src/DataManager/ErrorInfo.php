@@ -24,7 +24,7 @@ class ErrorInfo extends \Google\Collection
   protected $errorCountsDataType = 'array';
 
   /**
-   * @param ErrorCount[]
+   * @param ErrorCount[] $errorCounts
    */
   public function setErrorCounts($errorCounts)
   {

@@ -20,7 +20,7 @@ class ProductTemplateExport implements FromCollection, WithHeadings, WithEvents
         ];
     }
 
-    public function collection()
+    public function collection(): Collection
     {
         return new Collection([
             ['Product1', '30', 'Dollar'],

@@ -17,11 +17,11 @@
 
 namespace Google\Service\Contactcenterinsights\Resource;
 
-use Google\Service\Contactcenterinsights\GoogleCloudContactcenterinsightsV1BulkAnalyzeConversationsRequest;
 use Google\Service\Contactcenterinsights\GoogleCloudContactcenterinsightsV1BulkDeleteConversationsRequest;
 use Google\Service\Contactcenterinsights\GoogleCloudContactcenterinsightsV1CalculateStatsRequest;
 use Google\Service\Contactcenterinsights\GoogleCloudContactcenterinsightsV1CalculateStatsResponse;
 use Google\Service\Contactcenterinsights\GoogleCloudContactcenterinsightsV1Conversation;
+use Google\Service\Contactcenterinsights\GoogleCloudContactcenterinsightsV1GenerateConversationSignedAudioResponse;
 use Google\Service\Contactcenterinsights\GoogleCloudContactcenterinsightsV1IngestConversationsRequest;
 use Google\Service\Contactcenterinsights\GoogleCloudContactcenterinsightsV1ListConversationsResponse;
 use Google\Service\Contactcenterinsights\GoogleCloudContactcenterinsightsV1SampleConversationsRequest;
@@ -38,22 +38,6 @@ use Google\Service\Contactcenterinsights\GoogleProtobufEmpty;
  */
 class ProjectsLocationsDatasetsConversations extends \Google\Service\Resource
 {
-  /**
-   * Analyzes multiple conversations in a single request.
-   * (conversations.bulkAnalyze)
-   *
-   * @param string $parent Required. The parent resource to create analyses in.
-   * @param GoogleCloudContactcenterinsightsV1BulkAnalyzeConversationsRequest $postBody
-   * @param array $optParams Optional parameters.
-   * @return GoogleLongrunningOperation
-   * @throws \Google\Service\Exception
-   */
-  public function bulkAnalyze($parent, GoogleCloudContactcenterinsightsV1BulkAnalyzeConversationsRequest $postBody, $optParams = [])
-  {
-    $params = ['parent' => $parent, 'postBody' => $postBody];
-    $params = array_merge($params, $optParams);
-    return $this->call('bulkAnalyze', [$params], GoogleLongrunningOperation::class);
-  }
   /**
    * Deletes multiple conversations in a single request.
    * (conversations.bulkDelete)
@@ -103,6 +87,21 @@ class ProjectsLocationsDatasetsConversations extends \Google\Service\Resource
     $params = ['name' => $name];
     $params = array_merge($params, $optParams);
     return $this->call('delete', [$params], GoogleProtobufEmpty::class);
+  }
+  /**
+   * Gets the signed URI for the audio for the given conversation.
+   * (conversations.generateSignedAudio)
+   *
+   * @param string $name Required. The name of the conversation to sign.
+   * @param array $optParams Optional parameters.
+   * @return GoogleCloudContactcenterinsightsV1GenerateConversationSignedAudioResponse
+   * @throws \Google\Service\Exception
+   */
+  public function generateSignedAudio($name, $optParams = [])
+  {
+    $params = ['name' => $name];
+    $params = array_merge($params, $optParams);
+    return $this->call('generateSignedAudio', [$params], GoogleCloudContactcenterinsightsV1GenerateConversationSignedAudioResponse::class);
   }
   /**
    * Gets a conversation. (conversations.get)

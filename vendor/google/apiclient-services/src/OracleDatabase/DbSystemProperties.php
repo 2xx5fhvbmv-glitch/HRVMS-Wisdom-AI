@@ -19,22 +19,119 @@ namespace Google\Service\OracleDatabase;
 
 class DbSystemProperties extends \Google\Collection
 {
+  /**
+   * The compute model is unspecified.
+   */
+  public const COMPUTE_MODEL_COMPUTE_MODEL_UNSPECIFIED = 'COMPUTE_MODEL_UNSPECIFIED';
+  /**
+   * The compute model is virtual.
+   */
+  public const COMPUTE_MODEL_ECPU = 'ECPU';
+  /**
+   * Deprecated: This option is not supported. Please use ECPU instead. The
+   * compute model is physical.
+   *
+   * @deprecated
+   */
+  public const COMPUTE_MODEL_OCPU = 'OCPU';
+  /**
+   * The database edition is unspecified.
+   */
+  public const DATABASE_EDITION_DB_SYSTEM_DATABASE_EDITION_UNSPECIFIED = 'DB_SYSTEM_DATABASE_EDITION_UNSPECIFIED';
+  /**
+   * The database edition is Standard.
+   */
+  public const DATABASE_EDITION_STANDARD_EDITION = 'STANDARD_EDITION';
+  /**
+   * The database edition is Enterprise.
+   */
+  public const DATABASE_EDITION_ENTERPRISE_EDITION = 'ENTERPRISE_EDITION';
+  /**
+   * The database edition is Enterprise Edition.
+   */
+  public const DATABASE_EDITION_ENTERPRISE_EDITION_HIGH_PERFORMANCE = 'ENTERPRISE_EDITION_HIGH_PERFORMANCE';
+  /**
+   * The license model is unspecified.
+   */
+  public const LICENSE_MODEL_LICENSE_MODEL_UNSPECIFIED = 'LICENSE_MODEL_UNSPECIFIED';
+  /**
+   * The license model is included.
+   */
+  public const LICENSE_MODEL_LICENSE_INCLUDED = 'LICENSE_INCLUDED';
+  /**
+   * The license model is bring your own license.
+   */
+  public const LICENSE_MODEL_BRING_YOUR_OWN_LICENSE = 'BRING_YOUR_OWN_LICENSE';
+  /**
+   * Default unspecified value.
+   */
+  public const LIFECYCLE_STATE_DB_SYSTEM_LIFECYCLE_STATE_UNSPECIFIED = 'DB_SYSTEM_LIFECYCLE_STATE_UNSPECIFIED';
+  /**
+   * Indicates that the resource is in provisioning state.
+   */
+  public const LIFECYCLE_STATE_PROVISIONING = 'PROVISIONING';
+  /**
+   * Indicates that the resource is in available state.
+   */
+  public const LIFECYCLE_STATE_AVAILABLE = 'AVAILABLE';
+  /**
+   * Indicates that the resource is in updating state.
+   */
+  public const LIFECYCLE_STATE_UPDATING = 'UPDATING';
+  /**
+   * Indicates that the resource is in terminating state.
+   */
+  public const LIFECYCLE_STATE_TERMINATING = 'TERMINATING';
+  /**
+   * Indicates that the resource is in terminated state.
+   */
+  public const LIFECYCLE_STATE_TERMINATED = 'TERMINATED';
+  /**
+   * Indicates that the resource is in failed state.
+   */
+  public const LIFECYCLE_STATE_FAILED = 'FAILED';
+  /**
+   * Indicates that the resource has been migrated.
+   */
+  public const LIFECYCLE_STATE_MIGRATED = 'MIGRATED';
+  /**
+   * Indicates that the resource is in maintenance in progress state.
+   */
+  public const LIFECYCLE_STATE_MAINTENANCE_IN_PROGRESS = 'MAINTENANCE_IN_PROGRESS';
+  /**
+   * Indicates that the resource needs attention.
+   */
+  public const LIFECYCLE_STATE_NEEDS_ATTENTION = 'NEEDS_ATTENTION';
+  /**
+   * Indicates that the resource is upgrading.
+   */
+  public const LIFECYCLE_STATE_UPGRADING = 'UPGRADING';
   protected $collection_key = 'sshPublicKeys';
   /**
+   * Required. The number of CPU cores to enable for the DbSystem.
+   *
    * @var int
    */
   public $computeCount;
   /**
+   * Optional. The compute model of the DbSystem.
+   *
    * @var string
    */
   public $computeModel;
   protected $dataCollectionOptionsType = DataCollectionOptionsDbSystem::class;
   protected $dataCollectionOptionsDataType = '';
   /**
+   * Optional. The data storage size in GB that is currently available to
+   * DbSystems. The value is same as initial_data_storage_size_gb. This can be
+   * modified from OCI console.
+   *
    * @var int
    */
   public $dataStorageSizeGb;
   /**
+   * Required. The database edition of the DbSystem.
+   *
    * @var string
    */
   public $databaseEdition;
@@ -43,54 +140,84 @@ class DbSystemProperties extends \Google\Collection
   protected $dbSystemOptionsType = DbSystemOptions::class;
   protected $dbSystemOptionsDataType = '';
   /**
+   * Optional. The host domain name of the DbSystem.
+   *
    * @var string
    */
   public $domain;
   /**
+   * Output only. The hostname of the DbSystem.
+   *
    * @var string
    */
   public $hostname;
   /**
+   * Optional. Prefix for DB System host names.
+   *
    * @var string
    */
   public $hostnamePrefix;
   /**
+   * Required. The initial data storage size in GB.
+   *
    * @var int
    */
   public $initialDataStorageSizeGb;
   /**
+   * Required. The license model of the DbSystem.
+   *
    * @var string
    */
   public $licenseModel;
   /**
+   * Output only. State of the DbSystem.
+   *
    * @var string
    */
   public $lifecycleState;
   /**
+   * Optional. The memory size in GB. This value can not be set and is
+   * automatically calculated based on the number of ECPUs allocated to the
+   * DbSystem.
+   *
    * @var int
    */
   public $memorySizeGb;
   /**
+   * Optional. The number of nodes to launch for a virtual machine DbSystem. By
+   * default this will be set to 1.
+   *
    * @var int
    */
   public $nodeCount;
   /**
+   * Output only. OCID of the DbSystem.
+   *
    * @var string
    */
   public $ocid;
   /**
+   * Optional. The private IP address of the DbSystem.
+   *
    * @var string
    */
   public $privateIp;
   /**
+   * Optional. The reco/redo storage size in GB. The value for recovery storage
+   * size is based on the available data storage size.
+   *
    * @var int
    */
   public $recoStorageSizeGb;
   /**
+   * Required. Shape of DB System.
+   *
    * @var string
    */
   public $shape;
   /**
+   * Required. SSH public keys to be stored with the DbSystem.
+   *
    * @var string[]
    */
   public $sshPublicKeys;
@@ -98,7 +225,9 @@ class DbSystemProperties extends \Google\Collection
   protected $timeZoneDataType = '';
 
   /**
-   * @param int
+   * Required. The number of CPU cores to enable for the DbSystem.
+   *
+   * @param int $computeCount
    */
   public function setComputeCount($computeCount)
   {
@@ -112,21 +241,27 @@ class DbSystemProperties extends \Google\Collection
     return $this->computeCount;
   }
   /**
-   * @param string
+   * Optional. The compute model of the DbSystem.
+   *
+   * Accepted values: COMPUTE_MODEL_UNSPECIFIED, ECPU, OCPU
+   *
+   * @param self::COMPUTE_MODEL_* $computeModel
    */
   public function setComputeModel($computeModel)
   {
     $this->computeModel = $computeModel;
   }
   /**
-   * @return string
+   * @return self::COMPUTE_MODEL_*
    */
   public function getComputeModel()
   {
     return $this->computeModel;
   }
   /**
-   * @param DataCollectionOptionsDbSystem
+   * Optional. Data collection options for diagnostics.
+   *
+   * @param DataCollectionOptionsDbSystem $dataCollectionOptions
    */
   public function setDataCollectionOptions(DataCollectionOptionsDbSystem $dataCollectionOptions)
   {
@@ -140,7 +275,11 @@ class DbSystemProperties extends \Google\Collection
     return $this->dataCollectionOptions;
   }
   /**
-   * @param int
+   * Optional. The data storage size in GB that is currently available to
+   * DbSystems. The value is same as initial_data_storage_size_gb. This can be
+   * modified from OCI console.
+   *
+   * @param int $dataStorageSizeGb
    */
   public function setDataStorageSizeGb($dataStorageSizeGb)
   {
@@ -154,21 +293,28 @@ class DbSystemProperties extends \Google\Collection
     return $this->dataStorageSizeGb;
   }
   /**
-   * @param string
+   * Required. The database edition of the DbSystem.
+   *
+   * Accepted values: DB_SYSTEM_DATABASE_EDITION_UNSPECIFIED, STANDARD_EDITION,
+   * ENTERPRISE_EDITION, ENTERPRISE_EDITION_HIGH_PERFORMANCE
+   *
+   * @param self::DATABASE_EDITION_* $databaseEdition
    */
   public function setDatabaseEdition($databaseEdition)
   {
     $this->databaseEdition = $databaseEdition;
   }
   /**
-   * @return string
+   * @return self::DATABASE_EDITION_*
    */
   public function getDatabaseEdition()
   {
     return $this->databaseEdition;
   }
   /**
-   * @param DbHome
+   * Optional. Details for creating a Database Home.
+   *
+   * @param DbHome $dbHome
    */
   public function setDbHome(DbHome $dbHome)
   {
@@ -182,7 +328,9 @@ class DbSystemProperties extends \Google\Collection
     return $this->dbHome;
   }
   /**
-   * @param DbSystemOptions
+   * Optional. The options for the DbSystem.
+   *
+   * @param DbSystemOptions $dbSystemOptions
    */
   public function setDbSystemOptions(DbSystemOptions $dbSystemOptions)
   {
@@ -196,7 +344,9 @@ class DbSystemProperties extends \Google\Collection
     return $this->dbSystemOptions;
   }
   /**
-   * @param string
+   * Optional. The host domain name of the DbSystem.
+   *
+   * @param string $domain
    */
   public function setDomain($domain)
   {
@@ -210,7 +360,9 @@ class DbSystemProperties extends \Google\Collection
     return $this->domain;
   }
   /**
-   * @param string
+   * Output only. The hostname of the DbSystem.
+   *
+   * @param string $hostname
    */
   public function setHostname($hostname)
   {
@@ -224,7 +376,9 @@ class DbSystemProperties extends \Google\Collection
     return $this->hostname;
   }
   /**
-   * @param string
+   * Optional. Prefix for DB System host names.
+   *
+   * @param string $hostnamePrefix
    */
   public function setHostnamePrefix($hostnamePrefix)
   {
@@ -238,7 +392,9 @@ class DbSystemProperties extends \Google\Collection
     return $this->hostnamePrefix;
   }
   /**
-   * @param int
+   * Required. The initial data storage size in GB.
+   *
+   * @param int $initialDataStorageSizeGb
    */
   public function setInitialDataStorageSizeGb($initialDataStorageSizeGb)
   {
@@ -252,35 +408,50 @@ class DbSystemProperties extends \Google\Collection
     return $this->initialDataStorageSizeGb;
   }
   /**
-   * @param string
+   * Required. The license model of the DbSystem.
+   *
+   * Accepted values: LICENSE_MODEL_UNSPECIFIED, LICENSE_INCLUDED,
+   * BRING_YOUR_OWN_LICENSE
+   *
+   * @param self::LICENSE_MODEL_* $licenseModel
    */
   public function setLicenseModel($licenseModel)
   {
     $this->licenseModel = $licenseModel;
   }
   /**
-   * @return string
+   * @return self::LICENSE_MODEL_*
    */
   public function getLicenseModel()
   {
     return $this->licenseModel;
   }
   /**
-   * @param string
+   * Output only. State of the DbSystem.
+   *
+   * Accepted values: DB_SYSTEM_LIFECYCLE_STATE_UNSPECIFIED, PROVISIONING,
+   * AVAILABLE, UPDATING, TERMINATING, TERMINATED, FAILED, MIGRATED,
+   * MAINTENANCE_IN_PROGRESS, NEEDS_ATTENTION, UPGRADING
+   *
+   * @param self::LIFECYCLE_STATE_* $lifecycleState
    */
   public function setLifecycleState($lifecycleState)
   {
     $this->lifecycleState = $lifecycleState;
   }
   /**
-   * @return string
+   * @return self::LIFECYCLE_STATE_*
    */
   public function getLifecycleState()
   {
     return $this->lifecycleState;
   }
   /**
-   * @param int
+   * Optional. The memory size in GB. This value can not be set and is
+   * automatically calculated based on the number of ECPUs allocated to the
+   * DbSystem.
+   *
+   * @param int $memorySizeGb
    */
   public function setMemorySizeGb($memorySizeGb)
   {
@@ -294,7 +465,10 @@ class DbSystemProperties extends \Google\Collection
     return $this->memorySizeGb;
   }
   /**
-   * @param int
+   * Optional. The number of nodes to launch for a virtual machine DbSystem. By
+   * default this will be set to 1.
+   *
+   * @param int $nodeCount
    */
   public function setNodeCount($nodeCount)
   {
@@ -308,7 +482,9 @@ class DbSystemProperties extends \Google\Collection
     return $this->nodeCount;
   }
   /**
-   * @param string
+   * Output only. OCID of the DbSystem.
+   *
+   * @param string $ocid
    */
   public function setOcid($ocid)
   {
@@ -322,7 +498,9 @@ class DbSystemProperties extends \Google\Collection
     return $this->ocid;
   }
   /**
-   * @param string
+   * Optional. The private IP address of the DbSystem.
+   *
+   * @param string $privateIp
    */
   public function setPrivateIp($privateIp)
   {
@@ -336,7 +514,10 @@ class DbSystemProperties extends \Google\Collection
     return $this->privateIp;
   }
   /**
-   * @param int
+   * Optional. The reco/redo storage size in GB. The value for recovery storage
+   * size is based on the available data storage size.
+   *
+   * @param int $recoStorageSizeGb
    */
   public function setRecoStorageSizeGb($recoStorageSizeGb)
   {
@@ -350,7 +531,9 @@ class DbSystemProperties extends \Google\Collection
     return $this->recoStorageSizeGb;
   }
   /**
-   * @param string
+   * Required. Shape of DB System.
+   *
+   * @param string $shape
    */
   public function setShape($shape)
   {
@@ -364,7 +547,9 @@ class DbSystemProperties extends \Google\Collection
     return $this->shape;
   }
   /**
-   * @param string[]
+   * Required. SSH public keys to be stored with the DbSystem.
+   *
+   * @param string[] $sshPublicKeys
    */
   public function setSshPublicKeys($sshPublicKeys)
   {
@@ -378,7 +563,9 @@ class DbSystemProperties extends \Google\Collection
     return $this->sshPublicKeys;
   }
   /**
-   * @param TimeZone
+   * Optional. Time zone of the DbSystem.
+   *
+   * @param TimeZone $timeZone
    */
   public function setTimeZone(TimeZone $timeZone)
   {

@@ -34,7 +34,7 @@ class CustomVariable extends \Google\Collection
   public $variable;
 
   /**
-   * @param string[]
+   * @param string[] $destinationReferences
    */
   public function setDestinationReferences($destinationReferences)
   {
@@ -48,7 +48,7 @@ class CustomVariable extends \Google\Collection
     return $this->destinationReferences;
   }
   /**
-   * @param string
+   * @param string $value
    */
   public function setValue($value)
   {
@@ -62,7 +62,7 @@ class CustomVariable extends \Google\Collection
     return $this->value;
   }
   /**
-   * @param string
+   * @param string $variable
    */
   public function setVariable($variable)
   {

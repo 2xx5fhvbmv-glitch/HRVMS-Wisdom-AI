@@ -17,35 +17,97 @@
 
 namespace Google\Service\ManagedKafka;
 
-class Cluster extends \Google\Model
+class Cluster extends \Google\Collection
 {
+  /**
+   * A state was not specified.
+   */
+  public const STATE_STATE_UNSPECIFIED = 'STATE_UNSPECIFIED';
+  /**
+   * The cluster is being created.
+   */
+  public const STATE_CREATING = 'CREATING';
+  /**
+   * The cluster is active.
+   */
+  public const STATE_ACTIVE = 'ACTIVE';
+  /**
+   * The cluster is being deleted.
+   */
+  public const STATE_DELETING = 'DELETING';
+  /**
+   * The cluster is being updated.
+   */
+  public const STATE_UPDATING = 'UPDATING';
+  protected $collection_key = 'brokerDetails';
+  /**
+   * Output only. The bootstrap address of the Kafka cluster. The returned
+   * address format is: `bootstrap-...managedkafka.s.cloud.goog` or
+   * `bootstrap...managedkafka..cloud.goog` (legacy format). ## Examples:
+   * `bootstrap-nol2mecj8p94jhx2ge2rg54579a.c0aad26f.europe-
+   * west1.managedkafka.s.cloud.goog` - `bootstrap.my-cluster.us-
+   * central1.managedkafka.my-project.cloud.goog` The port number is omitted so
+   * clients can connect to their target listener (for example, `:9092` for TLS
+   * or `:9094` for mTLS).
+   *
+   * @var string
+   */
+  public $bootstrapAddress;
+  protected $brokerCapacityConfigType = BrokerCapacityConfig::class;
+  protected $brokerCapacityConfigDataType = '';
+  protected $brokerDetailsType = BrokerDetails::class;
+  protected $brokerDetailsDataType = 'array';
   protected $capacityConfigType = CapacityConfig::class;
   protected $capacityConfigDataType = '';
   /**
+   * Output only. The time when the cluster was created.
+   *
    * @var string
    */
   public $createTime;
+  protected $effectiveCapacityConfigType = EffectiveCapacityConfig::class;
+  protected $effectiveCapacityConfigDataType = '';
   protected $gcpConfigType = GcpConfig::class;
   protected $gcpConfigDataType = '';
   /**
+   * Optional. The Apache Kafka version of the cluster (for example, `3.7.x`,
+   * `4.3.x`). If not specified during cluster creation, defaults to `3.7.x`.
+   *
+   * @var string
+   */
+  public $kafkaVersion;
+  /**
+   * Optional. Labels as key value pairs.
+   *
    * @var string[]
    */
   public $labels;
   /**
+   * Identifier. The name of the cluster. Structured like:
+   * projects/{project_number}/locations/{location}/clusters/{cluster_id}
+   *
    * @var string
    */
   public $name;
+  protected $publicClusterDetailsType = PublicClusterDetails::class;
+  protected $publicClusterDetailsDataType = '';
   protected $rebalanceConfigType = RebalanceConfig::class;
   protected $rebalanceConfigDataType = '';
   /**
+   * Output only. Reserved for future use.
+   *
    * @var bool
    */
   public $satisfiesPzi;
   /**
+   * Output only. Reserved for future use.
+   *
    * @var bool
    */
   public $satisfiesPzs;
   /**
+   * Output only. The current state of the cluster.
+   *
    * @var string
    */
   public $state;
@@ -54,12 +116,73 @@ class Cluster extends \Google\Model
   protected $updateOptionsType = UpdateOptions::class;
   protected $updateOptionsDataType = '';
   /**
+   * Output only. The time when the cluster was last updated.
+   *
    * @var string
    */
   public $updateTime;
 
   /**
-   * @param CapacityConfig
+   * Output only. The bootstrap address of the Kafka cluster. The returned
+   * address format is: `bootstrap-...managedkafka.s.cloud.goog` or
+   * `bootstrap...managedkafka..cloud.goog` (legacy format). ## Examples:
+   * `bootstrap-nol2mecj8p94jhx2ge2rg54579a.c0aad26f.europe-
+   * west1.managedkafka.s.cloud.goog` - `bootstrap.my-cluster.us-
+   * central1.managedkafka.my-project.cloud.goog` The port number is omitted so
+   * clients can connect to their target listener (for example, `:9092` for TLS
+   * or `:9094` for mTLS).
+   *
+   * @param string $bootstrapAddress
+   */
+  public function setBootstrapAddress($bootstrapAddress)
+  {
+    $this->bootstrapAddress = $bootstrapAddress;
+  }
+  /**
+   * @return string
+   */
+  public function getBootstrapAddress()
+  {
+    return $this->bootstrapAddress;
+  }
+  /**
+   * Optional. Capacity configuration at a per-broker level within the Kafka
+   * cluster. The config will be appled to each broker in the cluster.
+   *
+   * @param BrokerCapacityConfig $brokerCapacityConfig
+   */
+  public function setBrokerCapacityConfig(BrokerCapacityConfig $brokerCapacityConfig)
+  {
+    $this->brokerCapacityConfig = $brokerCapacityConfig;
+  }
+  /**
+   * @return BrokerCapacityConfig
+   */
+  public function getBrokerCapacityConfig()
+  {
+    return $this->brokerCapacityConfig;
+  }
+  /**
+   * Output only. Only populated when FULL view is requested. Details of each
+   * broker in the cluster.
+   *
+   * @param BrokerDetails[] $brokerDetails
+   */
+  public function setBrokerDetails($brokerDetails)
+  {
+    $this->brokerDetails = $brokerDetails;
+  }
+  /**
+   * @return BrokerDetails[]
+   */
+  public function getBrokerDetails()
+  {
+    return $this->brokerDetails;
+  }
+  /**
+   * Required. Capacity configuration for the Kafka cluster.
+   *
+   * @param CapacityConfig $capacityConfig
    */
   public function setCapacityConfig(CapacityConfig $capacityConfig)
   {
@@ -73,7 +196,9 @@ class Cluster extends \Google\Model
     return $this->capacityConfig;
   }
   /**
-   * @param string
+   * Output only. The time when the cluster was created.
+   *
+   * @param string $createTime
    */
   public function setCreateTime($createTime)
   {
@@ -87,7 +212,27 @@ class Cluster extends \Google\Model
     return $this->createTime;
   }
   /**
-   * @param GcpConfig
+   * Output only. Only populated when FULL view is requested. The effective
+   * capacity configuration of the cluster.
+   *
+   * @param EffectiveCapacityConfig $effectiveCapacityConfig
+   */
+  public function setEffectiveCapacityConfig(EffectiveCapacityConfig $effectiveCapacityConfig)
+  {
+    $this->effectiveCapacityConfig = $effectiveCapacityConfig;
+  }
+  /**
+   * @return EffectiveCapacityConfig
+   */
+  public function getEffectiveCapacityConfig()
+  {
+    return $this->effectiveCapacityConfig;
+  }
+  /**
+   * Required. Configuration properties for a Kafka cluster deployed to Google
+   * Cloud Platform.
+   *
+   * @param GcpConfig $gcpConfig
    */
   public function setGcpConfig(GcpConfig $gcpConfig)
   {
@@ -101,7 +246,26 @@ class Cluster extends \Google\Model
     return $this->gcpConfig;
   }
   /**
-   * @param string[]
+   * Optional. The Apache Kafka version of the cluster (for example, `3.7.x`,
+   * `4.3.x`). If not specified during cluster creation, defaults to `3.7.x`.
+   *
+   * @param string $kafkaVersion
+   */
+  public function setKafkaVersion($kafkaVersion)
+  {
+    $this->kafkaVersion = $kafkaVersion;
+  }
+  /**
+   * @return string
+   */
+  public function getKafkaVersion()
+  {
+    return $this->kafkaVersion;
+  }
+  /**
+   * Optional. Labels as key value pairs.
+   *
+   * @param string[] $labels
    */
   public function setLabels($labels)
   {
@@ -115,7 +279,10 @@ class Cluster extends \Google\Model
     return $this->labels;
   }
   /**
-   * @param string
+   * Identifier. The name of the cluster. Structured like:
+   * projects/{project_number}/locations/{location}/clusters/{cluster_id}
+   *
+   * @param string $name
    */
   public function setName($name)
   {
@@ -129,7 +296,25 @@ class Cluster extends \Google\Model
     return $this->name;
   }
   /**
-   * @param RebalanceConfig
+   * Output only. Details of the public cluster feature for the Kafka cluster.
+   *
+   * @param PublicClusterDetails $publicClusterDetails
+   */
+  public function setPublicClusterDetails(PublicClusterDetails $publicClusterDetails)
+  {
+    $this->publicClusterDetails = $publicClusterDetails;
+  }
+  /**
+   * @return PublicClusterDetails
+   */
+  public function getPublicClusterDetails()
+  {
+    return $this->publicClusterDetails;
+  }
+  /**
+   * Optional. Rebalance configuration for the Kafka cluster.
+   *
+   * @param RebalanceConfig $rebalanceConfig
    */
   public function setRebalanceConfig(RebalanceConfig $rebalanceConfig)
   {
@@ -143,7 +328,9 @@ class Cluster extends \Google\Model
     return $this->rebalanceConfig;
   }
   /**
-   * @param bool
+   * Output only. Reserved for future use.
+   *
+   * @param bool $satisfiesPzi
    */
   public function setSatisfiesPzi($satisfiesPzi)
   {
@@ -157,7 +344,9 @@ class Cluster extends \Google\Model
     return $this->satisfiesPzi;
   }
   /**
-   * @param bool
+   * Output only. Reserved for future use.
+   *
+   * @param bool $satisfiesPzs
    */
   public function setSatisfiesPzs($satisfiesPzs)
   {
@@ -171,21 +360,27 @@ class Cluster extends \Google\Model
     return $this->satisfiesPzs;
   }
   /**
-   * @param string
+   * Output only. The current state of the cluster.
+   *
+   * Accepted values: STATE_UNSPECIFIED, CREATING, ACTIVE, DELETING, UPDATING
+   *
+   * @param self::STATE_* $state
    */
   public function setState($state)
   {
     $this->state = $state;
   }
   /**
-   * @return string
+   * @return self::STATE_*
    */
   public function getState()
   {
     return $this->state;
   }
   /**
-   * @param TlsConfig
+   * Optional. TLS configuration for the Kafka cluster.
+   *
+   * @param TlsConfig $tlsConfig
    */
   public function setTlsConfig(TlsConfig $tlsConfig)
   {
@@ -199,7 +394,10 @@ class Cluster extends \Google\Model
     return $this->tlsConfig;
   }
   /**
-   * @param UpdateOptions
+   * Optional. UpdateOptions represents options that control how updates to the
+   * cluster are applied.
+   *
+   * @param UpdateOptions $updateOptions
    */
   public function setUpdateOptions(UpdateOptions $updateOptions)
   {
@@ -213,7 +411,9 @@ class Cluster extends \Google\Model
     return $this->updateOptions;
   }
   /**
-   * @param string
+   * Output only. The time when the cluster was last updated.
+   *
+   * @param string $updateTime
    */
   public function setUpdateTime($updateTime)
   {

@@ -19,19 +19,47 @@ namespace Google\Service\Aiplatform;
 
 class GoogleCloudAiplatformV1EvaluationPrompt extends \Google\Model
 {
+  protected $agentDataType = GoogleCloudAiplatformV1AgentData::class;
+  protected $agentDataDataType = '';
   protected $promptTemplateDataType = GoogleCloudAiplatformV1EvaluationPromptPromptTemplateData::class;
   protected $promptTemplateDataDataType = '';
   /**
+   * Text prompt.
+   *
    * @var string
    */
   public $text;
+  protected $userScenarioType = GoogleCloudAiplatformV1EvaluationPromptUserScenario::class;
+  protected $userScenarioDataType = '';
   /**
+   * Fields and values that can be used to populate the prompt template.
+   *
    * @var array
    */
   public $value;
 
   /**
-   * @param GoogleCloudAiplatformV1EvaluationPromptPromptTemplateData
+   * Optional. Represents the complete execution trace of a multi-turn
+   * conversation, which can involve single or multiple agents. This serves as
+   * the input context for agent scraping.
+   *
+   * @param GoogleCloudAiplatformV1AgentData $agentData
+   */
+  public function setAgentData(GoogleCloudAiplatformV1AgentData $agentData)
+  {
+    $this->agentData = $agentData;
+  }
+  /**
+   * @return GoogleCloudAiplatformV1AgentData
+   */
+  public function getAgentData()
+  {
+    return $this->agentData;
+  }
+  /**
+   * Prompt template data.
+   *
+   * @param GoogleCloudAiplatformV1EvaluationPromptPromptTemplateData $promptTemplateData
    */
   public function setPromptTemplateData(GoogleCloudAiplatformV1EvaluationPromptPromptTemplateData $promptTemplateData)
   {
@@ -45,7 +73,9 @@ class GoogleCloudAiplatformV1EvaluationPrompt extends \Google\Model
     return $this->promptTemplateData;
   }
   /**
-   * @param string
+   * Text prompt.
+   *
+   * @param string $text
    */
   public function setText($text)
   {
@@ -59,7 +89,26 @@ class GoogleCloudAiplatformV1EvaluationPrompt extends \Google\Model
     return $this->text;
   }
   /**
-   * @param array
+   * Optional. The generated user scenario used to drive multi-turn agent
+   * running results.
+   *
+   * @param GoogleCloudAiplatformV1EvaluationPromptUserScenario $userScenario
+   */
+  public function setUserScenario(GoogleCloudAiplatformV1EvaluationPromptUserScenario $userScenario)
+  {
+    $this->userScenario = $userScenario;
+  }
+  /**
+   * @return GoogleCloudAiplatformV1EvaluationPromptUserScenario
+   */
+  public function getUserScenario()
+  {
+    return $this->userScenario;
+  }
+  /**
+   * Fields and values that can be used to populate the prompt template.
+   *
+   * @param array $value
    */
   public function setValue($value)
   {

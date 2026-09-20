@@ -38,8 +38,9 @@ class Projects extends \Google\Service\Resource
    * (projects.getAutokeyConfig)
    *
    * @param string $name Required. Name of the AutokeyConfig resource, e.g.
-   * `folders/{FOLDER_NUMBER}/autokeyConfig` or
-   * `projects/{PROJECT_NUMBER}/autokeyConfig`.
+   * `folders/{FOLDER_NUMBER}/autokeyConfig`,
+   * `projects/{PROJECT_NUMBER}/autokeyConfig`, or
+   * `projects/{PROJECT_ID}/autokeyConfig`.
    * @param array $optParams Optional parameters.
    * @return AutokeyConfig
    * @throws \Google\Service\Exception
@@ -54,7 +55,7 @@ class Projects extends \Google\Service\Resource
    * Gets the KeyAccessJustificationsPolicyConfig for a given organization,
    * folder, or project. (projects.getKajPolicyConfig)
    *
-   * @param string $name Required. The name of the
+   * @param string $name Required. Specifies the name of the
    * KeyAccessJustificationsPolicyConfig to get.
    * @param array $optParams Optional parameters.
    * @return KeyAccessJustificationsPolicyConfig
@@ -67,13 +68,17 @@ class Projects extends \Google\Service\Resource
     return $this->call('getKajPolicyConfig', [$params], KeyAccessJustificationsPolicyConfig::class);
   }
   /**
-   * Returns the effective Cloud KMS Autokey configuration for a given project.
+   * Returns the effective Cloud KMS Autokey configuration for a given project or
+   * folder. Note on permissions: - If called on a project (`projects/{project}`),
+   * requires `cloudkms.projects.showEffectiveAutokeyConfig`. - If called on a
+   * folder (`folders/{folder}`), requires
+   * `cloudkms.folders.showEffectiveAutokeyConfig`.
    * (projects.showEffectiveAutokeyConfig)
    *
-   * @param string $parent Required. Name of the resource project to the show
-   * effective Cloud KMS Autokey configuration for. This may be helpful for
-   * interrogating the effect of nested folder configurations on a given resource
-   * project.
+   * @param string $parent Required. Name of the resource project or folder to
+   * show the effective Cloud KMS Autokey configuration for. This may be helpful
+   * for evaluating the effect of nested folder configurations on a given resource
+   * project. Format: * projects/{project} * folders/{folder}
    * @param array $optParams Optional parameters.
    * @return ShowEffectiveAutokeyConfigResponse
    * @throws \Google\Service\Exception
@@ -89,8 +94,8 @@ class Projects extends \Google\Service\Resource
    * to the given project in hierarchy.
    * (projects.showEffectiveKeyAccessJustificationsEnrollmentConfig)
    *
-   * @param string $project Required. The number or id of the project to get the
-   * effective KeyAccessJustificationsEnrollmentConfig for.
+   * @param string $project Required. Specifies the number or id of the project to
+   * get the effective KeyAccessJustificationsEnrollmentConfig for.
    * @param array $optParams Optional parameters.
    * @return ShowEffectiveKeyAccessJustificationsEnrollmentConfigResponse
    * @throws \Google\Service\Exception
@@ -106,8 +111,8 @@ class Projects extends \Google\Service\Resource
    * the given project in hierarchy.
    * (projects.showEffectiveKeyAccessJustificationsPolicyConfig)
    *
-   * @param string $project Required. The number or id of the project to get the
-   * effective KeyAccessJustificationsPolicyConfig. In the format of
+   * @param string $project Required. Specifies the number or id of the project to
+   * get the effective KeyAccessJustificationsPolicyConfig. In the format of
    * "projects/{|}"
    * @param array $optParams Optional parameters.
    * @return ShowEffectiveKeyAccessJustificationsPolicyConfigResponse
@@ -120,16 +125,17 @@ class Projects extends \Google\Service\Resource
     return $this->call('showEffectiveKeyAccessJustificationsPolicyConfig', [$params], ShowEffectiveKeyAccessJustificationsPolicyConfigResponse::class);
   }
   /**
-   * Updates the AutokeyConfig for a folder. The caller must have both
-   * `cloudkms.autokeyConfigs.update` permission on the parent folder and
+   * Updates the AutokeyConfig for a folder or a project. The caller must have
+   * both `cloudkms.autokeyConfigs.update` permission on the parent folder and
    * `cloudkms.cryptoKeys.setIamPolicy` permission on the provided key project. A
    * KeyHandle creation in the folder's descendant projects will use this
    * configuration to determine where to create the resulting CryptoKey.
    * (projects.updateAutokeyConfig)
    *
    * @param string $name Identifier. Name of the AutokeyConfig resource, e.g.
-   * `folders/{FOLDER_NUMBER}/autokeyConfig`
-   * `projects/{PROJECT_NUMBER}/autokeyConfig`.
+   * `folders/{FOLDER_NUMBER}/autokeyConfig`,
+   * `projects/{PROJECT_NUMBER}/autokeyConfig`, or
+   * `projects/{PROJECT_ID}/autokeyConfig`.
    * @param AutokeyConfig $postBody
    * @param array $optParams Optional parameters.
    *
@@ -148,13 +154,14 @@ class Projects extends \Google\Service\Resource
    * Updates the KeyAccessJustificationsPolicyConfig for a given organization,
    * folder, or project. (projects.updateKajPolicyConfig)
    *
-   * @param string $name Identifier. The resource name for this
+   * @param string $name Identifier. Represents the resource name for this
    * KeyAccessJustificationsPolicyConfig in the format of
    * "{organizations|folders|projects}/kajPolicyConfig".
    * @param KeyAccessJustificationsPolicyConfig $postBody
    * @param array $optParams Optional parameters.
    *
-   * @opt_param string updateMask Optional. The list of fields to update.
+   * @opt_param string updateMask Optional. Specifies the list of fields to
+   * update.
    * @return KeyAccessJustificationsPolicyConfig
    * @throws \Google\Service\Exception
    */

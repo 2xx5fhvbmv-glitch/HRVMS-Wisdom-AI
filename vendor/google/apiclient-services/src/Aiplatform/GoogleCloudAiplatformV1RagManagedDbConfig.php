@@ -23,17 +23,26 @@ class GoogleCloudAiplatformV1RagManagedDbConfig extends \Google\Model
   protected $basicDataType = '';
   protected $scaledType = GoogleCloudAiplatformV1RagManagedDbConfigScaled::class;
   protected $scaledDataType = '';
+  protected $serverlessType = GoogleCloudAiplatformV1RagManagedDbConfigServerless::class;
+  protected $serverlessDataType = '';
+  protected $spannerType = GoogleCloudAiplatformV1RagManagedDbConfigSpanner::class;
+  protected $spannerDataType = '';
   protected $unprovisionedType = GoogleCloudAiplatformV1RagManagedDbConfigUnprovisioned::class;
   protected $unprovisionedDataType = '';
 
   /**
-   * @param GoogleCloudAiplatformV1RagManagedDbConfigBasic
+   * Deprecated: Use `mode` instead to set the tier under Spanner. Sets the
+   * RagManagedDb to the Basic tier.
+   *
+   * @deprecated
+   * @param GoogleCloudAiplatformV1RagManagedDbConfigBasic $basic
    */
   public function setBasic(GoogleCloudAiplatformV1RagManagedDbConfigBasic $basic)
   {
     $this->basic = $basic;
   }
   /**
+   * @deprecated
    * @return GoogleCloudAiplatformV1RagManagedDbConfigBasic
    */
   public function getBasic()
@@ -41,13 +50,18 @@ class GoogleCloudAiplatformV1RagManagedDbConfig extends \Google\Model
     return $this->basic;
   }
   /**
-   * @param GoogleCloudAiplatformV1RagManagedDbConfigScaled
+   * Deprecated: Use `mode` instead to set the tier under Spanner. Sets the
+   * RagManagedDb to the Scaled tier.
+   *
+   * @deprecated
+   * @param GoogleCloudAiplatformV1RagManagedDbConfigScaled $scaled
    */
   public function setScaled(GoogleCloudAiplatformV1RagManagedDbConfigScaled $scaled)
   {
     $this->scaled = $scaled;
   }
   /**
+   * @deprecated
    * @return GoogleCloudAiplatformV1RagManagedDbConfigScaled
    */
   public function getScaled()
@@ -55,13 +69,51 @@ class GoogleCloudAiplatformV1RagManagedDbConfig extends \Google\Model
     return $this->scaled;
   }
   /**
-   * @param GoogleCloudAiplatformV1RagManagedDbConfigUnprovisioned
+   * Sets the backend to be the serverless mode offered by RAG Engine.
+   *
+   * @param GoogleCloudAiplatformV1RagManagedDbConfigServerless $serverless
+   */
+  public function setServerless(GoogleCloudAiplatformV1RagManagedDbConfigServerless $serverless)
+  {
+    $this->serverless = $serverless;
+  }
+  /**
+   * @return GoogleCloudAiplatformV1RagManagedDbConfigServerless
+   */
+  public function getServerless()
+  {
+    return $this->serverless;
+  }
+  /**
+   * Sets the RAG Engine backend to be RagManagedDb, built on top of Spanner.
+   * NOTE: This is the default mode (w/ Basic Tier) if not explicitly chosen.
+   *
+   * @param GoogleCloudAiplatformV1RagManagedDbConfigSpanner $spanner
+   */
+  public function setSpanner(GoogleCloudAiplatformV1RagManagedDbConfigSpanner $spanner)
+  {
+    $this->spanner = $spanner;
+  }
+  /**
+   * @return GoogleCloudAiplatformV1RagManagedDbConfigSpanner
+   */
+  public function getSpanner()
+  {
+    return $this->spanner;
+  }
+  /**
+   * Deprecated: Use `mode` instead to set the tier under Spanner. Sets the
+   * RagManagedDb to the Unprovisioned tier.
+   *
+   * @deprecated
+   * @param GoogleCloudAiplatformV1RagManagedDbConfigUnprovisioned $unprovisioned
    */
   public function setUnprovisioned(GoogleCloudAiplatformV1RagManagedDbConfigUnprovisioned $unprovisioned)
   {
     $this->unprovisioned = $unprovisioned;
   }
   /**
+   * @deprecated
    * @return GoogleCloudAiplatformV1RagManagedDbConfigUnprovisioned
    */
   public function getUnprovisioned()

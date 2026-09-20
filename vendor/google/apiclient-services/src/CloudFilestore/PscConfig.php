@@ -20,12 +20,32 @@ namespace Google\Service\CloudFilestore;
 class PscConfig extends \Google\Model
 {
   /**
+   * Optional. Consumer service project in which the Private Service Connect
+   * endpoint would be set up. This is optional, and only relevant in case the
+   * network is a shared VPC. If this is not specified, the endpoint would be
+   * setup in the VPC host project.
+   *
    * @var string
    */
   public $endpointProject;
+  /**
+   * Optional. Immutable. Optional: The desired IP address for the instance. If
+   * not specified, an IP will be automatically allocated. The IP must be from
+   * the subnetwork range configured in the Service Connection Policy. This
+   * effective ip address is set in the ip_addresses field. use 3 instead of 2
+   * to avoid conflict with the reserved_ip_range field.
+   *
+   * @var string
+   */
+  public $requestedIpAddress;
 
   /**
-   * @param string
+   * Optional. Consumer service project in which the Private Service Connect
+   * endpoint would be set up. This is optional, and only relevant in case the
+   * network is a shared VPC. If this is not specified, the endpoint would be
+   * setup in the VPC host project.
+   *
+   * @param string $endpointProject
    */
   public function setEndpointProject($endpointProject)
   {
@@ -37,6 +57,26 @@ class PscConfig extends \Google\Model
   public function getEndpointProject()
   {
     return $this->endpointProject;
+  }
+  /**
+   * Optional. Immutable. Optional: The desired IP address for the instance. If
+   * not specified, an IP will be automatically allocated. The IP must be from
+   * the subnetwork range configured in the Service Connection Policy. This
+   * effective ip address is set in the ip_addresses field. use 3 instead of 2
+   * to avoid conflict with the reserved_ip_range field.
+   *
+   * @param string $requestedIpAddress
+   */
+  public function setRequestedIpAddress($requestedIpAddress)
+  {
+    $this->requestedIpAddress = $requestedIpAddress;
+  }
+  /**
+   * @return string
+   */
+  public function getRequestedIpAddress()
+  {
+    return $this->requestedIpAddress;
   }
 }
 

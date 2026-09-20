@@ -27,7 +27,9 @@ class StorageDatabasecenterPartnerapiV1mainResourceMaintenanceDenySchedule exten
   protected $timeDataType = '';
 
   /**
-   * @param GoogleTypeDate
+   * Optional. Disable validation warnings
+   *
+   * @param GoogleTypeDate $endDate
    */
   public function setEndDate(GoogleTypeDate $endDate)
   {
@@ -41,7 +43,9 @@ class StorageDatabasecenterPartnerapiV1mainResourceMaintenanceDenySchedule exten
     return $this->endDate;
   }
   /**
-   * @param GoogleTypeDate
+   * Optional. Disable validation warnings
+   *
+   * @param GoogleTypeDate $startDate
    */
   public function setStartDate(GoogleTypeDate $startDate)
   {
@@ -55,7 +59,9 @@ class StorageDatabasecenterPartnerapiV1mainResourceMaintenanceDenySchedule exten
     return $this->startDate;
   }
   /**
-   * @param GoogleTypeTimeOfDay
+   * Optional. Disable validation warnings
+   *
+   * @param GoogleTypeTimeOfDay $time
    */
   public function setTime(GoogleTypeTimeOfDay $time)
   {
