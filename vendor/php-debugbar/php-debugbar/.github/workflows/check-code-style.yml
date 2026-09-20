@@ -1,0 +1,37 @@
+name: Check Code Style
+
+on:
+  pull_request:
+    branches:
+      - "*"
+    paths:
+      - '**.php'
+
+jobs:
+  cs-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      COMPOSER_NO_INTERACTION: 1
+
+    name: Check Code Style
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: 8.2
+        coverage: none
+        tools: composer:v2
+
+    - name: Install dependencies
+      env:
+        COMPOSER_ROOT_VERSION: dev-master
+      run: composer update --prefer-dist --no-progress
+
+    - name: Fix Code Style
+      run: vendor/bin/php-cs-fixer check -v --diff
+      continue-on-error: true

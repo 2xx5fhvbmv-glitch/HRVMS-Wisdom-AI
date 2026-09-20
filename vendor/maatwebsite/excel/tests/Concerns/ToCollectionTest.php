@@ -1,0 +1,64 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Maatwebsite\Excel\Tests\Concerns;
+
+use Illuminate\Support\Collection;
+use Maatwebsite\Excel\Concerns\Importable;
+use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Tests\TestCase;
+use PHPUnit\Framework\Assert;
+
+final class ToCollectionTest extends TestCase
+{
+    public function test_can_import_to_collection(): void
+    {
+        $import = new class implements ToCollection
+        {
+            use Importable;
+
+            public bool $called = false;
+
+            public function collection(Collection $collection): void
+            {
+                $this->called = true;
+
+                Assert::assertSame([
+                    ['test', 'test'],
+                    ['test', 'test'],
+                ], $collection->toArray());
+            }
+        };
+
+        $import->import('import.xlsx');
+
+        $this->assertTrue($import->called);
+    }
+
+    public function test_can_import_multiple_sheets_to_collection(): void
+    {
+        $import = new class implements ToCollection
+        {
+            use Importable;
+
+            public int $called = 0;
+
+            public function collection(Collection $collection): void
+            {
+                $this->called++;
+
+                $sheetNumber = $this->called;
+
+                Assert::assertSame([
+                    [$sheetNumber . '.A1', $sheetNumber . '.B1'],
+                    [$sheetNumber . '.A2', $sheetNumber . '.B2'],
+                ], $collection->toArray());
+            }
+        };
+
+        $import->import('import-multiple-sheets.xlsx');
+
+        $this->assertSame(2, $import->called);
+    }
+}

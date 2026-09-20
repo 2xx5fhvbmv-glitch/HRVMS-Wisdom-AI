@@ -1,0 +1,119 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Maatwebsite\Excel\Tests\Concerns;
+
+use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
+use Maatwebsite\Excel\Concerns\Export;
+use Maatwebsite\Excel\Concerns\Exportable;
+use Maatwebsite\Excel\Concerns\FromView;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
+use Maatwebsite\Excel\Tests\Data\Stubs\Database\User;
+use Maatwebsite\Excel\Tests\Data\Stubs\SheetForUsersFromView;
+use Maatwebsite\Excel\Tests\TestCase;
+
+final class FromViewTest extends TestCase
+{
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->loadLaravelMigrations(['--database' => 'testing']);
+    }
+
+    public function test_can_export_from_view(): void
+    {
+        /** @var Collection<int, User> $users */
+        $users = User::factory()->count(100)->create();
+
+        $export = new class($users) implements FromView
+        {
+            use Exportable;
+
+            /**
+             * @param  Collection<int, User>  $users
+             */
+            public function __construct(
+                protected readonly Collection $users,
+            ) {
+            }
+
+            public function view(): View
+            {
+                return view('users', [
+                    'users' => $this->users,
+                ]);
+            }
+        };
+
+        $response = $export->store('from-view.xlsx');
+
+        $this->assertTrue($response);
+
+        $contents = $this->readAsArray(__DIR__ . '/../Data/Disks/Local/from-view.xlsx', 'Xlsx');
+
+        $expected = $users->map(fn (User $user): array => [
+            $user->name,
+            $user->email,
+        ])->prepend(['Name', 'Email'])->toArray();
+
+        $this->assertSame($expected, $contents);
+    }
+
+    public function test_can_export_multiple_sheets_from_view(): void
+    {
+        /** @var Collection<int, User> $users */
+        $users = User::factory()->count(300)->create();
+
+        $export = new class($users) implements Export, WithMultipleSheets
+        {
+            use Exportable;
+
+            /**
+             * @param  Collection<int, User>  $users
+             */
+            public function __construct(
+                protected readonly Collection $users,
+            ) {
+            }
+
+            /**
+             * @return SheetForUsersFromView[]
+             */
+            public function sheets(): array
+            {
+                return [
+                    new SheetForUsersFromView($this->users->forPage(1, 100)),
+                    new SheetForUsersFromView($this->users->forPage(2, 100)),
+                    new SheetForUsersFromView($this->users->forPage(3, 100)),
+                ];
+            }
+        };
+
+        $response = $export->store('from-multiple-view.xlsx');
+
+        $this->assertTrue($response);
+
+        $contents = $this->readAsArray(__DIR__ . '/../Data/Disks/Local/from-multiple-view.xlsx', 'Xlsx', 0);
+
+        $expected = $users->forPage(1, 100)->map(fn (User $user): array => [
+            $user->name,
+            $user->email,
+        ])->prepend(['Name', 'Email'])->toArray();
+
+        $this->assertCount(101, $contents);
+        $this->assertSame($expected, $contents);
+
+        $contents = $this->readAsArray(__DIR__ . '/../Data/Disks/Local/from-multiple-view.xlsx', 'Xlsx', 2);
+
+        $expected = $users->forPage(3, 100)->map(fn (User $user): array => [
+            $user->name,
+            $user->email,
+        ])->prepend(['Name', 'Email'])->toArray();
+
+        $this->assertCount(101, $contents);
+        $this->assertSame($expected, $contents);
+    }
+}

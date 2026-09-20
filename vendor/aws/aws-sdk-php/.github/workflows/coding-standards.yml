@@ -1,0 +1,47 @@
+name: Coding Standards
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  coding-standards:
+    runs-on: ubuntu-latest
+    name: PHPCS
+    steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          coverage: none
+          php-version: '8.1'
+
+      - name: Checkout codebase
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Find changed source files
+        id: changed-source-files
+        shell: bash
+        run: bash .github/scripts/find-changed-source-files.sh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+
+      - name: Install PHP_CodeSniffer
+        if: steps.changed-source-files.outputs.has_files == 'true'
+        run: composer require --dev squizlabs/php_codesniffer "^3.10" --no-interaction --prefer-dist --no-progress --update-with-all-dependencies
+
+      - name: Run PHP_CodeSniffer
+        if: steps.changed-source-files.outputs.has_files == 'true'
+        shell: bash
+        run: bash .github/scripts/run-phpcs.sh

@@ -1,0 +1,65 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Maatwebsite\Excel\Tests\Concerns;
+
+use Maatwebsite\Excel\Concerns\Importable;
+use Maatwebsite\Excel\Concerns\OnEachRow;
+use Maatwebsite\Excel\Row;
+use Maatwebsite\Excel\Tests\TestCase;
+use PHPUnit\Framework\Assert;
+
+final class OnEachRowTest extends TestCase
+{
+    public function test_can_import_each_row_individually(): void
+    {
+        $import = new class implements OnEachRow
+        {
+            use Importable;
+
+            public int $called = 0;
+
+            public function onRow(Row $row): void
+            {
+                foreach ($row->getCellIterator() as $cell) {
+                    Assert::assertSame('test', $cell->getValue());
+                }
+
+                Assert::assertSame([
+                    'test', 'test',
+                ], $row->toArray());
+
+                Assert::assertSame('test', $row[0]);
+
+                $this->called++;
+            }
+        };
+
+        $import->import('import.xlsx');
+
+        $this->assertSame(2, $import->called);
+    }
+
+    public function test_it_respects_the_end_column(): void
+    {
+        $import = new class implements OnEachRow
+        {
+            use Importable;
+
+            public function onRow(Row $row): void
+            {
+                // Accessing a row as an array calls toArray() without an end
+                // column. This saves the row in the cache, so we have to
+                // invalidate the cache once the end column changes
+                Assert::assertIsString($row[0]);
+
+                Assert::assertSame([
+                    'test',
+                ], $row->toArray(null, false, true, 'A'));
+            }
+        };
+
+        $import->import('import.xlsx');
+    }
+}

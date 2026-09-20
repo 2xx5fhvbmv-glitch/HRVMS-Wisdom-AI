@@ -1,0 +1,419 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Maatwebsite\Excel\Tests\Concerns;
+
+use Illuminate\Support\Collection;
+use Maatwebsite\Excel\Concerns\Export;
+use Maatwebsite\Excel\Concerns\Exportable;
+use Maatwebsite\Excel\Concerns\Import;
+use Maatwebsite\Excel\Concerns\Importable;
+use Maatwebsite\Excel\Concerns\SkipsUnknownSheets;
+use Maatwebsite\Excel\Concerns\ToArray;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
+use Maatwebsite\Excel\Exceptions\SheetNotFoundException;
+use Maatwebsite\Excel\Tests\Data\Stubs\Database\User;
+use Maatwebsite\Excel\Tests\Data\Stubs\SheetForUsersFromView;
+use Maatwebsite\Excel\Tests\Data\Stubs\SheetWith100Rows;
+use Maatwebsite\Excel\Tests\TestCase;
+use PHPUnit\Framework\Assert;
+
+final class WithMultipleSheetsTest extends TestCase
+{
+    public function test_can_export_with_multiple_sheets_using_collections(): void
+    {
+        $export = new class implements Export, WithMultipleSheets
+        {
+            use Exportable;
+
+            /**
+             * @return SheetWith100Rows[]
+             */
+            public function sheets(): array
+            {
+                return [
+                    new SheetWith100Rows('A'),
+                    new SheetWith100Rows('B'),
+                    new SheetWith100Rows('C'),
+                ];
+            }
+        };
+
+        $export->store('from-view.xlsx');
+
+        $this->assertCount(100, $this->readAsArray(__DIR__ . '/../Data/Disks/Local/from-view.xlsx', 'Xlsx', 0));
+        $this->assertCount(100, $this->readAsArray(__DIR__ . '/../Data/Disks/Local/from-view.xlsx', 'Xlsx', 1));
+        $this->assertCount(100, $this->readAsArray(__DIR__ . '/../Data/Disks/Local/from-view.xlsx', 'Xlsx', 2));
+    }
+
+    public function test_can_export_multiple_sheets_from_view(): void
+    {
+        $this->loadLaravelMigrations(['--database' => 'testing']);
+        /** @var Collection<int, User> $users */
+        $users = User::factory()->count(300)->create();
+
+        $export = new class($users) implements Export, WithMultipleSheets
+        {
+            use Exportable;
+
+            /**
+             * @param  Collection<int, User>  $users
+             */
+            public function __construct(
+                protected readonly Collection $users,
+            ) {
+            }
+
+            /**
+             * @return SheetForUsersFromView[]
+             */
+            public function sheets(): array
+            {
+                return [
+                    new SheetForUsersFromView($this->users->forPage(1, 100)),
+                    new SheetForUsersFromView($this->users->forPage(2, 100)),
+                    new SheetForUsersFromView($this->users->forPage(3, 100)),
+                ];
+            }
+        };
+
+        $export->store('from-view.xlsx');
+
+        $this->assertCount(101, $this->readAsArray(__DIR__ . '/../Data/Disks/Local/from-view.xlsx', 'Xlsx', 0));
+        $this->assertCount(101, $this->readAsArray(__DIR__ . '/../Data/Disks/Local/from-view.xlsx', 'Xlsx', 1));
+        $this->assertCount(101, $this->readAsArray(__DIR__ . '/../Data/Disks/Local/from-view.xlsx', 'Xlsx', 2));
+    }
+
+    public function test_unknown_sheet_index_will_throw_sheet_not_found_exception(): void
+    {
+        $this->expectException(SheetNotFoundException::class);
+        $this->expectExceptionMessage('Your requested sheet index: 9999 is out of bounds. The actual number of sheets is 2.');
+
+        $import = new class implements Import, WithMultipleSheets
+        {
+            use Importable;
+
+            public function sheets(): array
+            {
+                return [
+                    9999 => new class implements Import
+                    {
+                    },
+                ];
+            }
+        };
+
+        $import->import('import-multiple-sheets.xlsx');
+    }
+
+    public function test_unknown_sheet_name_will_throw_sheet_not_found_exception(): void
+    {
+        $this->expectException(SheetNotFoundException::class);
+        $this->expectExceptionMessage('Your requested sheet name [Some Random Sheet Name] is out of bounds.');
+
+        $import = new class implements Import, WithMultipleSheets
+        {
+            use Importable;
+
+            public function sheets(): array
+            {
+                return [
+                    'Some Random Sheet Name' => new class implements Import
+                    {
+                    },
+                ];
+            }
+        };
+
+        $import->import('import-multiple-sheets.xlsx');
+    }
+
+    public function test_unknown_sheet_name_can_be_ignored(): void
+    {
+        $import = new class implements Import, SkipsUnknownSheets, WithMultipleSheets
+        {
+            use Importable;
+
+            public string|int|null $unknown = null;
+
+            public function sheets(): array
+            {
+                return [
+                    'Some Random Sheet Name' => new class implements Import
+                    {
+                    },
+                ];
+            }
+
+            public function onUnknownSheet(int|string $sheetName): void
+            {
+                $this->unknown = $sheetName;
+            }
+        };
+
+        $import->import('import-multiple-sheets.xlsx');
+
+        $this->assertSame('Some Random Sheet Name', $import->unknown);
+    }
+
+    public function test_unknown_sheet_indices_can_be_ignored_per_name(): void
+    {
+        $import = new class implements Import, WithMultipleSheets
+        {
+            use Importable;
+
+            public function sheets(): array
+            {
+                return [
+                    'Some Random Sheet Name' => new class implements Import, SkipsUnknownSheets
+                    {
+                        public function onUnknownSheet(int|string $sheetName): void
+                        {
+                            Assert::assertSame('Some Random Sheet Name', $sheetName);
+                        }
+                    },
+                ];
+            }
+        };
+
+        $import->import('import-multiple-sheets.xlsx');
+    }
+
+    public function test_unknown_sheet_indices_can_be_ignored(): void
+    {
+        $import = new class implements Import, SkipsUnknownSheets, WithMultipleSheets
+        {
+            use Importable;
+
+            public string|int|null $unknown = null;
+
+            public function sheets(): array
+            {
+                return [
+                    99999 => new class implements Import
+                    {
+                    },
+                ];
+            }
+
+            public function onUnknownSheet(int|string $sheetName): void
+            {
+                $this->unknown = $sheetName;
+            }
+        };
+
+        $import->import('import-multiple-sheets.xlsx');
+
+        $this->assertSame(99999, $import->unknown);
+    }
+
+    public function test_unknown_sheet_indices_can_be_ignored_per_sheet(): void
+    {
+        $import = new class implements Import, WithMultipleSheets
+        {
+            use Importable;
+
+            public function sheets(): array
+            {
+                return [
+                    99999 => new class implements Import, SkipsUnknownSheets
+                    {
+                        public function onUnknownSheet(int|string $sheetName): void
+                        {
+                            Assert::assertSame(99999, $sheetName);
+                        }
+                    },
+                ];
+            }
+        };
+
+        $import->import('import-multiple-sheets.xlsx');
+    }
+
+    public function test_can_import_multiple_sheets(): void
+    {
+        $import = new class implements Import, WithMultipleSheets
+        {
+            use Importable;
+
+            /**
+             * @return ToArray[]
+             */
+            public function sheets(): array
+            {
+                return [
+                    new class implements ToArray
+                    {
+                        public function array(array $array): void
+                        {
+                            Assert::assertSame([
+                                ['1.A1', '1.B1'],
+                                ['1.A2', '1.B2'],
+                            ], $array);
+                        }
+                    },
+                    new class implements ToArray
+                    {
+                        public function array(array $array): void
+                        {
+                            Assert::assertSame([
+                                ['2.A1', '2.B1'],
+                                ['2.A2', '2.B2'],
+                            ], $array);
+                        }
+                    },
+                ];
+            }
+        };
+
+        $import->import('import-multiple-sheets.xlsx');
+    }
+
+    public function test_can_import_multiple_sheets_by_sheet_name(): void
+    {
+        $import = new class implements Import, WithMultipleSheets
+        {
+            use Importable;
+
+            /**
+             * @return array<string, ToArray>
+             */
+            public function sheets(): array
+            {
+                return [
+                    'Sheet2' => new class implements ToArray
+                    {
+                        public function array(array $array): void
+                        {
+                            Assert::assertSame([
+                                ['2.A1', '2.B1'],
+                                ['2.A2', '2.B2'],
+                            ], $array);
+                        }
+                    },
+                    'Sheet1' => new class implements ToArray
+                    {
+                        public function array(array $array): void
+                        {
+                            Assert::assertSame([
+                                ['1.A1', '1.B1'],
+                                ['1.A2', '1.B2'],
+                            ], $array);
+                        }
+                    },
+                ];
+            }
+        };
+
+        $import->import('import-multiple-sheets.xlsx');
+    }
+
+    public function test_can_import_multiple_sheets_by_sheet_index_and_name(): void
+    {
+        $import = new class implements Import, WithMultipleSheets
+        {
+            use Importable;
+
+            /** @var array<int|string, object> */
+            public array $sheets;
+
+            public function __construct()
+            {
+                $this->sheets = [
+                    0 => new class implements ToArray
+                    {
+                        public bool $called = false;
+
+                        public function array(array $array): void
+                        {
+                            $this->called = true;
+                            Assert::assertSame([
+                                ['1.A1', '1.B1'],
+                                ['1.A2', '1.B2'],
+                            ], $array);
+                        }
+                    },
+                    'Sheet2' => new class implements ToArray
+                    {
+                        public bool $called = false;
+
+                        public function array(array $array): void
+                        {
+                            $this->called = true;
+                            Assert::assertSame([
+                                ['2.A1', '2.B1'],
+                                ['2.A2', '2.B2'],
+                            ], $array);
+                        }
+                    },
+                ];
+            }
+
+            public function sheets(): array
+            {
+                return $this->sheets;
+            }
+        };
+
+        $import->import('import-multiple-sheets.xlsx');
+
+        foreach ($import->sheets as $sheet) {
+            $this->assertTrue($sheet->called);
+        }
+    }
+
+    public function test_can_import_multiple_sheets_by_sheet_name_and_index(): void
+    {
+        $import = new class implements Import, WithMultipleSheets
+        {
+            use Importable;
+
+            /** @var array<int|string, object> */
+            public array $sheets;
+
+            public function __construct()
+            {
+                $this->sheets = [
+                    'Sheet1' => new class implements ToArray
+                    {
+                        public bool $called = false;
+
+                        public function array(array $array): void
+                        {
+                            $this->called = true;
+                            Assert::assertSame([
+                                ['1.A1', '1.B1'],
+                                ['1.A2', '1.B2'],
+                            ], $array);
+                        }
+                    },
+                    1 => new class implements ToArray
+                    {
+                        public bool $called = false;
+
+                        public function array(array $array): void
+                        {
+                            $this->called = true;
+                            Assert::assertSame([
+                                ['2.A1', '2.B1'],
+                                ['2.A2', '2.B2'],
+                            ], $array);
+                        }
+                    },
+                ];
+            }
+
+            public function sheets(): array
+            {
+                return $this->sheets;
+            }
+        };
+
+        $import->import('import-multiple-sheets.xlsx');
+
+        foreach ($import->sheets as $sheet) {
+            $this->assertTrue($sheet->called);
+        }
+    }
+}

@@ -1,0 +1,401 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Maatwebsite\Excel\Tests;
+
+use Illuminate\Bus\PendingBatch;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\PendingDispatch;
+use Illuminate\Support\Collection;
+use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\ShouldBatch;
+use Maatwebsite\Excel\Concerns\ToModel;
+use Maatwebsite\Excel\Excel;
+use Maatwebsite\Excel\Facades\Excel as ExcelFacade;
+use Maatwebsite\Excel\Fakes\ExcelFake;
+use Maatwebsite\Excel\Tests\Data\Stubs\ChainedJobStub;
+use Maatwebsite\Excel\Tests\Data\Stubs\Database\User;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+
+final class ExcelFakeTest extends TestCase
+{
+    public function test_can_fake_an_export(): void
+    {
+        ExcelFacade::fake();
+
+        // Excel instance should be swapped to the fake now.
+        $this->assertInstanceOf(ExcelFake::class, $this->app->make('excel'));
+    }
+
+    public function test_can_assert_against_a_fake_downloaded_export(): void
+    {
+        ExcelFacade::fake();
+
+        $response = ExcelFacade::download($this->givenExport(), 'downloaded-filename.csv');
+
+        $this->assertInstanceOf(BinaryFileResponse::class, $response);
+
+        ExcelFacade::assertDownloaded('downloaded-filename.csv');
+        ExcelFacade::assertDownloaded('downloaded-filename.csv', fn (FromCollection $export) => $export->collection()->contains('foo'));
+        ExcelFacade::matchByRegex();
+        ExcelFacade::assertDownloaded('/\w{10}-\w{8}\.csv/');
+    }
+
+    public function test_can_assert_against_a_fake_stored_export(): void
+    {
+        ExcelFacade::fake();
+
+        $response = ExcelFacade::store($this->givenExport(), 'stored-filename.csv', 's3');
+
+        $this->assertTrue($response);
+
+        ExcelFacade::assertStored('stored-filename.csv', 's3');
+        ExcelFacade::assertStored('stored-filename.csv', 's3', fn (FromCollection $export) => $export->collection()->contains('foo'));
+        ExcelFacade::matchByRegex();
+        ExcelFacade::assertStored('/\w{6}-\w{8}\.csv/', 's3');
+    }
+
+    public function test_can_assert_regex_against_a_fake_stored_export_with_multiple_files(): void
+    {
+        ExcelFacade::fake();
+
+        $response = ExcelFacade::store($this->givenExport(), 'stored-filename-one.csv', 's3');
+
+        $this->assertTrue($response);
+
+        $response = ExcelFacade::store($this->givenExport(), 'stored-filename-two.csv', 's3');
+
+        $this->assertTrue($response);
+
+        ExcelFacade::matchByRegex();
+        ExcelFacade::assertStored('/\w{6}-\w{8}-one\.csv/', 's3');
+        ExcelFacade::assertStored('/\w{6}-\w{8}-two\.csv/', 's3');
+    }
+
+    public function test_a_callback_can_be_passed_as_the_second_argument_when_asserting_against_a_faked_stored_export(): void
+    {
+        ExcelFacade::fake();
+
+        $response = ExcelFacade::store($this->givenExport(), 'stored-filename.csv');
+
+        $this->assertTrue($response);
+
+        ExcelFacade::assertStored('stored-filename.csv');
+        ExcelFacade::assertStored('stored-filename.csv', fn (FromCollection $export) => $export->collection()->contains('foo'));
+        ExcelFacade::matchByRegex();
+        ExcelFacade::assertStored('/\w{6}-\w{8}\.csv/');
+    }
+
+    public function test_can_assert_against_a_fake_queued_export(): void
+    {
+        ExcelFacade::fake();
+
+        $response = ExcelFacade::queue($this->givenExport(), 'queued-filename.csv', 's3');
+
+        $this->assertInstanceOf(PendingDispatch::class, $response);
+
+        ExcelFacade::assertQueued('queued-filename.csv', 's3');
+        ExcelFacade::assertQueued('queued-filename.csv', 's3', fn (FromCollection $export) => $export->collection()->contains('foo'));
+        ExcelFacade::matchByRegex();
+        ExcelFacade::assertQueued('/\w{6}-\w{8}\.csv/', 's3');
+    }
+
+    public function test_can_assert_against_a_fake_implicitly_queued_export(): void
+    {
+        ExcelFacade::fake();
+
+        $response = ExcelFacade::store($this->givenQueuedExport(), 'queued-filename.csv', 's3');
+
+        $this->assertInstanceOf(PendingDispatch::class, $response);
+
+        ExcelFacade::assertStored('queued-filename.csv', 's3');
+        ExcelFacade::assertQueued('queued-filename.csv', 's3');
+        ExcelFacade::assertQueued('queued-filename.csv', 's3', fn (FromCollection $export) => $export->collection()->contains('foo'));
+        ExcelFacade::matchByRegex();
+        ExcelFacade::assertQueued('/\w{6}-\w{8}\.csv/', 's3');
+    }
+
+    public function test_can_assert_against_a_fake_queued_export_with_chain(): void
+    {
+        ExcelFacade::fake();
+
+        ExcelFacade::queue(
+            $this->givenQueuedExport(),
+            'queued-filename.csv',
+            's3'
+        )->chain([
+            new ChainedJobStub,
+        ]);
+
+        ExcelFacade::assertQueuedWithChain([
+            new ChainedJobStub,
+        ]);
+    }
+
+    public function test_can_assert_against_a_fake_raw_export(): void
+    {
+        ExcelFacade::fake();
+
+        ExcelFacade::raw($this->givenExport(), Excel::XLSX);
+
+        ExcelFacade::assertExportedInRaw($this->givenExport()::class);
+        ExcelFacade::assertExportedInRaw($this->givenExport()::class, fn (FromCollection $export) => $export->collection()->contains('foo'));
+    }
+
+    public function test_can_assert_against_a_fake_import(): void
+    {
+        ExcelFacade::fake();
+
+        ExcelFacade::import($this->givenImport(), 'stored-filename.csv', 's3');
+
+        ExcelFacade::assertImported('stored-filename.csv', 's3');
+        ExcelFacade::assertImported('stored-filename.csv', 's3', fn (ToModel $import): bool => $import->model([]) instanceof User);
+        ExcelFacade::matchByRegex();
+        ExcelFacade::assertImported('/\w{6}-\w{8}\.csv/', 's3');
+    }
+
+    public function test_can_assert_against_a_fake_import_with_uploaded_file(): void
+    {
+        ExcelFacade::fake();
+
+        ExcelFacade::import($this->givenImport(), $this->givenUploadedFile(__DIR__ . '/Data/Disks/Local/import.xlsx'));
+
+        ExcelFacade::assertImported('import.xlsx');
+        ExcelFacade::assertImported('import.xlsx', fn (ToModel $import): bool => $import->model([]) instanceof User);
+        ExcelFacade::matchByRegex();
+        ExcelFacade::assertImported('/\w{6}\.xlsx/');
+    }
+
+    public function test_can_assert_against_a_fake_queued_import(): void
+    {
+        ExcelFacade::fake();
+
+        $response = ExcelFacade::queueImport($this->givenQueuedImport(), 'queued-filename.csv', 's3');
+
+        $this->assertInstanceOf(PendingDispatch::class, $response);
+
+        ExcelFacade::assertImported('queued-filename.csv', 's3');
+        ExcelFacade::assertQueued('queued-filename.csv', 's3');
+        ExcelFacade::assertQueued('queued-filename.csv', 's3', fn (ToModel $import): bool => $import->model([]) instanceof User);
+        ExcelFacade::matchByRegex();
+        ExcelFacade::assertQueued('/\w{6}-\w{8}\.csv/', 's3');
+    }
+
+    public function test_can_assert_against_a_fake_implicitly_queued_import(): void
+    {
+        ExcelFacade::fake();
+
+        $response = ExcelFacade::import($this->givenQueuedImport(), 'queued-filename.csv', 's3');
+
+        $this->assertInstanceOf(PendingDispatch::class, $response);
+
+        ExcelFacade::assertImported('queued-filename.csv', 's3');
+        ExcelFacade::assertQueued('queued-filename.csv', 's3');
+        ExcelFacade::assertQueued('queued-filename.csv', 's3', fn (ToModel $import): bool => $import->model([]) instanceof User);
+        ExcelFacade::matchByRegex();
+        ExcelFacade::assertQueued('/\w{6}-\w{8}\.csv/', 's3');
+    }
+
+    public function test_can_assert_against_a_fake_queued_import_with_chain(): void
+    {
+        ExcelFacade::fake();
+
+        ExcelFacade::queueImport(
+            $this->givenQueuedImport(),
+            'queued-filename.csv',
+            's3'
+        )->chain([
+            new ChainedJobStub,
+        ]);
+
+        ExcelFacade::assertQueuedWithChain([
+            new ChainedJobStub,
+        ]);
+    }
+
+    public function test_a_callback_can_be_passed_as_the_second_argument_when_asserting_against_a_faked_queued_export(): void
+    {
+        ExcelFacade::fake();
+
+        $response = ExcelFacade::queue($this->givenExport(), 'queued-filename.csv');
+
+        $this->assertInstanceOf(PendingDispatch::class, $response);
+
+        ExcelFacade::assertQueued('queued-filename.csv');
+        ExcelFacade::assertQueued('queued-filename.csv', fn (FromCollection $export) => $export->collection()->contains('foo'));
+        ExcelFacade::matchByRegex();
+        ExcelFacade::assertQueued('/\w{6}-\w{8}\.csv/');
+    }
+
+    public function test_can_assert_against_a_fake_implicitly_batched_export(): void
+    {
+        ExcelFacade::fake();
+
+        $response = ExcelFacade::store($this->givenBatchedExport(), 'batched-filename.csv', 's3');
+
+        $this->assertInstanceOf(PendingBatch::class, $response);
+
+        ExcelFacade::assertStored('batched-filename.csv', 's3');
+        ExcelFacade::assertQueued('batched-filename.csv', 's3');
+    }
+
+    public function test_can_assert_against_a_fake_implicitly_batched_import(): void
+    {
+        ExcelFacade::fake();
+
+        $response = ExcelFacade::import($this->givenBatchedImport(), 'batched-filename.csv', 's3');
+
+        $this->assertInstanceOf(PendingBatch::class, $response);
+
+        ExcelFacade::assertImported('batched-filename.csv', 's3');
+        ExcelFacade::assertQueued('batched-filename.csv', 's3');
+    }
+
+    public function test_can_assert_to_array_fake(): void
+    {
+        ExcelFacade::fake();
+
+        $result = ExcelFacade::toArray($this->givenImport(), 'stored-filename.csv', 's3');
+
+        $this->assertSame([], $result);
+
+        ExcelFacade::assertImported('stored-filename.csv', 's3');
+        ExcelFacade::assertImported('stored-filename.csv', 's3', fn (ToModel $import): bool => $import->model([]) instanceof User);
+    }
+
+    public function test_can_assert_to_collection_fake(): void
+    {
+        ExcelFacade::fake();
+
+        $result = ExcelFacade::toCollection($this->givenImport(), 'stored-filename.csv', 's3');
+
+        $this->assertInstanceOf(Collection::class, $result);
+        $this->assertTrue($result->isEmpty());
+
+        ExcelFacade::assertImported('stored-filename.csv', 's3');
+        ExcelFacade::assertImported('stored-filename.csv', 's3', fn (ToModel $import): bool => $import->model([]) instanceof User);
+    }
+
+    public function test_do_not_match_by_regex_reverts_to_exact_matching(): void
+    {
+        ExcelFacade::fake();
+
+        ExcelFacade::store($this->givenExport(), 'stored-filename.csv', 's3');
+
+        ExcelFacade::matchByRegex();
+        ExcelFacade::assertStored('/\w{6}-\w{8}\.csv/', 's3');
+
+        ExcelFacade::doNotMatchByRegex();
+        ExcelFacade::assertStored('stored-filename.csv', 's3');
+    }
+
+    public function test_can_assert_against_a_fake_batched_export(): void
+    {
+        ExcelFacade::fake();
+
+        $response = ExcelFacade::queue($this->givenBatchedExport(), 'batched-filename.csv', 's3');
+
+        $this->assertInstanceOf(PendingBatch::class, $response);
+
+        ExcelFacade::assertQueued('batched-filename.csv', 's3');
+        ExcelFacade::assertQueued('batched-filename.csv', 's3', fn (FromCollection $export) => $export->collection()->contains('foo'));
+    }
+
+    public function test_can_assert_against_a_fake_batched_import(): void
+    {
+        ExcelFacade::fake();
+
+        $response = ExcelFacade::queueImport($this->givenBatchedImport(), 'batched-filename.csv', 's3');
+
+        $this->assertInstanceOf(PendingBatch::class, $response);
+
+        ExcelFacade::assertImported('batched-filename.csv', 's3');
+        ExcelFacade::assertQueued('batched-filename.csv', 's3');
+        ExcelFacade::assertQueued('batched-filename.csv', 's3', fn (ToModel $import): bool => $import->model([]) instanceof User);
+    }
+
+    /**
+     * @return FromCollection<int, string>
+     */
+    private function givenExport(): FromCollection
+    {
+        return new class implements FromCollection
+        {
+            /**
+             * @return Collection<int, string>
+             */
+            public function collection(): Collection
+            {
+                return collect(['foo', 'bar']);
+            }
+        };
+    }
+
+    /**
+     * @return FromCollection<int, string>
+     */
+    private function givenQueuedExport(): FromCollection
+    {
+        return new class implements FromCollection, ShouldQueue
+        {
+            /**
+             * @return Collection<int, string>
+             */
+            public function collection(): Collection
+            {
+                return collect(['foo', 'bar']);
+            }
+        };
+    }
+
+    private function givenImport(): object
+    {
+        return new class implements ToModel
+        {
+            public function model(array $row): User
+            {
+                return new User([]);
+            }
+        };
+    }
+
+    private function givenQueuedImport(): object
+    {
+        return new class implements ShouldQueue, ToModel
+        {
+            public function model(array $row): User
+            {
+                return new User([]);
+            }
+        };
+    }
+
+    /**
+     * @return FromCollection<int, string>
+     */
+    private function givenBatchedExport(): FromCollection
+    {
+        return new class implements FromCollection, ShouldBatch, ShouldQueue
+        {
+            /**
+             * @return Collection<int, string>
+             */
+            public function collection(): Collection
+            {
+                return collect(['foo', 'bar']);
+            }
+        };
+    }
+
+    private function givenBatchedImport(): object
+    {
+        return new class implements ShouldBatch, ShouldQueue, ToModel
+        {
+            public function model(array $row): User
+            {
+                return new User([]);
+            }
+        };
+    }
+}

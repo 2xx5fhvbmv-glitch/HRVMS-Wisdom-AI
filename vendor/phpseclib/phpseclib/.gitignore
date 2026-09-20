@@ -1,0 +1,9 @@
+.idea
+/build/php-cs-fixer.cache
+/composer.lock
+/composer.phar
+/tests/.phpunit.result.cache
+/vendor/
+.gitignore
+.phpunit.result.cache
+.DS_Store

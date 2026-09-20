@@ -1,0 +1,165 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Maatwebsite\Excel\Tests\Concerns;
+
+use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\Importable;
+use Maatwebsite\Excel\Concerns\ToModel;
+use Maatwebsite\Excel\Concerns\WithBatchInserts;
+use Maatwebsite\Excel\Tests\Data\Stubs\Database\Group;
+use Maatwebsite\Excel\Tests\Data\Stubs\Database\User;
+use Maatwebsite\Excel\Tests\TestCase;
+
+final class WithBatchInsertsTest extends TestCase
+{
+    /**
+     * Setup the test environment.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->loadLaravelMigrations(['--database' => 'testing']);
+        $this->loadMigrationsFrom(__DIR__ . '/../Data/Stubs/Database/Migrations');
+    }
+
+    public function test_can_import_to_model_in_batches(): void
+    {
+        DB::connection()->enableQueryLog();
+
+        $import = new class implements ToModel, WithBatchInserts
+        {
+            use Importable;
+
+            public function model(array $row): User
+            {
+                return new User([
+                    'name'     => $row[0],
+                    'email'    => $row[1],
+                    'password' => 'secret',
+                ]);
+            }
+
+            public function batchSize(): int
+            {
+                return 2;
+            }
+        };
+
+        $import->import('import-users.xlsx');
+
+        $this->assertCount(1, DB::getQueryLog());
+        DB::connection()->disableQueryLog();
+
+        $this->assertDatabaseHas('users', [
+            'name'  => 'Patrick Brouwers',
+            'email' => 'patrick@maatwebsite.nl',
+        ]);
+
+        $this->assertDatabaseHas('users', [
+            'name'  => 'Taylor Otwell',
+            'email' => 'taylor@laravel.com',
+        ]);
+    }
+
+    public function test_can_import_to_model_in_batches_bigger_file(): void
+    {
+        DB::connection()->enableQueryLog();
+
+        $import = new class implements ToModel, WithBatchInserts
+        {
+            use Importable;
+
+            public function model(array $row): Group
+            {
+                return new Group([
+                    'name' => $row[0],
+                ]);
+            }
+
+            public function batchSize(): int
+            {
+                return 1000;
+            }
+        };
+
+        $import->import('import-batches.xlsx');
+
+        $this->assertCount(5000 / $import->batchSize(), DB::getQueryLog());
+        DB::connection()->disableQueryLog();
+    }
+
+    public function test_can_import_multiple_different_types_of_models_in_single_to_model(): void
+    {
+        DB::connection()->enableQueryLog();
+
+        $import = new class implements ToModel, WithBatchInserts
+        {
+            use Importable;
+
+            /**
+             * @return array{0: User, 1: Group}
+             */
+            public function model(array $row): array
+            {
+                $user = new User([
+                    'name'     => $row[0],
+                    'email'    => $row[1],
+                    'password' => 'secret',
+                ]);
+
+                $group = new Group([
+                    'name' => $row[0],
+                ]);
+
+                return [$user, $group];
+            }
+
+            public function batchSize(): int
+            {
+                return 2;
+            }
+        };
+
+        $import->import('import-users.xlsx');
+
+        // Expected 2 batch queries, 1 for users, 1 for groups
+        $this->assertCount(2, DB::getQueryLog());
+
+        $this->assertSame(2, User::count());
+        $this->assertSame(2, Group::count());
+
+        DB::connection()->disableQueryLog();
+    }
+
+    public function test_has_timestamps_when_imported_in_batches(): void
+    {
+        $import = new class implements ToModel, WithBatchInserts
+        {
+            use Importable;
+
+            public function model(array $row): User
+            {
+                return new User([
+                    'name'     => $row[0],
+                    'email'    => $row[1],
+                    'password' => 'secret',
+                ]);
+            }
+
+            public function batchSize(): int
+            {
+                return 2;
+            }
+        };
+
+        $import->import('import-users.xlsx');
+
+        $user = User::first();
+
+        $this->assertNotNull($user->created_at);
+        $this->assertNotNull($user->updated_at);
+    }
+}

@@ -1,0 +1,44 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Maatwebsite\Excel\Tests\Concerns;
+
+use Maatwebsite\Excel\Tests\Data\Stubs\AfterQueueExportJob;
+use Maatwebsite\Excel\Tests\Data\Stubs\Database\Group;
+use Maatwebsite\Excel\Tests\Data\Stubs\Database\User;
+use Maatwebsite\Excel\Tests\Data\Stubs\FromQueryWithCustomQuerySize;
+use Maatwebsite\Excel\Tests\TestCase;
+
+final class WithCustomQuerySizeTest extends TestCase
+{
+    /**
+     * Setup the test environment.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->loadLaravelMigrations(['--database' => 'testing']);
+        $this->loadMigrationsFrom(__DIR__ . '/../Data/Stubs/Database/Migrations');
+
+        Group::factory()->count(5)->create()->each(function (Group $group): void {
+            $group->users()->attach(User::factory()->count(random_int(1, 3))->create());
+        });
+
+        config()->set('excel.exports.chunk_size', 2);
+    }
+
+    public function test_can_export_with_custom_count(): void
+    {
+        $export = new FromQueryWithCustomQuerySize;
+
+        $export->queue('export-from-query-with-count.xlsx', null, 'Xlsx')->chain([
+            new AfterQueueExportJob(__DIR__ . '/../Data/Disks/Local/export-from-query-with-count.xlsx'),
+        ]);
+
+        $actual = $this->readAsArray(__DIR__ . '/../Data/Disks/Local/export-from-query-with-count.xlsx', 'Xlsx');
+
+        $this->assertCount(Group::count(), $actual);
+    }
+}

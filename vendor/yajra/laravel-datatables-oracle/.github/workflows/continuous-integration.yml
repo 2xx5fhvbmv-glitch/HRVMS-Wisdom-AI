@@ -1,0 +1,51 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - master
+      - '*.x'
+  pull_request:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  tests:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: true
+      matrix:
+        php: [ 8.3, 8.4, 8.5 ]
+        stability: [ prefer-stable ]
+
+    name: PHP ${{ matrix.php }} - STABILITY ${{ matrix.stability }}
+
+    steps:
+      - name: Checkout code
+        # actions/checkout v2.7.0
+        uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5
+
+      - name: Setup PHP
+        # shivammathur/setup-php 2.35.5
+        uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          coverage: none
+
+      - name: Setup Memcached
+        # niden/actions-memcached v8
+        uses: niden/actions-memcached@9ff2b102979272958682d09bf262563039bea69c
+
+      - name: Install dependencies
+        # nick-invision/retry v1.0.4
+        uses: nick-invision/retry@39da88d5f7d15a96aed861dbabbe8b7443e3182a
+        with:
+          timeout_minutes: 5
+          max_attempts: 5
+          command: composer update --${{ matrix.stability }} --prefer-dist --no-interaction --no-progress
+
+      - name: Execute tests
+        run: vendor/bin/phpunit

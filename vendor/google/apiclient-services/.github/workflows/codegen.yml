@@ -1,0 +1,141 @@
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # daily at 12:30 am
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+
+name: codegen
+jobs:
+  discovery:
+    uses: googleapis/discovery-artifact-manager/.github/workflows/list-services.yml@a4ebecb5b7501f788d10393593c767558abf7abf # master
+  batch:
+    runs-on: ubuntu-24.04
+    needs: discovery
+    outputs:
+      services: ${{ steps.chunk.outputs.result }}
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        id: chunk
+        env:
+          SERVICES_LIST: ${{ needs.discovery.outputs.services }}
+        with:
+          script: |
+            console.log('splitting service names list into batches')
+            const services = JSON.parse(process.env.SERVICES_LIST)
+            const result = {
+              "one": [],
+              "two": [],
+            };
+            for (let i = 0; i < services.length; i++) {
+              if (!["discovery", "websecurityscanner"].includes(services[i])) {
+                j = i < (services.length/2) ? "one" : "two";
+                result[j].push(services[i])
+              }
+            }
+            return result
+  generate_batch1:
+    runs-on: ubuntu-24.04
+    needs: batch
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        service: ${{fromJson(needs.batch.outputs.services).one}}
+    steps:
+      - run: echo generating ${MATRIX_SERVICE}
+        env:
+          MATRIX_SERVICE: ${{ matrix.service }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          path: google-api-php-client-services
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: googleapis/discovery-artifact-manager
+          fetch-depth: 1
+          path: discovery-artifact-manager
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - id: find-preferred-versions
+        run: |
+          versions=$( jq -r --arg service "$MATRIX_SERVICE" '[.items[] | select(.name == $service) | select(.name == "admin" or .preferred).version] | join(",")' discovery-artifact-manager/discoveries/index.json )
+          echo "::set-output name=versions::$versions"
+        env:
+          MATRIX_SERVICE: ${{ matrix.service }}
+      - run: ./google-api-php-client-services/.github/workflows/generate.sh ${MATRIX_SERVICE} ${STEPS_FIND_PREFERRED_VERSIONS_OUTPUTS_VERSIONS}
+        env:
+          MATRIX_SERVICE: ${{ matrix.service }}
+          STEPS_FIND_PREFERRED_VERSIONS_OUTPUTS_VERSIONS: ${{ steps.find-preferred-versions.outputs.versions }}
+      - uses: googleapis/code-suggester@f9fef85aa02459e30e62526abe950341cbbd768b # v5
+        env:
+          ACCESS_TOKEN: ${{ secrets.YOSHI_CODE_BOT_TOKEN }}
+        with:
+          command: pr
+          upstream_owner: ${{ github.repository_owner }}
+          upstream_repo: google-api-php-client-services
+          description: 'Generated in GitHub action: https://github.com/${{ github.repository_owner }}/${{ github.repository }}/actions/workflows/codegen.yaml'
+          title: 'Regenerate ${{ matrix.service }} client'
+          message: 'Regenerate ${{ matrix.service }} client'
+          branch: regenerate-${{ matrix.service }}
+          git_dir: 'google-api-php-client-services/src'
+          primary: main
+          force: true
+          fork: true
+
+  generate_batch2:
+    runs-on: ubuntu-24.04
+    needs: batch
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        service: ${{fromJson(needs.batch.outputs.services).two}}
+    steps:
+      - run: echo generating ${MATRIX_SERVICE}
+        env:
+          MATRIX_SERVICE: ${{ matrix.service }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          path: google-api-php-client-services
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: googleapis/discovery-artifact-manager
+          fetch-depth: 1
+          path: discovery-artifact-manager
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - id: find-preferred-versions
+        run: |
+          versions=$( jq -r --arg service "$MATRIX_SERVICE" '[.items[] | select(.name == $service) | select(.name == "admin" or .preferred).version] | join(",")' discovery-artifact-manager/discoveries/index.json )
+          echo "::set-output name=versions::$versions"
+        env:
+          MATRIX_SERVICE: ${{ matrix.service }}
+      - run: ./google-api-php-client-services/.github/workflows/generate.sh ${MATRIX_SERVICE} ${STEPS_FIND_PREFERRED_VERSIONS_OUTPUTS_VERSIONS}
+        env:
+          MATRIX_SERVICE: ${{ matrix.service }}
+          STEPS_FIND_PREFERRED_VERSIONS_OUTPUTS_VERSIONS: ${{ steps.find-preferred-versions.outputs.versions }}
+      - uses: googleapis/code-suggester@f9fef85aa02459e30e62526abe950341cbbd768b # v5
+        env:
+          ACCESS_TOKEN: ${{ secrets.YOSHI_CODE_BOT_TOKEN }}
+        with:
+          command: pr
+          upstream_owner: ${{ github.repository_owner }}
+          upstream_repo: google-api-php-client-services
+          description: 'Generated in GitHub action: https://github.com/${{ github.repository_owner }}/${{ github.repository }}/actions/workflows/codegen.yaml'
+          title: 'Regenerate ${{ matrix.service }} client'
+          message: 'Regenerate ${{ matrix.service }} client'
+          branch: regenerate-${{ matrix.service }}
+          git_dir: 'google-api-php-client-services/src'
+          primary: main
+          force: true
+          fork: true

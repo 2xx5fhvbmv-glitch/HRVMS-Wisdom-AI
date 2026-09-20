@@ -1,0 +1,33 @@
+name: PHP Linting
+on:
+  push:
+    branches:
+      - master
+      - '*.x'
+
+jobs:
+  phplint:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      # actions/checkout v4.3.0
+      - name: Checkout code
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # aglipanci/laravel-pint-action v2.0.0
+      - name: "laravel-pint"
+        uses: aglipanci/laravel-pint-action@07f4f96d0e75037d5c9ff4f40963a9d086147747
+        with:
+          preset: laravel
+          verboseMode: true
+
+      # stefanzweifel/git-auto-commit-action v5.2.0
+      - uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403
+        with:
+          commit_message: "fix: pint :robot:"

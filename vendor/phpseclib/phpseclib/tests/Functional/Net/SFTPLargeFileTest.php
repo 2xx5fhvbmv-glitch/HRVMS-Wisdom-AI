@@ -1,0 +1,42 @@
+<?php
+
+/**
+ * @author    Andreas Fischer <bantu@phpbb.com>
+ * @copyright 2014-2026 Andreas Fischer
+ * @license   http://www.opensource.org/licenses/mit-license.html  MIT License
+ */
+
+declare(strict_types=1);
+
+namespace phpseclib4\Tests\Functional\Net;
+
+use phpseclib4\Net\SFTP;
+
+class SFTPLargeFileTest extends SFTPTestCase
+{
+    public static function setUpBeforeClass(): void
+    {
+        if (!extension_loaded('openssl')) {
+            self::markTestSkipped('This test depends on openssl for performance.');
+        }
+        self::ensureConstant('CRYPT_HASH_MODE', 3);
+        parent::setUpBeforeClass();
+    }
+
+    #[\PHPUnit\Framework\Attributes\Group('github298')]
+    #[\PHPUnit\Framework\Attributes\Group('github455')]
+    #[\PHPUnit\Framework\Attributes\Group('github457')]
+    public function testPutSizeLocalFile(): void
+    {
+        $tmp_filename = $this->createTempFile(128, 1024 * 1024);
+        $filename = 'file-large-from-local.txt';
+
+        $this->sftp->put($filename, $tmp_filename, SFTP::SOURCE_LOCAL_FILE);
+
+        $this->assertSame(
+            128 * 1024 * 1024,
+            $this->sftp->filesize($filename),
+            'Failed asserting that uploaded local file has the expected length.'
+        );
+    }
+}

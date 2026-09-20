@@ -1,0 +1,91 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Maatwebsite\Excel\Tests\Concerns;
+
+use Maatwebsite\Excel\Concerns\Importable;
+use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
+use Maatwebsite\Excel\Concerns\ToArray;
+use Maatwebsite\Excel\Concerns\WithColumnLimit;
+use Maatwebsite\Excel\Tests\TestCase;
+use PHPUnit\Framework\Assert;
+
+final class WithColumnLimitTest extends TestCase
+{
+    /**
+     * Setup the test environment.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->loadLaravelMigrations(['--database' => 'testing']);
+    }
+
+    public function test_can_import_to_array_with_column_limit(): void
+    {
+        $import = new class implements ToArray, WithColumnLimit
+        {
+            use Importable;
+
+            public function array(array $array): void
+            {
+                Assert::assertSame([
+                    [
+                        'Patrick Brouwers',
+                    ],
+                    [
+                        'Taylor Otwell',
+                    ],
+                ], $array);
+            }
+
+            public function endColumn(): string
+            {
+                return 'A';
+            }
+        };
+
+        $import->import('import-users.xlsx');
+    }
+
+    public function test_can_import_to_array_with_column_limit_and_skips_empty_rows(): void
+    {
+        $import = new class implements SkipsEmptyRows, ToArray, WithColumnLimit
+        {
+            use Importable;
+
+            public function array(array $array): void
+            {
+                Assert::assertSame([
+                    [
+                        'Test1',
+                        'Test2',
+                        null,
+                        null,
+                    ],
+                    [
+                        'Test3',
+                        'Test4',
+                        null,
+                        null,
+                    ],
+                    [
+                        'Test5',
+                        'Test6',
+                        null,
+                        null,
+                    ],
+                ], $array);
+            }
+
+            public function endColumn(): string
+            {
+                return 'D';
+            }
+        };
+
+        $import->import('import-empty-rows.xlsx');
+    }
+}

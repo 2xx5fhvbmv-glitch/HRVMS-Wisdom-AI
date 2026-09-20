@@ -1,0 +1,565 @@
+<?php
+
+namespace Yajra\DataTables\Tests\Unit;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
+use Yajra\DataTables\QueryDataTable;
+use Yajra\DataTables\Tests\Models\User;
+use Yajra\DataTables\Tests\TestCase;
+
+class QueryDataTableTest extends TestCase
+{
+    #[Test]
+    public function it_rejects_column_data_with_invalid_characters_when_ordering()
+    {
+        app('datatables.request')->merge([
+            'columns' => [
+                [
+                    'name' => '',
+                    'data' => "id%P'",
+                    'searchable' => 'true',
+                    'orderable' => 'true',
+                    'search' => ['value' => null, 'regex' => 'false'],
+                ],
+            ],
+            'order' => [
+                ['column' => 0, 'dir' => 'desc'],
+            ],
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')->select('users.*')
+        );
+
+        $dataTable->ordering();
+    }
+
+    #[Test]
+    public function it_rejects_column_name_with_invalid_characters_when_ordering()
+    {
+        app('datatables.request')->merge([
+            'columns' => [
+                [
+                    'name' => "id'; DROP TABLE users; --",
+                    'data' => 'id',
+                    'searchable' => 'true',
+                    'orderable' => 'true',
+                    'search' => ['value' => null, 'regex' => 'false'],
+                ],
+            ],
+            'order' => [
+                ['column' => 0, 'dir' => 'asc'],
+            ],
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')->select('users.*')
+        );
+
+        $dataTable->ordering();
+    }
+
+    #[Test]
+    public function it_rejects_column_data_with_invalid_characters_when_searching()
+    {
+        app('datatables.request')->merge([
+            'columns' => [
+                [
+                    'name' => '',
+                    'data' => "id'",
+                    'searchable' => 'true',
+                    'orderable' => 'false',
+                    'search' => ['value' => 'foo', 'regex' => 'false'],
+                ],
+            ],
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')->select('users.*')
+        );
+
+        $dataTable->columnSearch();
+    }
+
+    #[Test]
+    public function it_handles_normal_column_name_ordering()
+    {
+        app('datatables.request')->merge([
+            'columns' => [
+                [
+                    'name' => '',
+                    'data' => 'id',
+                    'searchable' => 'true',
+                    'orderable' => 'true',
+                    'search' => ['value' => null, 'regex' => 'false'],
+                ],
+            ],
+            'order' => [
+                ['column' => 0, 'dir' => 'desc'],
+            ],
+        ]);
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')->select('users.*')
+        );
+
+        $dataTable->ordering();
+
+        $sql = $dataTable->getQuery()->toSql();
+        $this->assertStringContainsString('desc', strtolower($sql));
+    }
+
+    #[Test]
+    public function it_rejects_column_data_with_percent_character()
+    {
+        app('datatables.request')->merge([
+            'columns' => [
+                [
+                    'name' => '',
+                    'data' => 'connections.id%P',
+                    'searchable' => 'true',
+                    'orderable' => 'true',
+                    'search' => ['value' => null, 'regex' => 'false'],
+                ],
+            ],
+            'order' => [
+                ['column' => 0, 'dir' => 'asc'],
+            ],
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid column name: "connections.id%P".');
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')->select('users.*')
+        );
+
+        $dataTable->ordering();
+    }
+
+    #[Test]
+    public function it_accepts_json_column_path_with_arrow_operator()
+    {
+        app('datatables.request')->merge([
+            'columns' => [
+                [
+                    'name' => '',
+                    'data' => 'address->city',
+                    'searchable' => 'true',
+                    'orderable' => 'true',
+                    'search' => ['value' => null, 'regex' => 'false'],
+                ],
+            ],
+            'order' => [
+                ['column' => 0, 'dir' => 'asc'],
+            ],
+        ]);
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')->select('users.*')
+        );
+
+        $dataTable->ordering();
+
+        $this->assertTrue(true);
+    }
+
+    #[Test]
+    public function it_accepts_array_notation_column_name_with_brackets()
+    {
+        app('datatables.request')->merge([
+            'columns' => [
+                [
+                    'name' => '',
+                    'data' => 'categories[, ].name',
+                    'searchable' => 'true',
+                    'orderable' => 'true',
+                    'search' => ['value' => null, 'regex' => 'false'],
+                ],
+            ],
+            'order' => [
+                ['column' => 0, 'dir' => 'asc'],
+            ],
+        ]);
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')->select('users.*')
+        );
+
+        $dataTable->ordering();
+
+        $this->assertTrue(true);
+    }
+
+    #[Test]
+    public function it_accepts_column_name_with_non_latin_characters()
+    {
+        app('datatables.request')->merge([
+            'columns' => [
+                [
+                    'name' => '',
+                    'data' => 'Βάρος',
+                    'searchable' => 'true',
+                    'orderable' => 'true',
+                    'search' => ['value' => null, 'regex' => 'false'],
+                ],
+            ],
+            'order' => [
+                ['column' => 0, 'dir' => 'asc'],
+            ],
+        ]);
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')->select('users.*')
+        );
+
+        $dataTable->ordering();
+
+        $this->assertTrue(true);
+    }
+
+    #[Test]
+    public function it_handles_normal_column_name_search()
+    {
+        app('datatables.request')->merge([
+            'columns' => [
+                [
+                    'name' => '',
+                    'data' => 'name',
+                    'searchable' => 'true',
+                    'orderable' => 'false',
+                    'search' => ['value' => 'john', 'regex' => 'false'],
+                ],
+            ],
+        ]);
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')->select('users.*')
+        );
+
+        $dataTable->columnSearch();
+
+        $sql = $dataTable->getQuery()->toSql();
+        $this->assertStringContainsString('name', strtolower($sql));
+        $this->assertSame(['%john%'], $dataTable->getQuery()->getBindings());
+    }
+
+    #[Test]
+    public function it_handles_starts_with_column_name_search()
+    {
+        config(['datatables.search.starts_with' => true]);
+
+        app('datatables.request')->merge([
+            'columns' => [
+                [
+                    'name' => '',
+                    'data' => 'name',
+                    'searchable' => 'true',
+                    'orderable' => 'false',
+                    'search' => ['value' => 'john', 'regex' => 'false'],
+                ],
+            ],
+        ]);
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')->select('users.*')
+        );
+
+        $dataTable->columnSearch();
+
+        $this->assertSame(['john%'], $dataTable->getQuery()->getBindings());
+    }
+
+    #[Test]
+    public function it_rejects_column_data_with_invalid_characters_when_null_last_ordering()
+    {
+        app('datatables.request')->merge([
+            'columns' => [
+                [
+                    'name' => '',
+                    'data' => "id'",
+                    'searchable' => 'true',
+                    'orderable' => 'true',
+                    'search' => ['value' => null, 'regex' => 'false'],
+                ],
+            ],
+            'order' => [
+                ['column' => 0, 'dir' => 'desc'],
+            ],
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')->select('users.*')
+        );
+        $dataTable->orderByNullsLast();
+        $dataTable->ordering();
+    }
+
+    public function test_complex_query_are_wrapped_and_countable()
+    {
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('module_telers')
+                ->selectRaw('module_telers.id, module_telers.publiceren, module_telers.archief, module_telers.uitgelicht, module_telers.image_header, module_telers.bedrijfsnaam, module_telers.titel, module_telers.plaats, group_concat(DISTINCT productenAlias.titel SEPARATOR \', \') as producten')
+                ->leftJoin('relation_producten_telers', 'module_telers.id', '=', 'relation_producten_telers.telers_id')
+                ->leftJoin('module_producten as productenAlias', 'productenAlias.id', '=', 'relation_producten_telers.producten_id')
+                ->groupBy('module_telers.id')
+        );
+
+        $this->assertQueryWrapped(true, $dataTable->prepareCountQuery());
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('posts')->selectRaw('title AS state')->groupBy('state')->having('state', '!=', 'deleted')
+        );
+
+        $this->assertQueryWrapped(true, $dataTable->prepareCountQuery());
+        $this->assertQueryHasNoSelect(false, $dataTable->prepareCountQuery());
+        $this->assertEquals(60, $dataTable->count());
+    }
+
+    public function test_complex_query_use_select_in_count()
+    {
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')
+                ->select('users.*')
+                ->addSelect([
+                    'last_post_id' => DB::table('posts')
+                        ->whereColumn('posts.user_id', 'users.id')
+                        ->orderBy('created_at')
+                        ->select('id'),
+                ])
+                ->orderBy(
+                    DB::table('posts')->whereColumn('posts.user_id', 'users.id')->orderBy('created_at')->select('created_at')
+                )
+        );
+
+        $this->assertQueryHasNoSelect(false, $dataTable->prepareCountQuery());
+        $this->assertEquals(20, $dataTable->count());
+    }
+
+    public function test_complex_query_can_ignore_select_in_count()
+    {
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')
+                ->select('users.*')
+                ->addSelect([
+                    'last_post_id' => DB::table('posts')
+                        ->whereColumn('posts.user_id', 'users.id')
+                        ->orderBy('created_at')
+                        ->select('id'),
+                ])
+                ->orderBy(
+                    DB::table('posts')->whereColumn('posts.user_id', 'users.id')->orderBy('created_at')->select('created_at')
+                )
+        )->ignoreSelectsInCountQuery();
+
+        $this->assertQueryHasNoSelect(true, $dataTable->prepareCountQuery());
+        $this->assertEquals(20, $dataTable->count());
+    }
+
+    public function test_simple_queries_with_complexe_select_are_not_wrapped()
+    {
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')
+                ->select('users.*')
+                ->addSelect([
+                    'last_post_id' => DB::table('posts')
+                        ->whereColumn('posts.user_id', 'users.id')
+                        ->orderBy('created_at')
+                        ->select('id'),
+                ])
+        );
+
+        $this->assertQueryWrapped(false, $dataTable->prepareCountQuery());
+        $this->assertEquals(20, $dataTable->count());
+    }
+
+    public function test_simple_queries_with_complexe_where_are_not_wrapped()
+    {
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            DB::table('users')
+                ->select('users.*')
+                ->where(
+                    DB::table('posts')
+                        ->whereColumn('posts.user_id', 'users.id')
+                        ->orderBy('created_at')
+                        ->select('title'), 'User-1 Post-1'
+                )
+        );
+
+        $this->assertQueryWrapped(false, $dataTable->prepareCountQuery());
+        $this->assertEquals(1, $dataTable->prepareCountQuery()->count());
+    }
+
+    public function test_simple_eloquent_queries_with_complexe_where_are_not_wrapped()
+    {
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            User::query()
+                ->select('users.*')
+                ->where(
+                    DB::table('posts')
+                        ->whereColumn('posts.user_id', 'users.id')
+                        ->orderBy('created_at')
+                        ->select('title'), 'User-1 Post-1'
+                )
+        );
+
+        $this->assertQueryWrapped(false, $dataTable->prepareCountQuery());
+        $this->assertEquals(1, $dataTable->prepareCountQuery()->count());
+    }
+
+    public function test_simple_queries_are_not_wrapped_and_countable()
+    {
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            User::with('posts')->select('users.*')
+        );
+
+        $this->assertQueryWrapped(false, $dataTable->prepareCountQuery());
+        $this->assertEquals(20, $dataTable->count());
+    }
+
+    public function test_complexe_queries_can_be_wrapped_and_countable()
+    {
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            User::with('posts')->select('users.*')
+        );
+
+        $this->assertQueryWrapped(false, $dataTable->prepareCountQuery());
+        $this->assertEquals(20, $dataTable->count());
+    }
+
+    /**
+     * @param  $expected  bool
+     * @param  $query  \Illuminate\Contracts\Database\Query\Builder
+     */
+    protected function assertQueryWrapped($expected, $query): void
+    {
+        $sql = $query->toSql();
+
+        $this->assertSame($expected, Str::endsWith($sql, 'count_row_table'), "'{$sql}' is not wrapped");
+    }
+
+    /**
+     * @param  $expected  bool
+     * @param  $query  \Illuminate\Contracts\Database\Query\Builder
+     */
+    public function assertQueryHasNoSelect($expected, $query): void
+    {
+        $sql = $query->select(DB::raw('count(*)'))->toSql();
+
+        $this->assertSame($expected, Str::startsWith($sql, 'select count(*) from (select 1 as dt_row_count from'), "'{$sql}' has select");
+    }
+
+    #[Test]
+    public function test_column_name_is_resolved_in_column_control(): void
+    {
+        app('datatables.request')->merge([
+            'columns' => [
+                [
+                    'name' => 'id',
+                    'data' => 'id',
+                    'searchable' => 'true',
+                    'orderable' => 'true',
+                    'search' => ['value' => null, 'regex' => 'false'],
+                    'columnControl' => [
+                        'search' => [
+                            'value' => '123',
+                            'logic' => 'equal',
+                            'type' => 'num',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            User::query()
+                ->select('users.*')
+                ->join('role_user', 'users.id', '=', 'role_user.user_id')
+                ->join('roles', 'role_user.role_id', '=', 'roles.id')
+        );
+
+        $dataTable->columnControlSearch();
+
+        $this->assertStringContainsString(
+            '"users"."id" = \'123\'',
+            $dataTable->getQuery()->toRawSql()
+        );
+    }
+
+    #[Test]
+    #[DataProvider('unsearchableColumnValues')]
+    public function it_skips_column_control_search_for_unsearchable_columns(bool|string $searchable): void
+    {
+        app('datatables.request')->merge([
+            'columns' => [
+                [
+                    'name' => 'id',
+                    'data' => 'id',
+                    'searchable' => $searchable,
+                    'orderable' => 'true',
+                    'search' => ['value' => null, 'regex' => 'false'],
+                    'columnControl' => [
+                        'search' => [
+                            'value' => '123',
+                            'logic' => 'equal',
+                            'type' => 'num',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        /** @var QueryDataTable $dataTable */
+        $dataTable = app('datatables')->of(
+            User::query()->select('users.*')
+        );
+
+        $dataTable->columnControlSearch();
+
+        $this->assertSame(
+            'select "users".* from "users"',
+            $dataTable->getQuery()->toSql()
+        );
+    }
+
+    public static function unsearchableColumnValues(): array
+    {
+        return [
+            'string false' => ['false'],
+            'boolean false' => [false],
+        ];
+    }
+}

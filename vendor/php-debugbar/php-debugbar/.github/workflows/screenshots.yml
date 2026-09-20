@@ -1,0 +1,53 @@
+name: Screenshots
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      COMPOSER_NO_INTERACTION: 1
+
+    strategy:
+      matrix:
+        php: [8.4]
+
+    name: PHP${{ matrix.php }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: composer:v2
+          extensions: pdo_sqlite
+
+      - name: Install dependencies
+        env:
+          COMPOSER_ROOT_VERSION: dev-master
+        run: |
+          composer update --prefer-dist --no-progress
+
+      - name: Execute Unit Tests
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_seconds: 30
+          command: vendor/bin/phpunit --testsuite=Browser
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v6
+        with:
+          name: debugbar-screenshots
+          path: tests/screenshots

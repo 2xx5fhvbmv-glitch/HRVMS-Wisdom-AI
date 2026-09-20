@@ -1,0 +1,31 @@
+parameters:
+    level: 6
+#    treatPhpDocTypesAsCertain: false
+    paths:
+        - src
+        - tests
+    bootstrapFiles:
+        - tests/phpstan-stubs.php
+    strictRules:
+        dynamicCallOnStaticMethod: false
+        booleansInConditions: false
+        disallowedShortTernary: false
+        noVariableVariables: false
+        strictArrayFilter: false
+    shipmonkRules:
+        enableAllRules: false
+        enforceNativeReturnTypehint:
+            enabled: true
+    ignoreErrors:
+        -
+            identifier: missingType.iterableValue
+        -
+            identifier: cast.useless
+        -
+            identifier: missingType.parameter
+            path: src/DataFormatter/VarDumper/DebugBarJsonDumper.php
+includes:
+    - vendor/phpstan/phpstan-phpunit/extension.neon
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor/shipmonk/phpstan-rules/rules.neon
+

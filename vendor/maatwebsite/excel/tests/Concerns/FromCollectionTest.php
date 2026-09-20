@@ -1,0 +1,107 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Maatwebsite\Excel\Tests\Concerns;
+
+use Illuminate\Foundation\Bus\PendingDispatch;
+use Illuminate\Support\LazyCollection;
+use Maatwebsite\Excel\Tests\Data\Stubs\EloquentLazyCollectionExport;
+use Maatwebsite\Excel\Tests\Data\Stubs\EloquentLazyCollectionQueuedExport;
+use Maatwebsite\Excel\Tests\Data\Stubs\QueuedExport;
+use Maatwebsite\Excel\Tests\Data\Stubs\SheetWith100Rows;
+use Maatwebsite\Excel\Tests\Data\Stubs\UntypedCollectionExport;
+use Maatwebsite\Excel\Tests\TestCase;
+
+final class FromCollectionTest extends TestCase
+{
+    public function test_can_export_from_collection(): void
+    {
+        $export = new SheetWith100Rows('A');
+
+        $response = $export->store('from-collection-store.xlsx');
+
+        $this->assertTrue($response);
+
+        $contents = $this->readAsArray(__DIR__ . '/../Data/Disks/Local/from-collection-store.xlsx', 'Xlsx');
+
+        $this->assertSame($export->collection()->toArray(), $contents);
+    }
+
+    public function test_can_export_with_multiple_sheets_from_collection(): void
+    {
+        $export = new QueuedExport;
+
+        $response = $export->store('multiple-sheets-collection-store.xlsx');
+
+        $this->assertTrue($response);
+
+        foreach ($export->sheets() as $sheetIndex => $sheet) {
+            $spreadsheet = $this->read(
+                __DIR__ . '/../Data/Disks/Local/multiple-sheets-collection-store.xlsx',
+                'Xlsx'
+            );
+
+            $worksheet = $spreadsheet->getSheet($sheetIndex);
+
+            $this->assertSame($sheet->collection()->toArray(), $worksheet->toArray());
+            $this->assertSame($sheet->title(), $worksheet->getTitle());
+        }
+    }
+
+    public function test_can_export_from_lazy_collection(): void
+    {
+        if (!class_exists(LazyCollection::class)) {
+            $this->markTestSkipped('Skipping test because LazyCollection is not supported');
+        }
+
+        $export = new EloquentLazyCollectionExport;
+
+        $export->store('from-lazy-collection-store.xlsx');
+
+        $contents = $this->readAsArray(__DIR__ . '/../Data/Disks/Local/from-lazy-collection-store.xlsx', 'Xlsx');
+
+        $this->assertSame(
+            $export->collection()->map(
+                fn (array $item): array => array_values($item)
+            )->toArray(),
+            $contents
+        );
+    }
+
+    public function test_can_export_from_lazy_collection_with_queue(): void
+    {
+        if (!class_exists(LazyCollection::class)) {
+            $this->markTestSkipped('Skipping test because LazyCollection is not supported');
+        }
+
+        $export = new EloquentLazyCollectionQueuedExport;
+
+        $response = $export->queue('from-lazy-collection-store.xlsx');
+
+        $this->assertInstanceOf(PendingDispatch::class, $response);
+
+        // Force dispatching via __destruct.
+        unset($response);
+
+        $contents = $this->readAsArray(__DIR__ . '/../Data/Disks/Local/from-lazy-collection-store.xlsx', 'Xlsx');
+
+        $this->assertSame(
+            $export->collection()->map(
+                fn (array $item): array => array_values($item)
+            )->toArray(),
+            $contents
+        );
+    }
+
+    public function test_can_export_from_collection_without_generic_annotations(): void
+    {
+        $export = new UntypedCollectionExport;
+
+        $this->assertTrue($export->store('from-untyped-collection-store.xlsx'));
+
+        $contents = $this->readAsArray(__DIR__ . '/../Data/Disks/Local/from-untyped-collection-store.xlsx', 'Xlsx');
+
+        $this->assertSame([['B1', 'A1'], ['B2', 'A2']], $contents);
+    }
+}

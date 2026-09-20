@@ -1,0 +1,87 @@
+<?php
+
+declare(strict_types=1);
+
+use DebugBar\DataCollector\MessagesCollector;
+use DebugBar\DataCollector\TimeDataCollector;
+use DebugBar\Bridge\Symfony\SymfonyHttpDriver;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Session\Session;
+use Symfony\Component\HttpFoundation\Session\Storage\PhpBridgeSessionStorage;
+
+/** @var \DebugBar\DebugBar|array{messages: MessagesCollector,time: TimeDataCollector} $debugbar */
+
+include 'bootstrap.php';
+if ($debugbar->hasCollector('request')) {
+    $debugbar->removeCollector('request');
+}
+
+$session = new Session(new PhpBridgeSessionStorage());
+
+// Create from globals
+$request = Request::createFromGlobals();
+$httpDriver = new SymfonyHttpDriver($session);
+
+$debugbar->setHttpDriver($httpDriver);
+
+$ajax = $request->query->get('ajax');
+if ($ajax) {
+    $debugbar['messages']->addMessage('hello from ajax');
+    $debugbar['exceptions']->addException(new \RuntimeException('error from AJAX'));
+    $response = new \Symfony\Component\HttpFoundation\JsonResponse('Hello from Symfony Ajax');
+
+    $response->setstatusCode(500);
+} else {
+    $response = new \Symfony\Component\HttpFoundation\Response(<<<HTML
+        <html>
+            <head>
+                <script type="text/javascript" nonce="demo">
+                    document.addEventListener('DOMContentLoaded', function() {
+                        document.querySelectorAll('.ajax').forEach(function(el) {
+                            el.addEventListener('click', function(event) {
+                                event.preventDefault();
+                                fetch(this.href)
+                                    .then(response => response.text())
+                                    .then(data => {
+                                        document.getElementById('ajax-result').innerHTML = data;
+                                    });
+                            });
+                        });
+                    });
+                </script>
+            </head>
+            <body>
+            <h1>DebugBar Symfony Integration</h1>
+            
+            <h2>Index</h2>
+            <ul>
+                <li><a href="index.php">Index page</a></li>
+            </ul>
+            
+            <h2>AJAX</h2>
+            <ul>
+                <li><a href="symfony.php?ajax=1" class="ajax">load ajax content</a></li>
+            </ul>
+            </body>
+        </html>
+        HTML);
+}
+
+$httpDriver->setResponse($response);
+
+$debugbar->addCollector(new DebugBar\Bridge\Symfony\SymfonyRequestCollector($request, $response));
+
+require __DIR__ . '/collectors/symfony_mailer.php';
+
+// Inject Debugbar
+if ($ajax) {
+    $debugbar->sendDataInHeaders();
+} elseif ($response->getContent()) {
+    $response->setContent($debugbar->getJavascriptRenderer()->injectInHtmlResponse($response->getContent()));
+}
+
+// Adds the Content-Security-Policy to the HTTP header.
+$response->headers->add(["Content-Security-Policy" => "default-src 'self' 'nonce-demo'; img-src data:"]);
+
+// Send the Response
+$response->send();

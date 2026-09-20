@@ -1,0 +1,45 @@
+name: Code Coverage
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  coverage-report:
+    runs-on: ubuntu-24.04
+
+    name: PHP Code Coverage
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+          tools: composer:v2
+          extensions: mbstring
+          coverage: pcov
+
+      - name: Install dependencies
+        env:
+          COMPOSER_ROOT_VERSION: dev-master
+        run: |
+          composer update --prefer-dist --no-interaction --no-suggest --with-all-dependencies
+
+      - name: Check Code Coverage
+        uses: nick-fields/retry@v3
+        with:
+            max_attempts: 3
+            timeout_seconds: 60
+            command: vendor/bin/phpunit --coverage-text --coverage-clover=clover.xml
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: coverage
+          path: clover.xml
