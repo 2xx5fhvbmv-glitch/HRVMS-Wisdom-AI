@@ -169,6 +169,11 @@ class ShopkeeperController extends Controller
 
         if($shopkeeper)
         {
+            // Security hardening (S4): the registration email sends this
+            // generated password in plaintext — force a change at first
+            // login. Direct property assignment, not mass assignment.
+            $shopkeeper->must_change_password = true;
+            $shopkeeper->save();
             $shopkeeper->sendShopkeeperRegistrationEmail($shopkeeper, $generatedPassword);
         }
 

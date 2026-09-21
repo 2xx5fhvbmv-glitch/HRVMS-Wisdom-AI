@@ -65,6 +65,17 @@ class LoginController extends Controller
       Auth::guard('admin')->login( $admin, isset( $request->remember ) );
       Common::logLoginAttempt('admin', $request->email, true, $request);
 
+      // Security hardening (S4): a freshly-created admin account is
+      // flagged must_change_password — the credential email sent that
+      // password in plaintext, so force a change before the dashboard.
+      if ($admin->must_change_password) {
+        $response['success'] = true;
+        $response['msg'] = 'Please set a new password before continuing.';
+        $response['must_change_password'] = true;
+        $response['redirect_url'] = route('admin.profile');
+        return response()->json($response);
+      }
+
       $response['success'] = true;
       $response['msg'] = 'Logged in';
       $response['redirect_url'] = route('admin.dashboard');

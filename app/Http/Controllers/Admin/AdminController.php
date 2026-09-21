@@ -217,6 +217,16 @@ class AdminController extends Controller
       $input['password'] = bcrypt($input['password']);
       $input['status'] = 'active';
       $admin = Admin::create($input);
+      if ($admin) {
+        // Security hardening (S4): the registration email below still
+        // sends this password in plaintext (fixing that outright needs a
+        // set-password-link redesign, separate scope) — force a change at
+        // first login so nobody keeps using a password someone else set.
+        // Direct property assignment, not mass assignment — the field is
+        // deliberately not in $fillable.
+        $admin->must_change_password = true;
+        $admin->save();
+      }
 
       if($admin){
         $admin->sendAdminRegistrationEmail($admin,($request['password']));
@@ -240,8 +250,12 @@ class AdminController extends Controller
   public function changePassword(Request $request)
   {
     try {
-      $admin = Admin::where( 'id', $request->admin_id )->first();
+      // IDOR fix: this used to trust $request->admin_id, letting any
+      // logged-in admin change any other admin's password. Always use
+      // the authenticated session's own id.
+      $admin = Admin::where( 'id', Auth::guard('admin')->id() )->first();
       $admin->password = bcrypt($request->password);
+      $admin->must_change_password = false;
       $admin->save();
 
       Auth::guard('admin')->logout();
@@ -256,7 +270,7 @@ class AdminController extends Controller
       \Log::emergency( "Message: ".$e->getMessage() );
 
       $response['success'] = false;
-      $response['msg'] = $e->getMessage();
+      $response['msg'] = 'An error occurred. Please try again later.';
       return response()->json($response);
     }
   }

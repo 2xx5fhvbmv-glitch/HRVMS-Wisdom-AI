@@ -164,17 +164,21 @@ class DashboardController extends Controller
         DB::beginTransaction();
         try
         {
-            $shopkeeper = Shopkeeper::find($request->id);
+            // IDOR fix: this used to trust $request->id, letting any
+            // logged-in shopkeeper edit/change the password of any other
+            // shopkeeper account. Always use the authenticated session's own id.
+            $shopkeeper = Shopkeeper::find($this->shopkeeper->id);
             $shopkeeper->name = $request->name;
             // Email is intentionally not updatable from this form (also
             // the shopkeeper login identifier) — the field is disabled
             // client-side, but a disabled input isn't submitted at all, so
             // this line used to null the email out on every save regardless.
             $shopkeeper->contact_no = $request->contact_no;
-           
+
             if(isset($request->password))
             {
                 $shopkeeper->password = Hash::make($request->password);
+                $shopkeeper->must_change_password = false;
             }
 
             if ($request->file('profile_photo'))

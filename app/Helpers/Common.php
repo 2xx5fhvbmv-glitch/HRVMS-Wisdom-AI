@@ -251,6 +251,13 @@ class Common
         } else {
             $resortAdminData['resort_id'] = $resortId;
             $resortAdmin = ResortAdmin::create($resortAdminData);
+            // Security hardening (S4): both callers of this shared helper
+            // (single Add Employee wizard and the bulk EmployeeImport)
+            // email this account's generated password in plaintext right
+            // after this call — force a change at first login. Direct
+            // property assignment, not mass assignment.
+            $resortAdmin->must_change_password = true;
+            $resortAdmin->save();
         }
 
         $employeeData['Admin_Parent_id'] = $resortAdmin->id;

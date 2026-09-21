@@ -329,6 +329,10 @@ class ResortsController extends Controller
               $resortAdmin->is_employee = 0;
               $resortAdmin->password = Hash::make($password);
               $resortAdmin->type = "super";
+              // Security hardening (S4): the registration email below
+              // sends this generated password in plaintext — force a
+              // change at first login.
+              $resortAdmin->must_change_password = true;
 
               if (isset($request->profile_picture)) {
                   $fileName = $request->profile_picture->getClientOriginalName();

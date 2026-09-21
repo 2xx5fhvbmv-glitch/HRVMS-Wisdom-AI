@@ -26,6 +26,9 @@ class Logincontroller extends Controller
      */
     private const INVALID_CREDENTIALS_HASH = '$2y$10$wJ8k1Qm5X0aG5s3fV1jvbeYyq3H2W1rY7Z9nQxT4uK6oL2mN8pS1e';
 
+    /** Security hardening (S10): max concurrent active Passport tokens per account. */
+    private const MAX_ACTIVE_TOKENS = 5;
+
     public function apiLogin(Request $request)
     {
         
@@ -99,6 +102,18 @@ class Logincontroller extends Controller
             //         'message'                       =>  'User is already logged in',
             //     ], 200);
             // }
+
+            // Security hardening (S10): an unbounded number of live tokens
+            // per account means a stolen/never-logged-out token from years
+            // ago is still valid forever. Cap concurrent sessions — revoke
+            // the oldest active tokens beyond the limit before issuing a
+            // new one.
+            $activeTokens = $resortAdmin->tokens()->where('revoked', false)->orderBy('created_at', 'desc')->get();
+            if ($activeTokens->count() >= self::MAX_ACTIVE_TOKENS) {
+                foreach ($activeTokens->slice(self::MAX_ACTIVE_TOKENS - 1) as $staleToken) {
+                    $staleToken->revoke();
+                }
+            }
 
             // Generate a new token
             $tokenResult                            =   $resortAdmin->createToken('ResortAdminToken');

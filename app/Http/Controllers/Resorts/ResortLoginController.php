@@ -122,6 +122,20 @@ class ResortLoginController extends Controller
             Auth::guard('resort-admin')->login($resort_admin, $request->remember);
             Common::logLoginAttempt('resort', $request->email, true, $request);
 
+            // Security hardening (S4): a freshly-created account (via the
+            // Add Employee wizard, bulk import, or a new resort) is flagged
+            // must_change_password — the credential email sent that
+            // password in plaintext, so force a change before letting them
+            // into the normal dashboard flow, regardless of role.
+            if ($resort_admin->must_change_password) {
+                return response()->json([
+                    'success' => true,
+                    'msg' => 'Please set a new password before continuing.',
+                    'must_change_password' => true,
+                    'redirect_url' => route('resort.user.profile')
+                ]);
+            }
+
             // 7. Redirect based on type & rank
             if ($resort_admin->type === 'sub' && $resort_admin->is_employee === 1) {
                 $employee = DB::table('employees')
@@ -587,6 +601,7 @@ class ResortLoginController extends Controller
 
         // ✅ Update password
         $user->password = Hash::make($request->password);
+        $user->must_change_password = false;
         $user->save();
 
         return response()->json([

@@ -64,6 +64,19 @@ class ShopkeeperLoginController extends Controller
             Auth::guard('shopkeeper')->login( $shopkeeper, isset( $request->remember ) );
             Common::logLoginAttempt('shopkeeper', $request->email, true, $request);
 
+            // Security hardening (S4): a freshly-created shopkeeper account
+            // is flagged must_change_password — the credential email sent
+            // that password in plaintext, so force a change before the
+            // dashboard.
+            if ($shopkeeper->must_change_password) {
+                return response()->json([
+                    'success' => true,
+                    'msg' => 'Please set a new password before continuing.',
+                    'must_change_password' => true,
+                    'redirect_url' => route('shopkeeper.profile')
+                ]);
+            }
+
             $response['success'] = true;
             $response['msg'] = 'Logged in Successfully.';
             $response['redirect_url'] = route('shopkeeper.dashboard');
