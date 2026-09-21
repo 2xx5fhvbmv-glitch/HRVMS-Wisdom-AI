@@ -37,6 +37,8 @@ class DashboardController extends Controller
 
         // Count employees actually paid (net_salary > 0) in the last completed/locked payroll
         $lastCompletedPayroll = Payroll::where('resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll_category', 'Permanent')
             ->whereIn('status', ['locked', 'completed'])
             ->where('total_payroll', '>', 0)
             ->orderBy('end_date', 'desc')
@@ -60,6 +62,8 @@ class DashboardController extends Controller
         // disagreed on what counted as "real spend".
         $committedStatuses = ['approved', 'locked'];
         $lastPayroll = Payroll::where('resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll_category', 'Permanent')
             ->where('end_date', '<', $today)
             ->whereIn('status', $committedStatuses)
             ->orderBy('end_date', 'desc')
@@ -67,6 +71,8 @@ class DashboardController extends Controller
         if (!$lastPayroll) {
             // Fallback: show most recent payroll regardless of status
             $lastPayroll = Payroll::where('resort_id', $resort_id)
+                // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+                ->where('payroll_category', 'Permanent')
                 ->where('end_date', '<', $today)
                 ->orderBy('end_date', 'desc')
                 ->first();
@@ -107,12 +113,16 @@ class DashboardController extends Controller
 
         // Only show drafts that have review data and no overlapping locked/completed payroll
         $draftPayrolls = Payroll::where('resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll_category', 'Permanent')
             ->where('status', 'draft')
             ->whereHas('reviews')
             ->whereNotExists(function ($query) use ($resort_id) {
                 $query->select(DB::raw(1))
                     ->from('payroll as locked_p')
                     ->where('locked_p.resort_id', $resort_id)
+                    // WP9 — a locked Casual run must not block a Permanent draft.
+                    ->where('locked_p.payroll_category', 'Permanent')
                     ->whereIn('locked_p.status', ['locked', 'completed', 'processed', 'paid'])
                     ->whereRaw('locked_p.start_date <= payroll.end_date')
                     ->whereRaw('locked_p.end_date >= payroll.start_date');
@@ -127,6 +137,8 @@ class DashboardController extends Controller
 
         // Payrolls in approval process (pending_approval, approved, or draft with rejection history)
         $approvalPayrolls = Payroll::where('resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll_category', 'Permanent')
             ->where(function($q) {
                 $q->whereIn('status', ['pending_approval', 'approved'])
                   ->orWhere(function($q2) {
@@ -155,6 +167,8 @@ class DashboardController extends Controller
 
         // Locked (completed) payrolls
         $lockedPayrolls = Payroll::where('resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll_category', 'Permanent')
             ->where('status', 'locked')
             ->orderByDesc('end_date')
             ->limit(5)
@@ -191,12 +205,16 @@ class DashboardController extends Controller
         $committedStatuses = ['approved', 'locked'];
 
         $lastPayroll = Payroll::where('resort_id', $resortId)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll_category', 'Permanent')
             ->where('end_date', '<', $today)
             ->whereIn('status', $committedStatuses)
             ->orderBy('end_date', 'desc')
             ->first();
         if (!$lastPayroll) {
             $lastPayroll = Payroll::where('resort_id', $resortId)
+                // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+                ->where('payroll_category', 'Permanent')
                 ->where('end_date', '<', $today)
                 ->orderBy('end_date', 'desc')
                 ->first();
@@ -237,6 +255,8 @@ class DashboardController extends Controller
         $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
 
         $payroll = Payroll::where('resort_id', $resortId)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll_category', 'Permanent')
             ->where('start_date', $cutoffPeriod['start']->format('Y-m-d'))
             ->where('end_date', $cutoffPeriod['end']->format('Y-m-d'))
             ->first();
@@ -245,6 +265,8 @@ class DashboardController extends Controller
             $nextStart = $cutoffPeriod['end']->copy()->addDay();
             $nextEnd = $nextStart->copy()->addMonth()->subDay();
             $payroll = Payroll::where('resort_id', $resortId)
+                // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+                ->where('payroll_category', 'Permanent')
                 ->where('start_date', $nextStart->format('Y-m-d'))
                 ->first();
             return ['start' => $nextStart, 'end' => $nextEnd, 'payroll' => $payroll];
@@ -695,6 +717,8 @@ class DashboardController extends Controller
         $now = \Carbon\Carbon::now();
 
         $latest = DB::table('payroll')->where('resort_id', $resortId)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll_category', 'Permanent')
             ->whereIn('status', $finalStatuses)->orderByDesc('end_date')->first();
 
         if (!$latest) {
@@ -803,6 +827,8 @@ class DashboardController extends Controller
             $monthly = DB::table('payroll as p')
                 ->join('payroll_reviews as pr', 'pr.payroll_id', '=', 'p.id')
                 ->where('p.resort_id', $resortId)
+                // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+                ->where('p.payroll_category', 'Permanent')
                 ->whereIn('p.status', $finalStatuses)
                 ->whereYear('p.end_date', $now->year)
                 ->groupBy(DB::raw('MONTH(p.end_date)'))
@@ -855,12 +881,16 @@ class DashboardController extends Controller
         $page_title = 'Draft Payrolls';
         $resort_id = $this->resort->resort_id;
         $drafts = Payroll::where('resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll_category', 'Permanent')
             ->where('status', 'draft')
             ->whereHas('reviews')
             ->whereNotExists(function ($query) use ($resort_id) {
                 $query->select(DB::raw(1))
                     ->from('payroll as locked_p')
                     ->where('locked_p.resort_id', $resort_id)
+                    // WP9 — a locked Casual run must not block a Permanent draft.
+                    ->where('locked_p.payroll_category', 'Permanent')
                     ->whereIn('locked_p.status', ['locked', 'completed', 'processed', 'paid'])
                     ->whereRaw('locked_p.start_date <= payroll.end_date')
                     ->whereRaw('locked_p.end_date >= payroll.start_date');
@@ -914,6 +944,8 @@ class DashboardController extends Controller
         // Find payroll matching this month/year (by start_date or end_date)
         // Prioritize locked payrolls
         $payroll = Payroll::where('resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll_category', 'Permanent')
             ->where(function($q) use ($month, $year) {
                 $q->where(function($q2) use ($month, $year) {
                     $q2->whereMonth('end_date', $month)->whereYear('end_date', $year);
@@ -958,6 +990,8 @@ class DashboardController extends Controller
                 DB::raw("SUM(total_payroll) as payroll_cost")
             )
             ->where('resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll_category', 'Permanent')
             ->where('status', 'locked')
             ->whereYear('end_date', $year)
             ->groupBy('month_num')
@@ -967,6 +1001,8 @@ class DashboardController extends Controller
         $otData = DB::table('payroll as p')
             ->join('payroll_reviews as pr', 'p.id', '=', 'pr.payroll_id')
             ->where('p.resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('p.payroll_category', 'Permanent')
             ->where('p.status', 'locked')
             ->whereYear('p.end_date', $year)
             ->select(
@@ -984,6 +1020,8 @@ class DashboardController extends Controller
                 DB::raw("SUM(payroll_service_charges.service_charge_amount) as service_charge")
             )
             ->where('payroll.resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll.payroll_category', 'Permanent')
             ->where('payroll.status', 'locked')
             ->whereYear('payroll.end_date', $year)
             ->groupBy('month_num')
@@ -1055,6 +1093,8 @@ class DashboardController extends Controller
             $result = DB::table('payroll as p')
                 ->join('payroll_reviews as pr', 'p.id', '=', 'pr.payroll_id')
                 ->where('p.resort_id', $resort_id)
+                // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+                ->where('p.payroll_category', 'Permanent')
                 ->where('p.status', 'locked')
                 ->where(function($q) use ($m) {
                     $q->where(function($q2) use ($m) {
@@ -1107,6 +1147,8 @@ class DashboardController extends Controller
 
         // Get the latest locked payroll only
         $latestLocked = Payroll::where('resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll_category', 'Permanent')
             ->where('status', 'locked')
             ->orderByDesc('end_date')
             ->first();
@@ -1140,6 +1182,8 @@ class DashboardController extends Controller
 
         // Fetch department-wise payroll distribution from the latest locked payroll only
         $latestLocked = Payroll::where('resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll_category', 'Permanent')
             ->where('status', 'locked')
             ->orderByDesc('end_date')
             ->first();
@@ -1154,6 +1198,8 @@ class DashboardController extends Controller
                 ->join('employees as e', 'e.id', '=', 'pe.employee_id')
                 ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                 ->where('payroll.id', $latestLocked->id)
+                // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+                ->where('payroll.payroll_category', 'Permanent')
                 ->selectRaw('rd.name as department, SUM(pr.net_salary) as total')
                 ->groupBy('e.Dept_id', 'rd.name')
                 ->get();
@@ -1190,6 +1236,8 @@ class DashboardController extends Controller
                      ->on('pd.payroll_id', '=', 'pe.payroll_id');
             })
             ->where('payroll.resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll.payroll_category', 'Permanent')
             ->selectRaw("DATE_FORMAT(payroll.start_date, '%b %Y') as month,
                         SUM(pd.pension) as employee,
                         SUM(pd.pension) as employer")
@@ -1209,6 +1257,8 @@ class DashboardController extends Controller
         $otData = DB::table('payroll_time_and_attandance')
             ->join('payroll', 'payroll_time_and_attandance.payroll_id', '=', 'payroll.id')
             ->where('payroll.resort_id', $resort_id)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('payroll.payroll_category', 'Permanent')
             ->where('payroll.status', 'locked')
             ->whereYear('payroll.start_date', $year)
             ->selectRaw("MONTH(payroll.start_date) as month_num, SUM(total_ot) as total_ot")
@@ -1269,6 +1319,8 @@ class DashboardController extends Controller
                      ->on('pr.employee_id', '=', 'pd.employee_id');
             })
             ->where('p.resort_id', $resortId)
+            // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+            ->where('p.payroll_category', 'Permanent')
             ->where('p.status', 'locked')
             ->whereYear('p.start_date', $year)
             ->select('pd.ewt', DB::raw('(pr.total_earnings - pd.pension) as taxable_income'))
@@ -1337,6 +1389,8 @@ class DashboardController extends Controller
             // Actual: payroll total_payroll for this month
             $actualPayroll = DB::table('payroll')
                 ->where('resort_id', $resort_id)
+                // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
+                ->where('payroll_category', 'Permanent')
                 ->whereYear('start_date', $year)
                 ->whereMonth('start_date', $monthNum)
                 ->sum('total_payroll');

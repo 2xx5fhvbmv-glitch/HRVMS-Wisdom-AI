@@ -7144,6 +7144,44 @@ class Common
         $vacantIndex  = (int) ($vacant->vacant_index ?? 0);
         if (!$vacantId || !$positionId || !$departmentId) return 0.0;
 
+        // WP2.2 — vacant Casual/Intern slots were always costed via
+        // resort_vacant_budget_cost_configurations.resort_budget_cost_id,
+        // which only ever points at Permanent cost lines (no UI or schema
+        // support exists to save a Casual/Intern-specific per-slot
+        // override, and using the same numeric id space would collide with
+        // an unrelated Permanent cost line anyway). D2/D3: Casual/Intern
+        // have no separate salary leg (line amount already includes
+        // salary) — computed directly from the applicable cost lines,
+        // position-tied, same as annualBudgetForEmployee()'s non-Permanent
+        // branch.
+        // resort_positions.employee_category is already the canonical
+        // 'Casual'/'Intern'/null (Permanent) — same values
+        // getCachedActiveResortCosts()/forCategory() expect directly, no
+        // employment_type-string mapping needed here.
+        $vacantManningCategory = \DB::table('resort_positions')->where('id', $positionId)->value('employee_category') ?: 'Permanent';
+        if ($vacantManningCategory !== 'Permanent') {
+            $nonPermanentCosts = self::getCachedActiveResortCosts($resortId, $vacantManningCategory);
+            $total = 0.0;
+            foreach ($nonPermanentCosts as $cost) {
+                $ties = $cost->applies_to_position_ids ?? [];
+                if (!empty($ties) && !in_array($positionId, $ties, true)) {
+                    continue;
+                }
+                $isMvrTemplate = strtoupper(trim((string) ($cost->amount_unit ?? 'USD'))) === 'MVR';
+                $mvrToUsdRate = 1.0;
+                if ($isMvrTemplate) {
+                    $dollarToMvr = (float) (optional(self::getCachedResortSettings($resortId))->DollertoMVR ?: 15.42);
+                    if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
+                    $mvrToUsdRate = 1.0 / $dollarToMvr;
+                }
+                for ($m = 1; $m <= 12; $m++) {
+                    $val = self::computeBudgetCostMonthlyValue($cost, $m, $year, false, false, 0.0, null, $vacantManningCategory);
+                    $total += $isMvrTemplate ? $val * $mvrToUsdRate : $val;
+                }
+            }
+            return $total;
+        }
+
         // -- 1. Salary leg ---------------------------------------------------
         // Per legacy ResortVacantBudgetCost mapping:
         //   basic_salary  = Current

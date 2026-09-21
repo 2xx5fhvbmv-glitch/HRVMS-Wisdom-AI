@@ -102,7 +102,10 @@
                         $seats = collect($pos->employees)->map(function ($employee) use ($Rank) {
                             return [
                                 'name' => trim(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')),
-                                'rank' => $Rank[$employee->rank] ?? '',
+                                // WP1 — $Rank[0] doesn't exist (Casual/
+                                // Intern sentinel), rankLabel() shows the
+                                // category instead of a blank cell.
+                                'rank' => \App\Helpers\Common::rankLabel($employee),
                                 'nation' => $employee->nationality,
                                 // No photo column is selected by this query — every
                                 // seat renders via the initials fallback below, per

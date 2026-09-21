@@ -206,9 +206,9 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     // Store a new division
     Route::post('manning/storedivisions', 'ManningController@store_divisions')->name('manning.divisions.store');
     // Inline update for divisions
-    Route::put('/manning/inlinedivisionupdate/{id}', 'ManningController@inlineDivisionUpdate')->name('manning.divisions.inlineUpdate');
+    Route::put('/manning/inlinedivisionupdate/{id?}', 'ManningController@inlineDivisionUpdate')->name('manning.divisions.inlineUpdate');
     // Delete a division
-    Route::delete('manning/destroydivision/{id}', 'ManningController@destroy_division')->name('manning.divisons.destroy');
+    Route::delete('manning/destroydivision/{id?}', 'ManningController@destroy_division')->name('manning.divisons.destroy');
 
 
     // Listing all departments with DataTables
@@ -216,9 +216,9 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     // Store a new department
     Route::post('manning/storedepartments', 'ManningController@store_departments')->name('manning.departments.store');
     // Inline update for department
-    Route::put('/manning/inlinedepartmentupdate/{id}', 'ManningController@inlineDepartmentUpdate')->name('manning.departments.inlineUpdate');
+    Route::put('/manning/inlinedepartmentupdate/{id?}', 'ManningController@inlineDepartmentUpdate')->name('manning.departments.inlineUpdate');
     // Delete a department
-    Route::delete('manning/destroydepartment/{id}', 'ManningController@destroy_department')->name('manning.departments.destroy');
+    Route::delete('manning/destroydepartment/{id?}', 'ManningController@destroy_department')->name('manning.departments.destroy');
 
     // Listing all sections with DataTables
     Route::get('/manning/getsections', 'ManningController@get_sections')->name('manning.sections.data');
@@ -227,16 +227,16 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     // Inline update for sections
     Route::post('/manning/inlinesectionupdate', 'ManningController@inlinesectionsUpdate')->name('manning.sections.inlineUpdate');
     // Delete a sections
-    Route::delete('manning/destroysection/{id}', 'ManningController@destroy_sections')->name('manning.sections.destroy');
+    Route::delete('manning/destroysection/{id?}', 'ManningController@destroy_sections')->name('manning.sections.destroy');
 
     // Listing all positions with DataTables
     Route::get('/manning/getpositions', 'ManningController@get_positions')->name('manning.positions.data');
     // Store a new positions
     Route::post('manning/storepositions', 'ManningController@store_positions')->name('manning.positions.store');
     // Inline update for positions
-    Route::put('/manning/inlinepositionupdate/{id}', 'ManningController@inlinePositionUpdate')->name('manning.positions.inlineUpdate');
+    Route::put('/manning/inlinepositionupdate/{id?}', 'ManningController@inlinePositionUpdate')->name('manning.positions.inlineUpdate');
     // Delete a positions
-    Route::delete('manning/destroyposition/{id}', 'ManningController@destroy_position')->name('manning.positions.destroy');
+    Route::delete('manning/destroyposition/{id?}', 'ManningController@destroy_position')->name('manning.positions.destroy');
 
     /*manning response */
     Route::post('/manning/responses', 'ManningResponseController@store')->name('manning.responses.store');
@@ -248,7 +248,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/manning/responses/categories-with-data/{deptId}/{year}', 'ManningResponseController@getCategoriesWithData')->name('manning.responses.categoriesWithData');
     Route::post('/manning/responses/close-notification', 'ManningResponseController@closeManningRequestNotification')->name('manning.responses.closeNotification');
     Route::post( '/manning/responses/show/department/wise-budget-data', 'ManningResponseController@ShowDepartmentWiseBudgetData')->name('resort.department.wise.budget.data');
-    Route::put( '/manning/responses/update-budget-data/{id}', 'ManningResponseController@updateBudgetData')->name('resort.budget.update');
+    Route::put( '/manning/responses/update-budget-data/{id?}', 'ManningResponseController@updateBudgetData')->name('resort.budget.update');
     Route::put( '/manning/responses/update-grand-total', 'ManningResponseController@updateParentTotal')->name('resort.budget.updateParentTotal');
 
     /** Budget **/
@@ -288,17 +288,17 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get( '/budget/cost/list','BudgetCostController@costlist')->name('resort.budget.costlist');
     Route::post('/budget/cost/store', 'BudgetCostController@store_costs')->name('resort.budget.storecost');
     // Inline update for sections
-    Route::put('/budget/cost/inlineupdate/{id}', 'BudgetCostController@inlinecostUpdate')->name('resort.budget.inlinecostupdate');
+    Route::put('/budget/cost/inlineupdate/{id?}', 'BudgetCostController@inlinecostUpdate')->name('resort.budget.inlinecostupdate');
     // Delete a sections
-    Route::delete('budget/cost/destroy/{id}', 'BudgetCostController@destroy_costs')->name('resort.budget.destroycost');
+    Route::delete('budget/cost/destroy/{id?}', 'BudgetCostController@destroy_costs')->name('resort.budget.destroycost');
 
     // Cost Configuration for Casuals & Interns — separate screen/table from
     // Permanent's above (see NonpermanentBudgetCostController for why).
     Route::get('/budget/cost/nonpermanent', 'NonpermanentBudgetCostController@index')->name('resort.budget.nonpermanent.index');
     Route::get('/budget/cost/nonpermanent/list', 'NonpermanentBudgetCostController@costlist')->name('resort.budget.nonpermanent.costlist');
     Route::post('/budget/cost/nonpermanent/store', 'NonpermanentBudgetCostController@store_costs')->name('resort.budget.nonpermanent.storecost');
-    Route::put('/budget/cost/nonpermanent/inlineupdate/{id}', 'NonpermanentBudgetCostController@inlinecostUpdate')->name('resort.budget.nonpermanent.inlinecostupdate');
-    Route::delete('budget/cost/nonpermanent/destroy/{id}', 'NonpermanentBudgetCostController@destroy_costs')->name('resort.budget.nonpermanent.destroycost');
+    Route::put('/budget/cost/nonpermanent/inlineupdate/{id?}', 'NonpermanentBudgetCostController@inlinecostUpdate')->name('resort.budget.nonpermanent.inlinecostupdate');
+    Route::delete('budget/cost/nonpermanent/destroy/{id?}', 'NonpermanentBudgetCostController@destroy_costs')->name('resort.budget.nonpermanent.destroycost');
 
     /** Benifit grid  */
     Route::get('/benifit-grid', 'BenifitGridController@index')->name('resort.benifitgrid.index');
@@ -436,20 +436,20 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     Route::post('talent-acquisition/position-sections/', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','PositionSections'])->name('resort.ta.PositionSections');
     Route::post('talent-acquisition/add-agent/', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','AddTicketAgent'])->name('resort.ta.add.Agent');
-    Route::put('/talent-acquisition/inline-agent-update/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','inlineUpdateAgent'])->name('resort.ta.inlineUpdateAgent');
+    Route::put('/talent-acquisition/inline-agent-update/{id?}', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','inlineUpdateAgent'])->name('resort.ta.inlineUpdateAgent');
 
     Route::get( '/get/talent-acquisition/get-resort-agent-ticket-list', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','GetAgentTicketList'])->name('resort.ta.getResortAgentTicketList');
-    Route::delete('/talent-acquisition/destroy-agentList/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','DestroyAgentList'])->name('resort.ta.destroyAgentList');
+    Route::delete('/talent-acquisition/destroy-agentList/{id?}', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','DestroyAgentList'])->name('resort.ta.destroyAgentList');
 
     //Hiring source
     Route::post('talent-acquisition/add-hiring-source/', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','AddHiringSource'])->name('resort.ta.add.source');
     Route::get( 'talent-acquisition/get-hiring-source/', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','GetHiringSource'])->name('resort.ta.get.source');
-    Route::delete('talent-acquisition/delete-hiring-source/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','DestroyHiringSource'])->name('resort.ta.delete.source');
+    Route::delete('talent-acquisition/delete-hiring-source/{id?}', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','DestroyHiringSource'])->name('resort.ta.delete.source');
 
     //Service provider
     Route::post('talent-acquisition/add-service-provider/', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','AddServiceProvider'])->name('resort.ta.add.provider');
     Route::get( 'talent-acquisition/get-service-provider/', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','GetServiceProvider'])->name('resort.ta.get.provider');
-    Route::delete('talent-acquisition/delete-service-provider/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','DestroyServiceProvider'])->name('resort.ta.delete.provider');
+    Route::delete('talent-acquisition/delete-service-provider/{id?}', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','DestroyServiceProvider'])->name('resort.ta.delete.provider');
 
     Route::post('talent-acquisition/terms-and-conditions/store', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','storeOrUpdateTC'])->name('resort.ta.termscondition.storeOrUpdate');
 
@@ -475,8 +475,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/talent-acquisition/job-advertisement', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','index'])->name('resort.ta.jobadvertisment.index');
     Route::get('/talent-acquisition/job-advertisement/list', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','getList'])->name('resort.ta.jobadvertisment.getList');
     Route::post('/talent-acquisition/job-advertisement/upload', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','StoreJobAvd'])->name('resort.ta.jobadvertisment.upload');
-    Route::delete('/talent-acquisition/job-advertisement/destroy/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','destroy'])->name('resort.ta.jobadvertisment.destroy');
-    Route::get('/talent-acquisition/job-advertisement/download/{vacancyId}', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','downloadComposedAd'])->name('resort.ta.jobadvertisment.download');
+    Route::delete('/talent-acquisition/job-advertisement/destroy/{id?}', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','destroy'])->name('resort.ta.jobadvertisment.destroy');
+    Route::get('/talent-acquisition/job-advertisement/download/{vacancyId?}', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','downloadComposedAd'])->name('resort.ta.jobadvertisment.download');
 
     Route::Post('/talent-acquisition/hold-vcancies', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','TaHoldVcanciesNotification'])->name('resort.ta.HiringNotification');
 
@@ -533,8 +533,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/talent-acquisition/contract-templates', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','index'])->name('resort.ta.contractTemplates.index')->defaults('type', 'contract');
     Route::get('/talent-acquisition/contract-templates/list', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','getList'])->name('resort.ta.contractTemplates.list')->defaults('type', 'contract');
     Route::post('/talent-acquisition/document-template/store', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','store'])->name('resort.ta.documentTemplate.store');
-    Route::put('/talent-acquisition/document-template/set-default/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','setDefault'])->name('resort.ta.documentTemplate.setDefault');
-    Route::delete('/talent-acquisition/document-template/destroy/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','destroy'])->name('resort.ta.documentTemplate.destroy');
+    Route::put('/talent-acquisition/document-template/set-default/{id?}', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','setDefault'])->name('resort.ta.documentTemplate.setDefault');
+    Route::delete('/talent-acquisition/document-template/destroy/{id?}', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','destroy'])->name('resort.ta.documentTemplate.destroy');
 
     // Rejected Applications & Review Reminders
     Route::get('/talent-acquisition/rejected-applicants', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','RejectedApplicants'])->name('resort.ta.RejectedApplicants');
@@ -746,7 +746,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('accommodation/configuration', 'Accommodation\ConfigrationController@index')->name('resort.accommodation.config.index');
     Route::post('accommodation/inventory/category', 'Accommodation\ConfigrationController@InvenptoryCategoryStore')->name('resort.accommodation.StoreInvCategory');
     Route::get('accommodation/inventory/category/index', 'Accommodation\ConfigrationController@InvenotryCatIndex')->name('resort.accommodation.config.InvenotryCatIndex');
-    Route::put('/accommodation/inventory/category/inline-update/{id}', 'Accommodation\ConfigrationController@CategoryUpdate')->name('resort.accommodation.inlineCatUpdate');
+    Route::put('/accommodation/inventory/category/inline-update/{id?}', 'Accommodation\ConfigrationController@CategoryUpdate')->name('resort.accommodation.inlineCatUpdate');
     Route::delete('/accommodation/inventory/category/inline-destroy/{id}', 'Accommodation\ConfigrationController@Catdestory')->name('resort.accommodation.Catdestory');
     Route::post('accommodation/check-room-exists', 'Accommodation\ConfigrationController@checkRoomIsExits')->name('resort.accommodation.config.checkRoomIsExits');
 
@@ -754,17 +754,17 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     Route::post('accommodation/type-store', 'Accommodation\ConfigrationController@AccommodationTypeStore')->name('resort.accommodation.AccommodationTypeStore');
     Route::get('accommodation/index', 'Accommodation\ConfigrationController@AccommodationIndex')->name('resort.accommodation.config.AccommodationIndex');
-    Route::put('/accommodation/update/{id}', 'Accommodation\ConfigrationController@AccommodationUpdate')->name('resort.accommodation.AccommodationUpdate');
+    Route::put('/accommodation/update/{id?}', 'Accommodation\ConfigrationController@AccommodationUpdate')->name('resort.accommodation.AccommodationUpdate');
     Route::delete('/accommodation/destroy/{id}', 'Accommodation\ConfigrationController@Accommodationdestory')->name('resort.accommodation.Accommodationdestory');
 
     Route::post('accommodation/building/store', 'Accommodation\ConfigrationController@StoreBuilding')->name('resort.accommodation.StoreBuilding');
     Route::get('accommodation/building/index', 'Accommodation\ConfigrationController@BuildingIndex')->name('resort.accommodation.config.BuildingIndex');
-    Route::put('/accommodation/building/update/{id}', 'Accommodation\ConfigrationController@BuildingUpdate')->name('resort.accommodation.BuildingUpdate');
+    Route::put('/accommodation/building/update/{id?}', 'Accommodation\ConfigrationController@BuildingUpdate')->name('resort.accommodation.BuildingUpdate');
     Route::delete('/accommodation/building/destroy/{id}', 'Accommodation\ConfigrationController@BuildingDestory')->name('resort.accommodation.BuildingDestory');
 
     Route::post('accommodation/floor-and-room/store', 'Accommodation\ConfigrationController@StoreFloorandroom')->name('resort.accommodation.StoreFloorandroom');
     Route::get('accommodation/floor-and-room/index', 'Accommodation\ConfigrationController@FloorRoomIndex')->name('resort.accommodation.config.FloorRoomIndex');
-    Route::put('/accommodation/floor-and-room/update/{id}', 'Accommodation\ConfigrationController@FloorAndRoomUpdate')->name('resort.accommodation.FloorAndRoomUpdate');
+    Route::put('/accommodation/floor-and-room/update/{id?}', 'Accommodation\ConfigrationController@FloorAndRoomUpdate')->name('resort.accommodation.FloorAndRoomUpdate');
     Route::delete('/accommodation/floor-and-room/destroy/{id}', 'Accommodation\ConfigrationController@FloorAndRoomDestroy')->name('resort.accommodation.FloorAndRoomDestroy');
     Route::get('accommodation/get-floor', 'Accommodation\ConfigrationController@GetBuildingWiseFloor')->name('resort.accommodation.config.getFloor');
     Route::get('accommodation/get-floor-wise-rooms', 'Accommodation\ConfigrationController@GetFloorWiseRooms')->name('resort.accommodation.config.GetFloorWiseRooms');
@@ -800,13 +800,13 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('accommodation/inventory/management', 'Accommodation\InventoryController@InventoryManagement')->name('resort.accommodation.InventoryManagement');
 
     Route::get('accommodation/historical-inventory', 'Accommodation\InventoryController@HistoricalInventory')->name('resort.accommodation.HisotricalInvenotry');
-    Route::put('/accommodation/inventory-update/{id}', 'Accommodation\InventoryController@Inventoryupdated')->name('resort.accommodation.Inventoryupdated');
+    Route::put('/accommodation/inventory-update/{id?}', 'Accommodation\InventoryController@Inventoryupdated')->name('resort.accommodation.Inventoryupdated');
 
     Route::post('accommodation/available-accommodation-store', 'Accommodation\ConfigrationController@AvailableAccommodationStore')->name('resort.accommodation.AvailableAccommodationStore');
     Route::get('accommodation/available-accommodation-list', 'Accommodation\ConfigrationController@AvailableAccommodationIndex')->name('resort.accommodation.AvailableAccommodationIndex');
-    Route::delete('accommodation/available-accommodation-destroy/{id}', 'Accommodation\ConfigrationController@AvailableAccommodationDestroy')->name('resort.accommodation.AvailableAccommodationDestroy');
-    Route::put('accommodation/available-accommodation-update/{id}', 'Accommodation\ConfigrationController@AvailableAccommodationUpdate')->name('resort.accommodation.AvailableAccommodationUpdate');
-    Route::get('accommodation/get-beds/{id}', 'Accommodation\ConfigrationController@getBeds')->name('resort.accommodation.getBeds');
+    Route::delete('accommodation/available-accommodation-destroy/{id?}', 'Accommodation\ConfigrationController@AvailableAccommodationDestroy')->name('resort.accommodation.AvailableAccommodationDestroy');
+    Route::put('accommodation/available-accommodation-update/{id?}', 'Accommodation\ConfigrationController@AvailableAccommodationUpdate')->name('resort.accommodation.AvailableAccommodationUpdate');
+    Route::get('accommodation/get-beds/{id?}', 'Accommodation\ConfigrationController@getBeds')->name('resort.accommodation.getBeds');
     // Route::get('accommodation/recalculate-inventory', 'Accommodation\ConfigrationController@recalculateInventory')->name('resort.accommodation.recalculateInventory');
     Route::get('accommodation/assign-accommodation', 'Accommodation\AssignAccommodationController@AssignAccommation')->name('resort.accommodation.AssignAccommation');
     Route::get('accommodation/buildingwise-accommodation', 'Accommodation\AssignAccommodationController@BuildingwiseAccommodation')->name('resort.accommodation.BuildingwiseAccommodation');
@@ -871,8 +871,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('payroll/shopkeepers/{id}/payments/list', 'Payroll\ShopkeeperController@paymentsList')->name('resort.shopkeeper.payments.list');
     Route::get('payroll/shopkeepers/{id}/payments/export', 'Payroll\ShopkeeperController@paymentsExport')->name('resort.shopkeeper.payments.export');
     Route::post('payroll/shopkeepers/payments/bulk-update-status', 'Payroll\ShopkeeperController@bulkUpdatePaymentStatus')->name('resort.shopkeeper.payments.bulkUpdateStatus');
-    Route::put('payroll/shopkeepers/inlineUpdate/{id}', 'Payroll\ShopkeeperController@inlineUpdate')->name('shopkeeper.inlineUpdate');
-    Route::delete('payroll/shopkeepers/destroy/{id}', 'Payroll\ShopkeeperController@destroy')->name('shopkeeper.destroy');
+    Route::put('payroll/shopkeepers/inlineUpdate/{id?}', 'Payroll\ShopkeeperController@inlineUpdate')->name('shopkeeper.inlineUpdate');
+    Route::delete('payroll/shopkeepers/destroy/{id?}', 'Payroll\ShopkeeperController@destroy')->name('shopkeeper.destroy');
 
     //Run Payroll
     Route::get('payroll/run-payroll', 'Payroll\PayrollController@index')->name('payroll.run');
@@ -976,15 +976,15 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
 
     Route::post('performance/review-types', 'Performance\ConfigurationController@ReviewTypes')->name('Performance.config.ReviewTypes');
-    Route::put('performance/review-types/inline-update/{id}', 'Performance\ConfigurationController@inlineReviewTypesUpdate')->name('Performance.config.ReviewTypes.inlineUpdate');
-    Route::delete('performance/review-types/destroy/{id}', 'Performance\ConfigurationController@DestroyReviewTypes')->name('Performance.DestroyReviewTypes');
+    Route::put('performance/review-types/inline-update/{id?}', 'Performance\ConfigurationController@inlineReviewTypesUpdate')->name('Performance.config.ReviewTypes.inlineUpdate');
+    Route::delete('performance/review-types/destroy/{id?}', 'Performance\ConfigurationController@DestroyReviewTypes')->name('Performance.DestroyReviewTypes');
 
     // form Templete  Genrate
     Route::post('performance/template-form', 'Performance\ConfigurationController@PerformanceTemplateFormStore')->name('Performance.config.PerformanceTemplateFormStore');
     Route::get('performance/template-form/list', 'Performance\ConfigurationController@PerformanceTemplateFormList')->name('Performance.config.PerformanceTemplateFormList');
     Route::post('performance/template-form/update', 'Performance\ConfigurationController@PerformanceTemplateFormUpdate')->name('Performance.config.PerformanceTemplateFormUpdate');
     Route::get('performance//template-form/get/{id}', 'Performance\ConfigurationController@GetPerformanceTemplateForm')->name('Performance.config.GetPerformanceTemplateForm');
-    Route::delete('performance/template-form/destroy/{id}', 'Performance\ConfigurationController@DestroyPerformanceTemplateForm')->name('Performance.DestroyPerformanceTemplateForm');
+    Route::delete('performance/template-form/destroy/{id?}', 'Performance\ConfigurationController@DestroyPerformanceTemplateForm')->name('Performance.DestroyPerformanceTemplateForm');
     Route::post('performance/schedule-meeting-email', 'Performance\ConfigurationController@ScheduleMeetingEmail')->name('Performance.config.ScheduleMeetingEmail');
 
 
@@ -992,13 +992,13 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('performance/ninty-day-peformance-form/list', 'Performance\ConfigurationController@NitnyPerformanceFormList')->name('Performance.config.NintyPerformanceFormList');
     Route::get('performance/ninty-day-peformance-form/get/{id}', 'Performance\ConfigurationController@GetNintyPerformanceForm')->name('Performance.config.GetNintyPerformanceForm');
     Route::post('performance/ninty-day-peformance-form/update', 'Performance\ConfigurationController@NintyDayPerformanceFormUpdate')->name('Performance.config.NintyDayPerformanceFormUpdate');
-    Route::delete('performance/ninty-day-peformance-form/destroy/{id}', 'Performance\ConfigurationController@DestroyNintyDayPerformanceForm')->name('Performance.DestroyNintyDayPerformanceForm');
+    Route::delete('performance/ninty-day-peformance-form/destroy/{id?}', 'Performance\ConfigurationController@DestroyNintyDayPerformanceForm')->name('Performance.DestroyNintyDayPerformanceForm');
 
     Route::get('performance/professional-form/List', 'Performance\ConfigurationController@ProfessionalFormList')->name('Performance.config.ProfessionalFormList');
     Route::post('performance/professional-form/store', 'Performance\ConfigurationController@ProfessionalFormStore')->name('Performance.config.ProfessionalFormStore');
     Route::get('performance/professional-form/get/{id}', 'Performance\ConfigurationController@GetProfessionalForm')->name('Performance.config.GetProfessionalForm');
     Route::post('performance/professional-form/update', 'Performance\ConfigurationController@ProfessionalFormUpdate')->name('Performance.config.ProfessionalFormUpdate');
-    Route::delete('performance/professional-form/destroy/{id}', 'Performance\ConfigurationController@DestroyProfessionalForm')->name('Performance.DestroyProfessionalForm');
+    Route::delete('performance/professional-form/destroy/{id?}', 'Performance\ConfigurationController@DestroyProfessionalForm')->name('Performance.DestroyProfessionalForm');
 
 
     Route::get('performance/meeting', 'Performance\PerformanceMeetingController@index')->name('Performance.Meeting.index');
@@ -1069,7 +1069,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('performance-cycle/fetch-employees', 'Performance\CycleController@CycleFetchEmployees')->name('Performance.cycle.FetchEmployees');
     Route::post('performance-cycle/fetch-template', 'Performance\CycleController@CycleFetchTemplate')->name('Performance.cycle.Template');
     Route::post('performance-cycle/store', 'Performance\CycleController@CycleStore')->name('Performance.cycle.store');
-    Route::delete('performance-cycle/destroy/{id}', 'Performance\CycleController@Destroy')->name('Performance.cycle.destory');
+    Route::delete('performance-cycle/destroy/{id?}', 'Performance\CycleController@Destroy')->name('Performance.cycle.destory');
 
     Route::get('performance/monthly-check-in', 'Performance\MonthlyCheckingController@index')->name('Performance.MonltyCheckIn');
     Route::get('performance/monthly-check-in/create', 'Performance\MonthlyCheckingController@create')->name('Performance.CreateMonltyCheckIn');
@@ -1097,29 +1097,29 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('grievance-and-disciplinary/configuration', 'GrievanceAndDisciplinery\ConfigurationController@index')->name('GrievanceAndDisciplinery.config.index');
     Route::get('grievance-and-disciplinary/followup-actions/list', 'GrievanceAndDisciplinery\ConfigurationController@FollowUpActionList')->name('GrievanceAndDisciplinery.config.FollowUpActionList');
     Route::post('grievance-and-disciplinary/followup-actions/store', 'GrievanceAndDisciplinery\ConfigurationController@FollowUpActionStore')->name('GrievanceAndDisciplinery.config.FollowUpActionStore');
-    Route::put('grievance-and-disciplinary/followup-actions/inline-update/{id}', 'GrievanceAndDisciplinery\ConfigurationController@FollowUpActionInlineUpdate')->name('GrievanceAndDisciplinery.config.FollowUpActionInlineUpdate');
+    Route::put('grievance-and-disciplinary/followup-actions/inline-update/{id?}', 'GrievanceAndDisciplinery\ConfigurationController@FollowUpActionInlineUpdate')->name('GrievanceAndDisciplinery.config.FollowUpActionInlineUpdate');
     Route::delete('grievance-and-disciplinary/followup-actions/destroy/{id}', 'GrievanceAndDisciplinery\ConfigurationController@FollowUpActionDestroy')->name('GrievanceAndDisciplinery.config.FollowUpActionDestroy');
 
     Route::get('grievance-and-disciplinary', 'GrievanceAndDisciplinery\ConfigurationController@IndexDisciplineryCategory')->name('GrievanceAndDisciplinery.config.Disciplineryindex');
     Route::post('grievance-and-disciplinary/disciplinery-category/store', 'GrievanceAndDisciplinery\ConfigurationController@StoreDisciplineryCategory')->name('GrievanceAndDisciplinery.config.Disciplinerystore');
-    Route::put('grievance-and-disciplinary/disciplinery-category/inline-update/{id}', 'GrievanceAndDisciplinery\ConfigurationController@DisciplineryCategoryinlineUpdate')->name('GrievanceAndDisciplinery.config.DisciplineryCategoryinlineUpdate');
+    Route::put('grievance-and-disciplinary/disciplinery-category/inline-update/{id?}', 'GrievanceAndDisciplinery\ConfigurationController@DisciplineryCategoryinlineUpdate')->name('GrievanceAndDisciplinery.config.DisciplineryCategoryinlineUpdate');
     Route::delete('grievance-and-disciplinary/disciplinery-category/destroy/{id}', 'GrievanceAndDisciplinery\ConfigurationController@DisciplineryCategoryDestory')->name('GrievanceAndDisciplinery.config.DisciplineryCategoryDestory');
 
     Route::get('grievance-and-disciplinary/offenses', 'GrievanceAndDisciplinery\ConfigurationController@IndexOffenses')->name('GrievanceAndDisciplinery.config.Offensesindex');
     Route::post('grievance-and-disciplinary/offenses/add', 'GrievanceAndDisciplinery\ConfigurationController@StoreOffenses')->name('GrievanceAndDisciplinery.config.StoreOffenses');
-    Route::put('grievance-and-disciplinary/offenses/inline-update/{id}', 'GrievanceAndDisciplinery\ConfigurationController@OffensesinlineUpdate')->name('GrievanceAndDisciplinery.config.OffensesinlineUpdate');
+    Route::put('grievance-and-disciplinary/offenses/inline-update/{id?}', 'GrievanceAndDisciplinery\ConfigurationController@OffensesinlineUpdate')->name('GrievanceAndDisciplinery.config.OffensesinlineUpdate');
     Route::delete('grievance-and-disciplinary/offenses/destroy/{id}', 'GrievanceAndDisciplinery\ConfigurationController@OffensesDestory')->name('GrievanceAndDisciplinery.config.OffensesDestory');
 
     Route::post('grievance-and-disciplinary/offenses/get-categories', 'GrievanceAndDisciplinery\ConfigurationController@GetCategoryOffenses')->name('GrievanceAndDisciplinery.config.GetCategoryOffenses');
 
     Route::post('grievance-and-disciplinary/action/store', 'GrievanceAndDisciplinery\ConfigurationController@ActionStore')->name('GrievanceAndDisciplinery.config.ActionStore');
     Route::get('grievance-and-disciplinary/action/index', 'GrievanceAndDisciplinery\ConfigurationController@IndexAction')->name('GrievanceAndDisciplinery.config.IndexAction');
-    Route::put('grievance-and-disciplinary/action/inline-update/{id}', 'GrievanceAndDisciplinery\ConfigurationController@ActioninlineUpdate')->name('GrievanceAndDisciplinery.config.ActioninlineUpdate');
+    Route::put('grievance-and-disciplinary/action/inline-update/{id?}', 'GrievanceAndDisciplinery\ConfigurationController@ActioninlineUpdate')->name('GrievanceAndDisciplinery.config.ActioninlineUpdate');
     Route::delete('grievance-and-disciplinary/action/destroy/{id}', 'GrievanceAndDisciplinery\ConfigurationController@ActionDestory')->name('GrievanceAndDisciplinery.config.ActionDestory');
 
     Route::get('grievance-and-disciplinary/severity/index', 'GrievanceAndDisciplinery\ConfigurationController@IndexSeverity')->name('GrievanceAndDisciplinery.config.IndexSeverity');
     Route::post('grievance-and-disciplinary/severity/store', 'GrievanceAndDisciplinery\ConfigurationController@SeverityStore')->name('GrievanceAndDisciplinery.config.SeverityStore');
-    Route::put('grievance-and-disciplinary/severity/inline-update/{id}', 'GrievanceAndDisciplinery\ConfigurationController@SeverityInlineUpdate')->name('GrievanceAndDisciplinery.config.SeverityinlineUpdate');
+    Route::put('grievance-and-disciplinary/severity/inline-update/{id?}', 'GrievanceAndDisciplinery\ConfigurationController@SeverityInlineUpdate')->name('GrievanceAndDisciplinery.config.SeverityinlineUpdate');
     Route::delete('grievance-and-disciplinary/severity/destroy/{id}', 'GrievanceAndDisciplinery\ConfigurationController@SeverityDestory')->name('GrievanceAndDisciplinery.config.SeverityDestory');
 
     Route::post('grievance-and-disciplinary/code-of-conduct', 'GrievanceAndDisciplinery\ConfigurationController@CodeOfCounduct')->name('GrievanceAndDisciplinery.config.CodeOfCounduct');
@@ -1135,7 +1135,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     Route::post('grievance-and-disciplinary/disciplinary-committees', 'GrievanceAndDisciplinery\ConfigurationController@DisciplinaryCommittees')->name('GrievanceAndDisciplinery.config.DisciplinaryCommittees');
     Route::get('grievance-and-disciplinary/disciplinary-committees/index', 'GrievanceAndDisciplinery\ConfigurationController@IndexDisciplinaryCommittees')->name('GrievanceAndDisciplinery.config.IndexDisciplinaryCommittees');
-    Route::put('grievance-and-disciplinary/disciplinary-committees/update/{id}', 'GrievanceAndDisciplinery\ConfigurationController@CommitteeinlineUpdate')->name('GrievanceAndDisciplinery.config.CommitteeinlineUpdate');
+    Route::put('grievance-and-disciplinary/disciplinary-committees/update/{id?}', 'GrievanceAndDisciplinery\ConfigurationController@CommitteeinlineUpdate')->name('GrievanceAndDisciplinery.config.CommitteeinlineUpdate');
     Route::delete('grievance-and-disciplinary/disciplinary-committees/destroy/{id}', 'GrievanceAndDisciplinery\ConfigurationController@DisciplinaryCommitteesDestory')->name('GrievanceAndDisciplinery.config.DisciplinaryCommitteesDestory');
     Route::post('grievance-and-disciplinary/investing-hearing-templete/store', 'GrievanceAndDisciplinery\ConfigurationController@InvestingHearingTempleteStore')->name('GrievanceAndDisciplinery.config.InvestingHearingTempleteStore');
 
@@ -1144,7 +1144,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     Route::post('grievance-and-disciplinary/delegation-rules/store', 'GrievanceAndDisciplinery\ConfigurationController@DelegationRulesStore')->name('GrievanceAndDisciplinery.config.DelegationRulesStore');
     Route::get('grievance-and-disciplinary/index-disciplinary-delegation-rule', 'GrievanceAndDisciplinery\ConfigurationController@IndexDisciplinaryDelegationRule')->name('GrievanceAndDisciplinery.config.IndexDisciplinaryDelegationRule');
-    Route::put('grievance-and-disciplinary/disciplinery-delegation-rule/inline-update/{id}', 'GrievanceAndDisciplinery\ConfigurationController@DisciplineryDeletgationRuleinlineUpdate')->name('GrievanceAndDisciplinery.config.DisciplineryDeletgationRuleinlineUpdate');
+    Route::put('grievance-and-disciplinary/disciplinery-delegation-rule/inline-update/{id?}', 'GrievanceAndDisciplinery\ConfigurationController@DisciplineryDeletgationRuleinlineUpdate')->name('GrievanceAndDisciplinery.config.DisciplineryDeletgationRuleinlineUpdate');
     Route::delete('grievance-and-disciplinary/disciplinery-delegation-rule/destroy/{id}', 'GrievanceAndDisciplinery\ConfigurationController@DisciplineryDeletegationRuleDestory')->name('GrievanceAndDisciplinery.config.DisciplineryDeletegationRuleDestory');
 
     Route::post('grievance-and-disciplinary/disciplinery-appeal-type-wise-data', 'GrievanceAndDisciplinery\ConfigurationController@DisciplineryAppealTypeWiseData')->name('GrievanceAndDisciplinery.config.DisciplineryAppealTypeWiseData');
@@ -1153,23 +1153,23 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     Route::get('grievance-and-disciplinary/index-grievance-category', 'GrievanceAndDisciplinery\ConfigurationController@IndexGrievanceCategory')->name('GrievanceAndDisciplinery.config.IndexGrievanceCategory');
     Route::post('grievance-and-disciplinary/category-grievance/store', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceCategoryStore')->name('GrievanceAndDisciplinery.config.GrievanceCategoryStore');
-    Route::put('grievance-and-disciplinary/category-grievance/inline-update/{id}', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceCategorinlineUpdate')->name('GrievanceAndDisciplinery.config.GrievanceCategorinlineUpdate');
+    Route::put('grievance-and-disciplinary/category-grievance/inline-update/{id?}', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceCategorinlineUpdate')->name('GrievanceAndDisciplinery.config.GrievanceCategorinlineUpdate');
     Route::delete('grievance-and-disciplinary/category-grievance/destroy/{id}', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceCategoryDestory')->name('GrievanceAndDisciplinery.config.GrievanceCategoryDestory');
 
     Route::post('grievance-and-disciplinary/grievance-sub-category/store', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceSubCategoryStore')->name('GrievanceAndDisciplinery.config.GrievanceSubCategoryStore');
     Route::get('grievance-and-disciplinary/grievance-sub-category/index', 'GrievanceAndDisciplinery\ConfigurationController@IndexGrievanceSubCategory')->name('GrievanceAndDisciplinery.config.IndexGrievanceSubCategory');
-    Route::put('grievance-and-disciplinary/grievance-sub-category/inline-update/{id}', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceSubCategorinlineUpdate')->name('GrievanceAndDisciplinery.config.GrievanceSubCategorinlineUpdate');
+    Route::put('grievance-and-disciplinary/grievance-sub-category/inline-update/{id?}', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceSubCategorinlineUpdate')->name('GrievanceAndDisciplinery.config.GrievanceSubCategorinlineUpdate');
     Route::delete('grievance-and-disciplinary/grievance-sub-category/destroy/{id}', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceSubCategoryDestory')->name('GrievanceAndDisciplinery.config.GrievanceSubCategoryDestory');
 
     Route::post('grievance-and-disciplinary/grievance-category/GrievanceCategoryWiseSubCategoryData', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceCategoryWiseSubCategoryData')->name('GrievanceAndDisciplinery.config.GrievanceCategoryWiseSubCategoryData');
     Route::post('grievance-and-disciplinary/grievance-category/store', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceCatAndSubCategoryStore')->name('GrievanceAndDisciplinery.config.GrievanceCatAndSubCategoryStore');
     Route::get('grievance-and-disciplinary/grievance-category/index', 'GrievanceAndDisciplinery\ConfigurationController@IndexGrievanceCatAndSubCategory')->name('GrievanceAndDisciplinery.config.IndexGrievanceCatAndSubCategory');
-    Route::put('grievance-and-disciplinary/grievance-category/inline-update/{id}', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceCatAndSubCategoryinlineUpdate')->name('GrievanceAndDisciplinery.config.GrievanceCatAndSubCategoryinlineUpdate');
+    Route::put('grievance-and-disciplinary/grievance-category/inline-update/{id?}', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceCatAndSubCategoryinlineUpdate')->name('GrievanceAndDisciplinery.config.GrievanceCatAndSubCategoryinlineUpdate');
     Route::delete('grievance-and-disciplinary/grievance-category/destroy/{id}', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceCatAndSubCategoryDestory')->name('GrievanceAndDisciplinery.config.GrievanceCatAndSubCategoryDestory');
 
    Route::post('grievance-and-disciplinary/grievance-delegation-rule-store',  'GrievanceAndDisciplinery\ConfigurationController@GrievanceDelegationRuleStore')->name('GrievanceAndDisciplinery.config.GrieDelegationRuleStore');
     Route::get('grievance-and-disciplinary/index-grievance-delegation-rule', 'GrievanceAndDisciplinery\ConfigurationController@IndexGrievanceDelegationRule')->name('GrievanceAndDisciplinery.config.IndexGrievanceDelegationRule');
-    Route::put('grievance-and-disciplinary/grievance-delegation-rule-inline-update/{id}','GrievanceAndDisciplinery\ConfigurationController@GrievanceDelegeationRuleinlineUpdate')->name('GrievanceAndDisciplinery.config.GrievanceDelegeationRuleinlineUpdate');
+    Route::put('grievance-and-disciplinary/grievance-delegation-rule-inline-update/{id?}','GrievanceAndDisciplinery\ConfigurationController@GrievanceDelegeationRuleinlineUpdate')->name('GrievanceAndDisciplinery.config.GrievanceDelegeationRuleinlineUpdate');
     Route::delete('grievance-and-disciplinary/grievance-delegation-rule-destroy/{id}', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceDelegeationRuleDestory')->name('GrievanceAndDisciplinery.config.GrievanceDelegeationRuleDestory');
     Route::post('grievance-and-disciplinary/grievance-right-to-be-accompanied', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceRightToBeAccompanied')->name('GrievanceAndDisciplinery.config.GrievanceRightToBeAccompanied');
 
@@ -1183,13 +1183,13 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
      Route::post('grievance-and-disciplinary/grievance-resolution-timeline-store', 'GrievanceAndDisciplinery\ConfigurationController@GrivanceResoultionTimeLineStore')->name('GrievanceAndDisciplinery.config.GrivanceResoultionTimeLineStore');
     Route::post('grievance-and-disciplinary/grievance-escalation-store', 'GrievanceAndDisciplinery\ConfigurationController@GrivanceEscaltionStore')->name('GrievanceAndDisciplinery.config.GrivanceEscaltionStore');
     Route::get('grievance-and-disciplinary/index-grievance-escalation', 'GrievanceAndDisciplinery\ConfigurationController@IndexGrievanceEscaltion')->name('GrievanceAndDisciplinery.config.IndexGrievanceEscaltion');
-    Route::put('grievance-and-disciplinary/grievance-escalation-inline-update/{id}', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceEscalationinlineUpdate')->name('GrievanceAndDisciplinery.config.GrievanceEscalationinlineUpdate');
+    Route::put('grievance-and-disciplinary/grievance-escalation-inline-update/{id?}', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceEscalationinlineUpdate')->name('GrievanceAndDisciplinery.config.GrievanceEscalationinlineUpdate');
     Route::delete('grievance-and-disciplinary/grievance-escalation-destroy/{id}', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceEscalationDestory')->name('GrievanceAndDisciplinery.config.GrievanceEscalationDestory');
 
 
 Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAndDisciplinery\ConfigurationController@GrievanceCommitteeStore')->name('GrievanceAndDisciplinery.config.GrievanceCommitteeStore');
     Route::get('grievance-and-disciplinary/grievance-committee-index', 'GrievanceAndDisciplinery\ConfigurationController@GrivanceCommitteeIndex')->name('GrievanceAndDisciplinery.config.GrivanceCommitteeIndex');
-    Route::put('grievance-and-disciplinary/grievance-committee-inline-update/{id}', 'GrievanceAndDisciplinery\ConfigurationController@GrivanceCommitteeinlineUpdate')->name('GrievanceAndDisciplinery.config.GrivanceCommitteeinlineUpdate');
+    Route::put('grievance-and-disciplinary/grievance-committee-inline-update/{id?}', 'GrievanceAndDisciplinery\ConfigurationController@GrivanceCommitteeinlineUpdate')->name('GrievanceAndDisciplinery.config.GrivanceCommitteeinlineUpdate');
     Route::delete('grievance-and-disciplinary/grievance-committees-destroy/{id}', 'GrievanceAndDisciplinery\GrivanceController@GrivevanceCommitteesDestory')->name('GrievanceAndDisciplinery.config.GrivevanceCommitteesDestory');
 
 
@@ -1254,8 +1254,8 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('learning/configuration', 'Learning\ConfigurationController@index')->name('learning.configration');
     Route::post('learning/categories/store', 'Learning\ConfigurationController@saveCategories')->name('learning.categories.save');
     Route::get('learning/categories/list', 'Learning\ConfigurationController@listCategories')->name('learning.categories.list');
-    Route::put('learning/category/inline-update/{id}', 'Learning\ConfigurationController@inlineCategoryUpdate')->name('learning.category.inlineUpdatecategory');
-    Route::delete('learning/category/destroy/{id}', 'Learning\ConfigurationController@destroyCategory')->name('learning.category.destroy');
+    Route::put('learning/category/inline-update/{id?}', 'Learning\ConfigurationController@inlineCategoryUpdate')->name('learning.category.inlineUpdatecategory');
+    Route::delete('learning/category/destroy/{id?}', 'Learning\ConfigurationController@destroyCategory')->name('learning.category.destroy');
 
     Route::post('learning/program/store', 'Learning\LearningProgramController@save')->name('learning.programs.save');
     Route::get('learning/program/index', 'Learning\LearningProgramController@index')->name('learning.programs.index');
@@ -1433,7 +1433,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::get('visa/configuration', 'Visa\ConfigurationController@index')->name('visa.config');
       Route::post('visa/nationality', 'Visa\ConfigurationController@NationalityStore')->name('resort.visa.nationality.store');
       Route::get('visa/nationality/index', 'Visa\ConfigurationController@NationalityIndex')->name('resort.visa.NationalityIndex');
-      Route::put('/visa/nationality/update/{id}', 'Visa\ConfigurationController@NationalityUpdate')->name('resort.visa.nationality.update');
+      Route::put('/visa/nationality/update/{id?}', 'Visa\ConfigurationController@NationalityUpdate')->name('resort.visa.nationality.update');
       Route::delete('visa/nationality/destroy/{id}', 'Visa\ConfigurationController@Destroy')->name('resort.visa.nationality.destroy');
       Route::get('visa/nationality/export', 'Visa\ConfigurationController@Nationalityexport')->name('visa.natioanlity.export');
       Route::post('visa/nationality/import', 'Visa\ConfigurationController@NationalityImport')->name('resort.visa.nationality.Import');
@@ -1442,12 +1442,12 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::post('visa/reminder-alert', 'Visa\ConfigurationController@Reminderalert')->name('resort.visa.Reminderalert');
       Route::get('visa/document-type/index', 'Visa\ConfigurationController@DocumentTypeIndex')->name('resort.visa.DocumentTypeIndex');
       Route::post('visa/document-type', 'Visa\ConfigurationController@DocumentType')->name('resort.visa.DocumentType');
-      Route::put('/visa/document-type/{id}', 'Visa\ConfigurationController@DocumentTypeUpdate')->name('resort.visa.DocumentType.update');
+      Route::put('/visa/document-type/{id?}', 'Visa\ConfigurationController@DocumentTypeUpdate')->name('resort.visa.DocumentType.update');
       Route::delete('visa/document-type/delete/{id}', 'Visa\ConfigurationController@DocumentTypeDelete')->name('resort.visa.DocumentTypeDelete');
 
       Route::post('visa/wallet/store', 'Visa\ConfigurationController@VisaWalletsStore')->name('resort.visa.VisaWalletsStore');
       Route::get('visa/wallet/index', 'Visa\ConfigurationController@WalletIndex')->name('resort.visa.WalletIndex');
-      Route::put('/visa/wallet/update/{id}', 'Visa\ConfigurationController@UpdateWallet')->name('resort.visa.UpdateWallet');
+      Route::put('/visa/wallet/update/{id?}', 'Visa\ConfigurationController@UpdateWallet')->name('resort.visa.UpdateWallet');
       Route::delete('visa/wallet/destroy/{id}', 'Visa\ConfigurationController@WalletDestroy')->name('resort.visa.WalletDestroy');
 
 
@@ -1486,7 +1486,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::post('visa/quota-slot/makr-as-paid', 'Visa\XpactEmployeeController@QuotaSlotMakrasPaid')->name('resort.visa.Quota_Slot_MakrasPaid');
       Route::get('visa/past-transection-history', 'Visa\XpactEmployeeController@PastTransectionHistory')->name('resort.visa.PastTransectionHistory');
       Route::post('visa/employee-wise-file-upload', 'Visa\XpactEmployeeController@EmployeeWiseVisaDocumentUpload')->name('resort.visa.EmployeeWiseVisaDocumentUpload');
-      Route::get('visa/xpact-employee-file-download/{id}', 'Visa\XpactEmployeeController@XpactEmpFileDownload')->name('resort.visa.XpactEmpFileDownload');
+      Route::get('visa/xpact-employee-file-download/{id?}', 'Visa\XpactEmployeeController@XpactEmpFileDownload')->name('resort.visa.XpactEmpFileDownload');
     // VerifyDetails
 
      Route::get('visa/verify-details','Visa\RenewalController@VerifyDetails')->name('resort.visa.VerifyDetails');
@@ -1559,19 +1559,19 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('incident/categories/view', 'Incident\ConfigurationController@viewCategories')->name('incident.categories.view');
     Route::get('incident/categories/list', 'Incident\ConfigurationController@categoriesList')->name('incident.categories.list');
     Route::post('incident/categories/store', 'Incident\ConfigurationController@storeCategories')->name('incident.categories.store');
-    Route::put('incident/categories/inline-upadte/{id}', 'Incident\ConfigurationController@CategoryinlineUpdate')->name('incident.categories.inlineUpdate');
+    Route::put('incident/categories/inline-upadte/{id?}', 'Incident\ConfigurationController@CategoryinlineUpdate')->name('incident.categories.inlineUpdate');
     Route::delete('incident/categories/destroy/{id}', 'Incident\ConfigurationController@categoryDestory')->name('incident.categories.destory');
 
     Route::get('incident/sub-categories/view', 'Incident\ConfigurationController@viewSubCategories')->name('incident.subcategories.view');
     Route::get('incident/sub-categories/list', 'Incident\ConfigurationController@subcategoriesList')->name('incident.subcategories.list');
     Route::post('incident/sub-categories/store', 'Incident\ConfigurationController@storeSubCategories')->name('incident.subcategories.store');
-    Route::put('incident/sub-categories/inline-upadte/{id}', 'Incident\ConfigurationController@subcategoryinlineUpdate')->name('incident.subcategories.inlineUpdate');
+    Route::put('incident/sub-categories/inline-upadte/{id?}', 'Incident\ConfigurationController@subcategoryinlineUpdate')->name('incident.subcategories.inlineUpdate');
     Route::delete('incident/sub-categories/destroy/{id}', 'Incident\ConfigurationController@subcategoryDestory')->name('incident.subcategories.destory');
 
     Route::get('incident/committees/view', 'Incident\ConfigurationController@viewCommittees')->name('incident.committees.view');
     Route::get('incident/committees/list', 'Incident\ConfigurationController@committeeList')->name('incident.committees.list');
     Route::post('incident/committees/store', 'Incident\ConfigurationController@storeCommittees')->name('incident.committees.store');
-    Route::put('incident/committees/inline-upadte/{id}', 'Incident\ConfigurationController@committeeinlineUpdate')->name('incident.committees.inlineUpdate');
+    Route::put('incident/committees/inline-upadte/{id?}', 'Incident\ConfigurationController@committeeinlineUpdate')->name('incident.committees.inlineUpdate');
     Route::delete('incident/committees/destroy/{id}', 'Incident\ConfigurationController@committeeDestory')->name('incident.committees.destory');
 
    Route::post('incident/resolution-timeline/store', 'Incident\ConfigurationController@storeResolutionTimeline')->name('incident.resolution-timeline.store');
@@ -1582,19 +1582,19 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
   Route::get('incident/followup-actions/view', 'Incident\ConfigurationController@viewFolloupActions')->name('incident.followup-actions.view');
   Route::get('incident/followup-actions/list', 'Incident\ConfigurationController@FolloupActionsList')->name('incident.followup-actions.list');
   Route::post('incident/followup-actions/store', 'Incident\ConfigurationController@storeFolloupActions')->name('incident.followup-actions.store');
-  Route::put('incident/followup-actions/inline-upadte/{id}', 'Incident\ConfigurationController@folloupActionsinlineUpdate')->name('incident.followup-actions.inlineUpdate');
+  Route::put('incident/followup-actions/inline-upadte/{id?}', 'Incident\ConfigurationController@folloupActionsinlineUpdate')->name('incident.followup-actions.inlineUpdate');
   Route::delete('incident/followup-actions/destroy/{id}', 'Incident\ConfigurationController@folloupActionsDestory')->name('incident.followup-actions.destory');
 
   Route::get('incident/outcome-type/view', 'Incident\ConfigurationController@viewOutcomeType')->name('incident.outcome-type.view');
   Route::get('incident/outcome-type/list', 'Incident\ConfigurationController@outcomeTypeList')->name('incident.outcome-type.list');
   Route::post('incident/outcome-type/store', 'Incident\ConfigurationController@storeOutcomeType')->name('incident.outcome-type.store');
-  Route::put('incident/outcome-type/inline-upadte/{id}', 'Incident\ConfigurationController@outcomeTypeinlineUpdate')->name('incident.outcome-type.inlineUpdate');
+  Route::put('incident/outcome-type/inline-upadte/{id?}', 'Incident\ConfigurationController@outcomeTypeinlineUpdate')->name('incident.outcome-type.inlineUpdate');
   Route::delete('incident/outcome-type/destroy/{id}', 'Incident\ConfigurationController@outcomeTypeDestory')->name('incident.outcome-type.destory');
 
   Route::get('incident/action-taken/view', 'Incident\ConfigurationController@viewActionTaken')->name('incident.action-taken.view');
   Route::get('incident/action-taken/list', 'Incident\ConfigurationController@ActionTakenList')->name('incident.action-taken.list');
   Route::post('incident/action-taken/store', 'Incident\ConfigurationController@storeActionTaken')->name('incident.action-taken.store');
-  Route::put('incident/action-taken/inline-upadte/{id}', 'Incident\ConfigurationController@actionTakeninlineUpdate')->name('incident.action-taken.inlineUpdate');
+  Route::put('incident/action-taken/inline-upadte/{id?}', 'Incident\ConfigurationController@actionTakeninlineUpdate')->name('incident.action-taken.inlineUpdate');
   Route::delete('incident/action-taken/destroy/{id}', 'Incident\ConfigurationController@actionTakenDestory')->name('incident.action-taken.destory');
 
 
@@ -1683,12 +1683,12 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
        Route::get('people/benefit-grade-level', 'People\BenefitGradeLevelController@index')->name('resort.benefitgradelevel.index');
        Route::get('people/benefit-grade-level/list', 'People\BenefitGradeLevelController@list')->name('resort.benefitgradelevel.list');
        Route::post('people/benefit-grade-level/store', 'People\BenefitGradeLevelController@store')->name('resort.benefitgradelevel.store');
-       Route::put('people/benefit-grade-level/{id}', 'People\BenefitGradeLevelController@inlineUpdate')->name('resort.benefitgradelevel.inlineUpdate');
+       Route::put('people/benefit-grade-level/{id?}', 'People\BenefitGradeLevelController@inlineUpdate')->name('resort.benefitgradelevel.inlineUpdate');
        Route::delete('people/benefit-grade-level/{id}', 'People\BenefitGradeLevelController@destroy')->name('resort.benefitgradelevel.destroy');
-       Route::get('people/benefit-grade-level/{id}/ranks', 'People\BenefitGradeLevelController@ranksFor')->name('resort.benefitgradelevel.ranksFor');
-       Route::post('people/benefit-grade-level/{id}/ranks', 'People\BenefitGradeLevelController@updateRanks')->name('resort.benefitgradelevel.updateRanks');
-       Route::get('people/benefit-grade-level/{id}/housekeeping-services', 'People\BenefitGradeLevelController@housekeepingServicesFor')->name('resort.benefitgradelevel.housekeepingServicesFor');
-       Route::post('people/benefit-grade-level/{id}/housekeeping-services', 'People\BenefitGradeLevelController@updateHousekeepingServices')->name('resort.benefitgradelevel.updateHousekeepingServices');
+       Route::get('people/benefit-grade-level/{id?}/ranks', 'People\BenefitGradeLevelController@ranksFor')->name('resort.benefitgradelevel.ranksFor');
+       Route::post('people/benefit-grade-level/{id?}/ranks', 'People\BenefitGradeLevelController@updateRanks')->name('resort.benefitgradelevel.updateRanks');
+       Route::get('people/benefit-grade-level/{id?}/housekeeping-services', 'People\BenefitGradeLevelController@housekeepingServicesFor')->name('resort.benefitgradelevel.housekeepingServicesFor');
+       Route::post('people/benefit-grade-level/{id?}/housekeeping-services', 'People\BenefitGradeLevelController@updateHousekeepingServices')->name('resort.benefitgradelevel.updateHousekeepingServices');
        Route::post('people/housekeeping-service/store', 'People\BenefitGradeLevelController@storeHousekeepingService')->name('resort.housekeepingservice.store');
        Route::delete('people/housekeeping-service/{id}', 'People\BenefitGradeLevelController@destroyHousekeepingService')->name('resort.housekeepingservice.destroy');
        Route::post('people/promotion/submit', 'People\Promotion\PromotionController@submitPromotion')->name('promotion.submit');
@@ -1713,7 +1713,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
        Route::get('/people/configuration', 'People\ConfigController@index')->name('people.config');
        Route::post('/people/announcement-category', 'People\ConfigController@storeCategory')->name('announcement.category.store');
        Route::get('/people/announcement-category/index', 'People\ConfigController@announcementCategories')->name('announcement.categories');
-       Route::put('people/announcement-category/inline-update/{id}', 'People\ConfigController@CategoryinlineUpdate')->name('announcement.categories.inlineUpdate');
+       Route::put('people/announcement-category/inline-update/{id?}', 'People\ConfigController@CategoryinlineUpdate')->name('announcement.categories.inlineUpdate');
        Route::delete('people/announcement-category/destroy/{id}', 'People\ConfigController@categoryDestory')->name('announcement.category.destory');
 
        Route::post('/people/configuration/resignation-withdrawal', 'People\ConfigController@EmployeeResignationWithdrawalConfigStore')->name('people.config.resignation-withdrawal-config');
@@ -1742,7 +1742,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::get('/people/resignation-reasons','People\configuration\ResignationReasonController@index')->name('people.resignation-reason.index');
       Route::get('/people/resignation-reason/list','People\configuration\ResignationReasonController@list')->name('people.resignation-reason.list');
       Route::post('/people/resignation-reason/store','People\configuration\ResignationReasonController@store')->name('people.resignation_reasons.store');
-      Route::post('/people/resignation-reason/update/{id}','People\configuration\ResignationReasonController@update')->name('people.resignation-reasons.inlineUpdate');
+      Route::post('/people/resignation-reason/update/{id?}','People\configuration\ResignationReasonController@update')->name('people.resignation-reasons.inlineUpdate');
       Route::delete('/people/resignation-reason/destroy/{id}','People\configuration\ResignationReasonController@destroy')->name('people.resignation-reasons.destroy');
 
 
@@ -1750,14 +1750,14 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::get('/people/reminder','People\configuration\EmployeeReminderController@index')->name('people.reminders.index');
       Route::get('/people/reminder/list','People\configuration\EmployeeReminderController@list')->name('people.reminders.list');
       Route::post('/people/reminder/store','People\configuration\EmployeeReminderController@store')->name('people.reminders.store');
-      Route::post('/people/reminder/update/{id}','People\configuration\EmployeeReminderController@update')->name('people.reminders.update');
+      Route::post('/people/reminder/update/{id?}','People\configuration\EmployeeReminderController@update')->name('people.reminders.update');
       Route::delete('/people/reminder/destroy/{id}','People\configuration\EmployeeReminderController@destroy')->name('people.reminders.destroy');
 
       // Employee Increment Type Module
       Route::get('/people/increment-types','People\configuration\IncrementTypeController@index')->name('people.increment-types.index');
       Route::get('/people/increment-types/list','People\configuration\IncrementTypeController@list')->name('people.increment-types.list');
       Route::post('/people/increment-types/store','People\configuration\IncrementTypeController@store')->name('people.increment-types.store');
-      Route::post('/people/increment-types/update/{id}','People\configuration\IncrementTypeController@update')->name('people.increment-types.update');
+      Route::post('/people/increment-types/update/{id?}','People\configuration\IncrementTypeController@update')->name('people.increment-types.update');
       Route::delete('/people/increment-types/destroy/{id}','People\configuration\IncrementTypeController@destroy')->name('people.increment-types.destroy');
 
 
@@ -1819,7 +1819,7 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
       Route::get('/people/notice-period','People\configuration\NoticePeriodController@index')->name('people.notice-period.index');
       Route::get('/people/notice-period/list','People\configuration\NoticePeriodController@list')->name('people.notice-period.list');
       Route::post('/people/notice-period/store','People\configuration\NoticePeriodController@store')->name('people.notice-period.store');
-      Route::post('/people/notice-period/update/{id}','People\configuration\NoticePeriodController@update')->name('people.notice-period.update');
+      Route::post('/people/notice-period/update/{id?}','People\configuration\NoticePeriodController@update')->name('people.notice-period.update');
       Route::delete('/people/notice-period/delete/{id}','People\configuration\NoticePeriodController@destroy')->name('people.notice-period.destroy');
 
        //Employees management
@@ -1932,12 +1932,12 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
         Route::get('people/onboarding/itinerary-template/list', 'People\Onboarding\OnboardingController@list')->name('onboarding.itinerary-template.list');
         Route::get('people/onboarding/itinerary-template/edit/{id}', 'People\Onboarding\OnboardingController@edit')->name('onboarding.itinerary-template.edit');
         Route::post('people/onboarding/itinerary-template/update/{id}', 'People\Onboarding\OnboardingController@update')->name('onboarding.itinerary-template.update');
-        Route::delete('people/onboarding/itinerary-template/destroy/{id}', 'People\Onboarding\OnboardingController@destroy')->name('onboarding.itinerary-template.destroy');
+        Route::delete('people/onboarding/itinerary-template/destroy/{id?}', 'People\Onboarding\OnboardingController@destroy')->name('onboarding.itinerary-template.destroy');
 
        //notification events
       Route::get('/people/onboarding/events','People\Onboarding\OnboardingController@events')->name('onboarding.events');
       Route::post('/people/onboarding/events/store','People\Onboarding\OnboardingController@storeEvents')->name('onboarding.events.store');
-      Route::post('/people/onboarding/events/update/{id}','People\Onboarding\OnboardingController@updateEvent')->name('onboarding.events.inlineUpdate');
+      Route::post('/people/onboarding/events/update/{id?}','People\Onboarding\OnboardingController@updateEvent')->name('onboarding.events.inlineUpdate');
       Route::delete('/people/onboarding/events/destroy/{id}','People\Onboarding\OnboardingController@destroyEvent')->name('onboarding.events.destroy');
 
       Route::post('people/onboarding/cultuarl-insights/store', 'People\Onboarding\OnboardingController@storeOrUpdateCI')->name('onboarding.cultural_insights.storeOrUpdate');
@@ -2029,17 +2029,17 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
     // SOS roles and permission
     Route::post('sos/roles-permission/store', 'SOS\ConfigurationController@SOSRolesAndPermissionStore')->name('sos.config.SOSRolesAndPermissionStore');
     Route::get('sos/roles-permission/index', 'SOS\ConfigurationController@IndexSOSRolesAndPermission')->name('sos.config.IndexSOSRolesAndPermission');
-    Route::put('sos/roles-permission/update/{id}', 'SOS\ConfigurationController@SOSRoleAndPerminlineUpdate')->name('sos.config.SOSRoleAndPerminlineUpdate');
+    Route::put('sos/roles-permission/update/{id?}', 'SOS\ConfigurationController@SOSRoleAndPerminlineUpdate')->name('sos.config.SOSRoleAndPerminlineUpdate');
     Route::delete('sos/roles-permission/destroy/{id}', 'SOS\ConfigurationController@SOSRolesAndPermissionDestory')->name('sos.config.SOSRolesAndPermissionDestory');
 
     // SOS team management
     Route::post('sos/team-management/store', 'SOS\ConfigurationController@SOSTeamStore')->name('sos.config.SOSTeamStore');
     Route::get('sos/team-management/index', 'SOS\ConfigurationController@IndexSOSTeamManagement')->name('sos.config.IndexSOSTeamManagement');
-    Route::put('sos/team-management/inline-update/{id}', 'SOS\ConfigurationController@SOSTeamManagementinlineUpdate')->name('sos.config.SOSTeamManagementinlineUpdate');
+    Route::put('sos/team-management/inline-update/{id?}', 'SOS\ConfigurationController@SOSTeamManagementinlineUpdate')->name('sos.config.SOSTeamManagementinlineUpdate');
     Route::delete('sos/team-management/destroy/{id}', 'SOS\ConfigurationController@SOSTeamManagementDestory')->name('sos.config.SOSTeamManagementDestory');
     Route::get('sos/team-management/view-details/{id}', 'SOS\ConfigurationController@team_details')->name('sos.team.detail');
     Route::get('sos/team-management/list-details/{id}', 'SOS\ConfigurationController@get_team_details')->name('sos.team.getTeamDetails');
-    Route::put('sos/team-member/inline-update/{id}', 'SOS\ConfigurationController@SOSTeamMemberinlineUpdate')->name('sos.config.SOSTeamMemberinlineUpdate');
+    Route::put('sos/team-member/inline-update/{id?}', 'SOS\ConfigurationController@SOSTeamMemberinlineUpdate')->name('sos.config.SOSTeamMemberinlineUpdate');
     Route::delete('sos/team-member/destroy/{id}', 'SOS\ConfigurationController@SOSTeamMemberDestory')->name('sos.config.SOSTeamMemberDestory');
     Route::get('sos/team-member/{id}/edit', 'SOS\ConfigurationController@getTeamData')->name('sos.team.edit');
     Route::post('sos/team-member/update/{id}', 'SOS\ConfigurationController@update_team_details')->name('sos.team.update');
@@ -2060,14 +2060,14 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
     Route::get('sos/view-details/{id}', 'SOS\DashboardController@view')->name('sos.emergency.view');
     Route::get('sos/view-team-activity/{id}', 'SOS\DashboardController@viewTeamActivityDetails')->name('sos.viewTeamActivityDetails');
     // Route::get('sos/team-activity-get', 'SOS\DashboardController@viewTeamActivityDetails')->name('sos.viewTeamActivityDetails');
-    Route::post('sos/filter-team-activity/{id}', 'SOS\DashboardController@filterTeamActivityDetails')->name('sos.filterTeamActivityDetails');
+    Route::post('sos/filter-team-activity/{id?}', 'SOS\DashboardController@filterTeamActivityDetails')->name('sos.filterTeamActivityDetails');
     Route::get('sos/view-employee-safety-status/{id}', 'SOS\DashboardController@viewEmployeeSafetyDetails')->name('sos.viewEmployeeSafetyDetails');
-    Route::post('sos/filter-employee-status/{id}', 'SOS\DashboardController@filterEmployeeSafetyDetails')->name('sos.filterEmployeeSafetyDetails');
+    Route::post('sos/filter-employee-status/{id?}', 'SOS\DashboardController@filterEmployeeSafetyDetails')->name('sos.filterEmployeeSafetyDetails');
     Route::post('sos/update-mass-instruction', 'SOS\DashboardController@updateMassInstruction')->name('sos.updateMassInstruction');
-    Route::get('sos/mass-instruction-history/{id}', 'SOS\DashboardController@massInstructionHistory')->name('sos.massInstructionHistory');
+    Route::get('sos/mass-instruction-history/{id?}', 'SOS\DashboardController@massInstructionHistory')->name('sos.massInstructionHistory');
     // Employee live location
     Route::get('sos/employees-live-location/{id}', 'SOS\DashboardController@showMap')->name('sos.showMap');
-    Route::post('sos/filter-map-employee-list/{id}', 'SOS\DashboardController@filterMapEmployeeList')->name('sos.filterMapEmployeeList');
+    Route::post('sos/filter-map-employee-list/{id?}', 'SOS\DashboardController@filterMapEmployeeList')->name('sos.filterMapEmployeeList');
     // API route for live employee locations (used for auto-refresh)
     Route::get('sos/all-employee-locations/{id}', 'SOS\DashboardController@getLiveEmployeeLocations')->name('sos.employeeLiveLocations');
 
@@ -2227,7 +2227,7 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
     Route::post('/people/compliance/regenerate-ai','People\Compliances\ComplianceController@regenerateAi')->name('people.compliance.regenerateAi');
     // Run the AI-only anomaly scan (Layer 2) — separate from the rules engine.
     Route::post('/people/compliance/anomaly-scan','People\Compliances\ComplianceController@runAnomalyScan')->name('people.compliance.anomalyScan');
-    Route::get('/people/compliance/dismiss/{id}','People\Compliances\ComplianceController@DismissCompliance')->name('people.compliances.dismiss');
+    Route::get('/people/compliance/dismiss/{id?}','People\Compliances\ComplianceController@DismissCompliance')->name('people.compliances.dismiss');
     Route::get('/people/compliance/download','People\Compliances\ComplianceController@download')->name('people.compliance.download');
     Route::get('/people/compliance/test','People\Compliances\ComplianceController@test')->name('people.compliance.test');
 
@@ -2239,7 +2239,7 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
     Route::post('people/onboarding/facility-tour-categories/store', 'People\Onboarding\FacilityTourCategoryController@store')->name('people.onboarding.facility-tour-categories.store');
     Route::get('people/onboarding/facility-tour-categories/view/{id}', 'People\Onboarding\FacilityTourCategoryController@show')->name('people.onboarding.facility-tour-categories.show');
     Route::get('people/onboarding/facility-tour-categories/edit/{id}', 'People\Onboarding\FacilityTourCategoryController@edit')->name('people.onboarding.facility-tour-categories.edit');
-    Route::post('people/onboarding/facility-tour-categories/update/{id}', 'People\Onboarding\FacilityTourCategoryController@update')->name('people.onboarding.facility-tour-categories.update');
+    Route::post('people/onboarding/facility-tour-categories/update/{id?}', 'People\Onboarding\FacilityTourCategoryController@update')->name('people.onboarding.facility-tour-categories.update');
     Route::delete('people/onboarding/facility-tour-categories/destroy/{id}', 'People\Onboarding\FacilityTourCategoryController@destroy')->name('people.onboarding.facility-tour-categories.destroy');
     Route::post('people/onboarding/facility-tour-categories/image-update', 'People\Onboarding\FacilityTourCategoryController@imageUpdate')->name('people.onboarding.facility-tour-categories.image-update');
     Route::delete('people/onboarding/facility-tour-categories/image-delete', 'People\Onboarding\FacilityTourCategoryController@imageDelete')->name('people.onboarding.facility-tour-categories.image-delete');

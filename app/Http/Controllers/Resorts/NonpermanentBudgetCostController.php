@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\ResortNonpermanentBudgetCost;
+use App\Models\ResortPosition;
 
 class NonpermanentBudgetCostController extends Controller
 {
@@ -14,8 +15,19 @@ class NonpermanentBudgetCostController extends Controller
         $page_title = 'Cost Configuration for Casuals & Interns';
         $resort_id = Auth::guard('resort-admin')->user()->resort_id;
 
+        // WP2.3 — without this, a cost line has no way to be tied to
+        // specific positions at creation time, so it silently applies to
+        // every position of its category (D2's "empty = all positions"
+        // default is meant to be a deliberate choice, not the only option).
+        $positions = ResortPosition::where('resort_id', $resort_id)
+            ->where('status', 'active')
+            ->whereIn('employee_category', ['Casual', 'Intern'])
+            ->orderBy('employee_category')
+            ->orderBy('position_title')
+            ->get(['id', 'position_title', 'employee_category']);
+
         return view('resorts.budgetcost.nonpermanent_index')->with(
-            compact('page_title', 'resort_id'));
+            compact('page_title', 'resort_id', 'positions'));
     }
 
     public function costlist(Request $request)
@@ -66,6 +78,16 @@ class NonpermanentBudgetCostController extends Controller
 
     public function store_costs(Request $request)
     {
+        $resort_id = Auth::guard('resort-admin')->user()->resort_id;
+
+        // WP2.3 — a position tie must belong to this resort AND to the
+        // category (or Both) this cost line applies to; otherwise a
+        // Casual-only line could be tied to an Intern position (or vice
+        // versa), silently costing nothing for anyone.
+        $appliesToCategories = $request->input('applies_to') === 'Both'
+            ? ['Casual', 'Intern']
+            : [$request->input('applies_to')];
+
         $request->validate([
             'cost_title' => 'required|string|max:255',
             'particulars' => 'nullable|string|max:255',
@@ -73,12 +95,18 @@ class NonpermanentBudgetCostController extends Controller
             'amount_unit' => 'required|string',
             'frequency' => 'required|string|max:255',
             'applies_to' => 'required|in:Casual,Intern,Both',
+            'position_ids' => 'nullable|array',
+            'position_ids.*' => [
+                'integer',
+                \Illuminate\Validation\Rule::exists('resort_positions', 'id')
+                    ->where('resort_id', $resort_id)
+                    ->whereIn('employee_category', $appliesToCategories),
+            ],
         ], [
             'amount.min' => 'Amount is not accepted negative value',
         ]);
 
         try {
-            $resort_id = Auth::guard('resort-admin')->user()->resort_id;
 
             $cost = new ResortNonpermanentBudgetCost();
             $cost->resort_id = $resort_id;
@@ -112,11 +140,16 @@ class NonpermanentBudgetCostController extends Controller
 
     public function inlinecostUpdate(Request $request, $id)
     {
-        $cost = ResortNonpermanentBudgetCost::where('resort_id', Auth::guard('resort-admin')->user()->resort_id)->find($id);
+        $resort_id = Auth::guard('resort-admin')->user()->resort_id;
+        $cost = ResortNonpermanentBudgetCost::where('resort_id', $resort_id)->find($id);
 
         if (!$cost) {
             return response()->json(['success' => false, 'message' => 'Cost not found.']);
         }
+
+        $appliesToCategories = $request->input('applies_to') === 'Both'
+            ? ['Casual', 'Intern']
+            : [$request->input('applies_to')];
 
         $request->validate([
             'cost_title' => 'required|string|max:255',
@@ -126,6 +159,13 @@ class NonpermanentBudgetCostController extends Controller
             'frequency' => 'required|string|max:255',
             'applies_to' => 'required|in:Casual,Intern,Both',
             'status' => 'required|in:active,inactive',
+            'position_ids' => 'nullable|array',
+            'position_ids.*' => [
+                'integer',
+                \Illuminate\Validation\Rule::exists('resort_positions', 'id')
+                    ->where('resort_id', $resort_id)
+                    ->whereIn('employee_category', $appliesToCategories),
+            ],
         ], [
             'amount.min' => 'Amount is not accepted negative value',
         ]);

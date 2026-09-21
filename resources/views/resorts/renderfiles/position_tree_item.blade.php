@@ -50,20 +50,16 @@
                                         $displayBasicSalary = $employee->configured_basic_salary ?? 0;
                                         $displayCurrentSalary = $employee->configured_current_salary ?? 0;
 
-                                        // Create cost lookup array for this employee
-                                        $employeeCostLookup = [];
-                                        if (isset($employee->budget_configurations) && $employee->budget_configurations->isNotEmpty()) {
-                                            foreach ($employee->budget_configurations as $config) {
-                                                // Convert to USD if needed
-                                                $valueInUSD = $config->currency === 'MVR'
-                                                    ? $config->value * $mvrToDollarRate
-                                                    : $config->value;
-                                                $employeeCostLookup[$config->resort_budget_cost_id] = [
-                                                    'value' => $valueInUSD,
-                                                    'currency' => $config->currency
-                                                ];
-                                            }
-                                        }
+                                        // WP2.1 — $employee->cost_breakdown (set by
+                                        // BudgetController::computeEmployeeYearlyTotalBatched())
+                                        // is the same live-fallback-aware, per-cost annual
+                                        // value the row's yearly_total is summed from, in
+                                        // USD. Using $employee->budget_configurations here
+                                        // (saved overrides only) meant a cost line with no
+                                        // manual override ever rendered as a blank cell even
+                                        // though it was included in the total — cells never
+                                        // summed to the total.
+                                        $employeeCostBreakdown = $employee->cost_breakdown ?? [];
                                         $employeeFullName = trim(ucwords(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')));
                                         $employeeInitials = strtoupper(collect(explode(' ', $employeeFullName))->filter()->map(fn($p) => mb_substr($p, 0, 1))->take(2)->implode(''));
                                         // Same isDefault check as View Budget's wbAvatarHtml() —
@@ -87,34 +83,27 @@
                                         </td>
                                         <td class="sticky-col sticky-col-2"><span class="cb-status-badge cb-status-filled">Filled</span></td>
                                         <td class="sticky-col sticky-col-3">
-                                            @php
-                                                $Rank = config('settings.Position_Rank');
-                                                $AvailableRank = !empty($employee->rank) && array_key_exists($employee->rank, $Rank) ? $Rank[$employee->rank] : '';
-                                            @endphp
-                                            {{ $AvailableRank }}
+                                            {{-- WP1 — Common::rankLabel() returns the category
+                                                 ("Casual"/"Intern") for rank 0 instead of the
+                                                 blank cell !empty($employee->rank) produced
+                                                 (0 is falsy). --}}
+                                            {{ \App\Helpers\Common::rankLabel($employee) }}
                                         </td>
                                         <td class="text-nowrap">{{ $employee->nationality ?? '-' }}</td>
                                         <td class="text-end text-nowrap basic-salary-cell" data-value="{{ $displayBasicSalary }}">@include('resorts.renderfiles.partials.cb_money', ['value' => $displayBasicSalary])</td>
                                         <td class="text-end text-nowrap current-salary-cell" data-value="{{ $displayCurrentSalary }}">@include('resorts.renderfiles.partials.cb_money', ['value' => $displayCurrentSalary])</td>
                                         @foreach ($resortCosts as $cost)
                                             @php
-                                                // Use yearly aggregated value or 0 if not configured
-                                                $costValue = $employeeCostLookup[$cost->id]['value'] ?? 0;
-                                                $costCurrency = $employeeCostLookup[$cost->id]['currency'] ?? 'USD';
-                                                // For display: if currency is MVR, show MVR symbol, otherwise USD
-                                                $originalValue = $costValue;
-                                                if (isset($employeeCostLookup[$cost->id]) && $employeeCostLookup[$cost->id]['currency'] === 'MVR') {
-                                                    // If it's MVR, we need to show the original MVR value, not the converted USD value
-                                                    // The $costValue is already in USD (converted), so we need to convert back for display
-                                                    $originalValue = $costValue / $mvrToDollarRate;
-                                                }
-                                                $displaySymbol = ($costCurrency === 'MVR') ? 'MVR ' : '$';
-                                                $displayValue = ($costCurrency === 'MVR') ? $originalValue : $costValue;
+                                                // Already USD, already annual (whole-year sum
+                                                // of saved overrides + live-computed gaps) —
+                                                // same source as yearly_total, so Σ cells now
+                                                // always equals the row total.
+                                                $costValue = $employeeCostBreakdown[$cost->id] ?? 0;
                                             @endphp
                                             <td class="text-end scrollable-col cost-cell"
                                                 data-cost-id="{{ $cost->id }}"
                                                 data-value="{{ $costValue }}"
-                                                data-currency="{{ $costCurrency }}">@if((float) $displayValue == 0)<span class="cb-zero-dash">&mdash;</span>@else{{ $displaySymbol }}{{ number_format($displayValue, 2) }}@endif</td>
+                                                data-currency="USD">@if((float) $costValue == 0)<span class="cb-zero-dash">&mdash;</span>@else${{ number_format($costValue, 2) }}@endif</td>
                                         @endforeach
 
                                     </tr>
@@ -157,8 +146,15 @@
                                         <td class="sticky-col sticky-col-2"><span class="cb-status-badge cb-status-vacant">Vacant</span></td>
                                         <td class="sticky-col sticky-col-3">
                                             @php
-                                                $Rank = config('settings.Position_Rank');
-                                                $AvailableRank = array_key_exists($positionData['rank'], $Rank) ? $Rank[$positionData['rank']] : '';
+                                                // WP1 — a vacant Casual/Intern slot's rank is 0;
+                                                // show the category (matches Common::rankLabel())
+                                                // instead of the Permanent rank map producing blank.
+                                                if (($positionData['employment_type'] ?? 'Permanent') !== 'Permanent') {
+                                                    $AvailableRank = $positionData['employment_type'];
+                                                } else {
+                                                    $Rank = config('settings.Position_Rank');
+                                                    $AvailableRank = array_key_exists($positionData['rank'], $Rank) ? $Rank[$positionData['rank']] : '';
+                                                }
                                             @endphp
                                             {{ $AvailableRank }}
                                         </td>
@@ -233,17 +229,14 @@
                                         $costTotals[$cost->id] = 0;
                                     }
 
-                                    // Calculate cost totals from employee configurations (YEARLY AGGREGATED)
+                                    // Calculate cost totals from employee cost_breakdown
+                                    // (WP2.1 — same live-fallback-aware source as the
+                                    // per-employee cells above, so TOTAL row = Σ cells
+                                    // too, not just Σ saved overrides).
                                     if(!empty($positionData['employees'])) {
                                         foreach($positionData['employees'] as $employee) {
-                                            if (isset($employee->budget_configurations) && $employee->budget_configurations->isNotEmpty()) {
-                                                foreach ($employee->budget_configurations as $config) {
-                                                    // Convert to USD if needed (value is already yearly total)
-                                                    $valueInUSD = $config->currency === 'MVR'
-                                                        ? $config->value * $mvrToDollarRate
-                                                        : $config->value;
-                                                    $costTotals[$config->resort_budget_cost_id] = ($costTotals[$config->resort_budget_cost_id] ?? 0) + $valueInUSD;
-                                                }
+                                            foreach (($employee->cost_breakdown ?? []) as $costId => $value) {
+                                                $costTotals[$costId] = ($costTotals[$costId] ?? 0) + $value;
                                             }
                                         }
                                     }

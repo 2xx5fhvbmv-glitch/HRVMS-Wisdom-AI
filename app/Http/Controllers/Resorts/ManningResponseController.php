@@ -377,7 +377,14 @@ class ManningResponseController extends Controller
             // (HR sending a submitted category back) is a separate, HR-
             // initiated flow (WP5) that flips status itself — this method
             // only ever writes a fresh, still-open draft.
-            if ($existing && $existing->status === 'submitted') {
+            // A2 — legacy rows submitted before `status` was tracked are
+            // '' (empty string, or null), not 'submitted'; a strict
+            // `=== 'submitted'` check let those fall through to the
+            // updateOrCreate below, silently demoting an already-submitted
+            // legacy row to draft and wiping its position_monthly_data.
+            // Treat anything that isn't explicitly 'draft' as already
+            // submitted — belt-and-braces on top of the backfill migration.
+            if ($existing && $existing->status !== 'draft') {
                 DB::commit();
                 return response()->json([
                     'success' => true,
@@ -491,7 +498,21 @@ class ManningResponseController extends Controller
             return response()->json(['success' => false, 'message' => 'You do not have access to this department.'], 403);
         }
 
-        ResortsChildNotifications::where('Parent_msg_id', $request->input('message_id'))
+        // C1 — resorts_child_notifications has no resort_id column of its
+        // own; without this, a caller whose dept_id legitimately belongs to
+        // their own resort could still pass ANOTHER resort's message_id
+        // (format is guessable — "DR" + digits) and mark that resort's
+        // notification answered. Verify the message_id's own parent row
+        // actually belongs to this resort first.
+        $messageId = $request->input('message_id');
+        $belongsToResort = \App\Models\ResortsParentNotifications::where('message_id', $messageId)
+            ->where('resort_id', $resortId)
+            ->exists();
+        if (!$belongsToResort) {
+            return response()->json(['success' => false, 'message' => 'Invalid request.'], 403);
+        }
+
+        ResortsChildNotifications::where('Parent_msg_id', $messageId)
             ->where('Department_id', $deptId)
             ->update(['response' => 'yes']);
 

@@ -28,8 +28,8 @@ Route::prefix('shopkeeper')->middleware(['auth:shopkeeper','revalidate'])->names
     Route::get('/products', 'ConfigurationController@products')->name('shopkeeper.products');
     Route::get('/products/list', 'ConfigurationController@list')->name('shopkeeper.products.list');
     Route::get('/products/show/{id}', 'ConfigurationController@show')->name('shopkeeper.products.show');
-    Route::delete('/products/delete/{id}', 'ConfigurationController@destroy')->name('shopkeeper.products.destroy');
-    Route::put('/products/inline-update/{id}', 'ConfigurationController@inlineUpdate')->name('shopkeeper.products.inlineUpdate');
+    Route::delete('/products/delete/{id?}', 'ConfigurationController@destroy')->name('shopkeeper.products.destroy');
+    Route::put('/products/inline-update/{id?}', 'ConfigurationController@inlineUpdate')->name('shopkeeper.products.inlineUpdate');
   
     Route::get('/products/export', 'ConfigurationController@exportProducts')->name('shopkeeper.products.download');
     Route::post('/products/Import', 'ConfigurationController@ImportProducts')->name('shopkeeper.products.import');
@@ -42,11 +42,11 @@ Route::prefix('shopkeeper')->middleware(['auth:shopkeeper','revalidate'])->names
     Route::get('payments/list', 'DashboardController@list')->name('dashboard.payment.list');
 
     Route::get('payments/add', 'PaymentController@add')->name('shopkeeper.payment.add');
-    Route::get('employees/get-details/{id}', 'PaymentController@getEmpDetails')->name('employees.details.get');
+    Route::get('employees/get-details/{id?}', 'PaymentController@getEmpDetails')->name('employees.details.get');
     Route::post('payments/store', 'PaymentController@store')->name('shopkeeper.payment.store');
     ROute::post('payments/send-consent', 'PaymentController@sendConsent')->name('shopkeeper.payment.sendConsent');
     Route::get('/get-product-price', 'PaymentController@getProductPrice')->name('getProductPrice');
-    Route::get('payments/qr-image/{id}', 'PaymentController@qrImage')->name('shopkeeper.payment.qr-image');
+    Route::get('payments/qr-image/{id?}', 'PaymentController@qrImage')->name('shopkeeper.payment.qr-image');
 
     Route::post('/payments/deduct', 'DashboardController@deductAmount')->name('payments.deduct');
 

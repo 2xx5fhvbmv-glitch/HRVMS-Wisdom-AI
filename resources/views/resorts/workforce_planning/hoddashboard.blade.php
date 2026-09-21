@@ -202,33 +202,43 @@
                                     @endforeach
                                 @endif
                             </ul>
-                        @elseif($BudgetRejactedStatus)
+                        @elseif($BudgetRejactedStatus->isNotEmpty())
                             <div class="card-title d-flex justify-content-between">
                                 <h3>Requests</h3>
                             </div>
+                            {{-- WP5 — was a single object (->first()), so a
+                                 department with more than one category
+                                 rejected at once only ever showed the
+                                 latest one; the loop below now renders one
+                                 block per still-rejected category. The
+                                 fixed-id hidden inputs this used to read
+                                 into (#budget/#BudgetRejacted_message_id/
+                                 #BudgetRejacted_employment_type) would
+                                 collide across entries, so the modal now
+                                 reads the actual clicked button's data-*
+                                 attributes via event.relatedTarget instead
+                                 (see the show.bs.modal handler below). --}}
+                            @foreach($BudgetRejactedStatus as $rejected)
                             <div class="requestsUser-block ">
                                 <div class="">
                                     <div class="img-circle">
-                                    <img src="{{Common::getResortUserPicture($BudgetRejactedStatus->loginid) }}" alt="image">
+                                    <img src="{{Common::getResortUserPicture($rejected->loginid) }}" alt="image">
                                     </div>
                                     <div class="">
-                                        <h6>{{ $BudgetRejactedStatus->first_name }} {{ $BudgetRejactedStatus->middle_name }}</h6>
-                                        <p>{{ strtoupper($BudgetRejactedStatus->DepartmentName) }}</p>
+                                        <h6>{{ $rejected->first_name }} {{ $rejected->middle_name }}</h6>
+                                        <p>{{ strtoupper($rejected->DepartmentName) }}</p>
                                     </div>
                                 </div>
                                 <div class="dfs">
-                                    <input type="hidden" name="budget" id="budget" value="{{ $BudgetRejactedStatus->Budget_id }}">
-
-                                    <input type="hidden" name="BudgetRejacted_message_id" id="BudgetRejacted_message_id" value="{{(isset( $BudgetRejactedStatus->message_id)?   $BudgetRejactedStatus->message_id :'') }}">
-                                    <input type="hidden" name="BudgetRejacted_employment_type" id="BudgetRejacted_employment_type" value="{{ $BudgetRejactedStatus->employment_type ?? 'Permanent' }}">
-                                    <p class="mb-1"><strong>{{ $BudgetRejactedStatus->employment_type ?? 'Permanent' }} budget {{ $BudgetRejactedStatus->year ?? '' }}</strong></p>
-                                    <h5>{{ (isset($BudgetRejactedStatus->reminder_message_subject )) ? $BudgetRejactedStatus->reminder_message_subject : $BudgetRejactedStatus->message_subject }}</h5>
+                                    <p class="mb-1"><strong>{{ $rejected->employment_type ?? 'Permanent' }} budget {{ $rejected->year ?? '' }}</strong></p>
+                                    <h5>{{ (isset($rejected->reminder_message_subject )) ? $rejected->reminder_message_subject : $rejected->message_subject }}</h5>
                                 </div>
                             </div>
-                            <div class="text-center">
-                                <a href="#sendRespond-modal" data-message_id = "{{ (isset($BudgetRejactedStatus->message_id ) ? $BudgetRejactedStatus->message_id :'') }}" data-Budget_id="{{ (isset($BudgetRejactedStatus->Budget_id ) ? $BudgetRejactedStatus->Budget_id :'') }}" data-employment_type="{{ $BudgetRejactedStatus->employment_type ?? 'Permanent' }}" data-bs-toggle="modal" class="btn btn-sm wfp-btn-primary">Revise
+                            <div class="text-center mb-2">
+                                <a href="#sendRespond-modal" data-message_id="{{ $rejected->message_id ?? '' }}" data-Budget_id="{{ $rejected->Budget_id ?? '' }}" data-employment_type="{{ $rejected->employment_type ?? 'Permanent' }}" data-bs-toggle="modal" class="btn btn-sm wfp-btn-primary">Revise
                                     Response</a>
                             </div>
+                            @endforeach
                         @else
                             <p>No Requests</p>
                         @endif
@@ -574,18 +584,25 @@
                 $('#manning-review-step').hide();
                 $('#manningResponseForm').show();
 
-                // Get the necessary data attributes or values to pass to fetchDraftData
-
-
-                $("#Budget_id").val($("#budget").val());
-
-            $("#Submit_message_id").val($("#BudgetRejacted_message_id").val());
+                // WP5 — the Requests card can now render one Revise button
+                // per rejected category (was a single fixed-id set of
+                // hidden inputs, which collided once more than one could
+                // exist at a time — see the blade loop above). Read the
+                // actual button that opened this modal instead — only
+                // overwrite the defaults (pre-populated server-side for
+                // the plain "Send Response" flow, line ~342) when this
+                // really was a Revise button (has a Budget_id to revise).
+                var $trigger = $(e.relatedTarget);
+                if ($trigger.data('budget_id')) {
+                    $("#Budget_id").val($trigger.data('budget_id'));
+                    $("#Submit_message_id").val($trigger.data('message_id') || '');
+                }
 
                 // WP5 — preselect the tab the rejection was actually about,
                 // instead of always opening on whatever tab was last active
                 // (usually Permanent), which showed the wrong category's
                 // numbers to revise.
-                var revisedCategory = $('#BudgetRejacted_employment_type').val();
+                var revisedCategory = $trigger.data('employment_type');
                 if (revisedCategory) {
                     $('input[name="employment_type"][value="' + revisedCategory + '"]').prop('checked', true);
                 }
@@ -889,7 +906,15 @@
                 const cat = categoryKeys[index];
 
                 if (cat === activeCategory) {
-                    $("#Submit_message_id").val($("#BudgetRejacted_message_id").val()?.trim() || $("#message_id").val());
+                    // WP5 — #Submit_message_id was already set correctly at
+                    // modal-open time (show.bs.modal handler above, from the
+                    // clicked Revise button's data-message_id, or the
+                    // server-populated default for a plain Send). No
+                    // per-category hidden input to re-read anymore now that
+                    // the Requests card can show more than one at once.
+                    if (!$("#Submit_message_id").val()) {
+                        $("#Submit_message_id").val($("#message_id").val());
+                    }
                     // WP4 — every call in a multi-category batch skips the
                     // notification close; finishMultiSubmit() closes it
                     // once, itself, only if every category succeeded.
@@ -1024,19 +1049,14 @@
         }
 
         function doManningSubmit() {
-            $("#Budget_id").val($("#Budget_id").val());
-
-            let BudgetRejacted_message_id = $("#BudgetRejacted_message_id").val();
-
-            if (BudgetRejacted_message_id !== null && BudgetRejacted_message_id !== undefined && BudgetRejacted_message_id.trim() !== "") {
-
-
-                $("#Submit_message_id").val(BudgetRejacted_message_id);
-            }
-            else
-            {
+            // WP5 — #Submit_message_id was already set correctly at
+            // modal-open time (show.bs.modal handler, from the clicked
+            // Revise button's data-message_id, or the server-populated
+            // default for a plain Send) — no per-category hidden input to
+            // re-read anymore now that the Requests card can show more
+            // than one rejected category at once.
+            if (!$("#Submit_message_id").val()) {
                 $("#Submit_message_id").val($("#message_id").val());
-
             }
 
 

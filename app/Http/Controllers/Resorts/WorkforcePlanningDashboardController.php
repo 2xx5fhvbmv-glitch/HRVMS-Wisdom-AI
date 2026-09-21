@@ -993,7 +993,14 @@ class WorkforcePlanningDashboardController extends Controller
             ->whereRaw('t5.id = (SELECT MAX(bs2.id) FROM budget_statuses bs2 WHERE bs2.Budget_id = t5.Budget_id AND bs2.resort_id = ? AND bs2.Department_id = ?)', [$resort_id, $Dept_id])
             ->where('t4.response', "Yes")
             ->orderBy('t5.id',  'desc')
-            ->first([
+            // WP5 — was ->first(), so a dept with more than one category
+            // rejected at once (e.g. Permanent AND Casual sent back
+            // together) only ever showed the latest one on the Requests
+            // card; the other sat invisible until the visible one was
+            // resolved. The "latest per Budget_id" rule above already
+            // scopes correctly per category, so ->get() returns exactly
+            // one row per still-rejected category.
+            ->get([
                 't3.name as DepartmentName',
                 't1.first_name',
                 't1.middle_name',
@@ -1092,6 +1099,9 @@ class WorkforcePlanningDashboardController extends Controller
                 })
                 ->where('p.resort_id', '=', $resort->resort_id)
                 ->where('p.dept_id', '=', $Dept_id)
+                // WP6(D6) — sibling of GetYearBasePositions() (initial page
+                // load vs its AJAX refresh render the same table); same fix.
+                ->whereNull('p.employee_category')
                 ->select('p.id', 'p.position_title')
                 ->selectRaw('COALESCE(MAX(CASE WHEN mr.year = ? THEN pmd.headcount END), 0) as headcount', [$currentYear])
                 ->groupBy('p.id', 'p.position_title')
@@ -1181,6 +1191,13 @@ class WorkforcePlanningDashboardController extends Controller
                 })
                 ->where('p.resort_id', '=', $ResortId)
                 ->where('p.dept_id', '=', $Dept_id)
+                // WP6(D6) — this widget has no category selector at all;
+                // without this a Casual/Intern position (e.g. Kitchen
+                // Helper, Waiter Intern) showed up blended in here
+                // regardless of year, since it never had a manning_response
+                // row scoped to a category in the first place. Permanent
+                // only, matching "Permanent views show only Permanent".
+                ->whereNull('p.employee_category')
                 ->select('p.id', 'p.position_title')
                 ->selectRaw('COALESCE(MAX(CASE WHEN mr.year = ? THEN pmd.headcount END), 0) as headcount', [$year])
                 ->groupBy('p.id', 'p.position_title')

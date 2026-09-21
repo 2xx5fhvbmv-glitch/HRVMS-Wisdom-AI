@@ -37,6 +37,25 @@ class PayrollController extends Controller
         }
     }
 
+    /**
+     * WP9 — this employee's own payroll.payroll_category, so a mobile
+     * payroll/payslip query never blends in a different-category run.
+     * Casual employees are paid via CasualPayrollController's separate
+     * run (its payroll rows are written with payroll_category='Casual' —
+     * see CasualPayrollController::index()/getEmployees()); Intern
+     * employees still run through the regular Permanent run
+     * (PayrollController::fetchTimeAttendance() handles Permanent+Intern),
+     * so Intern also resolves to 'Permanent' here — matches
+     * Common::manningCategory()'s 3-bucket split collapsed to the 2 values
+     * payroll_category actually has.
+     */
+    private function employeePayrollCategory($employee): string
+    {
+        // Nullsafe: $employee may be null (e.g. an Employee::find() miss) —
+        // falls through to '', which manningCategory() defaults to 'Permanent'.
+        return Common::manningCategory($employee?->employment_type ?? '') === 'Casual' ? 'Casual' : 'Permanent';
+    }
+
     public function payrollDashboard(Request $request)
     {
 
@@ -44,8 +63,9 @@ class PayrollController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
         $employee_id                                    =   $this->user->GetEmployee->id;
+        $payrollCategory                                =   $this->employeePayrollCategory($this->user->GetEmployee);
         try {
-            
+
             $year                                       =   $request->input('year', date('Y'));
 
             // 12-month chart data (Basic Pay / Overtime / Service Charge per
@@ -137,6 +157,9 @@ class PayrollController extends Controller
                                                                 $j->on('psc.payroll_id','=','payroll.id')->where('psc.employee_id',$employee_id);
                                                             })
                                                             ->where('pe.employee_id',$employee_id)
+                                                            // WP9 — this employee's own payroll_category (Casual vs
+                                                            // Permanent/Intern), see employeePayrollCategory().
+                                                            ->where('payroll.payroll_category',$payrollCategory)
                                                             // Was hardcoded to exactly last calendar month — if payroll
                                                             // for that specific month hasn't been run yet (a common lag;
                                                             // e.g. today is in August but the latest processed payroll
@@ -258,10 +281,13 @@ class PayrollController extends Controller
         }
 
         $employee_id = $this->user->GetEmployee->id;
+        $payrollCategory = $this->employeePayrollCategory($this->user->GetEmployee);
 
         try {
             $years = Payroll::join('payroll_employees as pe', 'pe.payroll_id', '=', 'payroll.id')
                 ->where('pe.employee_id', $employee_id)
+                // WP9 — this employee's own payroll_category, see employeePayrollCategory().
+                ->where('payroll.payroll_category', $payrollCategory)
                 ->where('payroll.status', 'locked')
                 ->selectRaw('DISTINCT YEAR(payroll.start_date) as year')
                 ->orderByDesc('year')
@@ -289,6 +315,7 @@ class PayrollController extends Controller
         
         $employee_id                                    =   $this->user->GetEmployee->id;
         $year                                           =   $request->year ?? Carbon::now()->format('Y');
+        $payrollCategory                                =   $this->employeePayrollCategory($this->user->GetEmployee);
 
         try {
              // Fetch Employee Details
@@ -328,6 +355,8 @@ class PayrollController extends Controller
                                                                 $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
                                                             })
                                                             ->where('pe.employee_id',$employee_id)
+                                                            // WP9 — this employee's own payroll_category, see employeePayrollCategory().
+                                                            ->where('payroll.payroll_category',$payrollCategory)
                                                             // Same "exactly last calendar month" bug as payrollDashboard()
                                                             // — shows the most recently processed period instead of
                                                             // demanding an exact match, so this header snapshot doesn't
@@ -368,6 +397,8 @@ class PayrollController extends Controller
                                                                 $j->on('psc.payroll_id','=','payroll.id')->where('psc.employee_id',$employee_id);
                                                             })
                                                             ->where('pe.employee_id',$employee_id)
+                                                            // WP9 — this employee's own payroll_category, see employeePayrollCategory().
+                                                            ->where('payroll.payroll_category',$payrollCategory)
                                                             ->whereYear('payroll.start_date', $year)
                                                             ->select(
                                                                 'payroll.id',  'payroll.resort_id', 'payroll.start_date',
@@ -416,9 +447,10 @@ class PayrollController extends Controller
         $employee_id                                    =   $this->user->GetEmployee->id;
         $year                                           =   $request->year ?? Carbon::now()->format('Y');
         $month                                          =   $request->month;
-       
+        $payrollCategory                                =   $this->employeePayrollCategory($this->user->GetEmployee);
+
         try {
-             
+
             // Fetch Last Month's Payroll Data. Deductions/service-charge stay
             // left-joined (a missing row there just means $0 deductions/no
             // service charge, still a real payslip) — but payroll_reviews
@@ -446,7 +478,9 @@ class PayrollController extends Controller
                                                                 ->leftJoin('payroll_service_charges as psc', function($j) use ($employee_id) {
                                                                     $j->on('psc.payroll_id','=','payroll.id')->where('psc.employee_id',$employee_id);
                                                                 })
-                                                                ->where('pe.employee_id',$employee_id);
+                                                                ->where('pe.employee_id',$employee_id)
+                                                                // WP9 — this employee's own payroll_category, see employeePayrollCategory().
+                                                                ->where('payroll.payroll_category',$payrollCategory);
                                                                 if($month) {
                                                                     // A pay period is labelled by the month it ENDS in
                                                                     // (e.g. 26 Feb - 25 Mar is "March's" payslip — matches
@@ -579,6 +613,12 @@ class PayrollController extends Controller
      */
     private function buildPayslipPdf($employee_id, $year, $month)
     {
+        // WP9 — this employee's own payroll_category, see employeePayrollCategory().
+        // Only $employee_id (not the full user context) is available here,
+        // so resolve the employee record directly — same pattern already
+        // used for this employee id elsewhere in this file (shareEmailPayslip()).
+        $payrollCategory = $this->employeePayrollCategory(Employee::find($employee_id));
+
         // Fetch Last Month's Payroll Data. Deductions/service-charge stay
         // left-joined (a missing row there just means $0 deductions/no
             // service charge, still a real payslip) — but payroll_reviews
@@ -606,7 +646,9 @@ class PayrollController extends Controller
                                                                 ->leftJoin('payroll_service_charges as psc', function($j) use ($employee_id) {
                                                                     $j->on('psc.payroll_id','=','payroll.id')->where('psc.employee_id',$employee_id);
                                                                 })
-                                                                ->where('pe.employee_id',$employee_id);
+                                                                ->where('pe.employee_id',$employee_id)
+                                                                // WP9 — this employee's own payroll_category, see employeePayrollCategory().
+                                                                ->where('payroll.payroll_category',$payrollCategory);
                                                                 if($month) {
                                                                     // A pay period is labelled by the month it ENDS in
                                                                     // (e.g. 26 Feb - 25 Mar is "March's" payslip — matches

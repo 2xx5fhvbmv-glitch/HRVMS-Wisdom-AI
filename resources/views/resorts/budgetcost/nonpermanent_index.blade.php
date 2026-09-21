@@ -182,6 +182,24 @@
                             <div id="div-applies-to"></div>
                         </div>
 
+                        {{-- WP2.3 — without this a cost line has no way to
+                             be restricted to specific positions at creation
+                             time; it silently applies to every position of
+                             its category. Empty selection keeps today's
+                             default (unrestricted). --}}
+                        <div class="form-group mb-20">
+                            <label class="form-label" for="position_ids">Applies to positions (optional)</label>
+                            <select id="position_ids" name="position_ids[]" multiple
+                                class="form-select select2t-none">
+                                @foreach($positions as $position)
+                                    <option value="{{ $position->id }}" data-category="{{ $position->employee_category }}">
+                                        {{ $position->position_title }} ({{ $position->employee_category }})
+                                    </option>
+                                @endforeach
+                            </select>
+                            <small class="text-muted">Leave empty to apply to every position of the selected category.</small>
+                        </div>
+
                         <div class="form-group mb-20">
                             <label class="form-label" for="details">Select Details</label>
                             <select id="details" name="details" class="form-select select2t-none">

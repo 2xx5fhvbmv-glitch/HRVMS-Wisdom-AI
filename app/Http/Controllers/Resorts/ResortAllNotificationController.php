@@ -325,6 +325,14 @@ class ResortAllNotificationController extends Controller
         $resort = Auth::guard('resort-admin')->user();
         $employeeRankPosition = Common::getEmployeeRankPosition($resort->getEmployee);
         $resort_id = $resort->resort_id;
+
+        // C2 — no role check existed at all; any authenticated resort-admin
+        // could hit this and forward every department's budget forward a
+        // stage. Only HR/Finance/GM ever legitimately do this.
+        if (!in_array($employeeRankPosition['position'], ['HR', 'Finance', 'GM'], true)) {
+            return response()->json(['success' => false, 'msg' => 'Unauthorized access'], 403);
+        }
+
         $typeofCommets = config('settings.manningRequestLifeCycle');
         // Always defined now (was left unset on the GM/else branches,
         // relying on PHP's undefined-variable-is-null fallback — harmless
@@ -367,11 +375,21 @@ class ResortAllNotificationController extends Controller
         $employmentType = $request->input('employment_type', 'Permanent');
         $categoriesToSend = $employmentType === 'all' ? ['Permanent', 'Casual', 'Intern'] : [$employmentType];
 
-        $totalDepartments = ResortDepartment::where('resort_id', $resort_id)->count();
+        // WP7.3 — an inactive department still counted toward the "every
+        // department must submit" total, which could make the gate
+        // permanently unsatisfiable (or, if that department also happened
+        // to have a stale manning row, silently satisfiable) for no
+        // legitimate reason.
+        $totalDepartments = ResortDepartment::where('resort_id', $resort_id)->where('status', 'active')->count();
         foreach ($categoriesToSend as $cat) {
+            // WP7.1 — was counting ANY manning_responses row (draft or
+            // submitted), so a department that had merely opened the tab
+            // (auto-saved a draft) counted as "submitted", letting the send
+            // proceed while real submissions were still missing.
             $submittedCount = ManningResponse::where('resort_id', $resort_id)
                 ->where('year', $request->year)
                 ->where('employment_type', $cat)
+                ->where('status', 'submitted')
                 ->distinct('dept_id')
                 ->count('dept_id');
             if ($submittedCount < $totalDepartments) {
@@ -384,9 +402,14 @@ class ResortAllNotificationController extends Controller
 
         DB::beginTransaction();
         try{
+            // WP7.2 — same status filter as the gate above: a draft (or a
+            // row ReviseBudget() sent back to draft — see A3) must never be
+            // forwarded, even if some other department's row for the same
+            // category happens to be submitted.
             $budgets = ManningResponse::where('resort_id', $resort_id)
                                     ->where('year', $request->year)
                                     ->whereIn('employment_type', $categoriesToSend)
+                                    ->where('status', 'submitted')
                                     ->get();
 
                 foreach ($budgets as $key => $budget) {
@@ -474,6 +497,26 @@ class ResortAllNotificationController extends Controller
         $Budget_id = $request->budget_id;
         $Department_id =  $request->department_id;
         $revise_Comment = $request->ReviseBudgetComment;
+
+        // C2 — this route had no role check at all; an HOD who knew (or
+        // guessed) the endpoint could hit the BudgetStatus::create path
+        // below with an empty $typeofCommet. Only HR/Finance/GM ever
+        // legitimately revise a budget.
+        if (!in_array($employeeRankPosition['position'], ['HR', 'Finance', 'GM'], true)) {
+            return response()->json(['success' => false, 'msg' => 'Unauthorized access'], 403);
+        }
+
+        // C2/C3 — $Budget_id/$Department_id were client-supplied and never
+        // checked against the caller's own resort: resolveMessageIdForBudget()
+        // and the later ManningResponse::find() were both unscoped, so a
+        // resort_id + budget_id pair belonging to ANOTHER resort would
+        // still resolve and get revised. Load + verify once here.
+        $manningResponse = \App\Models\ManningResponse::where('id', $Budget_id)
+            ->where('resort_id', $resort_id)
+            ->first();
+        if (!$manningResponse || (int) $manningResponse->dept_id !== (int) $Department_id) {
+            return response()->json(['success' => false, 'msg' => 'Budget not found for this resort.'], 404);
+        }
         // WP5 — was config('settings.Notifications')[4|5|9], a flat array
         // of stringified numbers ("5", "6", "10"...) never meant to be an
         // id at all — writing that into budget_statuses.message_id broke
@@ -501,13 +544,15 @@ class ResortAllNotificationController extends Controller
 
         DB::beginTransaction();
         try{
-            // ManningResponse::where([
-            //     'id' => $Budget_id,
-            //     'dept_id' => $Department_id,
-            //     'resort_id' => $resort_id
-            // ])->update([
-            //     'budget_process_status' => 'Rejected'
-            // ]);
+            // A3 — was commented out, so a revised category's
+            // manning_responses.status stayed 'submitted'. saveDraft()'s
+            // own guard (status !== 'draft' => skip) then dropped every
+            // in-progress edit the HOD made on that category on the next
+            // tab switch, and getCategoriesWithData() (status='draft' only)
+            // never surfaced it for the multi-category resubmit either.
+            // Flip it back to draft so the HOD can actually edit + resubmit.
+            $manningResponse->update(['status' => 'draft']);
+
             if($employeeRankPosition['position'] != 'GM') {
                 $BudgetStatus =BudgetStatus::create([
                     'message_id'=>$Message_id,
@@ -532,8 +577,7 @@ class ResortAllNotificationController extends Controller
                 // WP5 — the message had no category/year, so an HOD with
                 // more than one open manning request had no way to tell
                 // WHICH one this bell entry was about until they opened
-                // the popup.
-                $manningResponse = \App\Models\ManningResponse::find($Budget_id);
+                // the popup. ($manningResponse already resort-scoped above.)
                 $categoryLabel = $manningResponse->employment_type ?? 'Permanent';
                 $yearLabel = $manningResponse->year ?? '';
                 $pageId = \DB::table('module_pages')->where('internal_route', 'resort.workforceplan.hoddashboard')->value('id');
