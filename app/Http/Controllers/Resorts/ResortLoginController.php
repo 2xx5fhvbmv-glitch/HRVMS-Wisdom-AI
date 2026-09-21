@@ -56,7 +56,12 @@ class ResortLoginController extends Controller
             // caller knew the password. Password is now checked first, and
             // an unknown email runs a dummy hash so response time doesn't
             // distinguish "no such account" from "wrong password".
-            if (!$resort_admin || !Hash::check((string) $request->password, $resort_admin->password ?? self::INVALID_CREDENTIALS_HASH)) {
+            // Hash::check() must run unconditionally — `!$x || !Hash::check()`
+            // short-circuits on null $x, so the dummy hash above was never
+            // actually reached and timing kept leaking which branch ran
+            // (measured: ~7ms unknown-email vs ~75ms real-wrong-password).
+            $passwordValid = Hash::check(is_string($request->password) ? $request->password : '', $resort_admin->password ?? self::INVALID_CREDENTIALS_HASH);
+            if (!$resort_admin || !$passwordValid) {
                 Common::logLoginAttempt('resort', $request->email, false, $request);
                 return response()->json([
                     'success' => false,

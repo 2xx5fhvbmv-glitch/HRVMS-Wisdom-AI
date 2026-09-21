@@ -86,10 +86,19 @@ class ForgotPasswordController extends Controller
               $user->password = Hash::make($password);
               $user->save();
 
-              // No plaintext password in this email anymore — confirmation only.
-              $user->sendPasswordResetSuccessNotification($user, null);
-              if (method_exists($user, 'tokens')) {
-                  $user->tokens()->delete();
+              // The password is already changed at this point — a failure
+              // below must never propagate out of this closure, or
+              // PasswordBroker::reset() never reaches its own token-delete
+              // step and the reset token stays valid despite the password
+              // having already changed.
+              try {
+                  // No plaintext password in this email anymore — confirmation only.
+                  $user->sendPasswordResetSuccessNotification($user, null);
+                  if (method_exists($user, 'tokens')) {
+                      $user->tokens()->delete();
+                  }
+              } catch (\Throwable $e) {
+                  \Log::error('Admin password reset: post-reset notification/token-revoke failed: ' . $e->getMessage());
               }
           }
       );

@@ -232,6 +232,13 @@
                     }
                     });
 
+                // Password rule must match the server's actual policy
+                // (Password::min(12)->mixedCase()->numbers()) — was
+                // minlength:8 here.
+                $.validator.addMethod('pwcomplexity', function(value) {
+                    return /[a-z]/.test(value) && /[A-Z]/.test(value) && /[0-9]/.test(value);
+                }, 'Password must include an uppercase letter, a lowercase letter, and a number.');
+
                 // Add form validation
                 $('#formRequestPassword').validate({
                 errorClass: 'text-danger-custom',
@@ -243,12 +250,13 @@
                     },
                     'password': {
                     required: true,
-                    minlength: 8 ,
+                    minlength: 12,
+                    pwcomplexity: true
                     },
                     'password_confirmation': {
                     required: true,
                     equalTo: '#password',
-                    minlength: 8
+                    minlength: 12
                     }
                 },
                 messages: {
@@ -258,12 +266,12 @@
                     },
                     'password': {
                     required: "The password is required",
-                    minlength: "Your password must be at least 8 characters long"
+                    minlength: "Your password must be at least 12 characters long"
                     },
                     'password_confirmation': {
                     required: "The confirm password is required",
                     equalTo: 'The password must match',
-                    minlength: "Your confirm password must be at least 8 characters long"
+                    minlength: "Your confirm password must be at least 12 characters long"
                     }
                 },
                 errorPlacement: function(error, element) {
@@ -277,7 +285,49 @@
                     error.insertAfter(element).css('color', 'var(--error)');
                     }
                 },
-                errorElement: 'span'
+                errorElement: 'span',
+                submitHandler: function(form) {
+                    // No submitHandler existed before — the browser did a
+                    // normal native form POST, landing on the raw JSON the
+                    // controller returns instead of showing any message.
+                    var $btn = $(form).find('button[type="submit"]');
+                    $btn.prop('disabled', true);
+
+                    $.ajax({
+                        url: $(form).attr('action'),
+                        method: 'POST',
+                        data: $(form).serialize(),
+                        dataType: 'json'
+                    }).done(function (resp) {
+                        if (resp && resp.success) {
+                            wisdomToast('success', 'Success', resp.msg || 'Password changed successfully.');
+                            setTimeout(function () {
+                                window.location.href = resp.redirect_url || '{{ route('shopkeeper.loginindex') }}';
+                            }, 1200);
+                        } else {
+                            $btn.prop('disabled', false);
+                            wisdomToast('error', 'Error', (resp && resp.msg) || 'Something went wrong. Please try again.');
+                        }
+                    }).fail(function (xhr) {
+                        $btn.prop('disabled', false);
+                        if (xhr.status === 429) {
+                            wisdomToast('error', 'Too many attempts', 'Too many attempts — please try again in a minute.');
+                            return;
+                        }
+                        var msg = 'Something went wrong. Please try again.';
+                        if (xhr.status === 422 && xhr.responseJSON) {
+                            var errs = xhr.responseJSON.errors || xhr.responseJSON;
+                            var first = null;
+                            if (errs && typeof errs === 'object') {
+                                for (var k in errs) { first = Array.isArray(errs[k]) ? errs[k][0] : errs[k]; break; }
+                            }
+                            msg = first || msg;
+                        } else if (xhr.responseJSON && xhr.responseJSON.msg) {
+                            msg = xhr.responseJSON.msg;
+                        }
+                        wisdomToast('error', 'Error', msg);
+                    });
+                }
                 });
         });
     </script>

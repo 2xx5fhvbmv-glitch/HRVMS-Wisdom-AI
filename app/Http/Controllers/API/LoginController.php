@@ -53,7 +53,11 @@ class Logincontroller extends Controller
             // time doesn't distinguish "no such employee" from "wrong
             // password" (self::INVALID_CREDENTIALS_HASH is a fixed bcrypt
             // hash of a random string, never a real password).
-            if (!$resortAdmin || !Hash::check((string) $request->password, $resortAdmin->password ?? self::INVALID_CREDENTIALS_HASH)) {
+            // Hash::check() must run unconditionally — `!$x || !Hash::check()`
+            // short-circuits on null $x, so the dummy hash above was never
+            // actually reached and timing kept leaking which branch ran.
+            $passwordValid = Hash::check(is_string($request->password) ? $request->password : '', $resortAdmin->password ?? self::INVALID_CREDENTIALS_HASH);
+            if (!$resortAdmin || !$passwordValid) {
                 Common::logLoginAttempt('mobile', $request->emp_id, false, $request);
                 return response()->json([
                     'success'                       =>  false,

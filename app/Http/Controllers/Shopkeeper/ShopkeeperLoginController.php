@@ -39,7 +39,11 @@ class ShopkeeperLoginController extends Controller
             // Enumeration fix: unknown email and wrong password now return
             // the identical message, and an unknown email runs a dummy
             // hash so response time doesn't distinguish the two cases.
-            if (!$shopkeeper || !Hash::check((string) $request->password, $shopkeeper->password ?? self::INVALID_CREDENTIALS_HASH)) {
+            // Hash::check() must run unconditionally — `!$x || !Hash::check()`
+            // short-circuits on null $x, so the dummy hash above was never
+            // actually reached and timing kept leaking which branch ran.
+            $passwordValid = Hash::check(is_string($request->password) ? $request->password : '', $shopkeeper->password ?? self::INVALID_CREDENTIALS_HASH);
+            if (!$shopkeeper || !$passwordValid) {
                 Common::logLoginAttempt('shopkeeper', $request->email, false, $request);
                 return response()->json([
                     'success' => false,

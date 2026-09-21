@@ -241,7 +241,18 @@
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                     }
                     });
-                    
+
+                // Password rule must match the server's actual policy
+                // (Password::min(12)->mixedCase()->numbers()) — was
+                // minlength:8 here, so a page-valid 8-char password got
+                // rejected server-side after the page already said it
+                // was fine. The "not in a data breach" check stays
+                // server-only (HaveIBeenPwned lookup) and surfaces via
+                // the AJAX error handler below.
+                $.validator.addMethod('pwcomplexity', function(value) {
+                    return /[a-z]/.test(value) && /[A-Z]/.test(value) && /[0-9]/.test(value);
+                }, 'Password must include an uppercase letter, a lowercase letter, and a number.');
+
                 // Add form validation
                 $('#formRequestPassword').validate({
                 errorClass: 'text-danger-custom',
@@ -253,12 +264,13 @@
                     },
                     'password': {
                         required: true,
-                        minlength: 8
+                        minlength: 12,
+                        pwcomplexity: true
                     },
                     'password_confirmation': {
                         required: true,
                         equalTo: '#password',
-                        minlength: 8
+                        minlength: 12
                     }
                 },
                 messages: {
@@ -268,12 +280,12 @@
                     },
                     'password': {
                         required: "The password is required",
-                        minlength: "Your password must be at least 8 characters long"
+                        minlength: "Your password must be at least 12 characters long"
                     },
                     'password_confirmation': {
                         required: "The confirm password is required",
                         equalTo: "The password must match",
-                        minlength: "Your confirm password must be at least 8 characters long"
+                        minlength: "Your confirm password must be at least 12 characters long"
                     }
                 },
                 errorPlacement: function(error, element) {
@@ -289,12 +301,50 @@
                 },
                 errorElement: 'span',
                 submitHandler: function(form) {
-                    toastr.success( "Password changed successfully", "Success", { positionClass: 'toast-bottom-right'} );
+                    // Was a raw form.submit() — the controller returns JSON,
+                    // not a redirect/HTML page, so the browser landed on a
+                    // blank page showing the raw JSON body. Also removed the
+                    // "Password changed successfully" toast that fired
+                    // BEFORE the server had actually responded, which showed
+                    // success even when the reset failed (expired/replayed
+                    // token, weak/breached password).
+                    var $btn = $(form).find('button[type="submit"]');
+                    $btn.prop('disabled', true);
 
-                    setTimeout(function () 
-                    {
-                        form.submit();
-                    }, 1000); // 1 second delay
+                    $.ajax({
+                        url: $(form).attr('action'),
+                        method: 'POST',
+                        data: $(form).serialize(),
+                        dataType: 'json'
+                    }).done(function (resp) {
+                        if (resp && resp.success) {
+                            wisdomToast('success', 'Success', resp.msg || 'Password changed successfully.');
+                            setTimeout(function () {
+                                window.location.href = resp.redirect_url || '{{ route('resort.loginindex') }}';
+                            }, 1200);
+                        } else {
+                            $btn.prop('disabled', false);
+                            wisdomToast('error', 'Error', (resp && resp.msg) || 'Something went wrong. Please try again.');
+                        }
+                    }).fail(function (xhr) {
+                        $btn.prop('disabled', false);
+                        if (xhr.status === 429) {
+                            wisdomToast('error', 'Too many attempts', 'Too many attempts — please try again in a minute.');
+                            return;
+                        }
+                        var msg = 'Something went wrong. Please try again.';
+                        if (xhr.status === 422 && xhr.responseJSON) {
+                            var errs = xhr.responseJSON.errors || xhr.responseJSON;
+                            var first = null;
+                            if (errs && typeof errs === 'object') {
+                                for (var k in errs) { first = Array.isArray(errs[k]) ? errs[k][0] : errs[k]; break; }
+                            }
+                            msg = first || msg;
+                        } else if (xhr.responseJSON && xhr.responseJSON.msg) {
+                            msg = xhr.responseJSON.msg;
+                        }
+                        wisdomToast('error', 'Error', msg);
+                    });
                 }
             });
                 document.getElementById('togglePassword').addEventListener('click', function () {

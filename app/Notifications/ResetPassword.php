@@ -17,7 +17,18 @@ use App\Models\Settings;
 use App\Helpers\Common;
 use App\Models\ResortAdmin;
 
-class ResetPassword extends ResetPasswordNotification
+/**
+ * ShouldQueue (S5.3/B3 — security hardening review): sent synchronously
+ * before this, so a real account's forgot-password request paid a full
+ * SMTP round-trip while an unknown email returned in milliseconds —
+ * timing alone revealed which accounts exist even though the response
+ * text is identical. Queuing defers the actual send past the response,
+ * closing that gap. Only effective if QUEUE_CONNECTION isn't `sync` in
+ * the environment that's actually running this — `sync` executes queued
+ * jobs immediately in the same request and this fix becomes a no-op;
+ * confirm the real queue driver in production before relying on this.
+ */
+class ResetPassword extends ResetPasswordNotification implements ShouldQueue
 {
   use Queueable;
   public $token;

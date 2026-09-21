@@ -92,12 +92,22 @@ class ResortforgotPasswordController extends Controller
                 $user->password = Hash::make($password);
                 $user->save();
 
-                // No plaintext password in this email anymore (S4) — just a
-                // confirmation. Revoke the account's mobile API tokens so a
-                // stolen token can't survive a password reset (S3).
-                $user->sendPasswordResetSuccessNotification($user, null);
-                if (method_exists($user, 'tokens')) {
-                    $user->tokens()->delete();
+                // The password is already changed at this point — a failure
+                // below (SMTP down, etc.) must never propagate out of this
+                // closure, or PasswordBroker::reset() never reaches its own
+                // token-delete step and the reset token stays valid/replayable
+                // for the rest of its ~60min window despite the password
+                // having already changed.
+                try {
+                    // No plaintext password in this email anymore (S4) —
+                    // just a confirmation. Revoke the account's mobile API
+                    // tokens so a stolen token can't survive a reset (S3).
+                    $user->sendPasswordResetSuccessNotification($user, null);
+                    if (method_exists($user, 'tokens')) {
+                        $user->tokens()->delete();
+                    }
+                } catch (\Throwable $e) {
+                    \Log::error('Resort password reset: post-reset notification/token-revoke failed: ' . $e->getMessage());
                 }
             }
         );

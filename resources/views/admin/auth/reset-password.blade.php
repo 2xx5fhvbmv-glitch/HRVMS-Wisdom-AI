@@ -175,6 +175,12 @@
         }
       });
 
+      // Password rule must match the server's actual policy
+      // (Password::min(12)->mixedCase()->numbers()) — was minlength:8 here.
+      $.validator.addMethod('pwcomplexity', function(value) {
+          return /[a-z]/.test(value) && /[A-Z]/.test(value) && /[0-9]/.test(value);
+      }, 'Password must include an uppercase letter, a lowercase letter, and a number.');
+
       // Add form validation
       $('#formRequestPassword').validate({
         errorClass: 'text-danger-custom',
@@ -186,12 +192,13 @@
           },
           'password': {
             required: true,
-            minlength: 8 ,
+            minlength: 12,
+            pwcomplexity: true
           },
           'password_confirmation': {
             required: true,
             equalTo: '#password',
-            minlength: 8
+            minlength: 12
           }
         },
         messages: {
@@ -201,12 +208,12 @@
           },
           'password': {
             required: "The password is required",
-            minlength: "Your password must be at least 8 characters long"
+            minlength: "Your password must be at least 12 characters long"
           },
           'password_confirmation': {
             required: "The confirm password is required",
             equalTo: 'The password must match',
-            minlength: "Your confirm password must be at least 8 characters long"
+            minlength: "Your confirm password must be at least 12 characters long"
           }
         },
         errorPlacement: function(error, element) {
@@ -257,22 +264,31 @@
                             });
                         }
                     },
-                    error: function(result) {
+                    error: function(xhr) {
+                        // Was writing to #er-message, an element that
+                        // doesn't exist on this page — every real HTTP
+                        // error (422 validation, 429 throttled, 500) failed
+                        // completely silently. Also dropped copy-pasted
+                        // OTP-verification logic (#formLogin/#formResendOtp)
+                        // left over from an unrelated login page — none of
+                        // those elements exist here either.
                         HoldOn.close();
-                        $("#er-message").fadeIn();
-                        var data = result.responseJSON;
-                        if (data.status == false) {
-                            if (data.account_not_verified == 1) {
-                                $("#formLogin").addClass('d-none');
-                                $("#formResendOtp").removeClass('d-none');
-                                $("#formTitle").text("Verify account");
-                            }
-                            $("#er-message").html('<span> ' + data.message + '</span>');
-                        } else {
-                            $("#er-message").html(
-                                '<span><i class="fa fa-exclamation-triangle"></i> something went wrong please try again</span>'
-                            );
+                        if (xhr.status === 429) {
+                            toastr.error('Too many attempts — please try again in a minute.', 'Error', { positionClass: 'toast-bottom-right' });
+                            return;
                         }
+                        var msg = 'Something went wrong. Please try again.';
+                        if (xhr.status === 422 && xhr.responseJSON) {
+                            var errs = xhr.responseJSON.errors || xhr.responseJSON;
+                            var first = null;
+                            if (errs && typeof errs === 'object') {
+                                for (var k in errs) { first = Array.isArray(errs[k]) ? errs[k][0] : errs[k]; break; }
+                            }
+                            msg = first || msg;
+                        } else if (xhr.responseJSON && xhr.responseJSON.msg) {
+                            msg = xhr.responseJSON.msg;
+                        }
+                        toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
                     }
                 });
             }

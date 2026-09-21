@@ -4770,7 +4770,7 @@ class Common
         try {
             \DB::table('login_attempts')->insert([
                 'portal'      => $portal,
-                'identifier'  => (string) $identifier,
+                'identifier'  => is_scalar($identifier) ? (string) $identifier : '',
                 'ip_address'  => $request ? $request->ip() : null,
                 'user_agent'  => $request ? substr((string) $request->userAgent(), 0, 255) : null,
                 'successful'  => $successful,

@@ -55,7 +55,7 @@ class RouteServiceProvider extends ServiceProvider
         // different accounts from one source.
         foreach (['resort-login', 'admin-login', 'shopkeeper-login'] as $name) {
             RateLimiter::for($name, function ($request) {
-                $identifier = strtolower((string) $request->input('email'));
+                $identifier = self::safeIdentifier($request->input('email'));
                 return [
                     Limit::perMinute(5)->by($identifier . '|' . $request->ip()),
                     Limit::perMinute(30)->by($request->ip()),
@@ -64,7 +64,7 @@ class RouteServiceProvider extends ServiceProvider
         }
 
         RateLimiter::for('mobile-login', function ($request) {
-            $identifier = strtolower((string) $request->input('emp_id'));
+            $identifier = self::safeIdentifier($request->input('emp_id'));
             return [
                 Limit::perMinute(5)->by($identifier . '|' . $request->ip()),
                 Limit::perMinute(30)->by($request->ip()),
@@ -73,7 +73,7 @@ class RouteServiceProvider extends ServiceProvider
 
         foreach (['resort-password-reset', 'admin-password-reset', 'shopkeeper-password-reset', 'mobile-password-reset'] as $name) {
             RateLimiter::for($name, function ($request) {
-                $identifier = strtolower((string) $request->input('email'));
+                $identifier = self::safeIdentifier($request->input('email'));
                 return [
                     Limit::perMinute(3)->by($identifier . '|' . $request->ip()),
                     Limit::perHour(20)->by($request->ip()),
@@ -82,6 +82,19 @@ class RouteServiceProvider extends ServiceProvider
         }
 
         parent::boot();
+    }
+
+    /**
+     * `POST .../do-login` with `email[]=a&password[]=b` sends an array for
+     * a field these limiter closures treated as a string — `(string)`
+     * casting an array raises "Array to string conversion", which this
+     * app's error handler turns into a fatal 500 before the controller (and
+     * its own validation) ever runs. Non-string input is just "no valid
+     * identifier" for rate-limiting purposes.
+     */
+    private static function safeIdentifier($value): string
+    {
+        return is_string($value) ? strtolower($value) : '';
     }
 
     /**

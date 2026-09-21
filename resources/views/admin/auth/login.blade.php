@@ -214,27 +214,30 @@
     });
   </script>
   <script>
-    // Check if remember me is checked and autofill email and password
+    // Was also storing the plaintext PASSWORD in localStorage — any XSS or
+    // shared-browser access could read it directly. Remember-me now only
+    // remembers the email; the server-side "remember" cookie (already sent
+    // on login) still keeps the session signed in. Proactively purge any
+    // password a browser has cached from before this fix.
+    localStorage.removeItem('password');
+
+    // Check if remember me is checked and autofill email
     window.onload = function () {
       if (localStorage.getItem('rememberMe') && localStorage.getItem('rememberMe') === 'true') {
         var storedEmail = localStorage.getItem('email');
-        var storedPassword = localStorage.getItem('password');
         document.getElementById('email').value = storedEmail;
-        document.getElementById('password').value = storedPassword;
         document.getElementById('remember').checked = true;
       }
     };
 
-    // Save email and password to local storage when remember me is checked
+    // Save email to local storage when remember me is checked
     document.getElementById('formLogin').addEventListener('submit', function (event) {
       var rememberMe = document.getElementById('remember').checked;
       if (rememberMe) {
         localStorage.setItem('email', document.getElementById('email').value);
-        localStorage.setItem('password', document.getElementById('password').value);
         localStorage.setItem('rememberMe', 'true');
       } else {
         localStorage.removeItem('email');
-        localStorage.removeItem('password');
         localStorage.setItem('rememberMe', 'false');
       }
     });
