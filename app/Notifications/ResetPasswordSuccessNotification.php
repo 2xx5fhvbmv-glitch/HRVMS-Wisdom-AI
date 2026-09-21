@@ -69,16 +69,18 @@ class ResetPasswordSuccessNotification extends Notification
 
     $emailTemplate = EmailTemplate::find(config('settings.email_template.password_change_notification'));
 
-    $subjectLine = isset( $emailTemplate ) && $emailTemplate->subject != '' ? $emailTemplate->subject : 'Password Reset | Bark Lead Management';
+    $subjectLine = isset( $emailTemplate ) && $emailTemplate->subject != '' ? $emailTemplate->subject : 'Password Reset | HRVMS Wisdom AI';
 
+    // Never include the new plaintext password in this email — a reset
+    // confirmation only, so a compromised mailbox can't be used to recover
+    // the account's live password. If a stored EmailTemplate row still has
+    // a [Password] placeholder from before this fix, it's substituted with
+    // an empty string below (see $yummy) rather than a real password.
     $data['body'] = isset( $emailTemplate ) && $emailTemplate->body != '' ? $emailTemplate->body : "<p>Dear [User Name],</p>
 
-      <p>Your password has been successfully updated. Below are your credentials to access your account:</p>
+      <p>Your password for [Email] was just changed successfully.</p>
 
-      <p><strong>Email:</strong> [Email]</p>
-      <p><strong>Password:</strong> [Password]</p>
-
-      <p>Please keep these credentials safe and do not share them with anyone. You can log in to your account using the following link:</p>
+      <p>If you made this change, no further action is needed. If you did NOT request this change, please contact support immediately.</p>
 
       <p>[Login Url]</p>
 
@@ -102,7 +104,7 @@ class ResetPasswordSuccessNotification extends Notification
     $yummy = [
       $name,
       $this->userData->email,
-      $this->password,
+      '', // [Password] never substituted with a real value anymore — see note above.
       $login_button,
     ];
 

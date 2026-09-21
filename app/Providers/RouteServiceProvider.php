@@ -47,6 +47,40 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(180)->by($key);
         });
 
+        // Login/reset throttling (security review S1) — none of these
+        // existed before, so 30 wrong passwords in a row all returned a
+        // plain HTTP 200 with no slowdown. Keyed by identifier+IP (5/min)
+        // so an attacker can't lock a real user out by spraying from
+        // another IP, plus a per-IP cap (30/min) to stop spraying many
+        // different accounts from one source.
+        foreach (['resort-login', 'admin-login', 'shopkeeper-login'] as $name) {
+            RateLimiter::for($name, function ($request) {
+                $identifier = strtolower((string) $request->input('email'));
+                return [
+                    Limit::perMinute(5)->by($identifier . '|' . $request->ip()),
+                    Limit::perMinute(30)->by($request->ip()),
+                ];
+            });
+        }
+
+        RateLimiter::for('mobile-login', function ($request) {
+            $identifier = strtolower((string) $request->input('emp_id'));
+            return [
+                Limit::perMinute(5)->by($identifier . '|' . $request->ip()),
+                Limit::perMinute(30)->by($request->ip()),
+            ];
+        });
+
+        foreach (['resort-password-reset', 'admin-password-reset', 'shopkeeper-password-reset', 'mobile-password-reset'] as $name) {
+            RateLimiter::for($name, function ($request) {
+                $identifier = strtolower((string) $request->input('email'));
+                return [
+                    Limit::perMinute(3)->by($identifier . '|' . $request->ip()),
+                    Limit::perHour(20)->by($request->ip()),
+                ];
+            });
+        }
+
         parent::boot();
     }
 

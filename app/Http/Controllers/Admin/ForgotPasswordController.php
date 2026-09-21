@@ -5,12 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\SendsPasswordResetEmails;
 use App\Models\Admin;
-use App\Models\AdminPasswordReset;
-use App\Models\EmailHistoryLog;
-use Illuminate\Support\Facades\Session;
 
 class ForgotPasswordController extends Controller
 {
@@ -18,23 +16,6 @@ class ForgotPasswordController extends Controller
 
   public function __construct()
   {
-  }
-
-  public function checkEmailExists( Request $request )
-  {
-    try {
-      $admin = Admin::withTrashed()->where( 'email', $request->email )->first();
-
-      if( empty( $admin ) ) {
-        echo "false";
-      } else {
-        echo "true";
-      }
-    } catch( \Exception $e ) {
-      \Log::emergency( "File: ".$e->getFile() );
-      \Log::emergency( "Line: ".$e->getLine() );
-      \Log::emergency( "Message: ".$e->getMessage() );
-    }
   }
 
   public function requestPassword()
@@ -45,25 +26,21 @@ class ForgotPasswordController extends Controller
   public function requestPasswordSubmit(Request $request)
   {
     $this->validate($request, [
-      'email' => 'required'
+      'email' => 'required|email'
     ]);
 
     try {
         $this->sendResetLinkEmail($request);
-        $admin = Admin::where('email', '=', $request->email)->first();
-        $response['success'] = true;
-        $response['msg'] = __('messages.passwordRequestSuccess', ['name' => 'Password Reset Request']);
-        $response['redirect_url'] = route('admin.password.request');
-        return response()->json($response);
-        // return redirect()->route('admin.password.request')->with('success', 'Password reset link sent!');
     } catch (\Exception $e) {
-        $response['success'] = false;
-        $response['msg'] = $e->getMessage();
-        $response['redirect_url'] = route('admin.password.request');
-        return response()->json($response);
-        // return redirect()->route('admin.password.request')->with('fail', 'Server error occurred.');
+        \Log::error('Admin ForgotPasswordController::requestPasswordSubmit failed: ' . $e->getMessage());
     }
 
+    // Always the same response regardless of whether the account exists —
+    // Laravel's own broker already skips sending when it shouldn't.
+    $response['success'] = true;
+    $response['msg'] = __('messages.passwordRequestSuccess', ['name' => 'Password Reset Request']);
+    $response['redirect_url'] = route('admin.password.request');
+    return response()->json($response);
   }
 
   public function broker()
@@ -74,64 +51,64 @@ class ForgotPasswordController extends Controller
   public function resetPassword($token, Request $request)
   {
     try {
-      $ifExist = AdminPasswordReset::where('email','=', $request->email)->first();
+      $user = Admin::where('email', $request->email)->first();
 
-      if(!$ifExist) {
+      // tokenExists() is Laravel's own check (age via config's
+      // 'expire' minutes, plus hash match) — replaces the old hand-rolled
+      // Hash::check() with no expiry at all.
+      if (!$user || !$this->broker()->tokenExists($user, $token)) {
         return redirect(route('admin.password.request'))->withErrors(['error' => __('messages.invalidRequest')]);
-      } else {
-        if(!Hash::check($token, $ifExist->token)) {
-          return redirect(route('admin.password.request'))->withErrors(['error' => __('messages.invalidRequest')]);
-        }
       }
-      $data['token'] = $token;
-      $data['email'] = $request->email;
-      return view('admin.auth.reset-password',$data);
+      return view('admin.auth.reset-password', ['token' => $token, 'email' => $request->email]);
     } catch( \Exception $e ) {
       \Log::emergency( "File: ".$e->getFile() );
       \Log::emergency( "Line: ".$e->getLine() );
       \Log::emergency( "Message: ".$e->getMessage() );
+      return redirect(route('admin.password.request'))->withErrors(['error' => __('messages.invalidRequest')]);
     }
   }
 
   public function resetPasswordSubmit(Request $request)
   {
+    $this->validate($request, [
+      'token' => 'required',
+      'email' => 'required|email',
+      'password' => ['required', 'confirmed', PasswordRule::min(12)->mixedCase()->numbers()->uncompromised()],
+    ]);
+
     try {
-      $this->validate($request, [
-        'token' => 'required',
-        'email' => 'required|email',
-        'password'  => 'required|min:6',
-        'password_confirmation'  => 'required|min:6|same:password'
-      ]);
+      // Password::broker()->reset() validates token age + hash AND deletes
+      // the token row on success, so it can't be replayed — the old code
+      // hand-rolled only the Hash::check() half and never deleted the row.
+      $status = $this->broker()->reset(
+          $request->only('email', 'password', 'password_confirmation', 'token'),
+          function ($user, $password) {
+              $user->password = Hash::make($password);
+              $user->save();
 
-      $ifExist = AdminPasswordReset::where('email','=', $request->email)->first();
+              // No plaintext password in this email anymore — confirmation only.
+              $user->sendPasswordResetSuccessNotification($user, null);
+              if (method_exists($user, 'tokens')) {
+                  $user->tokens()->delete();
+              }
+          }
+      );
 
-      if(!$ifExist) {
-        $response['success'] = false;
-        $response['msg'] = __('messages.invalidRequest');
+      if ($status === Password::PASSWORD_RESET) {
+        $response['success'] = true;
+        $response['msg'] = __('messages.passwordResetSuccess');
+        $response['redirect_url'] = route('admin.loginindex');
         return response()->json($response);
-      } else {
-        if(!Hash::check($request->token, $ifExist->token)) {
-          $response['success'] = false;
-          $response['msg'] = __('messages.invalidRequest');
-          return response()->json($response);
-        }
       }
 
-      $adminId = Admin::where('email','=',$request->email)->first()->id;
-      $adminUser = Admin::find($adminId);
-      $adminUser->password = Hash::make($request->password);
-      $adminUser->save();
-
-      $adminUser->sendPasswordResetSuccessNotification($adminUser,$request->password);
-
-      $response['success'] = true;
-      $response['msg'] = __('messages.passwordResetSuccess');
-      $response['redirect_url'] = route('admin.loginindex');
+      $response['success'] = false;
+      $response['msg'] = __('messages.invalidRequest');
       return response()->json($response);
     } catch( \Exception $e ) {
       \Log::emergency( "File: ".$e->getFile() );
       \Log::emergency( "Line: ".$e->getLine() );
       \Log::emergency( "Message: ".$e->getMessage() );
+      return response()->json(['success' => false, 'msg' => 'An error occurred. Please try again later.']);
     }
   }
 }

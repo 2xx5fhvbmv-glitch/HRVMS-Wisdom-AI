@@ -4,37 +4,19 @@ namespace App\Http\Controllers\Resorts;
 
 
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\SendsPasswordResetEmails;
 use App\Models\ResortAdmin;
-use App\Models\ResortAdminPasswordReset;
-use App\Models\EmailHistoryLog;
-use Illuminate\Support\Facades\Session;
 class ResortforgotPasswordController extends Controller
 {
     use SendsPasswordResetEmails;
 
     public function __construct()
     {
-    }
-
-    public function checkEmailExists( Request $request )
-    {
-      try {
-        $admin = ResortAdmin::withTrashed()->where( 'email', $request->email )->first();
-
-        if( empty( $admin ) ) {
-          echo "false";
-        } else {
-          echo "true";
-        }
-      } catch( \Exception $e ) {
-        \Log::emergency( "File: ".$e->getFile() );
-        \Log::emergency( "Line: ".$e->getLine() );
-        \Log::emergency( "Message: ".$e->getMessage() );
-      }
     }
 
     public function requestPassword()
@@ -44,64 +26,25 @@ class ResortforgotPasswordController extends Controller
 
     public function requestPasswordSubmit(Request $request)
     {
-
-      // dd($request->all());
       $this->validate($request, [
-        'email' => 'required'
+        'email' => 'required|email'
       ]);
-      
-        try 
-        {  
-     
-          $this->sendResetLinkEmail($request);
-          $admin = ResortAdmin::with('GetEmployee','resort')->where('email', '=', $request->email)->where("status","Active")->where("deleted_at",null)->first();
 
-          if ($admin)
-          {
-            if ($admin->resort && $admin->resort->status === 'inactive') {
-                return response()->json([
-                    'success' => false,
-                    'msg' => 'Resort is inactive. Please contact your administrator.',
-                ]);
-            }
-            if(!$admin->GetEmployee){
-                // dd($resort_admin->type);
-                if($admin->type == "super" && $admin->is_master_admin == 1)
-                {
-                    // dd($resort_admin->status);
-                    if($admin->status == "inactive"){
-                        return response()->json([
-                            'success' => false,
-                            'msg' => 'Your account is inactive. Please contact your administrator.'
-                        ]);
-                    }
-                }
-            }
-            if ($admin && isset($admin->GetEmployee) && $admin->GetEmployee->status == "Active") {
+      try {
+        $this->sendResetLinkEmail($request);
+      } catch (\Exception $e) {
+        \Log::error('ResortforgotPasswordController::requestPasswordSubmit failed: ' . $e->getMessage());
+      }
 
-                $response['success'] = true;
-                $response['msg'] = __('messages.passwordRequestSuccess', ['name' => 'Password Reset Request']);
-                $response['redirect_url'] = route('resort.password.request');
-            } else {
-                $response['success'] = false;
-                $response['msg'] = 'Your account is inactive. Please contact your administrator.';
-                $response['redirect_url'] = ''; // no redirect
-            }
-          } else {
-            $response['success'] = false;
-            $response['msg'] = 'User not found';
-            $response['redirect_url'] = ''; // no redirect
-          }
-          return response()->json($response);
-        } 
-        catch (\Exception $e) 
-        {
-            $response['success'] = false;
-            $response['msg'] = $e->getMessage();
-            $response['redirect_url'] = route('resort.password.request');
-            return response()->json($response);
-        }
-
+      // Always the same response regardless of whether the account exists,
+      // is active, or belongs to an active resort — Laravel's own broker
+      // already skips sending when it shouldn't; the caller never learns
+      // which branch it took.
+      return response()->json([
+        'success' => true,
+        'msg' => __('messages.passwordRequestSuccess', ['name' => 'Password Reset Request']),
+        'redirect_url' => route('resort.password.request'),
+      ]);
     }
 
     public function broker()
@@ -111,27 +54,22 @@ class ResortforgotPasswordController extends Controller
 
     public function resetPassword($token, Request $request)
     {
-
-
         try {
-            $ifExist = ResortAdminPasswordReset::where('email','=', $request->email)->first();
+            $user = ResortAdmin::where('email', $request->email)->first();
 
-            if(!$ifExist) {
+            // tokenExists() is Laravel's own check (age via config's
+            // 'expire' => 60 minutes, plus hash match) — replaces the old
+            // hand-rolled Hash::check() with no expiry at all.
+            if (!$user || !$this->broker()->tokenExists($user, $token)) {
               return redirect(route('resort.password.request'))->withErrors(['error' => __('messages.invalidRequest')]);
-            } else {
-              if(!Hash::check($token, $ifExist->token)) {
-                return redirect(route('resort.password.request'))->withErrors(['error' => __('messages.invalidRequest')]);
-              }
-
             }
-            $data['token'] = $token;
-            $data['email'] = $request->email;
 
-            return view('resorts.auth.reset-password',$data);
+            return view('resorts.auth.reset-password', ['token' => $token, 'email' => $request->email]);
           } catch( \Exception $e ) {
             \Log::emergency( "File: ".$e->getFile() );
             \Log::emergency( "Line: ".$e->getLine() );
             \Log::emergency( "Message: ".$e->getMessage() );
+            return redirect(route('resort.password.request'))->withErrors(['error' => __('messages.invalidRequest')]);
           }
     }
 
@@ -140,46 +78,41 @@ class ResortforgotPasswordController extends Controller
         $this->validate($request, [
           'token' => 'required',
           'email' => 'required|email',
-          'password'  => 'required|min:6',
-          'password_confirmation'  => 'required|min:6|same:password'
+          'password' => ['required', 'confirmed', PasswordRule::min(12)->mixedCase()->numbers()->uncompromised()],
         ]);
 
-        $ifExist = ResortAdminPasswordReset::where('email','=', $request->email)->first();
+        // Password::broker()->reset() is Laravel's real implementation —
+        // it validates token age + hash (the same tokenExists() check
+        // above) AND deletes the token row on success, so it can't be
+        // replayed. The old code hand-rolled only the Hash::check() half
+        // and never deleted the row, so a used/expired token kept working.
+        $status = $this->broker()->reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, $password) {
+                $user->password = Hash::make($password);
+                $user->save();
 
-        if(!$ifExist) {
-          $response['success'] = false;
-          $response['msg'] = __('messages.invalidRequest');
-          return response()->json($response);
-        } else {
-          if(!Hash::check($request->token, $ifExist->token)) {
-            $response['success'] = false;
-            $response['msg'] = __('messages.invalidRequest');
-            return response()->json($response);
-          }
+                // No plaintext password in this email anymore (S4) — just a
+                // confirmation. Revoke the account's mobile API tokens so a
+                // stolen token can't survive a password reset (S3).
+                $user->sendPasswordResetSuccessNotification($user, null);
+                if (method_exists($user, 'tokens')) {
+                    $user->tokens()->delete();
+                }
+            }
+        );
 
-
-
+        if ($status === Password::PASSWORD_RESET) {
+            return response()->json([
+                'success' => true,
+                'msg' => __('messages.passwordResetSuccess'),
+                'redirect_url' => route('resort.loginindex'),
+            ]);
         }
 
-        $adminId = ResortAdmin::where('email','=',$request->email)->first()->id;
-
-        $adminUser = ResortAdmin::find($adminId);
-        $adminUser->password = Hash::make($request->password);
-        $adminUser->save();
-
-        $adminUser->sendPasswordResetSuccessNotification($adminUser,$request->password);
-
-        return redirect(route('resort.loginindex'))->withErrors(['error' => __('messages.invalidRequest')]);
-
-        // return redirect()->route('resort.loginindex')->with('success', 'Password reset successfully');
-        // $response['success'] = true;
-        // $response['msg'] = __('messages.passwordResetSuccess');
-        // $response['redirect_url'] = route('resort.loginindex');
-        // return response()->json($response);
-    //   } catch( \Exception $e ) {
-    //     \Log::emergency( "File: ".$e->getFile() );
-    //     \Log::emergency( "Line: ".$e->getLine() );
-    //     \Log::emergency( "Message: ".$e->getMessage() );
-    //   }
+        return response()->json([
+            'success' => false,
+            'msg' => __('messages.invalidRequest'),
+        ]);
     }
 }

@@ -4760,6 +4760,28 @@ class Common
     }
 
     /**
+     * Failed-login audit trail (security hardening review S10) — writes
+     * one row per login attempt (success or failure) on any of the four
+     * login surfaces. Wrapped in try/catch: a logging failure must never
+     * block or fail an actual login attempt.
+     */
+    public static function logLoginAttempt($portal, $identifier, bool $successful, $request = null)
+    {
+        try {
+            \DB::table('login_attempts')->insert([
+                'portal'      => $portal,
+                'identifier'  => (string) $identifier,
+                'ip_address'  => $request ? $request->ip() : null,
+                'user_agent'  => $request ? substr((string) $request->userAgent(), 0, 255) : null,
+                'successful'  => $successful,
+                'created_at'  => now(),
+            ]);
+        } catch (\Exception $e) {
+            \Log::warning('logLoginAttempt failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Resolve an Emp_main_id value (stored as numeric id, base64 id, or Emp_id
      * string like "DR-22") to a numeric employee primary key, or null if not found.
      * Legacy cycle rows stored the Emp_id string instead of the numeric key, so all

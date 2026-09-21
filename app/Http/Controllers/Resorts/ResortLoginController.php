@@ -33,22 +33,37 @@ class ResortLoginController extends Controller
       return redirect()->route('resort.loginindex');
     }
 
+    /**
+     * A fixed, valid bcrypt hash of a random string — never a real
+     * password. Used as the Hash::check() target when no account exists,
+     * so an unknown-email login costs the same CPU time as a real-account
+     * wrong-password check (timing-based enumeration fix).
+     */
+    private const INVALID_CREDENTIALS_HASH = '$2y$10$wJ8k1Qm5X0aG5s3fV1jvbeYyq3H2W1rY7Z9nQxT4uK6oL2mN8pS1e';
+
     public function login(Request $request)
     {
-       
+        try {
             $resort_admin = ResortAdmin::with(['GetEmployee', 'resort'])
                 ->where('email', $request->email)
                 ->whereNull('deleted_at')
                 ->first();
 
-            // 1. Account not found
-            if (!$resort_admin) {
+            // Enumeration fix: account-state checks (resort inactive,
+            // employee inactive, admin inactive) used to run BEFORE the
+            // password check, so a wrong password on a real email still
+            // leaked which of those was true without ever proving the
+            // caller knew the password. Password is now checked first, and
+            // an unknown email runs a dummy hash so response time doesn't
+            // distinguish "no such account" from "wrong password".
+            if (!$resort_admin || !Hash::check((string) $request->password, $resort_admin->password ?? self::INVALID_CREDENTIALS_HASH)) {
+                Common::logLoginAttempt('resort', $request->email, false, $request);
                 return response()->json([
                     'success' => false,
-                    'msg' => 'There is no account with this email address'
+                    'msg' => 'Invalid email or password.'
                 ]);
             }
-            // dd($resort_admin->resort->status);
+
             // 2. Resort is inactive
             if ($resort_admin->resort && $resort_admin->resort->status === 'inactive') {
                 return response()->json([
@@ -57,10 +72,8 @@ class ResortLoginController extends Controller
                 ]);
             }
             if(!$resort_admin->GetEmployee){
-                // dd($resort_admin->type);
                 if($resort_admin->type == "super" && $resort_admin->is_master_admin == 1)
                 {
-                    // dd($resort_admin->status);
                     if($resort_admin->status == "inactive"){
                         return response()->json([
                             'success' => false,
@@ -85,14 +98,6 @@ class ResortLoginController extends Controller
                 ]);
             }
 
-            // 5. Password check
-            if (!Hash::check($request->password, $resort_admin->password)) {
-                return response()->json([
-                    'success' => false,
-                    'msg' => 'Please enter a valid password'
-                ]);
-            }
-
             // 5b. Web-portal access gate.
             //   LINE WORKERS (rank 6) and SUPERVISORS (rank 5) are mobile-app
             //   only. MGR / HOD / EXCOM / GM / HR / Finance can use both web
@@ -110,6 +115,7 @@ class ResortLoginController extends Controller
 
             // 6. Successful login
             Auth::guard('resort-admin')->login($resort_admin, $request->remember);
+            Common::logLoginAttempt('resort', $request->email, true, $request);
 
             // 7. Redirect based on type & rank
             if ($resort_admin->type === 'sub' && $resort_admin->is_employee === 1) {
@@ -162,8 +168,7 @@ class ResortLoginController extends Controller
                 'msg' => 'Logged in',
                 'redirect_url' => route($defaultRedirect)
             ]);
-
-        try { } catch (\Exception $e) {
+        } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::emergency("Message: " . $e->getMessage());

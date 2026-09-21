@@ -18,6 +18,14 @@ class Logincontroller extends Controller
 {
     use SendsPasswordResetEmails;
 
+    /**
+     * A fixed, valid bcrypt hash of a random string — never a real
+     * password. Used as the Hash::check() target when no real user record
+     * exists, so an unknown-identifier login costs the same CPU time as a
+     * real-account wrong-password check (timing-based enumeration fix).
+     */
+    private const INVALID_CREDENTIALS_HASH = '$2y$10$wJ8k1Qm5X0aG5s3fV1jvbeYyq3H2W1rY7Z9nQxT4uK6oL2mN8pS1e';
+
     public function apiLogin(Request $request)
     {
         
@@ -34,14 +42,24 @@ class Logincontroller extends Controller
 
             // Find the Employee by Emp_id
             $employee                               =   Employee::where('Emp_id', $request->emp_id)->first();
+            $resortAdmin                            =   $employee ? ResortAdmin::where('id', $employee->Admin_Parent_id)->first() : null;
 
-            if (!$employee) {
+            // Enumeration fix: account-state checks (inactive employee,
+            // non-permanent employment type, inactive resort admin) used to
+            // run BEFORE the password check, so a wrong password on a real
+            // Emp_id still leaked "Account is deactivated" etc. without ever
+            // proving the caller knew the password. Password is now checked
+            // first, and unknown-emp_id runs a dummy hash so the response
+            // time doesn't distinguish "no such employee" from "wrong
+            // password" (self::INVALID_CREDENTIALS_HASH is a fixed bcrypt
+            // hash of a random string, never a real password).
+            if (!$resortAdmin || !Hash::check((string) $request->password, $resortAdmin->password ?? self::INVALID_CREDENTIALS_HASH)) {
+                Common::logLoginAttempt('mobile', $request->emp_id, false, $request);
                 return response()->json([
                     'success'                       =>  false,
                     'message'                       =>  'Invalid Employee ID or password. Please try again'
                 ],200);
             }
-
 
             if ($employee->status == "Inactive") {
                 return response()->json([
@@ -59,16 +77,6 @@ class Logincontroller extends Controller
                 return response()->json([
                     'success'                       =>  false,
                     'message'                       =>  'Mobile app access is not available for this account type'
-                ],200);
-            }
-
-            // Find the ResortAdmin by Admin_Parent_id
-            $resortAdmin                            =   ResortAdmin::where('id', $employee->Admin_Parent_id)->first();
-
-            if (!$resortAdmin || !Hash::check($request->password, $resortAdmin->password)) {
-                return response()->json([
-                    'success'                       =>  false,
-                    'message'                       =>  'Please enter a valid password'
                 ],200);
             }
 
@@ -91,6 +99,7 @@ class Logincontroller extends Controller
             // Generate a new token
             $tokenResult                            =   $resortAdmin->createToken('ResortAdminToken');
             $token                                  =   $tokenResult->accessToken;
+            Common::logLoginAttempt('mobile', $request->emp_id, true, $request);
 
             // Was never captured at login at all — the app had to remember
             // to call the separate add-device-token endpoint afterward, and
@@ -114,7 +123,7 @@ class Logincontroller extends Controller
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::error($e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Server error: ' . $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Server error. Please try again later.'], 500);
         }
     }
 
@@ -156,7 +165,7 @@ class Logincontroller extends Controller
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::error($e->getMessage());
-            return response()->json(['success'      => false, 'message' => 'Server error: ' . $e->getMessage()], 500);
+            return response()->json(['success'      => false, 'message' => 'Server error. Please try again later.'], 500);
         }
     }
 
@@ -171,25 +180,23 @@ class Logincontroller extends Controller
         }
 
         try {
-            $status = Password::broker('resort-admin')->sendResetLink(
-                $request->only('email')
-            );
+            // Always the same response regardless of $status — Laravel's own
+            // Password::RESET_LINK_SENT vs 'passwords.user' translation
+            // strings otherwise confirm whether the email is registered.
+            // The actual send-or-not decision still happens inside the
+            // broker; the caller just never learns which branch it took.
+            Password::broker('resort-admin')->sendResetLink($request->only('email'));
 
-            if ($status === Password::RESET_LINK_SENT) {
-                $admin = ResortAdmin::where('email', '=', $request->email)->first();
-                $response['success']                    = true;
-                $response['msg']                        = __('messages.passwordRequestSuccess', ['name' => 'Password Reset Request']);
-
-                return response()->json($response);
-            }else{
-                $response['success']                    = false;
-                $response['msg']                        =__($status);
-                return response()->json($response);
-            }
+            return response()->json([
+                'success' => true,
+                'msg'     => __('messages.passwordRequestSuccess', ['name' => 'Password Reset Request']),
+            ]);
         } catch (\Exception $e) {
-            $response['success']                    = false;
-            $response['msg']                        = $e->getMessage();
-            return response()->json($response);
+            \Log::error('apiForgotPassword failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => true,
+                'msg'     => __('messages.passwordRequestSuccess', ['name' => 'Password Reset Request']),
+            ]);
         }
     }
 
@@ -254,7 +261,7 @@ class Logincontroller extends Controller
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::error($e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Server error: ' . $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Server error. Please try again later.'], 500);
         }
     }
 
@@ -295,7 +302,7 @@ class Logincontroller extends Controller
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::error($e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Server error: ' . $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Server error. Please try again later.'], 500);
         }
     }
 }

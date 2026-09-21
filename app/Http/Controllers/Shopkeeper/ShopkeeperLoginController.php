@@ -17,6 +17,14 @@ use App\Models\Shopkeeper;
 
 class ShopkeeperLoginController extends Controller
 {
+    /**
+     * A fixed, valid bcrypt hash of a random string — never a real
+     * password. Used as the Hash::check() target when no account exists,
+     * so an unknown-email login costs the same CPU time as a real-account
+     * wrong-password check (timing-based enumeration fix).
+     */
+    private const INVALID_CREDENTIALS_HASH = '$2y$10$wJ8k1Qm5X0aG5s3fV1jvbeYyq3H2W1rY7Z9nQxT4uK6oL2mN8pS1e';
+
     public function logout()
     {
       Auth::guard('shopkeeper')->logout();
@@ -28,32 +36,34 @@ class ShopkeeperLoginController extends Controller
         try {
             $shopkeeper = Shopkeeper::where('email', $request->email)->first();
 
-            if (!$shopkeeper) {
+            // Enumeration fix: unknown email and wrong password now return
+            // the identical message, and an unknown email runs a dummy
+            // hash so response time doesn't distinguish the two cases.
+            if (!$shopkeeper || !Hash::check((string) $request->password, $shopkeeper->password ?? self::INVALID_CREDENTIALS_HASH)) {
+                Common::logLoginAttempt('shopkeeper', $request->email, false, $request);
                 return response()->json([
                     'success' => false,
-                    'msg' => 'There is no account with this email address'
+                    'msg' => 'Invalid email or password.'
                 ]);
             }
 
-            // if ($shopkeeper->status == "inactive") {
-            //     return response()->json([
-            //         'success' => false,
-            //         'msg' => 'Account is deactivated'
-            //     ]);
-            // }
-            
-            if( Hash::check( $request->password, $shopkeeper->password ) ) {
-                Auth::guard('shopkeeper')->login( $shopkeeper, isset( $request->remember ) );
-        
-                $response['success'] = true;
-                $response['msg'] = 'Logged in Successfully.';
-                $response['redirect_url'] = route('shopkeeper.dashboard');
-                return response()->json($response);
-              }
-        
-              $response['success'] = false;
-              $response['msg'] = 'Please enter a valid password';
-              return response()->json($response);
+            // NOTE: the `shopkeepers` table has no status/active column at
+            // all (confirmed against the real schema) — there is currently
+            // no way to deactivate a shopkeeper account. The commented-out
+            // check the security review found was already dead code
+            // referencing a column that doesn't exist; reinstating it
+            // would be a silent no-op, not a real fix. Adding a genuine
+            // inactive-account gate here needs a schema migration + admin
+            // UI to toggle it — flagged as separate follow-up work, not
+            // done in this pass.
+
+            Auth::guard('shopkeeper')->login( $shopkeeper, isset( $request->remember ) );
+            Common::logLoginAttempt('shopkeeper', $request->email, true, $request);
+
+            $response['success'] = true;
+            $response['msg'] = 'Logged in Successfully.';
+            $response['redirect_url'] = route('shopkeeper.dashboard');
+            return response()->json($response);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());

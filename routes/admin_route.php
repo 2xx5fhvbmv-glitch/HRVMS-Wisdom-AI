@@ -3,12 +3,11 @@
 /** Routes without login ***/
 Route::prefix('admin')->namespace('Admin')->group(function () {
   Route::get('/', 'LoginController@showLoginForm')->name('admin.loginindex');
-  Route::post('/do-login', 'LoginController@login')->name('admin.login');
+  Route::post('/do-login', 'LoginController@login')->middleware('throttle:admin-login')->name('admin.login');
   Route::get('/request-password', 'ForgotPasswordController@requestPassword')->name('admin.password.request');
-  Route::post('/request-password-submit', 'ForgotPasswordController@requestPasswordSubmit')->name('admin.password.request-submit');
+  Route::post('/request-password-submit', 'ForgotPasswordController@requestPasswordSubmit')->middleware('throttle:admin-password-reset')->name('admin.password.request-submit');
   Route::get('/reset-password/{token}', 'ForgotPasswordController@resetPassword')->name('admin.password.reset');
-  Route::post('/reset-password-submit', 'ForgotPasswordController@resetPasswordSubmit')->name('admin.password.reset-submit');
-  Route::post('/check-email-exists', 'ForgotPasswordController@checkEmailExists')->name('admin.emailExistForgotPassword');
+  Route::post('/reset-password-submit', 'ForgotPasswordController@resetPasswordSubmit')->middleware('throttle:admin-password-reset')->name('admin.password.reset-submit');
   Route::get('/permission-denied', 'LoginController@permissionDenied')->name('admin.permission.denied');
 });
 

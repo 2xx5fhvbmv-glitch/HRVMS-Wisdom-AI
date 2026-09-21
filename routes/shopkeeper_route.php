@@ -5,12 +5,11 @@ Route::get('shopkeeper/payment/confirm-purchased/{id}', ['App\Http\Controllers\S
 /** Routes without login ***/
 Route::prefix('shopkeeper')->namespace('Shopkeeper')->group(function () {
     Route::get('/',  ['App\Http\Controllers\Shopkeeper\ShopkeeperLoginController','showLoginForm'])->name('shopkeeper.loginindex');
-    Route::post('/do-login', ['App\Http\Controllers\Shopkeeper\ShopkeeperLoginController','login'])->name('shopkeeper.login');
+    Route::post('/do-login', ['App\Http\Controllers\Shopkeeper\ShopkeeperLoginController','login'])->middleware('throttle:shopkeeper-login')->name('shopkeeper.login');
     Route::get('/request-password', ['App\Http\Controllers\Shopkeeper\ForgotPasswordController','requestPassword'])->name('shopkeeper.password.request');
-    Route::post('/request-password-submit', ['App\Http\Controllers\Shopkeeper\ForgotPasswordController','requestPasswordSubmit'])->name('shopkeeper.password.request-submit');
+    Route::post('/request-password-submit', ['App\Http\Controllers\Shopkeeper\ForgotPasswordController','requestPasswordSubmit'])->middleware('throttle:shopkeeper-password-reset')->name('shopkeeper.password.request-submit');
     Route::get('/reset-password/{token}', ['App\Http\Controllers\Shopkeeper\ForgotPasswordController','resetPassword'])->name('shopkeeper.password.reset');
-    Route::post('/reset-password-submit', ['App\Http\Controllers\Shopkeeper\ForgotPasswordController','resetPasswordSubmit'])->name('shopkeeper.password.reset-submit');
-    Route::post('/check-email-exists', ['App\Http\Controllers\Shopkeeper\ForgotPasswordController','checkEmailExists'])->name('shopkeeper.emailExistForgotPassword');
+    Route::post('/reset-password-submit', ['App\Http\Controllers\Shopkeeper\ForgotPasswordController','resetPasswordSubmit'])->middleware('throttle:shopkeeper-password-reset')->name('shopkeeper.password.reset-submit');
     Route::get('/permission-denied', ['App\Http\Controllers\Shopkeeper\ShopkeeperLoginController','permissionDenied'])->name('shopkeeper.permission.denied');
 
 });

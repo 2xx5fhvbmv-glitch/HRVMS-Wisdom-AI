@@ -4,15 +4,14 @@
 /** Routes without login ***/
 Route::prefix('resort')->namespace('Resort')->group(function () {
   Route::get('/',  ['App\Http\Controllers\Resorts\ResortLoginController','showLoginForm'])->name('resort.loginindex');
-  Route::post('/do-login', ['App\Http\Controllers\Resorts\ResortLoginController','login'])->name('resort.login');
+  Route::post('/do-login', ['App\Http\Controllers\Resorts\ResortLoginController','login'])->middleware('throttle:resort-login')->name('resort.login');
   Route::get('/access-deined',  ['App\Http\Controllers\Resorts\ResortLoginController','AccessDeined'])->name('resort.AccessDeined');
 
 
   Route::get('/request-password', ['App\Http\Controllers\Resorts\ResortforgotPasswordController','requestPassword'])->name('resort.password.request');
-  Route::post('/request-password-submit', ['App\Http\Controllers\Resorts\ResortforgotPasswordController','requestPasswordSubmit'])->name('resort.password.request-submit');
+  Route::post('/request-password-submit', ['App\Http\Controllers\Resorts\ResortforgotPasswordController','requestPasswordSubmit'])->middleware('throttle:resort-password-reset')->name('resort.password.request-submit');
   Route::get('/reset-password/{token}', ['App\Http\Controllers\Resorts\ResortforgotPasswordController','resetPassword'])->name('resort.password.reset');
-  Route::post('/reset-password-submit', ['App\Http\Controllers\Resorts\ResortforgotPasswordController','resetPasswordSubmit'])->name('resort.password.reset-submit');
-  Route::post('/check-email-exists', ['App\Http\Controllers\Resorts\ResortforgotPasswordController','checkEmailExists'])->name('resort.emailExistForgotPassword');
+  Route::post('/reset-password-submit', ['App\Http\Controllers\Resorts\ResortforgotPasswordController','resetPasswordSubmit'])->middleware('throttle:resort-password-reset')->name('resort.password.reset-submit');
   Route::get('/permission-denied', ['App\Http\Controllers\Resorts\ResortLoginController','permissionDenied'])->name('resort.permission.denied');
 
   Route::get('/applicant-form/{id?}', ['App\Http\Controllers\Resorts\ApplicantController','showapplicantForm'])->name('resort.applicantForm');

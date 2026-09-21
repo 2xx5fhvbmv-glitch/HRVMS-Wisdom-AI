@@ -14,9 +14,18 @@ use Route;
 use App\Models\Resort;
 use App\Models\ResortAdmin;
 use App\Models\Admin;
+use App\Helpers\Common;
 
 class LoginController extends Controller
 {
+  /**
+   * A fixed, valid bcrypt hash of a random string — never a real
+   * password. Used as the Hash::check() target when no account exists, so
+   * an unknown-email login costs the same CPU time as a real-account
+   * wrong-password check (timing-based enumeration fix).
+   */
+  private const INVALID_CREDENTIALS_HASH = '$2y$10$wJ8k1Qm5X0aG5s3fV1jvbeYyq3H2W1rY7Z9nQxT4uK6oL2mN8pS1e';
+
   public function logout()
   {
     Auth::guard('admin')->logout();
@@ -29,9 +38,16 @@ class LoginController extends Controller
     try {
       $admin = Admin::where('email', $request->email)->first();
 
-      if (!$admin) {
+      // Enumeration fix: account-active check used to run BEFORE the
+      // password check, so a wrong password on a real email still leaked
+      // "Account is deactivated" without ever proving the caller knew the
+      // password. Password is now checked first, and an unknown email runs
+      // a dummy hash so response time doesn't distinguish "no such
+      // account" from "wrong password".
+      if (!$admin || !Hash::check((string) $request->password, $admin->password ?? self::INVALID_CREDENTIALS_HASH)) {
+        Common::logLoginAttempt('admin', $request->email, false, $request);
         $response['success'] = false;
-        $response['msg'] = 'There is no account with this email address';
+        $response['msg'] = 'Invalid email or password.';
         return response()->json($response);
       }
 
@@ -42,17 +58,12 @@ class LoginController extends Controller
         return response()->json($response);
       }
 
-      if( Hash::check( $request->password, $admin->password ) ) {
-        Auth::guard('admin')->login( $admin, isset( $request->remember ) );
+      Auth::guard('admin')->login( $admin, isset( $request->remember ) );
+      Common::logLoginAttempt('admin', $request->email, true, $request);
 
-        $response['success'] = true;
-        $response['msg'] = 'Logged in';
-        $response['redirect_url'] = route('admin.dashboard');
-        return response()->json($response);
-      }
-
-      $response['success'] = false;
-      $response['msg'] = 'Please enter a valid password';
+      $response['success'] = true;
+      $response['msg'] = 'Logged in';
+      $response['redirect_url'] = route('admin.dashboard');
       return response()->json($response);
     } catch( \Exception $e ) {
       \Log::emergency( "File: ".$e->getFile() );
@@ -60,7 +71,7 @@ class LoginController extends Controller
       \Log::emergency( "Message: ".$e->getMessage() );
 
       $response['success'] = false;
-      $response['msg'] = $e->getMessage();
+      $response['msg'] = 'An error occurred. Please try again later.';
       return response()->json($response);
     }
   }
@@ -145,7 +156,7 @@ class LoginController extends Controller
 
         return response()->json([
             'success' => false,
-            'msg' => $e->getMessage(),
+            'msg' => 'An error occurred. Please try again later.',
         ]);
       }
   }

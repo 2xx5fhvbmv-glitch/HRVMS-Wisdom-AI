@@ -18,8 +18,8 @@ use Illuminate\Support\Facades\Route;
 
 // Route::namespace('API')->group(function () {
 
-	Route::post('login', [App\Http\Controllers\API\LoginController::class, 'apiLogin'])->name('api.resort.login');
-	Route::post('forgotpassword', [App\Http\Controllers\API\LoginController::class, 'apiForgotPassword'])->name('api.resort.forgotpassword');
+	Route::post('login', [App\Http\Controllers\API\LoginController::class, 'apiLogin'])->middleware('throttle:mobile-login')->name('api.resort.login');
+	Route::post('forgotpassword', [App\Http\Controllers\API\LoginController::class, 'apiForgotPassword'])->middleware('throttle:mobile-password-reset')->name('api.resort.forgotpassword');
 
 	Route::middleware(['auth:api', 'applyResortSmtp'])->group(function () {
 

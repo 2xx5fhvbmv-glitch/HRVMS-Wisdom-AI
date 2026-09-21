@@ -6,35 +6,16 @@ namespace App\Http\Controllers\Shopkeeper;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\SendsPasswordResetEmails;
 use App\Models\Shopkeeper;
-use App\Models\ShopkeeperPasswordReset;
-use App\Models\EmailHistoryLog;
-use Illuminate\Support\Facades\Session;
 class ForgotPasswordController extends Controller
 {
     use SendsPasswordResetEmails;
 
     public function __construct()
     {
-    }
-
-    public function checkEmailExists( Request $request )
-    {
-      try {
-        $shopkeeper = Shopkeeper::withTrashed()->where( 'email', $request->email )->first();
-
-        if( empty( $shopkeeper ) ) {
-          echo "false";
-        } else {
-          echo "true";
-        }
-      } catch( \Exception $e ) {
-        \Log::emergency( "File: ".$e->getFile() );
-        \Log::emergency( "Line: ".$e->getLine() );
-        \Log::emergency( "Message: ".$e->getMessage() );
-      }
     }
 
     public function requestPassword()
@@ -44,27 +25,22 @@ class ForgotPasswordController extends Controller
 
     public function requestPasswordSubmit(Request $request)
     {
-
-
       $this->validate($request, [
-        'email' => 'required'
+        'email' => 'required|email'
       ]);
 
       try {
           $this->sendResetLinkEmail($request);
-          $admin = Shopkeeper::where('email', '=', $request->email)->first();
-
-          $response['success'] = true;
-          $response['msg'] = __('messages.passwordRequestSuccess', ['name' => 'Password Reset Request']);
-          $response['redirect_url'] = route('shopkeeper.password.request');
-          return response()->json($response);
       } catch (\Exception $e) {
-          $response['success'] = false;
-          $response['msg'] = $e->getMessage();
-          $response['redirect_url'] = route('shopkeeper.password.request');
-          return response()->json($response);
+          \Log::error('Shopkeeper ForgotPasswordController::requestPasswordSubmit failed: ' . $e->getMessage());
       }
 
+      // Always the same response regardless of whether the account exists —
+      // Laravel's own broker already skips sending when it shouldn't.
+      $response['success'] = true;
+      $response['msg'] = __('messages.passwordRequestSuccess', ['name' => 'Password Reset Request']);
+      $response['redirect_url'] = route('shopkeeper.password.request');
+      return response()->json($response);
     }
 
     public function broker()
@@ -74,27 +50,22 @@ class ForgotPasswordController extends Controller
 
     public function resetPassword($token, Request $request)
     {
-
-
         try {
-            $ifExist = ShopkeeperPasswordReset::where('email','=', $request->email)->first();
+            $user = Shopkeeper::where('email', $request->email)->first();
 
-            if(!$ifExist) {
+            // tokenExists() is Laravel's own check (age via config's
+            // 'expire' minutes, plus hash match) — replaces the old
+            // hand-rolled Hash::check() with no expiry at all.
+            if (!$user || !$this->broker()->tokenExists($user, $token)) {
               return redirect(route('shopkeeper.password.request'))->withErrors(['error' => __('messages.invalidRequest')]);
-            } else {
-              if(!Hash::check($token, $ifExist->token)) {
-                return redirect(route('shopkeeper.password.request'))->withErrors(['error' => __('messages.invalidRequest')]);
-              }
-
             }
-            $data['token'] = $token;
-            $data['email'] = $request->email;
 
-            return view('shopkeeper.auth.reset-password',$data);
+            return view('shopkeeper.auth.reset-password', ['token' => $token, 'email' => $request->email]);
           } catch( \Exception $e ) {
             \Log::emergency( "File: ".$e->getFile() );
             \Log::emergency( "Line: ".$e->getLine() );
             \Log::emergency( "Message: ".$e->getMessage() );
+            return redirect(route('shopkeeper.password.request'))->withErrors(['error' => __('messages.invalidRequest')]);
           }
     }
 
@@ -103,34 +74,39 @@ class ForgotPasswordController extends Controller
         $this->validate($request, [
           'token' => 'required',
           'email' => 'required|email',
-          'password'  => 'required|min:6',
-          'password_confirmation'  => 'required|min:6|same:password'
+          'password' => ['required', 'confirmed', PasswordRule::min(12)->mixedCase()->numbers()->uncompromised()],
         ]);
 
-        $ifExist = ShopkeeperPasswordReset::where('email','=', $request->email)->first();
+        // Password::broker()->reset() validates token age + hash AND
+        // deletes the token row on success, so it can't be replayed — the
+        // old code hand-rolled only the Hash::check() half and never
+        // deleted the row, and its success path returned a redirect
+        // carrying an "invalidRequest" error message even on success.
+        $status = $this->broker()->reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, $password) {
+                $user->password = Hash::make($password);
+                $user->save();
 
-        if(!$ifExist) {
-          $response['success'] = false;
-          $response['msg'] = __('messages.invalidRequest');
-          return response()->json($response);
-        } else {
-          if(!Hash::check($request->token, $ifExist->token)) {
-            $response['success'] = false;
-            $response['msg'] = __('messages.invalidRequest');
-            return response()->json($response);
-          }
+                // No plaintext password in this email anymore — confirmation only.
+                $user->sendPasswordResetSuccessNotification($user, null);
+                if (method_exists($user, 'tokens')) {
+                    $user->tokens()->delete();
+                }
+            }
+        );
+
+        if ($status === Password::PASSWORD_RESET) {
+            return response()->json([
+                'success' => true,
+                'msg' => __('messages.passwordResetSuccess'),
+                'redirect_url' => route('shopkeeper.loginindex'),
+            ]);
         }
 
-        $shopkeeperId = Shopkeeper::where('email','=',$request->email)->first()->id;
-
-        $shopkeeper = Shopkeeper::find($shopkeeperId);
-        // dd($shopkeeper->password,$request->password);
-        $shopkeeper->password = Hash::make($request->password);
-        $shopkeeper->save();
-
-        $shopkeeper->sendPasswordResetSuccessNotification($shopkeeper,$request->password);
-
-        return redirect(route('shopkeeper.loginindex'))->withErrors(['error' => __('messages.invalidRequest')]);
-
+        return response()->json([
+            'success' => false,
+            'msg' => __('messages.invalidRequest'),
+        ]);
     }
 }
