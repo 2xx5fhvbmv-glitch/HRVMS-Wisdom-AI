@@ -1079,6 +1079,7 @@ class MaintananceContorller extends Controller
                         $row->Location = $row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - ' . $row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - ' . $row->FloorNo : '');
                         $row->Priority = $row->priority;
                         $row->Date =date('d M Y',strtotime($row->date));
+                        $row->HoldUntilDisplay = $row->hold_until ? date('d M Y', strtotime($row->hold_until)) : '-';
                         $row->profileImg = Common::getResortUserPicture($row->Parentid);
                         $InventoryModule = InventoryModule::where('resort_id', $this->resort->resort_id)
                             ->where("id", $row->item_id)

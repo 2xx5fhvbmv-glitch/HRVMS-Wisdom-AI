@@ -683,6 +683,18 @@ class AccommodationController extends Controller
 
             if ($MaintanaceRequest) { // Ensure request exists before processing
                 $MaintanaceRequest->profileImg               =   Common::getResortUserPicture($MaintanaceRequest->Parentid);
+
+                // Who it's assigned to (Engineering HOD after approval, or
+                // the engineer they hand it to) — was never resolved past
+                // the raw employees.id here, unlike the list endpoints.
+                $assignedEmployee = $MaintanaceRequest->Assigned_To
+                    ? Common::GetEmployeeDetails($MaintanaceRequest->Assigned_To, $this->resort_id)
+                    : null;
+                $MaintanaceRequest->assigned_to_details = $assignedEmployee ? [
+                    'id'               => $MaintanaceRequest->Assigned_To,
+                    'name'             => ucfirst($assignedEmployee->first_name . ' ' . $assignedEmployee->last_name),
+                    'profile_picture'  => Common::getResortUserPicture($assignedEmployee->Parent_id),
+                ] : null;
                 // **Check & Assign Image Path**
                 // Image can be a plain filename (web upload) or a
                 // json_encode(['Filename'=>..,'Child_id'=>..]) value (mobile
@@ -2218,6 +2230,7 @@ class AccommodationController extends Controller
             // rejected request lost its reason, which the detail/listing
             // screens then had nothing to display.
             'reason'                                        =>  'required_if:action,On-Hold,Rejected',
+            'hold_until'                                    =>  'required_if:action,On-Hold|date|after_or_equal:today',
         ]);
 
         if ($validator->fails()) {
@@ -2274,6 +2287,10 @@ class AccommodationController extends Controller
             } elseif ($action === 'On-Hold') {
                 $maintanance->status                        =   "On-Hold";
                 $maintanance->ReasonOnHold                  =   $reason;
+                $maintanance->hold_until                    =   $request->input('hold_until');
+                // Cleared so a fresh hold on a previously-expired request
+                // fires the expiry notice again (see hold-expiry cron).
+                $maintanance->hold_expiry_notified_at       =   null;
             }
 
             $maintanance->save();

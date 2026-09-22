@@ -52,6 +52,7 @@
                         <th>Date</th>
                         <th>Priority</th>
                         <th>Reason For On-Hold</th>
+                        <th>Hold Until</th>
                         <th>Action</th>
                     </tr>
                 </thead>
@@ -320,7 +321,7 @@
                 "iDisplayLength": 6,
                 processing: true,
                 serverSide: true,
-                order:[[6, 'desc']],
+                order:[[7, 'desc']],
                 ajax: {
                     url: '{{ $holdAjaxRoute }}',
                     type: 'GET',
@@ -336,6 +337,7 @@
 
                     { data: 'Priority', name: 'Priority', className: 'text-nowrap' },
                     { data: 'ReasonOnHold', name: 'ReasonOnHold ', className: 'text-nowrap' },
+                    { data: 'HoldUntilDisplay', name: 'hold_until', className: 'text-nowrap' },
                     { data: 'action', name: 'action', orderable: false, searchable: false },
                      {data:'created_at',visible:false,searchable:false},
                 ]

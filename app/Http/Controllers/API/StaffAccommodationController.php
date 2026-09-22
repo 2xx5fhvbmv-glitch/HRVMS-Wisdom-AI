@@ -526,13 +526,25 @@ class StaffAccommodationController extends Controller
                 // directly from the parent record.
                 if (in_array($maintanaceRequest->Status, ['Rejected', 'On-Hold'])) {
                     $displayedStatuses['data'][] = [
-                        'status' => $maintanaceRequest->Status,
-                        'date'   => $maintanaceRequest->updated_at,
-                        'reason' => $maintanaceRequest->Status === 'Rejected'
+                        'status'     => $maintanaceRequest->Status,
+                        'date'       => $maintanaceRequest->updated_at,
+                        'reason'     => $maintanaceRequest->Status === 'Rejected'
                             ? $maintanaceRequest->RejactionReason
                             : $maintanaceRequest->ReasonOnHold,
+                        'hold_until' => $maintanaceRequest->Status === 'On-Hold' ? $maintanaceRequest->hold_until : null,
                     ];
                 }
+
+                // Who it's assigned to right now — was never resolved past
+                // the raw employees.id for the requester's own view either.
+                $assignedEmployee = $maintanaceRequest->Assigned_To
+                    ? Common::GetEmployeeDetails($maintanaceRequest->Assigned_To, $this->resort_id)
+                    : null;
+                $maintanaceRequest->assigned_to_details = $assignedEmployee ? [
+                    'id'              => $maintanaceRequest->Assigned_To,
+                    'name'            => ucfirst($assignedEmployee->first_name . ' ' . $assignedEmployee->last_name),
+                    'profile_picture' => Common::getResortUserPicture($assignedEmployee->Parent_id),
+                ] : null;
 
                 $assignMaintReqStaffDetails                 =   ChildMaintananceRequest::join("employees as t3", "t3.id", "=", "child_maintanance_requests.ApprovedBy")
                                                                     ->join("resort_admins as t1", "t1.id", "=", "t3.Admin_Parent_id")
