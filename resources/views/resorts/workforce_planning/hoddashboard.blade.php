@@ -1069,15 +1069,22 @@
                 data: formData,
                 success: function(response) {
                     if(response.success) {
-                        // Hide modal and show success message
-                        $('#sendRespond-modal').modal('hide');
-
                         // Update headcount display dynamically
                         document.querySelector('.manningHeadcount-block').innerText = `${currentYear} headcount = ${response.currentYearHeadcount}`;
                         document.querySelectorAll('.manningHeadcount-block')[1].innerText = `${nextYear} headcount = ${response.nextYearHeadcount}`;
 
-                        // Show the success modal
-                        $('#Manning-modal').modal('show');
+                        // B11 — calling .modal('hide') immediately followed by
+                        // .modal('show') on a different modal is a Bootstrap
+                        // stacked-modal race: the second modal can open before
+                        // the first's hide transition/backdrop cleanup
+                        // finishes, leaving both visible together. Wait for
+                        // #sendRespond-modal to actually finish hiding before
+                        // opening #Manning-modal.
+                        $('#sendRespond-modal').one('hidden.bs.modal', function () {
+                            $('#Manning-modal').modal('show');
+                        });
+                        $('#sendRespond-modal').modal('hide');
+
                         $('#total_headcount_current_year').val(response.currentYearHeadcount);
 
                         $('.AppendLifeCycleofRequest').html(response.html);

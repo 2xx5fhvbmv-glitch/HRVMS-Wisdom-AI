@@ -27,6 +27,7 @@ use Carbon\Carbon;
  *   php artisan payroll:purge-empty-drafts                  # delete drafts > 14d old (default)
  *   php artisan payroll:purge-empty-drafts --days=30        # change the cutoff
  *   php artisan payroll:purge-empty-drafts --resort=26      # scope to one resort
+ *   php artisan payroll:purge-empty-drafts --category=Casual # scope to one category
  *   php artisan payroll:purge-empty-drafts --resort=26 --dry-run --days=7
  *
  * Safety:
@@ -45,27 +46,37 @@ class PurgeEmptyDraftPayrolls extends Command
     protected $signature = 'payroll:purge-empty-drafts'
         . ' {--days=14 : Minimum age in days before a draft can be purged}'
         . ' {--resort= : Limit to one resort id}'
+        . ' {--category= : Limit to one payroll_category (Permanent/Casual/Intern)}'
         . ' {--dry-run : Preview only; do not delete anything}';
 
     protected $description = 'Delete stale, empty (no review rows) draft payrolls older than N days.';
 
     public function handle(): int
     {
-        $days    = (int) $this->option('days');
-        $resort  = $this->option('resort');
-        $dryRun  = (bool) $this->option('dry-run');
-        $cutoff  = Carbon::now()->subDays($days)->toDateTimeString();
+        $days     = (int) $this->option('days');
+        $resort   = $this->option('resort');
+        $category = $this->option('category');
+        $dryRun   = (bool) $this->option('dry-run');
+        $cutoff   = Carbon::now()->subDays($days)->toDateTimeString();
 
         $this->line('');
         $this->info(sprintf(
-            '%s draft payrolls older than %d day(s) (cutoff %s)%s',
+            '%s draft payrolls older than %d day(s) (cutoff %s)%s%s',
             $dryRun ? 'DRY-RUN — would purge' : 'Purging',
             $days,
             $cutoff,
-            $resort ? sprintf(' for resort #%d', (int) $resort) : ''
+            $resort ? sprintf(' for resort #%d', (int) $resort) : '',
+            $category ? sprintf(' [%s only]', $category) : ' [all categories]'
         ));
         $this->line('');
 
+        // F6 — with direct_pay, a Casual/Intern draft looks identical to a
+        // Permanent one here (same table, no category filter/column shown),
+        // so an empty draft could be purged or kept alongside an unrelated
+        // category's without anyone noticing. Surface payroll_category in
+        // the audit table always, and let --category scope a run to just
+        // one, same pattern as the other WP9 category-aware readers.
+        //
         // Pull every draft that's old enough. Filter by review-row count
         // AFTER the query so an admin scanning the audit log can see
         // both the deleted set AND the "skipped because it has data"
@@ -76,8 +87,11 @@ class PurgeEmptyDraftPayrolls extends Command
         if ($resort) {
             $query->where('resort_id', (int) $resort);
         }
+        if ($category) {
+            $query->where('payroll_category', $category);
+        }
         $drafts = $query->orderBy('id', 'desc')
-            ->get(['id', 'resort_id', 'start_date', 'end_date', 'status', 'created_at']);
+            ->get(['id', 'resort_id', 'payroll_category', 'start_date', 'end_date', 'status', 'created_at']);
 
         if ($drafts->isEmpty()) {
             $this->comment('Nothing matched. No stale empty drafts to clean up.');
@@ -94,6 +108,7 @@ class PurgeEmptyDraftPayrolls extends Command
             $row = [
                 'id'         => $p->id,
                 'resort_id'  => $p->resort_id,
+                'category'   => $p->payroll_category ?? 'Permanent',
                 'period'     => $p->start_date . ' → ' . $p->end_date,
                 'created'    => $p->created_at,
                 'review_rows'=> $reviewCount,
@@ -113,7 +128,7 @@ class PurgeEmptyDraftPayrolls extends Command
                 $dryRun ? 'WOULD BE' : 'will be'
             ));
             $this->table(
-                ['Payroll ID', 'Resort', 'Period', 'Created At', 'Review Rows'],
+                ['Payroll ID', 'Resort', 'Category', 'Period', 'Created At', 'Review Rows'],
                 $purgeRows
             );
         }
@@ -123,7 +138,7 @@ class PurgeEmptyDraftPayrolls extends Command
                 count($skipRows)
             ));
             $this->table(
-                ['Payroll ID', 'Resort', 'Period', 'Created At', 'Review Rows'],
+                ['Payroll ID', 'Resort', 'Category', 'Period', 'Created At', 'Review Rows'],
                 $skipRows
             );
         }

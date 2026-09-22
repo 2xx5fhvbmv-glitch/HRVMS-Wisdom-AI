@@ -1090,10 +1090,14 @@ if (!function_exists('safeParseDate')) {
                                                                         @php
                                                                             $jd = \Carbon\Carbon::parse($employee->joining_date);
                                                                             $now = \Carbon\Carbon::now();
-                                                                            $years = $jd->diffInYears($now);
+                                                                            // Carbon 3's diffIn*() returns a float by
+                                                                            // default (Carbon 2 truncated to int) —
+                                                                            // floor explicitly or this prints e.g.
+                                                                            // "4.6979403008349 months".
+                                                                            $years = (int) floor($jd->diffInYears($now));
                                                                             $tenureLabel = $years >= 1
                                                                                 ? ($years . ' year' . ($years != 1 ? 's' : ''))
-                                                                                : ($jd->diffInMonths($now) . ' months');
+                                                                                : ((int) floor($jd->diffInMonths($now)) . ' months');
                                                                         @endphp
                                                                         <span class="view-mode">
                                                                             {{ $jd->format('d M Y') }}
@@ -1107,6 +1111,30 @@ if (!function_exists('safeParseDate')) {
                                                                 </td>
 
                                                             </tr>
+                                                            {{-- F8 — visa_expiry_date/work_permit_expiry_date are
+                                                                 written by the Casual/Intern importer but were never
+                                                                 shown anywhere. Visa Management (Xpact) is out of
+                                                                 scope for Casual/Intern per the founder's module-scope
+                                                                 decision, so surface these on the People/employee
+                                                                 profile instead, read-only, Casual/Intern only. --}}
+                                                            @if(\App\Helpers\Common::manningCategory($employee->employment_type ?? '') !== 'Permanent' && ($employee->visa_expiry_date || $employee->work_permit_expiry_date))
+                                                                <tr>
+                                                                    <th>Visa Expiry:</th>
+                                                                    <td>
+                                                                        <span class="view-mode">
+                                                                            {{ $employee->visa_expiry_date ? \Carbon\Carbon::parse($employee->visa_expiry_date)->format('d M Y') : 'Not Available' }}
+                                                                        </span>
+                                                                    </td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <th>Work Permit Expiry:</th>
+                                                                    <td>
+                                                                        <span class="view-mode">
+                                                                            {{ $employee->work_permit_expiry_date ? \Carbon\Carbon::parse($employee->work_permit_expiry_date)->format('d M Y') : 'Not Available' }}
+                                                                        </span>
+                                                                    </td>
+                                                                </tr>
+                                                            @endif
                                                             <tr>
                                                                 <th>Employment Status:</th>
                                                                 <td>

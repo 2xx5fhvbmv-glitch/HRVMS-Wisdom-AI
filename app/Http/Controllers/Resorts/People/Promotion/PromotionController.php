@@ -45,6 +45,7 @@ class PromotionController extends Controller
         $employees = Employee::with(['resortAdmin','position','department'])
             ->where('resort_id',$resort_id)
             ->where('status','Active')
+            ->whereIn('employment_type', Common::manningCategoryEmploymentTypes('Permanent'))
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->get();
         // Page loads with no employee selected yet — Permanent is the

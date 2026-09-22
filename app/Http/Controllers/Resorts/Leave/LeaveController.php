@@ -25,6 +25,9 @@ use App\Models\EmployeeTravelPass;
 use App\Models\EmployeeLeaveStatus;
 use App\Models\PublicHoliday;
 use App\Models\ParentAttendace;
+use App\Models\ChildAttendace;
+use App\Models\DutyRosterEntry;
+use App\Models\ShiftSettings;
 use App\Models\ResortPosition;
 use App\Models\LeaveRecommendation;
 use App\Models\ResortTransportation;
@@ -2543,6 +2546,114 @@ class LeaveController extends Controller
         return $pdf->download($fileName);
     }
 
+    /**
+     * D8.3 write-through: once a leave is fully approved, mark every date
+     * in its range as FullDayLeave on that employee's attendance — for
+     * Permanent and Casual/Intern alike, since the gap (attendance and
+     * leave silently drifting out of sync unless a manager marks it by
+     * hand) is identical for both. Every leave day is a full day at this
+     * resort (employees_leaves.duration is never read/written anywhere),
+     * so there's no half-day/hourly case to branch on.
+     *
+     * Reuses the exact auto-create-a-roster-entry-if-none-exists pattern
+     * already written for Casual/Intern in
+     * AttandanceRegisterController::nonPermanentMark() — applied here
+     * regardless of category, since a Permanent employee can just as
+     * easily have no roster entry for a given date.
+     */
+    private function markAttendanceForApprovedLeave(EmployeeLeave $leave): void
+    {
+        $resortId = $leave->resort_id;
+        $empId = $leave->emp_id;
+        $from = Carbon::parse($leave->from_date)->startOfDay();
+        $to = Carbon::parse($leave->to_date)->startOfDay();
+        if ($to->lt($from)) {
+            return;
+        }
+
+        $defaultShift = null;
+
+        for ($date = $from->copy(); $date->lte($to); $date->addDay()) {
+            $dateStr = $date->format('Y-m-d');
+
+            $parentAttendance = ParentAttendace::where('resort_id', $resortId)
+                ->where('Emp_id', $empId)
+                ->whereDate('date', $dateStr)
+                ->first();
+
+            if ($parentAttendance) {
+                // The now-approved leave is authoritative for this date —
+                // overwrites whatever manual status (or none) was there.
+                $parentAttendance->Status = 'FullDayLeave';
+                $parentAttendance->save();
+                continue;
+            }
+
+            $rosterEntry = DutyRosterEntry::where('resort_id', $resortId)
+                ->where('Emp_id', $empId)
+                ->whereDate('date', $dateStr)
+                ->first();
+
+            if (!$rosterEntry) {
+                if (!$defaultShift) {
+                    $defaultShift = ShiftSettings::where('resort_id', $resortId)->first();
+                }
+                if (!$defaultShift) {
+                    // No shift configured for this resort at all — skip this
+                    // date rather than crash; the attendance register's
+                    // manual-mark path still works as a fallback.
+                    continue;
+                }
+
+                $rosterParentId = DB::table('duty_rosters')->insertGetId([
+                    'resort_id' => $resortId,
+                    'Shift_id' => $defaultShift->id,
+                    'Emp_id' => $empId,
+                    'ShiftDate' => $dateStr . ' - ' . $dateStr,
+                    'Year' => $date->format('Y'),
+                    'created_by' => $this->resort->id,
+                    'modified_by' => $this->resort->id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $rosterEntry = DutyRosterEntry::create([
+                    'roster_id' => $rosterParentId,
+                    'resort_id' => $resortId,
+                    'Shift_id' => $defaultShift->id,
+                    'Emp_id' => $empId,
+                    'date' => $dateStr,
+                    'Status' => 'FullDayLeave',
+                    'CheckingTime' => $defaultShift->StartTime,
+                    'CheckingOutTime' => $defaultShift->EndTime,
+                ]);
+            }
+
+            $shiftData = ShiftSettings::where('resort_id', $resortId)->where('id', $rosterEntry->Shift_id)->first();
+            $startTime = $shiftData ? $shiftData->StartTime : ($rosterEntry->CheckingTime ?? '00:00');
+            $endTime = $shiftData ? $shiftData->EndTime : ($rosterEntry->CheckingOutTime ?? '00:00');
+
+            $parentAttendance = ParentAttendace::create([
+                'Emp_id' => $empId,
+                'date' => $dateStr,
+                'roster_id' => $rosterEntry->roster_id,
+                'resort_id' => $resortId,
+                'Shift_id' => $rosterEntry->Shift_id,
+                'CheckingTime' => $startTime,
+                'CheckingOutTime' => $endTime,
+                'DayWiseTotalHours' => $rosterEntry->DayWiseTotalHours ?? '00:00',
+                'Status' => 'FullDayLeave',
+                'CheckInCheckOut_Type' => 'Manual',
+            ]);
+            ChildAttendace::create([
+                'Parent_attd_id' => $parentAttendance->id,
+                'InTime_out' => $startTime,
+                'OutTime_out' => $endTime,
+                'InTime_Location' => 'Leave Approval Auto-Mark',
+                'OutTime_Location' => 'Leave Approval Auto-Mark',
+            ]);
+        }
+    }
+
     public function handleLeaveAction(Request $request)
     {
         $leaveId = $request->input('leave_id');
@@ -2634,6 +2745,21 @@ class LeaveController extends Controller
             if ($pendingCount === 0) {
                 $leave->status = 'Approved';
                 $leave->save();
+
+                // D8.3 — write the approval through to attendance so payroll's
+                // FullDayLeave-off-attendance logic doesn't rely on a manager
+                // remembering to mark it by hand. Same for Permanent and
+                // Casual/Intern — this resort's leave is always a full day
+                // (employees_leaves.duration is a dead column, never
+                // half-day/hourly). Never let a failure here undo the
+                // approval that already committed above.
+                try {
+                    $this->markAttendanceForApprovedLeave($leave);
+                } catch (\Exception $e) {
+                    \Log::emergency("File: ".$e->getFile());
+                    \Log::emergency("Line: ".$e->getLine());
+                    \Log::emergency("Message: ".$e->getMessage());
+                }
             }
 
             // ── Notifications ──

@@ -97,6 +97,7 @@ class DutyRosterController extends Controller
                                 // ->whereIn('employees.id', $this->underEmp_id)
                                  ->where("employees.Dept_id",$Dept_id)
                                 ->where("employees.status","Active")
+                                ->whereIn('employees.employment_type', Common::manningCategoryEmploymentTypes('Permanent'))
                                 ->get(['t1.first_name','t1.last_name','t1.profile_picture','t2.position_title','employees.*']);
             }else{
                 $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
@@ -104,6 +105,7 @@ class DutyRosterController extends Controller
                                 ->where("t1.resort_id",$this->resort->resort_id)
                                 // ->where("employees.Dept_id",$Dept_id)
                                 ->where("employees.status","Active")
+                                ->whereIn('employees.employment_type', Common::manningCategoryEmploymentTypes('Permanent'))
                                 ->get(['t1.first_name','t1.last_name','t1.profile_picture','t2.position_title','employees.*']);
             }
         }else{
@@ -111,6 +113,7 @@ class DutyRosterController extends Controller
                                 ->leftJoin('resort_positions as t2',"t2.id","=","employees.Position_id")
                                 ->where("t1.resort_id",$this->resort->resort_id)
                                 ->where("employees.status","Active")
+                                ->whereIn('employees.employment_type', Common::manningCategoryEmploymentTypes('Permanent'))
                                 ->get(['t1.first_name','t1.last_name','t1.profile_picture','t2.position_title','employees.*']);
         }
         $ResortPosition = ResortPosition::where("dept_id", $Dept_id)
@@ -881,7 +884,8 @@ class DutyRosterController extends Controller
                                 ->leftJoin('resort_departments as t4',"t4.id","=","employees.Dept_id")
                                 ->leftJoin('resort_sections as t5',"t5.id","=","t2.section_id")
                                 ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't3.geofence_zone_id', 't1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title', 'employees.Dept_id', 't2.section_id as Section_id', 't4.name as dept_name', 't5.name as section_name')
-                                ->where('t1.resort_id', $this->resort->resort_id);
+                                ->where('t1.resort_id', $this->resort->resort_id)
+                                ->whereIn('employees.employment_type', Common::manningCategoryEmploymentTypes('Permanent'));
 
         if($this->resort->is_master_admin == 0){
             if($employeeRankPosition['position'] != "HR")
@@ -1671,18 +1675,21 @@ class DutyRosterController extends Controller
                                 // ->whereIn('employees.id', $this->underEmp_id)
                                  ->where("employees.Dept_id",$Dept_id)
                                 ->where("employees.status","Active")
+                                ->whereIn('employees.employment_type', Common::manningCategoryEmploymentTypes('Permanent'))
                                 ->get(['t1.first_name','t1.last_name','t1.profile_picture','employees.*']);
             }else{
                 $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
                                 ->where("t1.resort_id",$this->resort->resort_id)
                                 // ->where("employees.Dept_id",$Dept_id)
                                 ->where("employees.status","Active")
+                                ->whereIn('employees.employment_type', Common::manningCategoryEmploymentTypes('Permanent'))
                                 ->get(['t1.first_name','t1.last_name','t1.profile_picture','employees.*']);
             }
         }else{
             $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
                                 ->where("t1.resort_id",$this->resort->resort_id)
                                 ->where("employees.status","Active")
+                                ->whereIn('employees.employment_type', Common::manningCategoryEmploymentTypes('Permanent'))
                                 ->get(['t1.first_name','t1.last_name','t1.profile_picture','employees.*']);
         }
         $ResortPosition = ResortPosition::where("dept_id", $Dept_id)
@@ -1736,7 +1743,8 @@ class DutyRosterController extends Controller
                                 ->leftJoin('resort_departments as t4',"t4.id","=","employees.Dept_id")
                                 ->leftJoin('resort_sections as t5',"t5.id","=","t2.section_id")
                                 ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't3.geofence_zone_id', 't1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title', 'employees.Dept_id', 't2.section_id as Section_id', 't4.name as dept_name', 't5.name as section_name')
-                                ->where('t1.resort_id', $this->resort->resort_id);
+                                ->where('t1.resort_id', $this->resort->resort_id)
+                                ->whereIn('employees.employment_type', Common::manningCategoryEmploymentTypes('Permanent'));
 
                                 if($this->resort->is_master_admin == 0){
                                     if($employeeRankPosition['position'] != "HR")

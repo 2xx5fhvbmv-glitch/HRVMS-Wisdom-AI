@@ -62,6 +62,7 @@ class XpactEmployeeController extends Controller
                                 })
                                 ->where('resort_id', $this->resort->resort_id)
                                 ->where('status','Active')
+                                ->whereIn('employment_type', Common::manningCategoryEmploymentTypes('Permanent'))
                                 ->when(!empty($status) && $status != "All", function ($query) use ($status)
                                 {
                                     $query->where('status', $status);
@@ -245,7 +246,7 @@ class XpactEmployeeController extends Controller
         }
         $id = base64_decode($id);
         $page_title = "Xpat Employee Details";
-        $Employee = Employee::with(['resortAdmin', 'position', 'department'])->where("id",$id)->where("nationality",'!=',"Maldivian")->where('resort_id', $this->resort->resort_id)->first();
+        $Employee = Employee::with(['resortAdmin', 'position', 'department'])->where("id",$id)->where("nationality",'!=',"Maldivian")->where('resort_id', $this->resort->resort_id)->whereIn('employment_type', Common::manningCategoryEmploymentTypes('Permanent'))->first();
         // Guard: a bad id, another resort's employee, or a Maldivian (excluded
         // above) yields null — without this the page 500s on the next line.
         if (!$Employee) {

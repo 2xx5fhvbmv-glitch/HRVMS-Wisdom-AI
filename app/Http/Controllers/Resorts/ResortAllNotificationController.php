@@ -454,11 +454,18 @@ class ResortAllNotificationController extends Controller
                     };
                     if (!empty($recipientIds)) {
                         try {
+                            // F4 — same category/year fix as ReviseBudget()'s
+                            // notification: a Finance/GM reviewer with more
+                            // than one department's budget forwarded to them
+                            // had no way to tell WHICH one this was about
+                            // until they opened it.
+                            $categoryLabel = $budget->employment_type ?? 'Permanent';
+                            $yearLabel = $budget->year ?? '';
                             Common::notifyEmployees(
                                 $resort_id,
                                 $recipientIds,
                                 'Budget Review Update',
-                                'A department budget has been forwarded to ' . $budgetProcessStatus . ' for review.',
+                                "{$categoryLabel} budget {$yearLabel} has been forwarded to {$budgetProcessStatus} for review.",
                                 'WorkForce Planning',
                                 $budget->id
                             );

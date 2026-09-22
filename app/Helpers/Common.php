@@ -2131,7 +2131,7 @@ class Common
      */
     private static array $resortSettingsCache = [];
 
-    private static function getCachedResortSettings($resortId)
+    public static function getCachedResortSettings($resortId)
     {
         if (!$resortId) return null;
         if (!array_key_exists($resortId, self::$resortSettingsCache)) {
@@ -4167,6 +4167,25 @@ class Common
                                         return $item->only(['total_days', 'leave_type', 'leave_cat_id', 'from_date', 'to_date', 'Emp_id', 'status']);
                                     })->values()->toArray();
                                  $roster->LeaveData = $transformedLeaveData;
+
+                    // D8.3 — "show it, not just store it": a FullDayLeave day
+                    // now backed by a real attendance row (the leave-approval
+                    // write-through) never got the LeaveType/LeaveFirstName
+                    // badge fields — those were only ever set on the
+                    // synthetic no-roster-row entries below
+                    // (getLeaveRegisterEntries()). Reuses the same
+                    // already-fetched $Leavevcategory, no extra query.
+                    if ($roster->Status === 'FullDayLeave' && $Leavevcategory->isNotEmpty()) {
+                        $rosterDate = Carbon::parse($roster->date)->format('Y-m-d');
+                        $matchingLeave = $Leavevcategory->first(function ($item) use ($rosterDate) {
+                            return $rosterDate >= Carbon::parse($item->from_date)->format('Y-m-d')
+                                && $rosterDate <= Carbon::parse($item->to_date)->format('Y-m-d');
+                        });
+                        if ($matchingLeave) {
+                            $roster->LeaveType = $matchingLeave->leave_type;
+                            $roster->LeaveFirstName = substr($matchingLeave->leave_type, 0, 1);
+                        }
+                    }
                 return $roster;
             });
 
@@ -4321,6 +4340,20 @@ class Common
                                         return $item->only(['total_days', 'leave_type', 'leave_cat_id', 'from_date', 'to_date', 'Emp_id', 'status']);
                                     })->values()->toArray();
                                  $roster->LeaveData = $transformedLeaveData;
+
+                            // D8.3 — same badge-attachment fix as the
+                            // "weekly" branch above; see its comment.
+                            if ($roster->Status === 'FullDayLeave' && $Leavevcategory->isNotEmpty()) {
+                                $rosterDate = Carbon::parse($roster->date)->format('Y-m-d');
+                                $matchingLeave = $Leavevcategory->first(function ($item) use ($rosterDate) {
+                                    return $rosterDate >= Carbon::parse($item->from_date)->format('Y-m-d')
+                                        && $rosterDate <= Carbon::parse($item->to_date)->format('Y-m-d');
+                                });
+                                if ($matchingLeave) {
+                                    $roster->LeaveType = $matchingLeave->leave_type;
+                                    $roster->LeaveFirstName = substr($matchingLeave->leave_type, 0, 1);
+                                }
+                            }
                         return $roster;
                     });
 

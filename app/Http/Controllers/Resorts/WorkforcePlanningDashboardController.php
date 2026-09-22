@@ -945,12 +945,18 @@ class WorkforcePlanningDashboardController extends Controller
             $BudgetStatus = BudgetStatus::whereIn('status', ['Genrated', 'Approved', 'Pending'])
             ->where('resort_id', $resort_id)
             ->where('Department_id', $Dept_id)
-            ->whereNotIn('resort_id', function($query) use ($resort_id, $Dept_id) {
-                $query->select('resort_id')
-                    ->from('budget_statuses')
-                    ->where('status', 'Rejected')
-                    ->where('resort_id', $resort_id)
-                    ->where('Department_id', $Dept_id);
+            // Excludes a Budget_id only when its CURRENT (latest) status is
+            // Rejected — not merely "was ever rejected" — otherwise a
+            // budget that was rejected and later regenerated/approved
+            // would stay excluded forever. Same "latest row per Budget_id"
+            // pattern as $BudgetRejactedStatus below.
+            ->whereNotIn('Budget_id', function($query) use ($resort_id, $Dept_id) {
+                $query->select('bs.Budget_id')
+                    ->from('budget_statuses as bs')
+                    ->where('bs.status', 'Rejected')
+                    ->where('bs.resort_id', $resort_id)
+                    ->where('bs.Department_id', $Dept_id)
+                    ->whereRaw('bs.id = (SELECT MAX(bs2.id) FROM budget_statuses bs2 WHERE bs2.Budget_id = bs.Budget_id AND bs2.resort_id = ? AND bs2.Department_id = ?)', [$resort_id, $Dept_id]);
             })
             // WP5 — was groupBy('message_id'): Permanent/Casual/Intern share
             // one message_id for the same manning request, so this

@@ -21,7 +21,7 @@
 
         <div id="collapse{{ $accordionId }}" class="accordion-collapse collapse"
              aria-labelledby="heading{{ $accordionId }}">
-            <div class="accordion-body p-3">
+            <div class="accordion-body" style="padding: 16px 18px;">
 
                 {{-- Combined Employee and Vacant Table --}}
                 <div class="table-responsive table-wrapper cb-table-wrapper">

@@ -3459,13 +3459,13 @@ class TimeAndAttendanceController extends Controller
     public function hodCasualInternMonth(Request $request)
     {
         if (!Auth::guard('api')->check()) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+            return response()->json(['status' => false, 'success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $user                                               =   Auth::guard('api')->user();
         $employee                                           =   $user->GetEmployee;
         if (!$employee) {
-            return response()->json(['success' => false, 'message' => 'Employee record not found.'], 403);
+            return response()->json(['status' => false, 'success' => false, 'message' => 'Employee record not found.'], 403);
         }
 
         $resort_id                                          =   $user->resort_id;
@@ -3479,12 +3479,12 @@ class TimeAndAttendanceController extends Controller
         $monthParam                                         =   $request->query('month');
         if (!empty($monthParam)) {
             if (!preg_match('/^\d{4}-\d{2}$/', $monthParam)) {
-                return response()->json(['success' => false, 'message' => 'Invalid month format, expected YYYY-MM.'], 422);
+                return response()->json(['status' => false, 'success' => false, 'message' => 'Invalid month format, expected YYYY-MM.'], 422);
             }
             try {
                 $monthStart                                 =   Carbon::createFromFormat('Y-m-d', $monthParam . '-01')->startOfMonth();
             } catch (\Exception $e) {
-                return response()->json(['success' => false, 'message' => 'Invalid month format, expected YYYY-MM.'], 422);
+                return response()->json(['status' => false, 'success' => false, 'message' => 'Invalid month format, expected YYYY-MM.'], 422);
             }
         } else {
             $monthStart                                     =   Carbon::now()->startOfMonth();
@@ -3554,7 +3554,7 @@ class TimeAndAttendanceController extends Controller
             $employees                                      =   $empQuery->get();
 
             if ($employees->isEmpty()) {
-                return response()->json(['status' => true, 'month' => $monthStart->format('Y-m'), 'employees' => []]);
+                return response()->json(['status' => true, 'success' => true, 'month' => $monthStart->format('Y-m'), 'employees' => []]);
             }
 
             $attendanceByEmp                                =   ParentAttendace::where('resort_id', $resort_id)
@@ -3609,6 +3609,7 @@ class TimeAndAttendanceController extends Controller
 
             return response()->json([
                 'status'    => true,
+                'success'   => true,
                 'month'     => $monthStart->format('Y-m'),
                 'employees' => $employeesOut,
             ]);
@@ -3616,7 +3617,7 @@ class TimeAndAttendanceController extends Controller
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::error($e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+            return response()->json(['status' => false, 'success' => false, 'message' => 'Server error'], 500);
         }
     }
 

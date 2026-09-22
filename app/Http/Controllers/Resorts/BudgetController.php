@@ -3066,11 +3066,15 @@ class BudgetController extends Controller
                 if ($hod) {
                     $notifyIds[] = $hod->id;
                 }
+                // F4 — named the year but not the category; an HR/HOD with
+                // more than one category's budget in flight for the same
+                // year had no way to tell which one this was about.
+                $categoryLabel = $manningResponse->employment_type ?? 'Permanent';
                 Common::notifyEmployees(
                     $manningResponse->resort_id,
                     $notifyIds,
                     'Budget Approved',
-                    "Budget for year {$year} has been approved by GM.",
+                    "{$categoryLabel} budget for year {$year} has been approved by GM.",
                     'WorkForce Planning',
                     $budgetId
                 );
