@@ -332,7 +332,7 @@
                     cbUpdateSummaryCards();
                     // WP7(D4) — was inverted (disabled the buttons when
                     // isBudgetCompleted was true), the opposite of View
-                    // Manning's `{{ $isBudgetCompleted ? '' : 'disabled' }}`
+                    // Manning's `@{{ $isBudgetCompleted ? '' : 'disabled' }}`
                     // convention. Combined with the backend's old hardcoded
                     // `true`, the buttons were simply always disabled.
                     var missingList = (response.missingDepartments || []).join(', ');
