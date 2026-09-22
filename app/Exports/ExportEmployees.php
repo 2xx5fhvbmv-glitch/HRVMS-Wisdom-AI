@@ -2,10 +2,11 @@
 namespace App\Exports;
 
 use Illuminate\Support\Facades\Auth;
+use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
-class ExportEmployees implements WithMultipleSheets
+class ExportEmployees implements WithMultipleSheets, Export
 {
     use Exportable;
 

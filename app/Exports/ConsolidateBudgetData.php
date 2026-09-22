@@ -2,9 +2,10 @@
 
 namespace App\Exports;
 
+use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
-class ConsolidateBudgetData implements WithMultipleSheets
+class ConsolidateBudgetData implements WithMultipleSheets, Export
 {
     public function __construct(protected int $resortId)
     {

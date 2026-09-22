@@ -1,6 +1,7 @@
 <?php
 namespace App\Exports;
 
+use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -10,7 +11,7 @@ use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 use PhpOffice\PhpSpreadsheet\NamedRange;
 
-class VisaNationalityExport implements WithMultipleSheets
+class VisaNationalityExport implements WithMultipleSheets, Export
 {
     public function sheets(): array
     {

@@ -4202,7 +4202,7 @@ class PayrollController extends Controller
 
     private function exportReviewExcel($rows, $payroll, $symbol, $allowanceTypes, $filename)
     {
-        return Excel::download(new class($rows, $symbol, $allowanceTypes, $payroll) implements \Maatwebsite\Excel\Concerns\WithMultipleSheets {
+        return Excel::download(new class($rows, $symbol, $allowanceTypes, $payroll) implements \Maatwebsite\Excel\Concerns\WithMultipleSheets, \Maatwebsite\Excel\Concerns\Export {
             private $rows;
             private $symbol;
             private $allowanceTypes;

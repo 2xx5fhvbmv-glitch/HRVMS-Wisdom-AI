@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\Employee;
 use App\Models\LeaveCategory;
+use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -12,7 +13,7 @@ use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Events\AfterSheet;
 
 // Main Export Class
-class EmployeeLeaveExport implements WithMultipleSheets
+class EmployeeLeaveExport implements WithMultipleSheets, Export
 {
     use Exportable;
 
