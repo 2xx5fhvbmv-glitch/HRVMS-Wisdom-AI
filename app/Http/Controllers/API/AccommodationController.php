@@ -1489,14 +1489,8 @@ class AccommodationController extends Controller
 
             $housekeepingSchedules                      =   $housekeepingSchedules->select('housekeeping_schedules.*', 'bm.BuildingName as BName')->get();
 
-            if ($housekeepingSchedules->isEmpty()) {
-                $response['status']                     =   true;
-                $response['message']                    =   'No schedules found.';
-                return response()->json($response);
-            }
-
             $response['status']                         =   true;
-            $response['message']                        =   'Housekeeping Schedule Dashboard.';
+            $response['message']                        =   $housekeepingSchedules->isEmpty() ? 'No schedules found.' : 'Housekeeping Schedule Dashboard.';
             $response['accomodation_data']              =   $housekeepingSchedules;
             return response()->json($response);
 
@@ -1687,14 +1681,10 @@ class AccommodationController extends Controller
                 'assignedHousekeeping'                      =>  $assignedHousekeeping
             ];
 
-            if ($housekeepingSchedules->isEmpty() && $assignedHousekeeping->isEmpty()) {
-                $response['status']                         =   true;
-                $response['message']                        =   'No schedules found.';
-                return response()->json($response);
-            }
+            $isEmpty = $housekeepingSchedules->isEmpty() && $assignedHousekeeping->isEmpty();
 
             $response['status']                             =   true;
-            $response['message']                            =   'Housekeeping Schedule Dashboard.';
+            $response['message']                            =   $isEmpty ? 'No schedules found.' : 'Housekeeping Schedule Dashboard.';
             $response['accomodation_data']                  =   $data;
             return response()->json($response);
         } catch (\Exception $e) {

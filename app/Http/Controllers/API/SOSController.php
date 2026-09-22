@@ -507,18 +507,46 @@ class SOSController extends Controller
             $sosHistoryEmployeeStatus->longitude        =   $request->longitude;
             $sosHistoryEmployeeStatus->save();
 
-            // An "Unsafe" self-report during an active SOS previously raised
-            // nothing — the single most urgent inbound signal in the app.
-            // Mirror the panic-button trigger's own SM notification.
-            if ($request->status === 'Unsafe') {
+            // Safe/Unsafe self-report during an active SOS goes to everyone
+            // who needs to know: the team dispatched to this incident, HR,
+            // Security, and GM. sos_team_member_activity.emp_id is a
+            // resort_admins.id (see the identical bridge join at L350-354),
+            // so it's routed through employees.Admin_Parent_id before being
+            // handed to notifyEmployees(), which requires employees.id.
+            try {
+                $dispatchedTeamEmpIds                   =   SosTeamMemberActivity::join('resort_admins as ra', 'ra.id', '=', 'sos_team_member_activity.emp_id')
+                                                                ->join('employees as e', 'e.Admin_Parent_id', '=', 'ra.id')
+                                                                ->where('sos_team_member_activity.sos_history_id', $sosHistoryEmployeeStatus->sos_history_id)
+                                                                ->pluck('e.id');
+
                 $smEmployee                             =   Common::findActiveSecurityManager($this->resort_id);
-                if ($smEmployee) {
-                    $title                               =   'SOS Alert';
-                    $body                                =   ($this->user->first_name ?? '') . ' ' . ($this->user->last_name ?? '')
-                                                                . " reported Unsafe during an active SOS.\nLocation: " . $request->address;
-                    Common::sendPushNotificationForMobile([$smEmployee['device_token']], $title, $body, 'SOS', 'Pending', 'siren_sound', 'custom_sound_channel', NULL);
-                    Common::sendMobileNotification($this->resort_id, 2, null, null, $title, $body, 'SOS', [$smEmployee['id']], $sosHistoryEmployeeStatus->sos_history_id, false, 'sos-unsafe-status');
+
+                $recipientIds                           =   $dispatchedTeamEmpIds
+                                                                ->merge(Common::getResortHrEmployeeIds($this->resort_id))
+                                                                ->merge(Common::getResortSecurityEmployeeIds($this->resort_id))
+                                                                ->merge(Common::getResortGmEmployeeIds($this->resort_id))
+                                                                ->when($smEmployee, fn ($c) => $c->push($smEmployee['id']))
+                                                                ->unique()
+                                                                ->reject(fn ($id) => (int) $id === (int) $this->user->GetEmployee->id)
+                                                                ->values()
+                                                                ->all();
+
+                if (!empty($recipientIds)) {
+                    $employeeName                        =   trim(($this->user->first_name ?? '') . ' ' . ($this->user->last_name ?? ''));
+                    $body                                =   "{$employeeName} reported {$request->status} during an active SOS.\nLocation: {$request->address}";
+
+                    Common::notifyEmployees(
+                        $this->resort_id,
+                        $recipientIds,
+                        'SOS Alert',
+                        $body,
+                        'SOS',
+                        $sosHistoryEmployeeStatus->sos_history_id,
+                        $request->status === 'Unsafe' ? 'sos-unsafe-status' : 'sos-safe-status'
+                    );
                 }
+            } catch (\Exception $e) {
+                \Log::warning('SOS safe-status notification failed: ' . $e->getMessage());
             }
 
             return response()->json([
@@ -1227,6 +1255,90 @@ class SOSController extends Controller
                 'success'                               =>  true,
                 'message'                               =>  "SOS details fetched successfully.",
                 'data'                                  =>  $SOSEmergencyTypesModel
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Home-banner chip source for regular employees. getAnySOSEmergency()
+     * always returns today's open incident regardless of the caller's own
+     * response status, so a non-dispatched employee who already tapped
+     * Safe/Unsafe keeps seeing the chip forever. This scopes to incidents
+     * the caller hasn't responded to yet, and returns an empty list — not
+     * a "not found" error — when there's nothing to show.
+     */
+    public function employeeOpenSOS()
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $employeeId                                 =   $this->user->GetEmployee->id;
+            $currentDate                                =   Carbon::today()->format('Y-m-d');
+
+            $openIncidents                              =   SOSHistoryModel::join('employees as e', 'sos_history.emp_initiated_by', '=', 'e.id')
+                                                                ->join('resort_admins as ra', 'e.Admin_Parent_id', '=', 'ra.id')
+                                                                ->join('resort_positions as rp', 'e.position_id', '=', 'rp.id')
+                                                                ->join('sos_emergency_types as set', 'sos_history.emergency_id', '=', 'set.id')
+                                                                ->where('sos_history.resort_id', $this->resort_id)
+                                                                ->whereDate('sos_history.date', $currentDate)
+                                                                ->whereIn('sos_history.status', Common::sosOpenStatuses())
+                                                                ->whereNotExists(function ($query) use ($employeeId) {
+                                                                    $query->select(DB::raw(1))
+                                                                        ->from('sos_history_employee_status')
+                                                                        ->whereColumn('sos_history_employee_status.sos_history_id', 'sos_history.id')
+                                                                        ->where('sos_history_employee_status.emp_id', $employeeId)
+                                                                        ->whereIn('sos_history_employee_status.status', ['Safe', 'Unsafe']);
+                                                                })
+                                                                ->select('sos_history.*', 'set.name as emergency_name', 'ra.first_name', 'ra.last_name', 'ra.profile_picture', 'rp.position_title', 'e.Admin_Parent_id')
+                                                                ->orderBy('sos_history.created_at', 'ASC')
+                                                                ->get();
+
+            $data                                        =   $openIncidents->map(function ($incident) use ($employeeId) {
+                $sosEmployee                             =   SOSTeamMemeberModel::join('sos_team_member_activity as stma', 'sos_team_members.team_id', '=', 'stma.team_id')
+                                                                ->where('sos_team_members.resort_id', $this->resort_id)
+                                                                ->where('sos_team_members.emp_id', $this->user->id)
+                                                                ->where('stma.emp_id', $this->user->id)
+                                                                ->where('stma.sos_history_id', $incident->id)
+                                                                ->first();
+
+                if ($sosEmployee) {
+                    $sosEmployee->role_assigned          =   SOSRolesAndPermission::where('sos_role_management.resort_id', $this->resort_id)
+                                                                ->where('id', $sosEmployee->role_id)
+                                                                ->first();
+                    if ($sosEmployee->role_assigned) {
+                        $sosEmployee->role_assigned->permission         = explode(',', $sosEmployee->role_assigned->permission);
+                        $sosEmployee->role_assigned->permission_names   = collect($sosEmployee->role_assigned->permission)
+                            ->filter(function ($id) {
+                                return !empty($id) && isset(config('settings.sosAssignPermissions')[$id]);
+                            })
+                            ->map(function ($id) {
+                                return config('settings.sosAssignPermissions')[$id];
+                            })
+                            ->values()
+                            ->toArray();
+                    }
+                }
+
+                $incident->profile_picture              =   Common::getResortUserPicture($incident->Admin_Parent_id);
+                $incident->employee_status              =   SosHistoryEmployeeStatus::where('emp_id', $employeeId)->where('sos_history_id', $incident->id)->first();
+                $incident->sos_employee                 =   $sosEmployee ?? null;
+                $incident->sos_team_id                  =   SOSChildEmergencyType::where('emergency_id', $incident->emergency_id)->get();
+
+                return $incident;
+            });
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  $data->isEmpty() ? 'No open SOS found' : 'Open SOS fetched successfully.',
+                'data'                                  =>  $data->values(),
             ]);
 
         } catch (\Exception $e) {

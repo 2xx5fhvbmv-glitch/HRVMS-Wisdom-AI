@@ -127,6 +127,9 @@ use Illuminate\Support\Facades\Route;
 		Route::post('boarding/emp-leaving-arriving', [App\Http\Controllers\API\BoardingPassController::class, 'employeeLeavingOrArriving']);
 		Route::post('boarding/emergency-cancel-pass', [App\Http\Controllers\API\BoardingPassController::class, 'emergencyCancelBoardingPass']);
 		Route::post('boarding/transportation-date-emp', [App\Http\Controllers\API\BoardingPassController::class, 'transportationDateBasedEmp']);
+		// Alias: mobile Arrival/Departure Manifest screen calls this URL (with
+		// "-based-"), not the route name above — 404'd every manifest submit.
+		Route::post('boarding/transportation-date-based-emp', [App\Http\Controllers\API\BoardingPassController::class, 'transportationDateBasedEmp']);
 		Route::post('boarding/manifest-store', [App\Http\Controllers\API\BoardingPassController::class, 'manifestStore']);
 		Route::post('boarding/pass-time-update', [App\Http\Controllers\API\BoardingPassController::class, 'passTimeupdateHRAndSM']);
 		Route::post('boarding/boarding-pass-update', [App\Http\Controllers\API\BoardingPassController::class, 'boardingPassUpdate']);
@@ -554,6 +557,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('sos/sos-history-listing', [App\Http\Controllers\API\SOSController::class, 'SOSHistoryListing']);
 		Route::get('sos/sos-history-details/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'SOSHistoryDetails']);
 		Route::get('sos/get-any-sos-emergency', [App\Http\Controllers\API\SOSController::class, 'getAnySOSEmergency']);
+		Route::get('sos/employee-open-sos', [App\Http\Controllers\API\SOSController::class, 'employeeOpenSOS']);
 		Route::get('sos/get-team-acknowledged/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'getTeamAcknowledged']);
 		Route::post('sos/location-update', [App\Http\Controllers\API\SOSController::class, 'SOSLocationUpdate']);
 		Route::get('sos/fire-team-members', [App\Http\Controllers\API\SOSController::class, 'fireTeamMembers']);
