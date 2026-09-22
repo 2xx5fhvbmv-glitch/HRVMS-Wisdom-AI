@@ -251,6 +251,37 @@
         let task_id = $(this).data('task_id');
         let flag = $(this).data('flag');
         let msg = (flag === "On-Hold") ? 'Yes, put it on hold!' : 'Yes, close it!';
+        let today = new Date().toISOString().split('T')[0];
+
+        // On-Hold needs a reason AND the date to hold until (Figma calendar
+        // selector); Close only needs the plain reason textarea.
+        let extraOpts = (flag === "On-Hold") ? {
+            html:
+                '<textarea id="onHoldReason" class="swal2-textarea" placeholder="Enter your reason here..." style="display:flex;"></textarea>' +
+                '<label style="display:block;text-align:left;font-size:13px;font-weight:600;margin-bottom:4px;">Hold until</label>' +
+                '<input type="date" id="onHoldUntil" class="swal2-input" style="margin:0;" min="' + today + '">',
+            preConfirm: () => {
+                const reason = document.getElementById('onHoldReason').value.trim();
+                const holdUntil = document.getElementById('onHoldUntil').value;
+                if (!reason) {
+                    Swal.showValidationMessage('Reason is required!');
+                    return false;
+                }
+                if (!holdUntil) {
+                    Swal.showValidationMessage('Please select the date until which this request should remain on hold!');
+                    return false;
+                }
+                return { reason: reason, hold_until: holdUntil };
+            }
+        } : {
+            input: 'textarea', // Input type for providing a reason
+            inputPlaceholder: 'Enter your reason here...',
+            inputValidator: (value) => {
+                if (!value) {
+                    return 'Reason is required!';
+                }
+            }
+        };
 
         // SweetAlert confirmation dialog with input field
         wisdomConfirm({
@@ -258,18 +289,11 @@
             title: 'Are you sure?',
             text: msg,
             confirmText: msg,
-            extra: {
-                input: 'textarea', // Input type for providing a reason
-                inputPlaceholder: 'Enter your reason here...',
-                inputValidator: (value) => {
-                    if (!value) {
-                        return 'Reason is required!';
-                    }
-                }
-            }
+            extra: extraOpts
         }).then((result) => {
             if (result.isConfirmed) {
-                let reason = result.value; // Get the reason entered by the user
+                let reason = (flag === "On-Hold") ? result.value.reason : result.value;
+                let holdUntil = (flag === "On-Hold") ? result.value.hold_until : null;
 
                 // Proceed with AJAX request
                 $.ajax({
@@ -279,6 +303,7 @@
                         "task_id": task_id,
                         "flag": flag,
                         "reason": reason,
+                        "hold_until": holdUntil,
                         "_token": "{{ csrf_token() }}"
                     },
                     success: function(response) {

@@ -50,6 +50,44 @@
                                     </td>
                                 </tr>
                                 <tr>
+                                    <th>Assigned To:</th>
+                                    <td>
+                                        {!! $MaintanaceRequest->AssignedToDisplay ?? '<span class="badge badge-themeWarning border-0">Not Assigned Yet</span>' !!}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                        {!! $MaintanaceRequest->StatusLabel ?? '' !!}
+                                    </td>
+                                </tr>
+                                @if ($MaintanaceRequest->RawStatus === 'Rejected' && !empty($MaintanaceRequest->RejactionReason))
+                                    <tr>
+                                        <th>Rejection Reason:</th>
+                                        <td>
+                                            <div class="smallImg-block">
+                                                {{ $MaintanaceRequest->RejactionReason }}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endif
+                                @if ($MaintanaceRequest->RawStatus === 'On-Hold')
+                                    <tr>
+                                        <th>Reason On Hold:</th>
+                                        <td>
+                                            <div class="smallImg-block">
+                                                {{ $MaintanaceRequest->ReasonOnHold }}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    @if (!empty($MaintanaceRequest->HoldUntilDisplay))
+                                        <tr>
+                                            <th>On Hold Until:</th>
+                                            <td>{{ $MaintanaceRequest->HoldUntilDisplay }}</td>
+                                        </tr>
+                                    @endif
+                                @endif
+                                <tr>
                                     <th>Location:</th>
                                     <td> {!! $MaintanaceRequest->Location !!}</td>
                                 </tr>
@@ -79,16 +117,6 @@
                                         </div>
                                     </td>
                                 </tr>
-                                @if (isset($MaintanaceRequest->ReasonOnHold))
-                                    <tr>
-                                        <th>Reason On Hold:</th>
-                                        <td>
-                                            <div class="smallImg-block">
-                                                {{ $MaintanaceRequest->ReasonOnHold }}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endif
                             </tbody>
                         </table>
                     </div>

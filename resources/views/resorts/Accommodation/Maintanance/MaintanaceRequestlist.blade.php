@@ -204,6 +204,63 @@
         let task_id = $(this).data('task_id');
         let flag = $(this).data('flag');
         let msg = (flag === "On-Hold") ? 'Yes, put it on hold!' : 'Yes, close it!';
+        let today = new Date().toISOString().split('T')[0];
+
+        // On-Hold needs a reason AND the date to hold until (Figma calendar
+        // selector) — Close only needs the plain reason textarea, so the
+        // dialog markup branches on flag rather than always showing the
+        // date field.
+        let extraOpts = (flag === "On-Hold") ? {
+            html:
+                '<textarea id="onHoldReason" class="swal2-textarea" placeholder="Enter your reason here (max 100 characters)..." style="display:flex;"></textarea>' +
+                '<div id="onHoldReasonCounter" style="text-align:right;margin-top:-8px;margin-bottom:8px;font-size:12px;color:#666;">0/100 characters</div>' +
+                '<label style="display:block;text-align:left;font-size:13px;font-weight:600;margin-bottom:4px;">Hold until</label>' +
+                '<input type="date" id="onHoldUntil" class="swal2-input" style="margin:0;" min="' + today + '">',
+            didOpen: () => {
+                const reasonInput = document.getElementById('onHoldReason');
+                const counter = document.getElementById('onHoldReasonCounter');
+                reasonInput.addEventListener('input', function() {
+                    const len = this.value.length;
+                    counter.innerHTML = `${len}/100 characters`;
+                    counter.style.color = len > 100 ? '#d33' : (len > 80 ? '#f39c12' : '#666');
+                });
+            },
+            preConfirm: () => {
+                const reason = document.getElementById('onHoldReason').value.trim();
+                const holdUntil = document.getElementById('onHoldUntil').value;
+                if (!reason) {
+                    Swal.showValidationMessage('Reason is required!');
+                    return false;
+                }
+                if (/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi.test(reason)) {
+                    Swal.showValidationMessage('Script tags are not allowed!');
+                    return false;
+                }
+                if (reason.length > 100) {
+                    Swal.showValidationMessage('Reason must be 100 characters or less!');
+                    return false;
+                }
+                if (!holdUntil) {
+                    Swal.showValidationMessage('Please select the date until which this request should remain on hold!');
+                    return false;
+                }
+                return { reason: reason, hold_until: holdUntil };
+            }
+        } : {
+            input: 'textarea',
+            inputPlaceholder: 'Enter your reason here (max 100 characters)...',
+            inputValidator: (value) => {
+                if (!value) {
+                    return 'Reason is required!';
+                }
+                if (/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi.test(value)) {
+                    return 'Script tags are not allowed!';
+                }
+                if (value.length > 100) {
+                    return 'Reason must be 100 characters or less!';
+                }
+            }
+        };
 
         // SweetAlert confirmation dialog with input field
         wisdomConfirm({
@@ -211,63 +268,14 @@
             title: 'Are you sure?',
             text: msg,
             confirmText: msg,
-            extra: {
-                input: 'textarea',
-                inputPlaceholder: 'Enter your reason here (max 100 characters)...',
-                inputValidator: (value) => {
-                    if (!value) {
-                        return 'Reason is required!';
-                    }
-
-                    // Check for script tags (case insensitive)
-                    if (/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi.test(value)) {
-                        return 'Script tags are not allowed!';
-                    }
-
-                    // Check character limit
-                    if (value.length > 100) {
-                        return 'Reason must be 100 characters or less!';
-                    }
-                },
-                // Add character counter
-                didOpen: () => {
-                    const input = Swal.getInput();
-                    const charCounter = document.createElement('div');
-                    charCounter.id = 'char-counter';
-                    charCounter.style.cssText = 'text-align: right; margin-top: 5px; font-size: 12px; color: #666;';
-                    charCounter.innerHTML = '0/100 characters';
-
-                    input.parentNode.appendChild(charCounter);
-
-                    input.addEventListener('input', function() {
-                        const currentLength = this.value.length;
-                        charCounter.innerHTML = `${currentLength}/100 characters`;
-
-                        // Change color based on character count
-                        if (currentLength > 100) {
-                            charCounter.style.color = '#d33';
-                        } else if (currentLength > 80) {
-                            charCounter.style.color = '#f39c12';
-                        } else {
-                            charCounter.style.color = '#666';
-                        }
-                    });
-                }
-            }
+            extra: extraOpts
         }).then((result) => {
                 if (result.isConfirmed) {
-                    let reason = result.value.trim(); // Get the reason and trim whitespace
-                    
-                    // Additional client-side validation before sending
-                    if (reason.length > 100) {
-                        wisdomAlert({
-                            type: 'error',
-                            title: 'Error!',
-                            text: 'Reason must be 100 characters or less!'
-                        });
-                        return;
-                    }
-                    
+                    // Closed keeps the plain string result; On-Hold's
+                    // preConfirm above already returns {reason, hold_until}.
+                    let reason = (flag === "On-Hold") ? result.value.reason : result.value.trim();
+                    let holdUntil = (flag === "On-Hold") ? result.value.hold_until : null;
+
                     // Proceed with AJAX request
                     $.ajax({
                         url: "{{ route('resort.accommodation.MainRequestOnHold') }}",
@@ -276,6 +284,7 @@
                             "task_id": task_id,
                             "flag": flag,
                             "reason": reason,
+                            "hold_until": holdUntil,
                             "_token": "{{ csrf_token() }}"
                         },
                         success: function(response) {

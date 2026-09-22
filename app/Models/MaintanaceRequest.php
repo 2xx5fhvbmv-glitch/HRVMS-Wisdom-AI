@@ -11,7 +11,7 @@ class MaintanaceRequest extends Model
     protected $table = 'maintanace_requests';
 
     protected $fillable = [
-        'resort_id','date','start_time','end_time','building_id','item_id','FloorNo','Request_id','RoomNo','Image','Completed_Image','Video','priority','Raised_By','Assigned_To','descriptionIssues','Status','ReasonOnHold','RejactionReason'];
+        'resort_id','date','start_time','end_time','building_id','item_id','FloorNo','Request_id','RoomNo','Image','Completed_Image','Video','priority','Raised_By','Assigned_To','descriptionIssues','Status','ReasonOnHold','RejactionReason','hold_until','hold_expiry_notified_at'];
 
 
     public function BuilidngData()

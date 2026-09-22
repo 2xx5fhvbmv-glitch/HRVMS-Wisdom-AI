@@ -762,8 +762,11 @@ class MaintananceContorller extends Controller
         if ($flag == 'On-Hold') {
             $validator = Validator::make($request->all(), [
                 'reason' => 'required|string',
+                'hold_until' => 'required|date|after_or_equal:today',
             ], [
                 'reason.required' => 'Please provide a reason for placing this request on hold.',
+                'hold_until.required' => 'Please select the date until which this request should remain on hold.',
+                'hold_until.after_or_equal' => 'Hold until date cannot be in the past.',
             ]);
             if ($validator->fails()) {
                 return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
@@ -788,7 +791,14 @@ class MaintananceContorller extends Controller
             {
                 $status ="On-Hold";
                 $reason = $request->input('reason');
-                $mainRequest->update(['Status'=>$status,"ReasonOnHold"=>$reason]);
+                // Clearing hold_expiry_notified_at lets a fresh hold on a
+                // previously-expired request fire the expiry notice again.
+                $mainRequest->update([
+                    'Status' => $status,
+                    'ReasonOnHold' => $reason,
+                    'hold_until' => $request->input('hold_until'),
+                    'hold_expiry_notified_at' => null,
+                ]);
             }
             else
             {
@@ -829,6 +839,52 @@ class MaintananceContorller extends Controller
         }
     }
 
+    /**
+     * Ticket: Accommodation - Maintenance Request - Assignment, Status &
+     * Hold Flow. Detail views (MainRequestDetails/HODMainRequestDetails)
+     * only ever showed the raw Assigned_To id and had no badge for
+     * Rejected/On-Hold/Approved/ResolvedAwaiting. Added as new properties
+     * instead of changing the existing Status/AssgingedStaff mutation
+     * further down in each method — the blade's own timeline section still
+     * compares $MaintanaceRequest->Status against raw 'Open'/'Rejected'/
+     * 'On-Hold' strings, so overwriting Status there for every value would
+     * silently break that comparison.
+     */
+    private function attachMaintenanceDisplayExtras($MaintanaceRequest)
+    {
+        if (!$MaintanaceRequest) {
+            return $MaintanaceRequest;
+        }
+
+        $MaintanaceRequest->RawStatus = $MaintanaceRequest->Status;
+        $MaintanaceRequest->HoldUntilDisplay = $MaintanaceRequest->hold_until
+            ? date('d M Y', strtotime($MaintanaceRequest->hold_until))
+            : null;
+
+        $assignedEmployee = $MaintanaceRequest->Assigned_To
+            ? Common::GetEmployeeDetails($MaintanaceRequest->Assigned_To, $this->resort->resort_id)
+            : null;
+        $MaintanaceRequest->AssignedToDisplay = $assignedEmployee
+            ? '<div class="tableUser-block"><div class="img-circle"><img src="' . Common::getResortUserPicture($assignedEmployee->Parent_id) . '" alt="user"></div><span class="userApplicants-btn">' . ucfirst($assignedEmployee->first_name . ' ' . $assignedEmployee->last_name) . '</span></div>'
+            : '<span class="badge badge-themeWarning border-0">Not Assigned Yet</span>';
+
+        $statusBadges = [
+            'pending'          => ['Pending', 'badge-themeSkyblue'],
+            'Open'             => ['Open', 'badge-orange'],
+            'In-Progress'      => ['In-Progress', 'badge-themeBlue'],
+            'Assigned'         => ['Assigned', 'badge-themeWarning'],
+            'Approved'         => ['Approved', 'badge-success'],
+            'Rejected'         => ['Rejected', 'badge-danger'],
+            'On-Hold'          => ['On Hold', 'badge-warning'],
+            'ResolvedAwaiting' => ['Resolved - Awaiting Confirmation', 'badge-info'],
+            'Closed'           => ['Closed', 'badge-secondary'],
+        ];
+        [$label, $class] = $statusBadges[$MaintanaceRequest->RawStatus] ?? [$MaintanaceRequest->RawStatus, 'badge-secondary'];
+        $MaintanaceRequest->StatusLabel = '<span class="badge ' . $class . '">' . $label . '</span>';
+
+        return $MaintanaceRequest;
+    }
+
     public function MainRequestDetails($id)
     {
 
@@ -845,6 +901,7 @@ class MaintananceContorller extends Controller
                                             // ->where('maintanace_requests.Status',"!=",'Closed')
                                             ->where("maintanace_requests.id",$id)
                                             ->first(['t1.id as Parentid','t1.first_name','t1.last_name','maintanace_requests.*']);
+        $MaintanaceRequest = $this->attachMaintenanceDisplayExtras($MaintanaceRequest);
         $MaintanaceRequestChild =MaintanaceRequest::join('child_maintanance_requests as t1',"t1.maintanance_request_id","=","maintanace_requests.id")
                                                     ->where('maintanace_requests.resort_id',$this->resort->resort_id)
                                                     ->where('maintanace_requests.id',$id)
@@ -1155,6 +1212,7 @@ class MaintananceContorller extends Controller
                                             ->whereNotNull('maintanace_requests.Assigned_To')
                                             ->where("maintanace_requests.id",$id)
                                             ->first(['t1.id as Parentid','t1.first_name','t1.last_name','maintanace_requests.*']);
+        $MaintanaceRequest = $this->attachMaintenanceDisplayExtras($MaintanaceRequest);
         $MaintanaceRequestChild =MaintanaceRequest::join('child_maintanance_requests as t1',"t1.maintanance_request_id","=","maintanace_requests.id")
                                             ->where('maintanace_requests.resort_id',$this->resort->resort_id)
                                             ->where('maintanace_requests.id',$id)

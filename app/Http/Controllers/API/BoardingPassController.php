@@ -1691,9 +1691,6 @@ class BoardingPassController extends Controller
 
             if($request->manifest_type == 'arrival') {
 
-                // Set status for arrival
-                $status = in_array($request->status, ['draft', 'confirmed']) ? $request->status : 'draft';
-
                  // Create manifest
                 $manifest = Manifest::create([
                     'resort_id'                         =>  $this->resort_id,
@@ -1720,9 +1717,6 @@ class BoardingPassController extends Controller
                         ]);
                 }
             } else {
-
-                // Set status for departure
-                $status = in_array($request->status, ['saved', 'closed']) ? $request->status : 'saved';
 
                  // Create manifest
                 $manifest = Manifest::create([
@@ -1894,6 +1888,16 @@ class BoardingPassController extends Controller
         try {
 
             $pass                                   = EmployeeTravelPass::findOrFail($request->pass_id);
+
+            // A confirmed/closed manifest is an archive record — its passes'
+            // times must not change under it after the fact.
+            if ($pass->manifest_id && Manifest::where('id', $pass->manifest_id)->whereIn('status', ['confirmed', 'closed'])->exists()) {
+                DB::rollBack();
+                return response()->json([
+                    'success'                       => false,
+                    'message'                       => 'This travel pass belongs to a confirmed manifest and can no longer be edited.'
+                ], 200);
+            }
 
             // Update times conditionally
             if ($request->has('departure_time')) {
@@ -2201,8 +2205,8 @@ class BoardingPassController extends Controller
                 }
                 if ($request->status == 'departed') {
                     $employeeTravelPass->employee_departure_status      = 'departed';
-                } elseif ($request->status == 'arrival') {
-                    $employeeTravelPass->employee_arrival_status        = 'arrived'; // Example new field
+                } elseif ($request->status == 'arrived') {
+                    $employeeTravelPass->employee_arrival_status        = 'arrived';
                 }
 
                 $employeeTravelPass->save();
@@ -2727,9 +2731,6 @@ class BoardingPassController extends Controller
                 ], 200);
             }
 
-            // Manifest status to check and update
-            $manifestStatus = $isDeparture ? 'saved' : 'confirmed';
-            // dd($manifestStatus);
             $Manifest = Manifest::where('resort_id', $this->resort_id)
                 ->where('manifest_type', $manifestType)
                 ->where('status', 'saved')
