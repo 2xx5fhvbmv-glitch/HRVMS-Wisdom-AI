@@ -46,7 +46,7 @@ class DisciplinaryController extends Controller
             $activeDisciplinaryCount                            =   disciplinarySubmit::with(['offence'])
                                                                         ->where('resort_id',$this->resort_id) //show all and history of all the committe members
                                                                         ->where('Employee_id',$employee_id)
-                                                                        ->where('status', 'In_Review')
+                                                                        ->whereIn('status', ['In_Review', 'Acknowledged'])
                                                                         ->count();
 
             $pastDisciplinaryCount                              =   disciplinarySubmit::with(['offence'])
@@ -91,8 +91,12 @@ class DisciplinaryController extends Controller
             $employee_id                                        =   $this->user->GetEmployee->id;
             $DisciplinaryModel                                  =   disciplinarySubmit::with(['offence',
                                                                         'action:id,ActionName',
-                                                                        'GetEmployee:id,Admin_Parent_id,Position_id,Emp_id',
+                                                                        'GetEmployee:id,Admin_Parent_id,Position_id,Emp_id,reporting_to',
                                                                         'GetEmployee.resortAdmin:id,first_name,last_name,profile_picture',
+                                                                        // No column restriction here — hasOneThrough's join makes a
+                                                                        // qualified 'id,...' list ambiguous (ProfileController does
+                                                                        // the same for this relation for the same reason).
+                                                                        'GetEmployee.reportingToAdmin',
                                                                        ])
                                                                         ->where('resort_id', $this->resort_id) //show all and history of all the committe members
                                                                         ->where('Employee_id',$employee_id)
@@ -100,6 +104,12 @@ class DisciplinaryController extends Controller
                                                                         ->first();
 
             $DisciplinaryModel->GetEmployee->resortAdmin->profile_picture =   Common::getResortUserPicture( $DisciplinaryModel->GetEmployee->resortAdmin->id);
+
+            // reporting_to defaults to 0 (no manager set) — reportingToAdmin
+            // then resolves to null, which is exactly the "not provided" case.
+            if ($DisciplinaryModel->GetEmployee->reportingToAdmin) {
+                $DisciplinaryModel->GetEmployee->reportingToAdmin->profile_picture = Common::getResortUserPicture($DisciplinaryModel->GetEmployee->reportingToAdmin->id);
+            }
 
 
             $path = config('settings.DisciplinaryAttachments');
@@ -156,25 +166,59 @@ class DisciplinaryController extends Controller
                 ], 200);
             }
             $DisciplinaryModel->Acknowledgment_description      =   $request->Acknowledgment_description;
-            $DisciplinaryModel->save();
-            
-            // Send mobile notification to HR employee
-            $hrEmployee = Common::FindResortHR($this->user);
-            if ($hrEmployee) {
-                Common::sendMobileNotification(
-                    $this->resort_id,
-                    2,
-                    null,
-                    null,
-                    'Employee Disciplinary Acknowledgment',
-                    'A disciplinary acknowledgment has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
-                    'Employee Disciplinary',
-                    [$hrEmployee->id],
-                    $DisciplinaryModel->id,
-                    false,
-                    'disciplinary-acknowledgment',
-                );
+            // Only advance In_Review -> Acknowledged. Leaves resolved/rejected
+            // untouched so a re-submitted acknowledgment can never undo an
+            // HR/committee decision that already landed on the case — status
+            // moves forward from here only through the committee's own
+            // investigation-report flow (DisciplinaryController@InvestigationReportStore).
+            if ($DisciplinaryModel->status === 'In_Review') {
+                $DisciplinaryModel->status                      =   'Acknowledged';
             }
+            $DisciplinaryModel->save();
+
+            // Notify HR and the case's assigned committee members. A
+            // notification failure must never turn a successfully saved
+            // acknowledgment into a false "failed" response to the employee.
+            try {
+                $hrEmployee = Common::FindResortHR($this->user);
+                if ($hrEmployee) {
+                    Common::sendMobileNotification(
+                        $this->resort_id,
+                        2,
+                        null,
+                        null,
+                        'Employee Disciplinary Acknowledgment',
+                        'A disciplinary acknowledgment has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                        'Employee Disciplinary',
+                        [$hrEmployee->id],
+                        $DisciplinaryModel->id,
+                        false,
+                        'disciplinary-acknowledgment',
+                    );
+                }
+
+                if ($DisciplinaryModel->Committee_id) {
+                    $committeeEmpIds = \App\Models\DisciplineryCommitteeMembers::where('Parent_committee_id', $DisciplinaryModel->Committee_id)
+                        ->pluck('MemberId')
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all();
+                    if (!empty($committeeEmpIds)) {
+                        Common::notifyEmployees(
+                            $this->resort_id,
+                            $committeeEmpIds,
+                            'Employee Disciplinary Acknowledgment',
+                            $this->user->first_name . ' ' . $this->user->last_name . ' has acknowledged their disciplinary case.',
+                            'Disciplinary',
+                            $DisciplinaryModel->id
+                        );
+                    }
+                }
+            } catch (\Exception $notifyEx) {
+                \Log::warning('Disciplinary acknowledgment notification failed: ' . $notifyEx->getMessage());
+            }
+
             $response['status']                                 =   true;
             $response['message']                                =   'Acknowledgment Disciplinary Submitted Successfully';
         

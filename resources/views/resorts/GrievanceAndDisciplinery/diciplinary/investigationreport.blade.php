@@ -136,6 +136,7 @@
                         <div class="krow"><span class="kk">Employee ID</span><span class="kv">{{ $Disciplinary_parent->employee_code ?? '-' }}</span></div>
                         <div class="krow"><span class="kk">Department</span><span class="kv">{{ $Disciplinary_parent->DepartmentName }}</span></div>
                         <div class="krow"><span class="kk">Position</span><span class="kv">{{ $Disciplinary_parent->PositiontName }}</span></div>
+                        <div class="krow"><span class="kk">Supervisor</span><span class="kv">{{ $Disciplinary_parent->SupervisorFirstName ? $Disciplinary_parent->SupervisorFirstName.' '.$Disciplinary_parent->SupervisorLastName : 'Not assigned' }}</span></div>
                         <div class="krow">
                             <span class="kk">Email</span>
                             @if(!empty($Disciplinary_parent->employee_email))

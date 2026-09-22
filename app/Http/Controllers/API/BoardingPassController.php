@@ -1567,11 +1567,15 @@ class BoardingPassController extends Controller
                                                         ->whereDoesntHave('employeeTravelPassStatusData', function ($q) {
                                                             $q->where('status', '!=', 'Approved');
                                                         });
-            // Filter by arrival or departure
+            // Filter by date only — the transportation mode the employee
+            // originally picked when applying for the Island Pass has no
+            // bearing on which manifest HR/Security actually assigns them
+            // to. transportation_id is still accepted (mobile always sends
+            // it) but is no longer used to restrict this query.
             if ($request->type === 'arrival') {
-                $query->where('arrival_date', $request->date)->where('arrival_mode', $request->transportation_id);
+                $query->where('arrival_date', $request->date);
             } else {
-                $query->where('departure_date', $request->date)->where('departure_mode', $request->transportation_id);
+                $query->where('departure_date', $request->date);
             }
 
             $employeeTravelPasses                   =   $query->get();

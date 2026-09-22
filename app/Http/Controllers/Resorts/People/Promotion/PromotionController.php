@@ -1565,7 +1565,7 @@ class PromotionController extends Controller
 
             if (in_array('disciplinary', $filters)) {
                 $disciplinaryEmployees = Employee::whereHas('disciplinarySubmits', function ($q) {
-                    $q->where('status', 'In_Review')                
+                    $q->whereIn('status', ['In_Review', 'Acknowledged'])
                     ->where('resort_id', $this->resort->resort_id); // example condition
                 })->pluck('id')->toArray();
                 $excludeIds = array_merge($excludeIds, $disciplinaryEmployees);

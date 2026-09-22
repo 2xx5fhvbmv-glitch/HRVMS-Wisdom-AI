@@ -2265,7 +2265,7 @@ class WisdomTools
             'disciplinary' => [
                 'open'             => $disc()->whereNotIn('status', ['resolved', 'rejected'])->count(),
                 'pending'          => $disc()->where('status', 'pending')->count(),
-                'under_review'     => $disc()->where('status', 'In_Review')->count(),
+                'under_review'     => $disc()->whereIn('status', ['In_Review', 'Acknowledged'])->count(),
                 'resolved'         => $disc()->where('status', 'resolved')->count(),
                 'filed_this_month' => $disc()->where('created_at', '>=', $monthStart)->count(),
             ],
@@ -2295,7 +2295,14 @@ class WisdomTools
             case 'under_review':
             case 'investigation':
             case 'under_investigation':
-                $q->where('status', $review);
+                // Disciplinary's employee-acknowledgment step still counts as
+                // "under review" — only resolved/rejected close a case.
+                $type === 'disciplinary'
+                    ? $q->whereIn('status', [$review, 'Acknowledged'])
+                    : $q->where('status', $review);
+                break;
+            case 'acknowledged':
+                $q->where('status', 'Acknowledged');
                 break;
             case 'closed':
             case 'resolved':

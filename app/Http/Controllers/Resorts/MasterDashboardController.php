@@ -294,7 +294,7 @@ class MasterDashboardController extends Controller
             $pending_grivance_count = $grivance_data->where('status','pending')->count();
             $resolve_grivance_count  = $grivance_data->where('status','resolved')->count();
 
-            $open_disciplinary_count = $disiplinary_data->where('status','In_Review')->count();
+            $open_disciplinary_count = $disiplinary_data->whereIn('status',['In_Review','Acknowledged'])->count();
             $pending_disciplinary_count = $disiplinary_data->where('status','pending')->count();
             $resolve_disciplinary_count  = $disiplinary_data->where('status','resolved')->count();
 

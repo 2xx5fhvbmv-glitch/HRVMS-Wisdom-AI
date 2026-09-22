@@ -610,10 +610,11 @@ class SalaryIncrementController extends Controller
         }
 
         if ((int) $request->exclude_disciplinary === 1) {
-            // disciplinary_submits.status values are 'Pending', 'In_Review'
-            // (capital + underscore — the old lowercase array never matched).
+            // disciplinary_submits.status values are 'Pending', 'In_Review',
+            // 'Acknowledged' (capital + underscore — the old lowercase array
+            // never matched). Acknowledged is still an open, unresolved case.
             $disciplinaryIds = Employee::whereHas('disciplinarySubmits', function ($q) use ($resortId) {
-                $q->where('status', 'In_Review')
+                $q->whereIn('status', ['In_Review', 'Acknowledged'])
                   ->where('resort_id', $resortId);
             })->pluck('id')->all();
             if (!empty($disciplinaryIds)) {

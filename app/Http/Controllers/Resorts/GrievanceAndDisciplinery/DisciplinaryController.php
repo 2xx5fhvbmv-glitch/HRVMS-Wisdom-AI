@@ -515,7 +515,7 @@ class DisciplinaryController extends Controller
     {
         $DisciplinarySubmissionModel= disciplinarySubmit::with(['category','offence','GetEmployee'])
         ->leftjoin('action_stores as t1', 't1.id', '=', 'disciplinary_submits.Action_id')
-        ->where('disciplinary_submits.status','In_Review')
+        ->whereIn('disciplinary_submits.status',['In_Review','Acknowledged'])
         ->where('disciplinary_submits.Employee_id',base64_decode($request->Employee_id))
         ->where('disciplinary_submits.resort_id',$this->resort->resort_id) //show all and history of all the committe members
         ->get(['t1.ActionName','disciplinary_submits.*']);
@@ -567,10 +567,14 @@ class DisciplinaryController extends Controller
                                                     ->join('offenses_models as t6',"t6.id","=","disciplinary_submits.Offence_id")
                                                     ->join('disciplinary_categories_models as t7',"t7.id","=","disciplinary_submits.Category_id")
                                                     ->leftJoin('disciplinery_assign_committees as t9',"t9.id","=","disciplinary_submits.Committee_id")
+                                                    // Supervisor (reporting_to) — nullable, and defaults to 0 for
+                                                    // employees with no manager set, so this stays a left join.
+                                                    ->leftJoin('employees as t10',"t10.id","=","t1.reporting_to")
+                                                    ->leftJoin('resort_admins as t11',"t11.id","=","t10.Admin_Parent_id")
                                                     ->where("t1.resort_id",$this->resort->resort_id)
                                                     ->where("disciplinary_submits.id",$id)
-                                                    ->where('disciplinary_submits.status','In_Review')
-                                                    ->first(['t8.ActionName','t7.DisciplinaryCategoryName as  CatName','t6.OffensesName','t2.personal_phone','t2.email as employee_email','t2.id as Parentid','t2.first_name','t2.last_name','t2.profile_picture','t1.Emp_id as employee_code','t9.CommitteeName','disciplinary_submits.*','t3.name as DepartmentName','t4.position_title as PositiontName']);
+                                                    ->whereIn('disciplinary_submits.status',['In_Review','Acknowledged'])
+                                                    ->first(['t8.ActionName','t7.DisciplinaryCategoryName as  CatName','t6.OffensesName','t2.personal_phone','t2.email as employee_email','t2.id as Parentid','t2.first_name','t2.last_name','t2.profile_picture','t1.Emp_id as employee_code','t9.CommitteeName','disciplinary_submits.*','t3.name as DepartmentName','t4.position_title as PositiontName','t11.first_name as SupervisorFirstName','t11.last_name as SupervisorLastName']);
        
         $page_title ="Disciplinary Investigation";
         $path = config('settings.DisciplinaryAttachments');
