@@ -816,6 +816,11 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('accommodation/get-accommodationwise-employee', 'Accommodation\AssignAccommodationController@GetAccmmodationwiseEmployee')->name('resort.accommodation.GetAccmmodationwiseEmployee');
     Route::post('accommodation/move-to-next', 'Accommodation\AssignAccommodationController@MoveToNext')->name('resort.accommodation.MoveToNext');
 
+    Route::get('accommodation/housekeeping-request', 'Accommodation\HousekeepingRequestController@index')->name('resort.accommodation.HousekeepingRequest');
+    Route::post('accommodation/housekeeping-request/eligible-services', 'Accommodation\HousekeepingRequestController@eligibleServices')->name('resort.accommodation.HousekeepingRequestEligibleServices');
+    Route::post('accommodation/housekeeping-request/store', 'Accommodation\HousekeepingRequestController@store')->name('resort.accommodation.HousekeepingRequestStore');
+    Route::get('accommodation/housekeeping-request/list', 'Accommodation\HousekeepingRequestController@list')->name('resort.accommodation.HousekeepingRequestList');
+
 
     Route::post('accommodation/hr-forward-to-hod-maintenance-request', 'Accommodation\MaintananceContorller@HrForwardToHODManitenanceRequest')->name('resort.accommodation.HrForwardToHODManitenanceRequest');
 
@@ -2269,6 +2274,7 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
       Route::get('chat/view/{type}/{type_id}', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'chatView'])->name('resort.chat.view');
       Route::post('chat/send', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'sendMessage'])->name('resort.chat.send');
       Route::post('chat/mark-read', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'markAsRead'])->name('resort.chat.markRead');
+      Route::post('chat/typing', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'typing'])->name('resort.chat.typing');
 
       // Clinic — temporary (third-party/agency) doctor accounts. HR-only
       // (Common::hasFullDataAccess(), checked in the controller); mobile

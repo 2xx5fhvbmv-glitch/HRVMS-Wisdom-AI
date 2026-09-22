@@ -312,6 +312,37 @@ class ConversationController extends Controller
         ]);
     }
 
+    /**
+     * 1-1 typing indicator only — group typing is a client-side whisper on
+     * the group's presence channel (no server round trip needed, see
+     * wisdom-chat.blade.php), since group.{id} members can publish to it
+     * directly. chat.{id} is each user's own private inbox channel, not a
+     * shared per-conversation channel, so the sender can't join the
+     * recipient's channel to whisper the same way — this endpoint stands in.
+     */
+    public function typing(Request $request)
+    {
+        if (!$this->resort) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        $resort = $this->resort;
+
+        if ($request->type !== 'individual') {
+            return response()->json(['success' => true]);
+        }
+
+        $recipientInResort = ResortAdmin::where('id', $request->type_id)
+            ->where('resort_id', $resort->resort_id)
+            ->exists();
+        if (!$recipientInResort) {
+            return response()->json(['success' => false, 'message' => 'Recipient not found.'], 404);
+        }
+
+        broadcast(new \App\Events\UserTyping($request->type_id, $resort->id, $resort->full_name))->toOthers();
+
+        return response()->json(['success' => true]);
+    }
+
     public function markAsRead(Request $request)
     {
         $resort = $this->resort;

@@ -310,7 +310,7 @@ class MaintananceContorller extends Controller
 
         DB::beginTransaction();
         try{
-            $mainRequest->update(['status'=>'Open','date'=>date('Y-m-d'),'Assigned_To'=>$HOD_id]);
+            $mainRequest->update(['Status'=>'Open','date'=>date('Y-m-d'),'Assigned_To'=>$HOD_id]);
             ChildMaintananceRequest::where("maintanance_request_id",$task_id)->where('resort_id', $this->resort->resort_id)->update(['ApprovedBy'=>$this->resort->GetEmployee->id,'Status'=>'Open']);
             ChildMaintananceRequest::create([
                 'maintanance_request_id' => $task_id,
@@ -717,7 +717,7 @@ class MaintananceContorller extends Controller
         try
         {
             $mainRequest = MaintanaceRequest::where("resort_id",$this->resort->resort_id)->where("id",$id)->first();
-            $mainRequest->update(['status'=>'Rejected',"RejactionReason"=>$reason]);
+            $mainRequest->update(['Status'=>'Rejected',"RejactionReason"=>$reason]);
 
             // Notify the employee who raised the request
             try {
@@ -788,12 +788,12 @@ class MaintananceContorller extends Controller
             {
                 $status ="On-Hold";
                 $reason = $request->input('reason');
-                $mainRequest->update(['status'=>$status,"ReasonOnHold"=>$reason]);
+                $mainRequest->update(['Status'=>$status,"ReasonOnHold"=>$reason]);
             }
             else
             {
                 $status="Closed";
-                $mainRequest->update(['status'=>$status]);
+                $mainRequest->update(['Status'=>$status]);
 
                 ChildMaintananceRequest::where("maintanance_request_id",$task_id)->where('resort_id', $this->resort->resort_id)->update(['Status'=>'Closed']);
 
@@ -1522,6 +1522,14 @@ class MaintananceContorller extends Controller
                         elseif($row->Status=='Assigned')
                         {
                             return '<span class="badge badge-themeWarning">Assigned</span>';
+                        }
+                        elseif($row->Status=='ResolvedAwaiting')
+                        {
+                            return '<span class="badge badge-info">Resolved Awaiting</span>';
+                        }
+                        elseif($row->Status=='Rejected')
+                        {
+                            return '<span class="badge badge-danger">Rejected</span>';
                         }
                     })
 

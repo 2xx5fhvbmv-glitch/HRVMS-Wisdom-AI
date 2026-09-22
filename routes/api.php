@@ -228,6 +228,7 @@ use Illuminate\Support\Facades\Route;
 			Route::get('accommodation/hr-bed-assign/{emp_id}', [App\Http\Controllers\API\AccommodationController::class, 'hrBedAssign']);
 			Route::post('accommodation/hr-room-info', [App\Http\Controllers\API\AccommodationController::class, 'hrRoomInfo']);
 			Route::post('accommodation/assign-accommodation-to-emp', [App\Http\Controllers\API\AccommodationController::class, 'assignAccommodationToEmp']);
+			Route::post('accommodation/move-accommodation-for-emp', [App\Http\Controllers\API\AccommodationController::class, 'moveAccommodationForEmp']);
 			Route::post('accommodation/emp-list-with-available-bed', [App\Http\Controllers\API\AccommodationController::class, 'empListWithAvailableBed']);
 			Route::post('accommodation/housekeeping-add-schedules', [App\Http\Controllers\API\AccommodationController::class, 'houseKeepingAddSchedules']);
 			Route::post('accommodation/hr-housekeeping-dashboard', [App\Http\Controllers\API\AccommodationController::class, 'hrHouseKeepingDashboard']);
@@ -668,6 +669,7 @@ use Illuminate\Support\Facades\Route;
 		Route::post('chat/send-message', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'sendMessage']);
 		Route::get('chat/get-messages/{type}/{type_id}', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'chatView']);
 		Route::get('chat/messages/mark-read', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'markAsRead']);
+		Route::post('chat/typing', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'typing']);
 
 		// Pusher private/presence channel auth for mobile (Passport/api guard) —
 		// the default Broadcast::routes() auth endpoint only works under the

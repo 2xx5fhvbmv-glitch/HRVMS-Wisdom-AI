@@ -12,7 +12,8 @@ class HousekeepingRequest extends Model
 
     protected $fillable = [
         'resort_id', 'request_id', 'batch_id', 'employee_id', 'housekeeping_service_id',
-        'raised_by', 'BuildingName', 'FloorNo', 'RoomNo', 'remarks', 'status', 'completed_at',
+        'raised_by', 'BuildingName', 'FloorNo', 'RoomNo', 'remarks', 'scheduled_date',
+        'scheduled_time', 'status', 'completed_at',
     ];
 
     protected static function boot()

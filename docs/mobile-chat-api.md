@@ -32,6 +32,7 @@ resort-admin id.
 | GET | `chat/get-messages/{type}/{type_id}` | Alias of `chat/view` — same response, same params. Use whichever reads better client-side. |
 | POST | `chat/send-message` | Multipart. Fields: `type` (`individual`\|`group`, required), `type_id` (required), `message` (**now optional** if `attachment` is present — was hard-required before, so a photo with no caption used to fail validation), `attachment` (optional file, now validated server-side: `jpg,jpeg,png,pdf,doc,docx,xls,xlsx`, max 10MB) |
 | GET | `chat/messages/mark-read?conversation_id=` | Marks that conversation thread read for you — **not** a single-message read receipt, it flips your `chat_message_read` row for the whole thread |
+| POST | `chat/typing` | **New.** Body: `type` (`individual` only — no-op for `group`, see §Typing indicators below), `type_id` (the person you're typing to). Broadcasts `UserTyping` on their `chat.{their_id}` channel. |
 
 `chat/view`'s response for `type=group` now includes the member list and whether *you* can manage this group:
 ```json
@@ -158,11 +159,27 @@ socket), it's worth re-testing whether that's still needed.
 ```
 For a group message, `type_id` is the group id, not a recipient id.
 
-**Typing indicators**: no backend endpoint — use a Pusher [client event](https://pusher.com/docs/channels/using_channels/events/#triggering-client-events)
-directly on `chat.{theirUserId}` or `group.{groupId}`. Convention: event name
-`client-typing`, payload `{"user_id": <you>, "type": "individual|group", "type_id": <same as above>}`.
-Client events require no server code but do need "client events" enabled on
-the Pusher app (already on, same as support-chat uses).
+**Typing indicators** — two different mechanisms, because `chat.{id}` and
+`group.{id}` have different auth models:
+
+- **Group**: `group.{groupId}` is a presence channel any member can join, so
+  a member can [client-event](https://pusher.com/docs/channels/using_channels/events/#triggering-client-events)
+  whisper directly on it — no server round trip. Event name `client-typing`
+  (received by other subscribers as `client-typing`), payload `{"name": "<your display name>"}`.
+  Needs "client events" enabled on the Pusher app (already on, same as
+  support-chat uses).
+- **Individual**: `chat.{receiverId}` is auth'd as "only the user whose id
+  equals `receiverId`" — i.e. it's each user's own private inbox channel, not
+  a channel shared by the two participants. A sender can't join the
+  *recipient's* `chat.{recipientId}` channel to whisper on it (an earlier
+  version of this doc suggested exactly that — it doesn't work, the
+  subscription is rejected). Use `POST chat/typing` instead:
+  `{"type": "individual", "type_id": <the person you're typing to>}`.
+  The server broadcasts a `UserTyping` event
+  (`{"type": "individual", "type_id": <you>, "sender_id": <them>, "sender_name": "..."}`)
+  on your own `chat.{myUserId}` channel — the same channel `MessageSent`
+  already arrives on. Throttle client-side (once per ~3s while typing is
+  plenty); the web portal client hides the indicator 3s after the last event.
 
 **Last-seen (offline) timestamps are not implemented.** `resort-online`
 presence gives live online/offline only — nothing is persisted for "seen 2

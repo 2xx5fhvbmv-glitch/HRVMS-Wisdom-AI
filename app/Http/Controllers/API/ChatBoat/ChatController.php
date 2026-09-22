@@ -55,8 +55,15 @@ class ChatController extends Controller
                          ->with(['GetEmployee' => function ($query) {
                               $query->where('status', 'Active');
                          }])
-                         ->get()
-                         ->map(function ($ResortAdmin) use ($resort) {
+                         ->get();
+
+              // Same one-query-per-row picture lookup already fixed on the
+              // employee-list pickers — this is the conversation list itself,
+              // loaded on every panel open, so it pays the same N+1 cost.
+              $pictures = Common::getResortUserPicturesBatch($chatWithEmp->pluck('id')->all());
+
+              $chatWithEmp = $chatWithEmp
+                         ->map(function ($ResortAdmin) use ($resort, $pictures) {
 
                               // Correctly group the conditions for the last message query
                               $lastMessage = Conversation::where('resort_id', $resort->resort_id)
@@ -82,7 +89,7 @@ class ChatController extends Controller
                                    'id' => $ResortAdmin->id,
                                    'name' => $ResortAdmin->first_name . ' ' . $ResortAdmin->last_name,
                                    'last_seen' => $ResortAdmin->updated_at,
-                                   'profile' => Common::getResortUserPicture($ResortAdmin->id),
+                                   'profile' => $pictures[$ResortAdmin->id] ?? Common::getResortUserPicture($ResortAdmin->id),
                                    'last_msg' => $lastMessage->message ?? null,
                                    'last_message_time' => optional($lastMessage)->created_at,
                                    'unread_count' => $unreadCount,
@@ -514,13 +521,19 @@ class ChatController extends Controller
                ->with('resortAdmin', fn($query) => $query->where('id', '!=', $resort->id))
                ->get();
 
+          // Same one-query-per-row picture lookup already fixed on newChat()/
+          // newEmployeeList() (the reported 3-4s employee-list load) — this
+          // picker had the identical unpatched pattern.
+          $adminIds = $employees->pluck('resortAdmin.id')->filter()->values()->all();
+          $pictures = Common::getResortUserPicturesBatch($adminIds);
+
           $datas = [];
           foreach ($employees as $employee) {
                if ($employee->resortAdmin != null) {
                     $datas[] = [
                          'id' => $employee->resortAdmin->id,
                          'name' => $employee->resortAdmin->full_name,
-                         'profile' => Common::getResortUserPicture($employee->resortAdmin->id),
+                         'profile' => $pictures[$employee->resortAdmin->id] ?? Common::getResortUserPicture($employee->resortAdmin->id),
                     ];
                }
           }

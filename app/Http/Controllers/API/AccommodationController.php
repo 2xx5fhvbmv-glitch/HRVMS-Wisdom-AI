@@ -1025,6 +1025,204 @@ class AccommodationController extends Controller
         }
     }
 
+    /**
+     * Mobile "move" — same purpose as the web portal's
+     * AssignAccommodationController::MoveToNext(), for an employee who
+     * already has a bed (most employees do — see assignAccommodationToEmp()
+     * above, which refuses to reassign someone already housed). Unlike
+     * MoveToNext(), the client never has to know/send the employee's OLD
+     * bed id — it's resolved server-side from emp_id, matching how this
+     * exact lookup already works in assignAccommodationToEmp()'s
+     * "already assigned" branch just above.
+     */
+    public function moveAccommodationForEmp(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'emp_id'                                        =>    'required',
+            'assign_id'                                     =>    'required',
+            'accommodation_type_id'                         =>    'required',
+            'building_id'                                   =>    'required',
+            'floor'                                         =>    'required',
+            'room'                                          =>    'required',
+            'bed'                                            =>    'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $assignId                                           =   $request->assign_id;
+        $emp_id                                             =   $request->emp_id;
+        $reason                                              =   $request->reason ?? 'Moved via mobile';
+
+        $newBed = AssingAccommodation::where('id', $assignId)->where('resort_id', $this->resort_id)->first();
+        if (!$newBed) {
+            return response()->json(['success' => false, 'message' => 'Accommodation not found.'], 404);
+        }
+        if (!Employee::where('id', $emp_id)->where('resort_id', $this->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
+        }
+
+        // The whole point of "move" vs "assign": the employee must already
+        // be housed somewhere. assignAccommodationToEmp() is first-assign
+        // only and actively refuses a re-assignment — this is its
+        // counterpart for everyone already in a bed.
+        $oldBed = AssingAccommodation::where('emp_id', $emp_id)->where('resort_id', $this->resort_id)->first();
+        if (!$oldBed) {
+            return response()->json(['success' => false, 'message' => 'Employee has no current accommodation to move from — use assign-accommodation-to-emp instead.'], 422);
+        }
+        if ($oldBed->id == $newBed->id) {
+            return response()->json(['success' => false, 'message' => 'Employee is already assigned to this bed.'], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $oldAvailableAccommodationId = $oldBed->available_a_id;
+            $oldEffectedDate = $oldBed->effected_date;
+
+            // Free the old bed, occupy the new one. (effected_date is now
+            // in AssingAccommodation::$fillable — was missing, which
+            // silently dropped it from every update() call across this
+            // module; fixed at the model, see AssingAccommodation.php.)
+            $oldBed->update(['emp_id' => 0, 'effected_date' => null]);
+            $newBed->update(['emp_id' => $emp_id, 'effected_date' => date('Y-m-d')]);
+
+            Common::recordAccommodationHistory(
+                $this->resort_id,
+                $emp_id,
+                $oldBed->id,
+                $newBed->id,
+                $oldEffectedDate,
+                date('Y-m-d'),
+                $reason
+            );
+
+            // Inventory occupancy — decrement the room being left,
+            // increment the room being moved into. (MoveToNext() on the web
+            // portal only does the decrement half, and
+            // assignAccommodationToEmp() only does the increment half when
+            // freeing a previous bed — neither alone is correct; this does
+            // both, which is what actually keeps Occupied accurate.)
+            $oldAccommodation = $oldAvailableAccommodationId
+                ? AvailableAccommodationModel::where('id', $oldAvailableAccommodationId)
+                    ->where('resort_id', $this->resort_id)
+                    ->with('availableAccommodationInvItem.inventoryModule')
+                    ->first()
+                : null;
+            if ($oldAccommodation) {
+                foreach ($oldAccommodation->availableAccommodationInvItem as $item) {
+                    if ($item->inventoryModule) {
+                        $item->inventoryModule->Occupied = max(0, ($item->inventoryModule->Occupied ?? 0) - 1);
+                        $item->inventoryModule->save();
+                    }
+                }
+            }
+
+            $Employeelist = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
+                ->join('assing_accommodations as t3', 't3.emp_id', '=', 'employees.id')
+                ->select(
+                    't1.id as Parentid',
+                    't1.first_name',
+                    't1.last_name',
+                    't1.profile_picture',
+                    'employees.Emp_id as EmployeeId',
+                    't2.position_title',
+                    't3.available_a_id',
+                    'employees.id as new_emp_id'
+                )
+                ->where('t3.id', $newBed->id)
+                ->where('employees.resort_id', $this->resort_id)
+                ->first();
+
+            $data = [];
+            if ($Employeelist) {
+                $newAccommodation = AvailableAccommodationModel::where('id', $Employeelist->available_a_id)
+                    ->where('resort_id', $this->resort_id)
+                    ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType')
+                    ->first();
+                if ($newAccommodation) {
+                    $itemData = [];
+                    $item_id = [];
+                    foreach ($newAccommodation->availableAccommodationInvItem as $item) {
+                        $inventoryItem = $item->inventoryModule ? ucfirst($item->inventoryModule->ItemName) : 'Unknown';
+                        $item_id[] = $item->inventoryModule->id;
+                        $itemData[] = $inventoryItem;
+                    }
+                    $buildingModel = BuildingModel::find($newAccommodation->BuildingName);
+
+                    $previousAccommodation = null;
+                    if ($oldAccommodation) {
+                        $oldBuildingModel = BuildingModel::find($oldAccommodation->BuildingName);
+                        $previousAccommodation = [
+                            'building_name' => $oldBuildingModel ? $oldBuildingModel->BuildingName : 'N/A',
+                            'floor'         => $oldAccommodation->Floor ?? 'N/A',
+                            'room_no'       => $oldAccommodation->RoomNo ?? 'N/A',
+                            'bed_no'        => $oldBed->BedNo ?? 'N/A',
+                        ];
+                    }
+
+                    $data = [
+                        'employee' => [
+                            'name'             => ucfirst($Employeelist->first_name . ' ' . $Employeelist->last_name),
+                            'position'         => ucfirst($Employeelist->position_title),
+                            'profile_picture'  => Common::getResortUserPicture($Employeelist->Parentid),
+                            'emp_id'           => $Employeelist->EmployeeId,
+                        ],
+                        'accommodation' => [
+                            'building_name'      => $buildingModel ? $buildingModel->BuildingName : 'Not Available',
+                            'floor'              => $newAccommodation->Floor ?? 'Not Available',
+                            'room_no'            => $newAccommodation->RoomNo ?? 'Not Available',
+                            'bed_no'             => $newBed->BedNo ?? '-',
+                            'facilities'         => $itemData,
+                            'RoomStatus'         => $newAccommodation->RoomStatus ?? 'Not Available',
+                            'color'              => $newAccommodation->accommodationType->Color ?? 'DefaultColor',
+                            'accommodation_name' => $newAccommodation->accommodationType->AccommodationName ?? 'Not Available',
+                        ],
+                        'previous_accommodation' => $previousAccommodation,
+                    ];
+
+                    foreach (InventoryModule::whereIn('id', $item_id)->get() as $module) {
+                        $module->Occupied = ($module->Occupied ?? 0) + 1;
+                        $module->save();
+                    }
+                }
+            }
+
+            DB::commit();
+
+            try {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    [(int) $emp_id],
+                    'Accommodation Moved',
+                    'You have been moved to bed ' . ($newBed->BedNo ?? '') . '.',
+                    'Accommodation',
+                    $newBed->id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Accommodation move notification failed: ' . $ne->getMessage());
+            }
+
+            return response()->json([
+                'status'          => true,
+                'message'         => 'Bed moved successfully.',
+                'bed_assign_data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency('File: ' . $e->getFile());
+            \Log::emergency('Line: ' . $e->getLine());
+            \Log::emergency('Message: ' . $e->getMessage());
+            return response()->json(['success' => false, 'error' => 'Failed to move bed', 'message' => 'Failed to move accommodation'], 500);
+        }
+    }
+
     public function hrRoomInfo(Request $request)
     {
         if (!$this->user) {

@@ -12,7 +12,13 @@ class AssingAccommodation extends Model
 
 
     protected $table='assing_accommodations';
-    public $fillable = ['resort_id','available_a_id','emp_id','BedNo'];
+    // effected_date was missing here — every ->update(['emp_id'=>..,
+    // 'effected_date'=>..]) call across the Accommodation module (web
+    // Assign/Unassign/MoveToNext's new-bed leg, mobile assign/move) was
+    // silently dropping effected_date (mass-assignment protection), so
+    // "check-in date" / stay-duration reporting and the freed-bed's date
+    // never actually updated. Confirmed by testing moveAccommodationForEmp().
+    public $fillable = ['resort_id','available_a_id','emp_id','BedNo','effected_date'];
 
     public function availableAccommodation()
     {

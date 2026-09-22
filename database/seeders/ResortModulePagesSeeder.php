@@ -323,6 +323,14 @@ class ResortModulePagesSeeder extends Seeder
               "place_order"     => "0"
             ],
            [
+              "page_name"       => "Housekeeping Request",
+              "Module_Id"       => "10",
+              "internal_route"  => "resort.accommodation.HousekeepingRequest",
+              "TypeOfPage"      => "InsideOfMenu",
+              "type"            => "normal",
+              "place_order"     => "0"
+            ],
+           [
               "page_name"       => "Accommodation Master",
               "Module_Id"       => "10",
               "internal_route"  => "resort.accommodation.AccommodationMaster",

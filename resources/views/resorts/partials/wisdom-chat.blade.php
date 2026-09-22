@@ -56,7 +56,9 @@
      data-uc-remove-member-url-tpl="{{ route('resort.chat.removeMember', ['type_id' => '__id__']) }}"
      data-uc-update-group-url-tpl="{{ route('resort.chat.updateGroup', ['type_id' => '__id__']) }}"
      data-uc-delete-group-url-tpl="{{ route('resort.chat.deleteGroup', ['type_id' => '__id__']) }}"
-     data-uc-my-id="{{ auth()->guard('resort-admin')->id() ?? 0 }}">
+     data-uc-typing-url="{{ route('resort.chat.typing') }}"
+     data-uc-my-id="{{ auth()->guard('resort-admin')->id() ?? 0 }}"
+     data-resort-id="{{ auth()->guard('resort-admin')->user()->resort_id ?? 0 }}">
 
     <!-- Dim scrim behind the floating panels — the Dynamic Island that opens
          them lives in header.blade.php; this partial owns the panels + the
@@ -162,6 +164,10 @@
                 </div>
             </div>
             <div class="wai-messages" id="uc-messages"></div>
+            <div class="uc-typing-row" id="uc-typing-row" style="display:none;">
+                <div class="wai-typing"><span></span><span></span><span></span></div>
+                <span id="uc-typing-name"></span>
+            </div>
             <div class="wai-input uc-thread-input" id="uc-send-form">
                 <label class="uc-attach-btn" title="Attach a photo or file">
                     <input type="file" id="uc-attachment" accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx" hidden>
@@ -461,9 +467,9 @@
    Scoped entirely under #uc-panel so the Wisdom AI assistant panel above
    (which shares several base classes: .wai-header, .wai-row, .wai-bubble,
    .wai-input, .wai-mini-avatar) keeps its own existing look untouched.
-   No presence dots — the only "presence" field the API returns
-   (last_seen) is a ResortAdmin row's updated_at, not real activity
-   tracking, so a dot/"Active now" text driven by it would just be wrong. */
+   Online dots (.uc-online-dot) come from the resort-online.{resort_id}
+   presence roster (routes/channels.php), not the "last_seen" field below —
+   that's still just a ResortAdmin row's updated_at, not activity. */
 #uc-panel .wai-header { background: var(--teal); }
 #uc-panel .uc-back,
 #uc-panel .wai-header-actions button { background: rgba(255,255,255,.14); }
@@ -509,6 +515,17 @@
 }
 .uc-thread-empty-t { font-size: 13.5px; font-weight: 600; color: var(--ink); }
 .uc-thread-empty-s { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+/* Typing indicator — reuses the WAI panel's .wai-typing dot animation */
+.uc-typing-row { display: flex; align-items: center; gap: 6px; padding: 0 18px 6px; font-size: 11.5px; color: var(--muted); flex: none; }
+
+/* Online presence dot — resort-online.{resort_id} presence roster (routes/channels.php),
+   drawn on the conversation-list avatar corner (.crow .av is already position:relative). */
+.uc-online-dot { position: absolute; right: 0; bottom: 0; width: 9px; height: 9px; border-radius: 50%; background: #2ecc71; border: 2px solid #fff; z-index: 2; }
+
+/* Read receipt ticks — single check (sent) vs. double check (read), next to the message time */
+.uc-tick-sent { opacity: .7; }
+.uc-tick-read { color: #4FC3F7; }
 
 @media (prefers-reduced-motion: reduce) {
     .wai-scrim, .wai-float, .wai-gbtn, #wai-send, #uc-send, .prow, .prow-c, .crow {
@@ -744,6 +761,8 @@
 
     var CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
     var MY_ID = parseInt(root.dataset.ucMyId || '0', 10);
+    var MY_NAME = root.dataset.userName || 'Someone';
+    var RESORT_ID = parseInt(root.dataset.resortId || '0', 10);
 
     var LIST_URL = root.dataset.ucListUrl;
     var NEW_CHAT_URL = root.dataset.ucNewChatUrl;
@@ -757,6 +776,7 @@
     var REMOVE_MEMBER_URL_TPL = root.dataset.ucRemoveMemberUrlTpl;
     var UPDATE_GROUP_URL_TPL = root.dataset.ucUpdateGroupUrlTpl;
     var DELETE_GROUP_URL_TPL = root.dataset.ucDeleteGroupUrlTpl;
+    var TYPING_URL = root.dataset.ucTypingUrl;
 
     function viewUrl(type, id) { return VIEW_URL_TPL.replace('__type__', type).replace('__id__', id); }
     function withId(tpl, id) { return tpl.replace('__id__', id); }
@@ -831,6 +851,9 @@
     var pendingAttachment = null;
     var convCache = [];
     var subscribedChannels = {};
+    var onlineIds = {}; // resort_admin id -> true, from the resort-online.{resort_id} presence roster
+    var typingHideTimer = null;
+    var typingThrottleTimer = null;
 
     function showView(v) {
         [viewList, viewPicker, viewThread, viewInfo].forEach(function (el) { el.style.display = (el === v) ? 'flex' : 'none'; });
@@ -912,6 +935,7 @@
             open.type === 'individual' ? MY_ID : open.id
         ) && (open.type === 'group' ? true : parseInt(data.sender_id, 10) === parseInt(open.id, 10));
         if (forOpenThread && ucPanel.classList.contains('wai-open')) {
+            hideTypingIndicator(); // the message that just arrived supersedes it
             // Re-fetch rather than append the raw broadcast payload — the
             // attachment path in the socket event isn't resolved to a real
             // URL (only the REST endpoints do that), so a re-fetch is the
@@ -960,12 +984,51 @@
         if (window.playChatPing) window.playChatPing();
     }
 
+    // ---- Typing indicator ------------------------------------------------
+    function showTypingIndicator(name) {
+        document.getElementById('uc-typing-name').textContent = (name || 'Someone').split(' ')[0] + ' is typing';
+        document.getElementById('uc-typing-row').style.display = 'flex';
+        clearTimeout(typingHideTimer);
+        typingHideTimer = setTimeout(hideTypingIndicator, 3000);
+    }
+    function hideTypingIndicator() {
+        document.getElementById('uc-typing-row').style.display = 'none';
+    }
+    // Fired on the recipient's own private channel — mirrors MessageSent's
+    // channel choice, so this always arrives on MY inbox when someone I'm
+    // chatting with (individually) is typing to me.
+    function handleTypingReceived(data) {
+        if (!state.current || state.current.type !== 'individual') return;
+        if (parseInt(data.sender_id, 10) !== parseInt(state.current.id, 10)) return;
+        showTypingIndicator(data.sender_name);
+    }
+    // Throttled to once per 3s so every keystroke doesn't fire a broadcast/
+    // whisper — good enough for "is someone typing", no need for finer signal.
+    function fireTypingSignal() {
+        if (!state.current || typingThrottleTimer) return;
+        typingThrottleTimer = setTimeout(function () { typingThrottleTimer = null; }, 3000);
+        if (state.current.type === 'group') {
+            // group.{id} is a presence channel — members can whisper on it
+            // directly, no server round trip needed.
+            var ch = subscribedChannels['group.' + state.current.id];
+            if (ch && ch.whisper) ch.whisper('typing', { name: MY_NAME });
+        } else {
+            fetch(TYPING_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ type: 'individual', type_id: state.current.id })
+            }).catch(function () {});
+        }
+    }
+
     function subscribeRealtime() {
         if (!window.Echo || !MY_ID) return;
         var myChannel = 'chat.' + MY_ID;
         if (!subscribedChannels[myChannel]) {
             subscribedChannels[myChannel] = true;
-            window.Echo.private(myChannel).listen('MessageSent', handleIncomingMessage);
+            window.Echo.private(myChannel)
+                .listen('MessageSent', handleIncomingMessage)
+                .listen('UserTyping', handleTypingReceived);
         }
     }
     function subscribeToGroups(list) {
@@ -974,16 +1037,48 @@
             if (c.type !== 'group') return;
             var name = 'group.' + c.id;
             if (subscribedChannels[name]) return;
-            subscribedChannels[name] = true;
-            window.Echo.join(name).listen('MessageSent', handleIncomingMessage);
+            var channel = window.Echo.join(name).listen('MessageSent', handleIncomingMessage);
+            channel.listenForWhisper('typing', function (e) {
+                if (state.current && state.current.type === 'group' && String(state.current.id) === String(c.id)) {
+                    showTypingIndicator((e && e.name) || 'Someone');
+                }
+            });
+            subscribedChannels[name] = channel; // kept so fireTypingSignal() can .whisper() on it
         });
+    }
+    // My own inbox channel only tells me when a message/typing event arrives
+    // FOR me — it says nothing about who else is online. resort-online.
+    // {resort_id} is a dedicated presence roster (routes/channels.php);
+    // Pusher's own here/joining/leaving on it ARE the online-status list,
+    // no backend polling needed.
+    function subscribeOnlinePresence() {
+        if (!window.Echo || !RESORT_ID) return;
+        var name = 'resort-online.' + RESORT_ID;
+        if (subscribedChannels[name]) return;
+        subscribedChannels[name] = true;
+        window.Echo.join(name)
+            .here(function (users) {
+                onlineIds = {};
+                (users || []).forEach(function (u) { onlineIds[u.id] = true; });
+                refreshOnlineUI();
+            })
+            .joining(function (u) { onlineIds[u.id] = true; refreshOnlineUI(); })
+            .leaving(function (u) { delete onlineIds[u.id]; refreshOnlineUI(); });
+    }
+    function refreshOnlineUI() {
+        if (state.current && state.current.type === 'individual') {
+            document.getElementById('uc-thread-subtitle').textContent = onlineIds[state.current.id] ? 'Online' : '';
+        }
+        if (ucPanel.classList.contains('wai-open') && viewList.style.display !== 'none') {
+            renderConversations(convCache);
+        }
     }
     // partials.pusher-init (which defines window.Echo) is included in
     // resorts.layouts.js — loaded AFTER resorts.layouts.footer (this
     // widget) in the page layout, so window.Echo doesn't exist yet at this
     // point in document order. DOMContentLoaded fires once every
     // synchronous script — including the later one — has run.
-    function initRealtimeAndBadge() { subscribeRealtime(); loadConversations(); }
+    function initRealtimeAndBadge() { subscribeRealtime(); subscribeOnlinePresence(); loadConversations(); }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initRealtimeAndBadge);
     } else {
@@ -1052,7 +1147,7 @@
             item.className = 'crow' + (unread ? ' unread' : '');
             var avatar = c.type === 'group'
                 ? '<span class="av"><i class="fa-solid fa-user-group"></i></span>'
-                : '<span class="av">' + ucAvatarInner(c.profile, c.name) + '</span>';
+                : '<span class="av">' + ucAvatarInner(c.profile, c.name) + (onlineIds[c.id] ? '<i class="uc-online-dot"></i>' : '') + '</span>';
             item.innerHTML = avatar +
                 '<div class="cw">' +
                     '<div class="r1"><span class="cn">' + escapeHtml(c.name) + '</span>' +
@@ -1178,12 +1273,13 @@
     function openThread(type, id, name, profile) {
         state.current = { type: type, id: id, name: name, profile: profile || null, isAdmin: false, members: [] };
         document.getElementById('uc-thread-title').textContent = name || '';
-        document.getElementById('uc-thread-subtitle').textContent = type === 'group' ? 'Group' : '';
+        document.getElementById('uc-thread-subtitle').textContent = type === 'group' ? 'Group' : (onlineIds[id] ? 'Online' : '');
         var avatarEl = document.getElementById('uc-thread-avatar');
         avatarEl.innerHTML = type === 'group'
             ? '<i class="fa-solid fa-user-group"></i>'
             : ucAvatarInner(profile, name);
         document.getElementById('uc-thread-info').style.display = type === 'group' ? 'flex' : 'none';
+        hideTypingIndicator();
         showView(viewThread);
         loadThread();
     }
@@ -1193,6 +1289,7 @@
         // new message arriving while the user was back on the LIST screen
         // still silently re-fetched and marked that thread's messages read.
         state.current = null;
+        hideTypingIndicator();
         showView(viewList);
         loadConversations();
     });
@@ -1278,7 +1375,11 @@
                     ? '<img src="' + m.attachment + '" onclick="window.open(this.src)">'
                     : '<a href="' + m.attachment + '" target="_blank" rel="noopener"><i class="fa-solid fa-paperclip"></i> Attachment</a>') + '</div>';
             }
-            bubble += '<div class="uc-bt">' + ucTimeLabel(m.created_at) + '</div>';
+            bubble += '<div class="uc-bt">' + ucTimeLabel(m.created_at);
+            if (mine && m.read_status) {
+                bubble += ' <i class="fa-solid ' + (m.read_status === 'read' ? 'fa-check-double uc-tick-read' : 'fa-check uc-tick-sent') + '"></i>';
+            }
+            bubble += '</div>';
             bubble += '</div>';
             row.innerHTML = avatarHtml + bubble;
             msgsEl.appendChild(row);
@@ -1317,6 +1418,7 @@
     ucTextEl.addEventListener('input', function () {
         this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 110) + 'px';
         ucSendBtn.disabled = !this.value.trim();
+        if (this.value.trim()) fireTypingSignal();
     });
     ucTextEl.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendUsersChatMessage(); }

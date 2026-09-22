@@ -517,7 +517,23 @@ class StaffAccommodationController extends Controller
                         ];
                     }
                 }
-            
+
+                // Reject/On-Hold never create a child_maintanance_requests
+                // row (only the Approve branch of handleMaintananceAction()
+                // does), so the loop above leaves this block empty for
+                // those two terminal statuses — the detail screen showed no
+                // status at all. Surface the current status + reason here
+                // directly from the parent record.
+                if (in_array($maintanaceRequest->Status, ['Rejected', 'On-Hold'])) {
+                    $displayedStatuses['data'][] = [
+                        'status' => $maintanaceRequest->Status,
+                        'date'   => $maintanaceRequest->updated_at,
+                        'reason' => $maintanaceRequest->Status === 'Rejected'
+                            ? $maintanaceRequest->RejactionReason
+                            : $maintanaceRequest->ReasonOnHold,
+                    ];
+                }
+
                 $assignMaintReqStaffDetails                 =   ChildMaintananceRequest::join("employees as t3", "t3.id", "=", "child_maintanance_requests.ApprovedBy")
                                                                     ->join("resort_admins as t1", "t1.id", "=", "t3.Admin_Parent_id")
                                                                     ->where('child_maintanance_requests.Status','In-Progress')
