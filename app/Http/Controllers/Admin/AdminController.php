@@ -254,6 +254,9 @@ class AdminController extends Controller
       // logged-in admin change any other admin's password. Always use
       // the authenticated session's own id.
       $admin = Admin::where( 'id', Auth::guard('admin')->id() )->first();
+      if (!$request->filled('old_pass') || !\Hash::check($request->old_pass, $admin->password)) {
+        return response()->json(['success' => false, 'msg' => 'Old password is incorrect.']);
+      }
       $admin->password = bcrypt($request->password);
       $admin->must_change_password = false;
       $admin->save();

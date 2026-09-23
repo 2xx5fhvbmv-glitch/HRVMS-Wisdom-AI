@@ -150,6 +150,7 @@ class ConfigurationController extends Controller
             }
        
             DB::commit();
+            $this->notifySosConfig([], 'SOS Role Created', 'New SOS role(s) have been created: ' . collect($request->sos)->pluck('role_name')->implode(', ') . '.');
             return response()->json([
                 'success' => true,
                 'message' => 'SOS Roles and Permission Create Successfully',
@@ -354,6 +355,8 @@ class ConfigurationController extends Controller
         try
         {
 
+            $roleName = SOSRolesAndPermission::where('id', $id)->where('resort_id', $this->resort->resort_id)->value('name');
+            $affectedEmpIds = SOSTeamMemeberModel::where('resort_id', $this->resort->resort_id)->where('role_id', $id)->pluck('emp_id')->all();
             $deleted = SOSRolesAndPermission::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             if (!$deleted) {
                 DB::rollBack();
@@ -361,6 +364,7 @@ class ConfigurationController extends Controller
             }
 
             DB::commit();
+            $this->notifySosConfig($affectedEmpIds, 'SOS Role Deleted', 'The SOS role "' . $roleName . '" has been deleted.');
             return response()->json([
                 'success' => true,
                 'message' => 'SOS Roles And Permission Delete Successfully',
@@ -543,6 +547,8 @@ class ConfigurationController extends Controller
         try
         {
 
+            $teamName = SOSTeamManagementModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->value('name');
+            $affectedEmpIds = $this->sosTeamMemberIds([$id]);
             $team = SOSTeamManagementModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             if (!$team) {
                 DB::rollBack();
@@ -554,6 +560,7 @@ class ConfigurationController extends Controller
             }
             
             DB::commit();
+            $this->notifySosConfig($affectedEmpIds, 'SOS Team Deleted', 'The SOS team "' . $teamName . '" has been deleted.');
             return response()->json([
                 'success' => true,
                 'message' => 'SOS Team Delete Successfully',
@@ -610,6 +617,7 @@ class ConfigurationController extends Controller
                 ]);
                 
                 DB::commit();
+                $this->notifySosConfig($this->sosTeamMemberIds([$Main_id]), 'SOS Team Updated', 'The SOS team "' . $request->team_name . '" has been updated.', $Main_id);
                 return response()->json([
                     'success' => true,
                     'message' => 'SOS Team Updated Successfully',
@@ -691,6 +699,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
+            $removedMember = SOSTeamMemeberModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
             $team = SOSTeamMemeberModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             if (!$team) {
                 DB::rollBack();
@@ -698,6 +707,9 @@ class ConfigurationController extends Controller
             }
 
             DB::commit();
+            if ($removedMember) {
+                $this->notifySosConfig([$removedMember->emp_id], 'Removed from SOS Team', 'You have been removed from an SOS team.', $removedMember->team_id);
+            }
             return response()->json([
                 'success' => true,
                 'message' => 'SOS Team Member Delete Successfully',
@@ -756,6 +768,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
+            $oldEmpId = SOSTeamMemeberModel::where('id', $Main_id)->where('resort_id', $this->resort->resort_id)->value('emp_id');
             $updated = SOSTeamMemeberModel::where('id', $Main_id)
             ->where('resort_id', $this->resort->resort_id)
             ->update([
@@ -768,6 +781,7 @@ class ConfigurationController extends Controller
             }
 
             DB::commit();
+            $this->notifySosConfig(array_filter([$oldEmpId, $request->member_id]), 'SOS Team Assignment Updated', 'Your SOS team assignment has been updated.', $request->team_id);
             return response()->json([
                 'success' => true,
                 'message' => 'SOS Team Member Updated Successfully',
@@ -902,6 +916,7 @@ class ConfigurationController extends Controller
                         'description' => strip_tags($request->description),
                     ]);
 
+                $affectedEmpIds = $this->sosTeamMemberIds([$id]);
                 SOSTeamMemeberModel::where("team_id", $id)->where('resort_id', $resort_id)->delete();
 
                 foreach($request->employee as $block) {
@@ -917,11 +932,13 @@ class ConfigurationController extends Controller
                             'emp_id' => $memberId,
                             'role_id' => $roleId
                         ]);
+                        $affectedEmpIds[] = $memberId;
                     }
                 }
             }
             
             DB::commit();
+            $this->notifySosConfig($affectedEmpIds, 'SOS Team Updated', 'The SOS team "' . $request->team_name . '" has been updated.', $id);
             return response()->json([
                 'success' => true,
                 'message' => 'SOS Team Updated Successfully',
@@ -1003,6 +1020,7 @@ class ConfigurationController extends Controller
             }
 
             DB::commit();
+            $this->notifySosConfig($this->sosTeamMemberIds($request->assign_default_team), 'SOS Emergency Type Created', 'A new SOS emergency type "' . $request->emergency_name . '" has been assigned to your team.', $insert->id);
             return response()->json([
                 'success' => true,
                 'message' => 'SOS Emergency Type Create Successfully',
@@ -1080,6 +1098,8 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
+            $typeName = SOSEmergencyTypesModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->value('name');
+            $affectedEmpIds = $this->sosTeamMemberIds(SOSChildEmergencyType::where('emergency_id', $id)->pluck('team_id')->all());
             $deleted = SOSEmergencyTypesModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             if (!$deleted) {
                 DB::rollBack();
@@ -1087,6 +1107,7 @@ class ConfigurationController extends Controller
             }
 
             DB::commit();
+            $this->notifySosConfig($affectedEmpIds, 'SOS Emergency Type Deleted', 'The SOS emergency type "' . $typeName . '" has been deleted.');
             return response()->json([
                 'success' => true,
                 'message' => 'SOS Emergency Type Delete Successfully',
@@ -1161,6 +1182,7 @@ class ConfigurationController extends Controller
                 ]);
 
                 // Remove old assigned teams
+                $oldTeamIds = SOSChildEmergencyType::where('emergency_id', $id)->pluck('team_id')->all();
                 SOSChildEmergencyType::where('emergency_id', $id)->delete();
 
                 // Insert new assigned teams
@@ -1175,6 +1197,7 @@ class ConfigurationController extends Controller
             }
             
             DB::commit();
+            $this->notifySosConfig($this->sosTeamMemberIds(array_merge($oldTeamIds, $request->assign_default_team)), 'SOS Emergency Type Updated', 'The SOS emergency type "' . $request->emergency_name . '" has been updated.', $id);
             return response()->json([
                 'success' => true,
                 'message' => 'SOS Emergency Type Updated Successfully',
@@ -1190,5 +1213,21 @@ class ConfigurationController extends Controller
         }
     }
 
-}
+    private function sosTeamMemberIds(array $teamIds): array
+    {
+        return SOSTeamMemeberModel::where('resort_id', $this->resort->resort_id)
+            ->whereIn('team_id', $teamIds)->pluck('emp_id')->all();
+    }
 
+    // Config-change notice to affected team members + resort GM; never breaks the request.
+    private function notifySosConfig(array $empIds, string $title, string $message, $requestId = null): void
+    {
+        try {
+            $resort_id = $this->resort->resort_id;
+            Common::notifyEmployees($resort_id, array_merge($empIds, Common::getResortGmEmployeeIds($resort_id)), $title, $message, 'SOS', $requestId);
+        } catch (\Throwable $e) {
+            \Log::warning('SOS config notification failed: ' . $e->getMessage());
+        }
+    }
+
+}

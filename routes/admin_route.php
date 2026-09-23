@@ -12,7 +12,7 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
 });
 
 /*** Admin Authenticated Routes ***/
-    Route::prefix('admin')->middleware(['auth:admin','revalidate'])->namespace('Admin')->group(function () {
+    Route::prefix('admin')->middleware(['auth:admin','forcePasswordChange:admin','revalidate'])->namespace('Admin')->group(function () {
 
     /*** Logout ***/
     Route::get('/logout', 'LoginController@logout')->name('admin.logout');

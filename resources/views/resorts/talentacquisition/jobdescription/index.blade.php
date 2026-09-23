@@ -45,6 +45,7 @@
                             <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                                 <select class="form-select dd-native-select" id="complianceSelect">
                                     <option value="Approved" selected>Compliance Passed</option>
+                                    <option value="HR Approved">HR Approved</option>
                                     <option value="Rejected">Compliance Rejected</option>
                                 </select>
                                 <div class="dd" data-target="#complianceSelect">
@@ -55,6 +56,7 @@
                                     <div class="dd-panel" role="listbox" aria-label="Compliance">
                                         <div class="dd-scroll">
                                             <div class="dd-item active" role="option" data-value="Approved"><span class="dd-nm">Compliance Passed</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="HR Approved"><span class="dd-nm">HR Approved</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
                                             <div class="dd-item" role="option" data-value="Rejected"><span class="dd-nm">Compliance Rejected</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
                                         </div>
                                     </div>
@@ -409,6 +411,13 @@
         });
 
 
+        $(document).on('click', '.resolve-advisory-btn', function () {
+            let url = "{{ route('resort.ta.jobdescription.advisory', ':id') }}".replace(':id', $(this).data('id'));
+            $.getJSON(url).done(function (r) {
+                if (r.success) showJdAdvisory(r.advisory);
+            });
+        });
+
         $('#complianceSelect').change(function() {
             viewJobDes.ajax.reload();
         });
@@ -512,4 +521,5 @@
     });
     </script>
     @include('resorts._dropdown_script')
+@include('resorts.talentacquisition.jobdescription._advisory_modal')
     @endsection

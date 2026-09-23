@@ -81,6 +81,7 @@ class Kernel extends HttpKernel
         'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+        'forcePasswordChange' => \App\Http\Middleware\ForcePasswordChange::class,
         'revalidate' => \App\Http\Middleware\RevalidateBackHistory::class,
         'hasModuleAccess' => \App\Http\Middleware\CheckAdminModuleAccess::class,
         'redirectIfNotCorrect.dashboard' => \App\Http\Middleware\RedirectIfNotCorrectDashboard::class,

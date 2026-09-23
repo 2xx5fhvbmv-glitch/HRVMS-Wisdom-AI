@@ -663,6 +663,7 @@
             </div>
         </div>
     </div>
+
 @endsection
 
 @section('import-css')
@@ -737,6 +738,10 @@ $(document).ready(function()
                             });
                             // Close modal after success
                             $('#jobDesEdit-modal').modal('hide');
+                            if (response.advisory && response.advisory.items.length) {
+                                showJdAdvisory(response.advisory);
+                                return;
+                            }
                             // Land on the Job Description list so the new
                             // entry (and its compliance result) is visible
                             // immediately, instead of staying on this
@@ -1568,4 +1573,5 @@ $('#AdTemplete').on('submit', function(e) {
 </script>
 
 @include('resorts._dropdown_script')
+@include('resorts.talentacquisition.jobdescription._advisory_modal')
 @endsection

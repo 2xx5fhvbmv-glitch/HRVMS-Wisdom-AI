@@ -14,7 +14,7 @@ Route::prefix('shopkeeper')->namespace('Shopkeeper')->group(function () {
 
 });
 
-Route::prefix('shopkeeper')->middleware(['auth:shopkeeper','revalidate'])->namespace('Shopkeeper')->group(function () {
+Route::prefix('shopkeeper')->middleware(['auth:shopkeeper','forcePasswordChange:shopkeeper','revalidate'])->namespace('Shopkeeper')->group(function () {
 
     /*** Logout ***/
     Route::get('/logout', 'ShopkeeperLoginController@logout')->name('shopkeeper.logout');

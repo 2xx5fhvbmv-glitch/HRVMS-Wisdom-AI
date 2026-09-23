@@ -82,6 +82,23 @@
 
         </div>
     </div>
+
+    <div class="modal fade" id="responses-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Responses: <span id="responses-form-name"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table w-100" id="responses-table">
+                        <thead><tr><th>Interviewee</th><th>Interviewer</th><th>Submitted</th><th>Action</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
     @endsection
 
     @section('import-css')
@@ -121,6 +138,30 @@
                 { data: 'form_name', name: 'Form Name', className: 'text-nowrap' },
                 { data: 'action', name: 'Action', orderable: false, searchable: false },
             ]
+        });
+
+        $(document).on('click', '.responses-row-btn', function(e) {
+            e.preventDefault();
+            $('#responses-form-name').text($(this).data('name'));
+            if ($.fn.DataTable.isDataTable('#responses-table')) {
+                $('#responses-table').DataTable().destroy();
+            }
+            $('#responses-table').DataTable({
+                searching: false,
+                bLengthChange: false,
+                processing: true,
+                serverSide: true,
+                iDisplayLength: 6,
+                ordering: false,
+                ajax: { url: $(this).data('url'), type: 'GET' },
+                columns: [
+                    { data: 'interviewee' },
+                    { data: 'interviewer' },
+                    { data: 'submitted' },
+                    { data: 'action', searchable: false },
+                ]
+            });
+            $('#responses-modal').modal('show');
         });
 
         $(document).on('click', '.delete-row-btn', function() {

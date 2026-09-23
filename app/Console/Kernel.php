@@ -38,6 +38,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('Daily:CheckDepositRefundReminders')->dailyAt('09:15');
         $schedule->command('accommodation:escalation-reminder')->dailyAt('09:30');
         $schedule->command('accommodation:notify-maintenance-hold-expiry')->dailyAt('09:35');
+        $schedule->command('learning:probation-reminders')->dailyAt('09:40');
         // Command is named CheckHourly — was wired to everyMinute(), spawning
         // 60 extra cron PHP processes (each a new DB connection) per hour to
         // redundantly re-run the same 48h compliance check. Matches the

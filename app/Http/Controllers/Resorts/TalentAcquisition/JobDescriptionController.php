@@ -116,7 +116,10 @@ class JobDescriptionController extends Controller
                     // passed compliance (sections 3-7) — a Rejected JD has nothing
                     // legally complete to issue to anyone yet.
                     $issuanceButtons = '';
-                    if ($row->compliance === 'Approved') {
+                    if ($row->compliance === 'Rejected' && strpos((string) $row->reason, 'Awaiting HR decision on') === 0) {
+                        $issuanceButtons = '<a href="javascript:void(0)" class="btn-tableIcon btnIcon-orange resolve-advisory-btn" title="Resolve compliance advisory" data-id="' . (int) $row->id . '"><i class="fa-solid fa-triangle-exclamation"></i></a>';
+                    }
+                    if (in_array($row->compliance, ['Approved', 'HR Approved'])) {
                         $issuanceButtons = '
                             <a href="javascript:void(0)" class="btn-tableIcon btnIcon-skyblue issue-jd-btn" title="Issue to employees" data-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '"><i class="fa-regular fa-paper-plane"></i></a>
                             <a href="javascript:void(0)" class="btn-tableIcon btnIcon-orange view-jd-employees-btn" title="View employee sign-off" data-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '"><i class="fa-solid fa-users"></i></a>';
@@ -168,6 +171,10 @@ class JobDescriptionController extends Controller
                         return '<span class="text-successTheme"><i class="fa-solid fa-circle-check  me-2"></i>Compliance Passed</span>';
 
                     }
+                    else if($row->compliance == "HR Approved")
+                    {
+                        return '<span class="text-warning"><i class="fa-solid fa-circle-exclamation  me-2"></i>HR Approved</span>';
+                    }
                     else
                     {
                         return '<span class="text-danger"><i class="fa-solid fa-circle-xmark  me-2"></i>Compliance Rejected</span>';
@@ -177,6 +184,10 @@ class JobDescriptionController extends Controller
                 })
 
                 ->addColumn('Reason', function ($row) {
+                    if($row->compliance == "HR Approved" && !empty($row->reason))
+                    {
+                        return '<span class="text-warning">'.htmlspecialchars($row->reason, ENT_QUOTES, 'UTF-8').'</span>';
+                    }
                     if($row->compliance == "Rejected" && !empty($row->reason))
                     {
                         return '<span class="text-danger">'.htmlspecialchars($row->reason, ENT_QUOTES, 'UTF-8').'</span>';
@@ -298,11 +309,16 @@ class JobDescriptionController extends Controller
             // Employer/employee identity (sections 1-2) isn't filled in at the
             // template stage — no employee exists on a job_descriptions row yet —
             // so only gate on sections 3-7 here.
-            $requiredElements = [
-                'job_title_duties'    => 'Job title and duties',
-                'place_of_employment' => 'Place of employment',
+            // Advisory model: title/duties are hard requirements (missing =>
+            // Rejected). Place of employment / working hours are soft — resorts
+            // run rotational shifts, so HR is asked what to do (see
+            // resolveAdvisory) instead of an automatic Rejected.
+            $hardElements = ['job_title_duties' => 'Job title and duties'];
+            $softElements = [
                 'working_hours'       => 'Working hours',
+                'place_of_employment' => 'Place of employment',
             ];
+            $advisory = null;
             try {
                 $aiUrl = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/check_compliance';
                 $curl = curl_init();
@@ -338,22 +354,35 @@ class JobDescriptionController extends Controller
                     $jobDescription->save();
                 } else {
                     // An element passes when its value is truthy / "Pass".
-                    $missing = [];
-                    foreach ($requiredElements as $key => $label) {
+                    $isPassed = function ($key) use ($checks) {
                         $val = $checks[$key] ?? false;
-                        $passed = $val === true || $val === 1
+                        return $val === true || $val === 1
                             || (is_string($val) && in_array(strtolower($val), ['pass', 'true', 'yes', '1'], true));
-                        if (!$passed) {
+                    };
+                    $missing = [];
+                    foreach ($hardElements as $key => $label) {
+                        if (!$isPassed($key)) {
                             $missing[] = $label;
                         }
                     }
+                    $softMissing = [];
+                    foreach ($softElements as $key => $label) {
+                        if (!$isPassed($key)) {
+                            $softMissing[$key] = $label;
+                        }
+                    }
 
-                    if (empty($missing)) {
+                    if (!empty($missing)) {
+                        $jobDescription->compliance = 'Rejected';
+                        $jobDescription->reason     = 'Missing required content: ' . implode(', ', array_merge($missing, $softMissing)) . '.';
+                    } elseif (empty($softMissing)) {
                         $jobDescription->compliance = 'Approved';
                         $jobDescription->reason     = null;
                     } else {
+                        // Left Rejected until HR answers the advisory pop-up.
                         $jobDescription->compliance = 'Rejected';
-                        $jobDescription->reason     = 'Missing required content: ' . implode(', ', $missing) . '.';
+                        $jobDescription->reason     = 'Awaiting HR decision on: ' . implode(', ', $softMissing) . '.';
+                        $advisory = $this->buildAdvisory($jobDescription, array_keys($softMissing));
                     }
                     $jobDescription->save();
                 }
@@ -364,8 +393,103 @@ class JobDescriptionController extends Controller
                 $jobDescription->save();
             }
 
-            return response()->json(['success' => true, 'message' => 'Job Description Added successfully.'],200);
+            return response()->json(['success' => true, 'message' => 'Job Description Added successfully.', 'advisory' => $advisory],200);
 
+    }
+
+    private function buildAdvisory(JobDescription $jd, array $keys): array
+    {
+        $resort = Resort::find($jd->Resort_id);
+        $address = trim(implode(', ', array_filter([$resort->address1 ?? null, $resort->address2 ?? null, $resort->city ?? null, $resort->country ?? null])));
+        $items = [
+            'working_hours' => [
+                'key' => 'working_hours',
+                'label' => 'Working hours',
+                'law' => 'Section 7, Employment Act requires the working hours to be stated. As resorts run rotating shifts an exact clock schedule is not required, but stating a total hours figure satisfies the law better.',
+                'suggestion' => "Given the resort's shift-based operations, the employee's exact shift will be shared weekly; the normal working day will not exceed 8 hours.",
+            ],
+            'place_of_employment' => [
+                'key' => 'place_of_employment',
+                'label' => 'Place of employment',
+                'law' => "The resort's own address is the implied place of employment; stating it makes the position legally complete.",
+                'suggestion' => 'The place of employment is ' . ($resort->resort_name ?? 'the resort') . ($address ? ', ' . $address : '') . '.',
+            ],
+        ];
+        return ['jd_id' => $jd->id, 'items' => array_values(array_intersect_key($items, array_flip($keys)))];
+    }
+
+    /** Rebuild the advisory pop-up for a JD still awaiting HR's decision. */
+    public function getAdvisory($id)
+    {
+        $jd = JobDescription::where('Resort_id', $this->resort->resort_id)->find($id);
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (!$jd || (is_array($scopedDeptIds) && !in_array($jd->Department_id, $scopedDeptIds))) {
+            return response()->json(['success' => false, 'message' => 'Job description not found.'], 404);
+        }
+        $reason = (string) $jd->reason;
+        if ($jd->compliance !== 'Rejected' || strpos($reason, 'Awaiting HR decision on') !== 0) {
+            return response()->json(['success' => false, 'message' => 'No pending advisory for this job description.'], 422);
+        }
+        $keys = array_keys(array_filter([
+            'working_hours' => stripos($reason, 'Working hours') !== false,
+            'place_of_employment' => stripos($reason, 'Place of employment') !== false,
+        ]));
+        return response()->json(['success' => true, 'advisory' => $this->buildAdvisory($jd, $keys)]);
+    }
+
+    /**
+     * HR's answer to the advisory pop-up: per item either insert text (as-is
+     * or edited) or skip. All inserted => Approved (genuine pass, no AI
+     * re-call needed for text HR just wrote); any skipped => HR Approved
+     * with the skipped items recorded in `reason`.
+     */
+    public function resolveAdvisory(Request $request, $id)
+    {
+        $jd = JobDescription::where('Resort_id', $this->resort->resort_id)->find($id);
+        if (!$jd) {
+            return response()->json(['success' => false, 'message' => 'Job description not found.'], 404);
+        }
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (is_array($scopedDeptIds) && !in_array($jd->Department_id, $scopedDeptIds)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access to this department.'], 403);
+        }
+        // Only a JD parked at the advisory step can be resolved.
+        if ($jd->compliance !== 'Rejected' || strpos((string) $jd->reason, 'Awaiting HR decision on') !== 0) {
+            return response()->json(['success' => false, 'message' => 'No pending advisory for this job description.'], 422);
+        }
+
+        $labels = ['working_hours' => 'Working hours', 'place_of_employment' => 'Place of employment'];
+        $decisions = (array) $request->input('items', []);
+        $skipped = [];
+        $inserted = [];
+        foreach ($labels as $key => $label) {
+            if (!array_key_exists($key, $decisions)) {
+                continue;
+            }
+            $text = trim((string) ($decisions[$key]['text'] ?? ''));
+            if (($decisions[$key]['action'] ?? '') === 'insert' && $text !== '') {
+                $inserted[] = $text;
+            } else {
+                $skipped[] = $label;
+            }
+        }
+        if (empty($inserted) && empty($skipped)) {
+            return response()->json(['success' => false, 'message' => 'No decision received.'], 422);
+        }
+
+        if ($inserted) {
+            // JD body is CKEditor HTML (rendered raw), so append as paragraphs.
+            $jd->jobdescription = $jd->jobdescription . implode('', array_map(fn ($t) => '<p>' . e($t) . '</p>', $inserted));
+        }
+        if ($skipped) {
+            $jd->compliance = 'HR Approved';
+            $jd->reason = implode(' and ', $skipped) . ' not specified — issued on HR\'s decision.';
+        } else {
+            $jd->compliance = 'Approved';
+            $jd->reason = null;
+        }
+        $jd->save();
+        return response()->json(['success' => true, 'compliance' => $jd->compliance]);
     }
 
     /**
@@ -551,7 +675,7 @@ class JobDescriptionController extends Controller
         if (!$jd) {
             return response()->json(['success' => false, 'message' => 'Job description not found.'], 404);
         }
-        if ($jd->compliance !== 'Approved') {
+        if (!in_array($jd->compliance, ['Approved', 'HR Approved'])) {
             return response()->json(['success' => false, 'message' => 'This job description has not passed compliance yet.'], 422);
         }
 

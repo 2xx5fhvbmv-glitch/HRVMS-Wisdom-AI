@@ -59,7 +59,7 @@ Route::prefix('resort')->namespace('Resort')->group(function () {
 });
 
 /*** Admin Authenticated Routes ***/
-Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkResortPermission','applyResortSmtp'])->namespace('Resorts')->group(function () {
+Route::prefix('resort')->middleware(['auth:resort-admin','forcePasswordChange:resort','revalidate','checkResortPermission','applyResortSmtp'])->namespace('Resorts')->group(function () {
 
     /*** Logout ***/
     Route::get( '/logout', ['App\Http\Controllers\Resorts\ResortLoginController','logout'] )->name('resort.logout');
@@ -468,6 +468,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get( '/talent-acquisition/job-description/download/{slug}/', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','download'])->name('resort.ta.jobdescription.download');
 
     // Per-employee JD issuance / e-signature consent tracking
+    Route::get('/talent-acquisition/job-description/{id}/advisory', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','getAdvisory'])->name('resort.ta.jobdescription.advisory');
+    Route::post('/talent-acquisition/job-description/{id}/resolve-advisory', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','resolveAdvisory'])->name('resort.ta.jobdescription.resolveAdvisory');
     Route::post('/talent-acquisition/job-description/{id}/issue', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','issueToEmployees'])->name('resort.ta.jobdescription.issue');
     Route::get('/talent-acquisition/job-description/{id}/employee-records', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','GetEmployeeRecordsList'])->name('resort.ta.jobdescription.employeeRecords');
     Route::post('/talent-acquisition/job-description-employee-record/{id}/resend', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','resendDeclined'])->name('resort.ta.jobdescription.resend');
@@ -564,6 +566,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/interview-assessment/update/{id}', 'TalentAcquisition\InterviewAssessmentController@update')->name('interview-assessment.update');
     Route::delete('/interview-assessment/delete/{id}', 'TalentAcquisition\InterviewAssessmentController@delete')->name('interview-assessment.delete');
 
+    Route::get('/interview-assessment/responses/{formId}', 'TalentAcquisition\InterviewAssessmentController@listResponses')->name('interview-assessment.responses');
     Route::get('/interview-assessment/{position_id}/{applicant_id}','TalentAcquisition\InterviewAssessmentController@show')->name('interview-assessment.show');
     Route::post('/interview-assessment/{id}/response', 'TalentAcquisition\InterviewAssessmentController@saveResponse')->name('interview-assessment.saveResponse');
     Route::get('/interview-assessment/view/{formId}/{responseId}', 'TalentAcquisition\InterviewAssessmentController@viewResponse')->name('interview-assessment.viewResponse');

@@ -3151,6 +3151,35 @@ class TimeAndAttendanceController extends Controller
                 $currentDate                                =   Carbon::now($appTimezone)->format('Y-m-d');
             }
 
+            // Same guards the list (hodMarkAttendance) applies: no future date,
+            // no date inside a closed payroll period.
+            $markDate                                       =   Carbon::createFromFormat('Y-m-d', $currentDate)->startOfDay();
+            if ($markDate->gt(Carbon::today())) {
+                return response()->json(['success' => false, 'message' => 'Cannot mark attendance for a future date.'], 422);
+            }
+            $cutoffDay                                      =   PayrollConfig::where('resort_id', $resort_id)->value('cutoff_day') ?? 1;
+            $cutoffPeriod                                   =   Common::getCurrentCutoffPeriod($cutoffDay);
+            if ($markDate->lt($cutoffPeriod['start']->copy()->startOfDay())) {
+                return response()->json(['success' => false, 'message' => 'This date falls in a closed payroll period and can no longer be marked.'], 422);
+            }
+
+            // Same department scoping as the list: HR/GM/HR-dept mark anyone
+            // in the resort, everyone else only their own department.
+            $actor                                          =   $user->GetEmployee;
+            $actorRank                                      =   config('settings.Position_Rank', [])[$actor->rank ?? ''] ?? '';
+            $hrDeptId                                       =   ResortDepartment::where('resort_id', $resort_id)
+                                                                    ->where('name', 'like', '%Human Resources%')
+                                                                    ->value('id');
+            $markScopeAll                                   =   in_array($actorRank, ['HR', 'GM'], true)
+                                                                    || ($hrDeptId && (int) $actor->Dept_id === (int) $hrDeptId);
+            $scopedEmpQuery                                 =   function ($q) use ($resort_id, $actor, $markScopeAll) {
+                $q->where('resort_id', $resort_id);
+                if (!$markScopeAll) {
+                    $q->where('Dept_id', $actor->Dept_id);
+                }
+                return $q;
+            };
+
             DB::beginTransaction();
 
             // Manager marking OT on behalf of a Casual/Intern with no app —
@@ -3160,7 +3189,9 @@ class TimeAndAttendanceController extends Controller
             // Mark by attendance_id (existing behaviour) — no OT support on
             // this path; ot_hours only applies to the emp_id loop below.
             foreach ($attendaceIds as $value) {
-                $parentAttendance                           =   ParentAttendace::where('resort_id', $resort_id)->where('id', $value)->whereIn('Status', ['', null])->first();
+                $parentAttendance                           =   ParentAttendace::where('resort_id', $resort_id)->where('id', $value)->whereIn('Status', ['', null])
+                    ->whereIn('Emp_id', $scopedEmpQuery(Employee::query())->select('id'))
+                    ->first();
                 if ($parentAttendance) {
                     $shiftData                              =   ShiftSettings::where('resort_id', $resort_id)->where('id', $parentAttendance->Shift_id)->first();
                     if ($shiftData) {
@@ -3205,7 +3236,7 @@ class TimeAndAttendanceController extends Controller
                 // No cross-resort management concept exists anywhere else
                 // in this codebase; reject instead of crossing the tenant
                 // boundary.
-                if (!Employee::where('id', $empId)->where('resort_id', $resort_id)->exists()) {
+                if (!$scopedEmpQuery(Employee::where('id', $empId))->exists()) {
                     $markResultByEmpId[$empId]              =   [
                         'emp_id'                            =>  $empId,
                         'marked'                            =>  false,
@@ -3427,8 +3458,8 @@ class TimeAndAttendanceController extends Controller
                 Common::notifyEmployees(
                     $resort_id,
                     $notifyEmpIds,
-                    'Attendance Marked Present',
-                    'Your attendance for ' . $currentDate . ' was marked Present by your HOD/HR.',
+                    'Attendance Marked ' . $status,
+                    'Your attendance for ' . $currentDate . ' was marked ' . $status . ' by your HOD/HR.',
                     'Attendance',
                     null,
                     'hod-mark-present'

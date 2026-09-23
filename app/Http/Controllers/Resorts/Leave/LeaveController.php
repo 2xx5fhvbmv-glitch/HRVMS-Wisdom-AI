@@ -1086,6 +1086,7 @@ class LeaveController extends Controller
             $leaveDetail->original_leave = $leaveDetail->extends_leave_id
                 ? DB::table('employees_leaves')
                     ->where('id', $leaveDetail->extends_leave_id)
+                    ->where('resort_id', $resort_id)
                     ->select('id', 'from_date', 'to_date', 'total_days', 'status')
                     ->first()
                 : null;
@@ -2205,23 +2206,23 @@ class LeaveController extends Controller
                 foreach ($approvalFlow as $approver) {
                     $approverEmp = Employee::find($approver->id);
                     if ($approverEmp) {
-                        event(new ResortNotificationEvent(Common::nofitication(
-                            $resort_id, 10,
+                        Common::notifyEmployees(
+                            $resort_id,
+                            [$approverEmp->id],
                             'Leave Approval Required',
                             $applicantName . ' has applied for leave from ' . $leaveFromFormatted . ' to ' . $leaveToFormatted . '. Please review.',
-                            $leave->id,
-                            $approverEmp->id,
-                            'Leave'
-                        )));
+                            'Leave',
+                            $leave->id
+                        );
                         if ($dayOffLeave) {
-                            event(new ResortNotificationEvent(Common::nofitication(
-                                $resort_id, 10,
+                            Common::notifyEmployees(
+                                $resort_id,
+                                [$approverEmp->id],
                                 'Leave Approval Required',
                                 $applicantName . ' has applied for Day Off from ' . $leaveFromFormatted . ' to ' . $leaveToFormatted . '. Please review.',
-                                $dayOffLeave->id,
-                                $approverEmp->id,
-                                'Leave'
-                            )));
+                                'Leave',
+                                $dayOffLeave->id
+                            );
                         }
                     }
                 }
@@ -2230,14 +2231,14 @@ class LeaveController extends Controller
                 if ($request->task_delegation) {
                     $delegatedEmp = Employee::find($request->task_delegation);
                     if ($delegatedEmp) {
-                        event(new ResortNotificationEvent(Common::nofitication(
-                            $resort_id, 10,
+                        Common::notifyEmployees(
+                            $resort_id,
+                            [$delegatedEmp->id],
                             'Task Delegation',
                             $applicantName . ' has delegated tasks to you during leave (' . $leaveFromFormatted . ' - ' . $leaveToFormatted . '). Pending approval.',
-                            $leave->id,
-                            $delegatedEmp->id,
-                            'Leave'
-                        )));
+                            'Leave',
+                            $leave->id
+                        );
                     }
                 }
 
@@ -2866,41 +2867,41 @@ class LeaveController extends Controller
 
                 if ($pendingCount === 0) {
                     // Fully approved — notify applicant
-                    event(new ResortNotificationEvent(Common::nofitication(
-                        $leave->resort_id, 10,
+                    Common::notifyEmployees(
+                        $leave->resort_id,
+                        [$applicant->id],
                         'Leave Approved',
                         'Your leave from ' . $leaveFrom . ' to ' . $leaveTo . ' has been fully approved.',
-                        $leave->id,
-                        $applicant->id,
-                        'Leave'
-                    )));
+                        'Leave',
+                        $leave->id
+                    );
 
                     // Notify task delegation person that leave is confirmed
                     if ($leave->task_delegation) {
                         $delegatedEmp = Employee::find($leave->task_delegation);
                         if ($delegatedEmp) {
-                            event(new ResortNotificationEvent(Common::nofitication(
-                                $leave->resort_id, 10,
+                            Common::notifyEmployees(
+                                $leave->resort_id,
+                                [$delegatedEmp->id],
                                 'Task Delegation Confirmed',
                                 $applicantName . '\'s leave has been approved (' . $leaveFrom . ' - ' . $leaveTo . '). You are responsible for their tasks during this period.',
-                                $leave->id,
-                                $delegatedEmp->id,
-                                'Leave'
-                            )));
+                                'Leave',
+                                $leave->id
+                            );
                         }
                     }
                 } else {
                     // Partially approved — notify applicant
                     $approverAdmin = ResortAdmin::find($this->resort->GetEmployee->Admin_Parent_id ?? 0);
                     $approverName = $approverAdmin ? trim($approverAdmin->first_name . ' ' . $approverAdmin->last_name) : 'Approver';
-                    event(new ResortNotificationEvent(Common::nofitication(
-                        $leave->resort_id, 10,
+                    Common::notifyEmployees(
+                        $leave->resort_id,
+                        [$applicant->id],
                         'Leave Partially Approved',
                         'Your leave (' . $leaveFrom . ' - ' . $leaveTo . ') has been approved by ' . $approverName . '. Awaiting next approval.',
-                        $leave->id,
-                        $applicant->id,
-                        'Leave'
-                    )));
+                        'Leave',
+                        $leave->id
+                    );
                 }
             } catch (\Exception $notifEx) {
                 \Log::warning('Leave approval notification error: ' . $notifEx->getMessage());
@@ -2930,14 +2931,14 @@ class LeaveController extends Controller
                 $leaveFrom = Carbon::parse($leave->from_date)->format('d M Y');
                 $leaveTo = Carbon::parse($leave->to_date)->format('d M Y');
 
-                event(new ResortNotificationEvent(Common::nofitication(
-                    $leave->resort_id, 10,
+                Common::notifyEmployees(
+                    $leave->resort_id,
+                    [$applicant->id],
                     'Leave Rejected',
                     'Your leave (' . $leaveFrom . ' - ' . $leaveTo . ') has been rejected by ' . $approverName . '.' . ($comments ? ' Reason: ' . $comments : ''),
-                    $leave->id,
-                    $applicant->id,
-                    'Leave'
-                )));
+                    'Leave',
+                    $leave->id
+                );
 
                 // Notify task delegation person that leave is cancelled
                 if ($leave->task_delegation) {
@@ -2945,14 +2946,14 @@ class LeaveController extends Controller
                     if ($delegatedEmp) {
                         $applicantAdmin = ResortAdmin::find($applicant->Admin_Parent_id ?? 0);
                         $applicantName = $applicantAdmin ? trim($applicantAdmin->first_name . ' ' . $applicantAdmin->last_name) : 'Employee';
-                        event(new ResortNotificationEvent(Common::nofitication(
-                            $leave->resort_id, 10,
+                        Common::notifyEmployees(
+                            $leave->resort_id,
+                            [$delegatedEmp->id],
                             'Task Delegation Cancelled',
                             $applicantName . '\'s leave (' . $leaveFrom . ' - ' . $leaveTo . ') has been rejected. Task delegation is no longer active.',
-                            $leave->id,
-                            $delegatedEmp->id,
-                            'Leave'
-                        )));
+                            'Leave',
+                            $leave->id
+                        );
                     }
                 }
             } catch (\Exception $notifEx) {

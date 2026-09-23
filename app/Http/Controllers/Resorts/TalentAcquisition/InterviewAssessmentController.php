@@ -82,7 +82,9 @@ class InterviewAssessmentController extends Controller
 
                 $edit_url = route('interview-assessment.edit', $row->id);
                 // $delete_url = route('interview-assessment.delete', $row->id);
-                return "<a href='$edit_url' class='btn-tableIcon ta-btn-secondary edit-row-btn $edit_class' title='Edit'><i class='fa-solid fa-pen'></i></a>
+                $responses_url = route('interview-assessment.responses', $row->id);
+                return "<a href='#' class='btn-tableIcon ta-btn-secondary responses-row-btn' data-url='$responses_url' data-name='" . e($row->form_name) . "' title='Responses'><i class='fa-solid fa-list'></i></a>
+                        <a href='$edit_url' class='btn-tableIcon ta-btn-secondary edit-row-btn $edit_class' title='Edit'><i class='fa-solid fa-pen'></i></a>
                         <a href='#' class='btn-tableIcon ta-btn-critical delete-row-btn $delete_class' data-id='$row->id' title='Delete'><i class='fa-solid fa-trash'></i></a>";
             })
             ->addColumn('Position', function ($row) {
@@ -92,6 +94,36 @@ class InterviewAssessmentController extends Controller
                 return $row->form_name;
             })
             ->rawColumns(['Position', 'form_name', 'action'])
+            ->make(true);
+    }
+
+    public function listResponses(Request $request, $formId)
+    {
+        // Same visibility rule as list(): rank 1/2 only see their own department's forms.
+        $form = InterviewAssessmentForm::join('resort_positions as t4', 't4.id', '=', 'interview_assessment_forms.position')
+            ->where('interview_assessment_forms.resort_id', $this->resort->resort_id)
+            ->where('interview_assessment_forms.id', $formId)
+            ->when(in_array((int) $this->rank, [1, 2], true), function ($q) {
+                $q->where('t4.dept_id', $this->resort->GetEmployee->Dept_id);
+            })
+            ->select('interview_assessment_forms.id')
+            ->firstOrFail();
+
+        $responses = InterviewAssessmentResponseForm::with(['interviewer', 'interviewee'])
+            ->where('form_id', $form->id)
+            ->orderBy('id', 'DESC');
+
+        return datatables()->of($responses)
+            ->addColumn('interviewee', fn($r) => e(trim(($r->interviewee->first_name ?? '') . ' ' . ($r->interviewee->last_name ?? ''))) ?: '-')
+            ->addColumn('interviewer', fn($r) => e(trim(($r->interviewer->first_name ?? '') . ' ' . ($r->interviewer->last_name ?? ''))) ?: '-')
+            ->addColumn('submitted', fn($r) => optional($r->created_at)->format('d M Y, h:i A'))
+            ->addColumn('action', function ($r) {
+                $view = route('interview-assessment.viewResponse', [base64_encode($r->form_id), base64_encode($r->id)]);
+                $download = route('interview-assessment.downloadResponsePdf', [base64_encode($r->form_id), base64_encode($r->id)]);
+                return "<a href='$view' class='btn-tableIcon ta-btn-secondary' title='View'><i class='fa-solid fa-eye'></i></a>
+                        <a href='$download' class='btn-tableIcon ta-btn-secondary' title='Download'><i class='fa-solid fa-download'></i></a>";
+            })
+            ->rawColumns(['interviewee', 'interviewer', 'action'])
             ->make(true);
     }
 
@@ -509,7 +541,7 @@ class InterviewAssessmentController extends Controller
 
             // Fetch the form structure
             $form = InterviewAssessmentForm::where('resort_id', $this->resort->resort_id)->findOrFail($formId);
-            $formStructure = json_decode($form->form_structure, true);
+            $formStructure = json_decode(json_decode($form->form_structure), true) ?: [];
 
             return view('resorts.talentacquisition.interview-assessment.viewResponse', compact('response', 'responses', 'formStructure','page_title'));
         } catch (\Exception $e) {
@@ -542,7 +574,7 @@ class InterviewAssessmentController extends Controller
 
         $responses = json_decode($response->responses, true) ?: [];
         $form = InterviewAssessmentForm::where('resort_id', $this->resort->resort_id)->findOrFail($formId);
-        $formStructure = json_decode($form->form_structure, true) ?: [];
+        $formStructure = json_decode(json_decode($form->form_structure), true) ?: [];
 
         $resort = Resort::find($this->resort->resort_id);
         $letterhead = Common::getLetterheadData($this->resort->resort_id);

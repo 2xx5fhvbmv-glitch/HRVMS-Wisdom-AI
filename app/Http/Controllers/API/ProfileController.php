@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use App\Models\Employee;
 use App\Models\Resort;
 use App\Models\ResortAdmin;
@@ -360,16 +361,23 @@ class ProfileController extends Controller
         return response()->json($response);
       }
 
-      if (strlen($request->password) != 6) {
-        $response['status']   = false;
-        $response['message']  = 'Password must be 6 digit number';
-        return response()->json($response);
+      // Same policy as the web reset flows — this writes the same
+      // resort_admins.password the web login checks.
+      $validator = \Validator::make($request->only('password'), [
+        'password' => [PasswordRule::min(12)->mixedCase()->numbers()->uncompromised()],
+      ]);
+      if ($validator->fails()) {
+        return response()->json(['status' => false, 'message' => $validator->errors()->first('password')]);
       }
 
-      $employee           = Auth::guard('api')->user();
-      $password           = bcrypt($request->password);
+      $employee = Auth::guard('api')->user();
 
-      $employee->password = $password;
+      if (!$request->filled('old_password') || !Hash::check($request->old_password, $employee->password)) {
+        return response()->json(['status' => false, 'message' => 'Old password is incorrect']);
+      }
+
+      $employee->password = Hash::make($request->password);
+      $employee->must_change_password = false;
       $employee->save();
 
       // Security-visibility: let the employee know their password changed,

@@ -840,7 +840,7 @@ class GrivanceController extends Controller
             return response()->json(['success' => false, 'message' => 'Only designated key personnel can request identity disclosure.'], 403);
         }
 
-        $grievance = GrivanceSubmissionModel::find($id);
+        $grievance = GrivanceSubmissionModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
         if (!$grievance || $grievance->Grivance_Submission_Type != "Yes") {
             return response()->json(['success' => false, 'message' => 'Grievance not found or not confidential.'], 404);
         }

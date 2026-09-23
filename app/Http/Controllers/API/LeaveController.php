@@ -1712,6 +1712,7 @@ class LeaveController extends Controller
                     $leaveDetail->original_leave             =   $leaveDetail->extends_leave_id
                                                                     ? DB::table('employees_leaves')
                                                                         ->where('id', $leaveDetail->extends_leave_id)
+                                                                        ->where('resort_id', $resortId)
                                                                         ->select('id', 'from_date', 'to_date', 'total_days', 'status')
                                                                         ->first()
                                                                     : null;
@@ -3712,6 +3713,7 @@ class LeaveController extends Controller
                     $leaveDetail->original_leave             = $leaveDetail->extends_leave_id
                                                                     ? DB::table('employees_leaves')
                                                                         ->where('id', $leaveDetail->extends_leave_id)
+                                                                        ->where('resort_id', $resortId)
                                                                         ->select('id', 'from_date', 'to_date', 'total_days', 'status')
                                                                         ->first()
                                                                     : null;
