@@ -887,6 +887,23 @@ class AccommodationController extends Controller
             $response['status']                             =   true;
             $response['message']                            =   'Bed assignments data retrieved successfully';
             $response['bed_assign']                 =   $availableAccommodation;
+
+            // Always surface the employee's existing allocation (most are
+            // already housed); null only when they truly have no bed.
+            $currentBed                                     =   AssingAccommodation::where('emp_id', $empId)->where('resort_id', $this->resort_id)->first();
+            $currentAcc                                     =   $currentBed
+                                                                ? AvailableAccommodationModel::where('id', $currentBed->available_a_id)
+                                                                    ->where('resort_id', $this->resort_id)
+                                                                    ->with('accommodationType')
+                                                                    ->first()
+                                                                : null;
+            $response['current_accommodation']              =   $currentAcc ? [
+                'accommodation_name'                        =>  $currentAcc->accommodationType->AccommodationName ?? null,
+                'building_name'                             =>  BuildingModel::where('id', $currentAcc->BuildingName)->value('BuildingName'),
+                'floor'                                     =>  $currentAcc->Floor,
+                'room_no'                                   =>  $currentAcc->RoomNo,
+                'bed_no'                                    =>  $currentBed->BedNo,
+            ] : null;
             return response()->json($response);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
