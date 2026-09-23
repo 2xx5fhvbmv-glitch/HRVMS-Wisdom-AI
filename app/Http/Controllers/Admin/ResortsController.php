@@ -365,6 +365,28 @@ class ResortsController extends Controller
         //   create default folder in aws
         $folder = Common::createFolderByResort($resort->id);
 
+        // Guarantee the "Day Off" leave category exists for every new
+        // resort (mirrors database/migrations/2026_06_03_000002_seed_day_off_leave_category.php's
+        // one-time backfill, which never runs again for resorts created
+        // after it) — required by the duty-roster-driven Day Off
+        // accumulation system.
+        \App\Models\LeaveCategory::create([
+            'resort_id' => $resort->id,
+            'leave_type' => 'Day Off',
+            'number_of_days' => 52,
+            'carry_forward' => 1,
+            'carry_max' => null,
+            'earned_leave' => 0,
+            'earned_max' => null,
+            'eligibility' => '8,1,2,3,4,5,6,7',
+            'frequency' => 'Weekly',
+            'number_of_times' => 1,
+            'color' => '#f1c40f',
+            'leave_category' => '',
+            'combine_with_other' => 0,
+            'is_paid' => 'paid',
+        ]);
+
           $response['success'] = true;
           $response['msg'] = __('messages.addSuccess', ['name' => 'Resort']);
           $response['redirect_url'] = route('admin.resorts.index');

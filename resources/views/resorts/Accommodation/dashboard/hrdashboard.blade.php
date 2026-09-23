@@ -950,7 +950,7 @@
                             });
                             AccomComplitionRequest();
 
-                            $("#ForwardToHOD-Model").modal('hide');
+                            $("#ForwardToHOD-DetailsModel").modal('hide');
 
                         } else {
                             toastr.error(response.message, "Error", {

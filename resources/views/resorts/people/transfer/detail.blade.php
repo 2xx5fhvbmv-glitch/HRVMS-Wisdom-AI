@@ -282,6 +282,10 @@
                                class="btn btn-themeSkyblue btn-sm">
                                 <i class="fa-regular fa-file-pdf"></i> Preview Transfer Letter
                             </a>
+                            <a href="{{ route('people.transfer.download-letter', $transfer->id) }}"
+                               class="btn btn-themeNeon btn-sm">
+                                <i class="fa-solid fa-download"></i> Download
+                            </a>
                             <button type="button" id="sendTransferLetterBtn"
                                data-url="{{ route('people.transfer.send-letter', $transfer->id) }}"
                                class="btn btn-themeBlue btn-sm">

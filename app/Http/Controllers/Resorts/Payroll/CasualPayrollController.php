@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Helpers\Common;
 use App\Models\CasualPositionPayConfig;
 use App\Models\Employee;
+use App\Models\EmployeeLeave;
 use App\Models\ParentAttendace;
 use App\Models\Payroll;
 use App\Models\PayrollConfig;
@@ -184,6 +185,24 @@ class CasualPayrollController extends Controller
             ->get()
             ->groupBy('Emp_id');
 
+        // Paid/unpaid override for each FullDayLeave day — set per
+        // application at Leave apply time (LeaveController::store()), since
+        // Casual has no leave_categories.is_paid entitlement of its own.
+        // Keyed by [emp_id][Y-m-d] => 'paid'|'unpaid'|null.
+        $leaveOverrideByEmpDate = [];
+        foreach (EmployeeLeave::whereIn('emp_id', $scopedEmployeeIds)
+            ->where('status', 'Approved')
+            ->where('from_date', '<=', $request->endDate)
+            ->where('to_date', '>=', $request->startDate)
+            ->get(['emp_id', 'from_date', 'to_date', 'is_paid_override']) as $leave) {
+            $cursor = Carbon::parse($leave->from_date);
+            $end = Carbon::parse($leave->to_date);
+            while ($cursor->lte($end)) {
+                $leaveOverrideByEmpDate[$leave->emp_id][$cursor->format('Y-m-d')] = $leave->is_paid_override;
+                $cursor->addDay();
+            }
+        }
+
         $settings = ResortSiteSettings::where('resort_id', $resort_id)->first();
         $dollarToMvr = (float) ($settings->DollertoMVR ?? 15.42) ?: 15.42;
         $displayCurrency = strtoupper($request->input('currency', $settings->currency ?? 'USD')) === 'MVR' ? 'MVR' : 'USD';
@@ -223,7 +242,10 @@ class CasualPayrollController extends Controller
             // Permanent does (§1 of the founder's own spec: supervisor marks
             // the full daily status, no benefit-grid leave allocation
             // applies) — only Present + DayOff are paid; Absent/Sick/
-            // ShortLeave/HalfDayLeave/FullDayLeave are all unpaid days.
+            // ShortLeave/HalfDayLeave are all unpaid days. FullDayLeave is
+            // the one exception: it's leave-driven, so its paid/unpaid
+            // status comes from the per-application override set at Leave
+            // apply time (LeaveController::store()) instead of a fixed rule.
             $presentDayEquivalent = 0.0;
             foreach ($records->where('Status', 'Present') as $rec) {
                 $hasHours = !empty($rec->DayWiseTotalHours) && !in_array($rec->DayWiseTotalHours, ['0', '0:0', '0:00', '00:00'], true);
@@ -236,7 +258,21 @@ class CasualPayrollController extends Controller
                 $presentDayEquivalent += min(1.0, $dayHours / 8);
             }
             $presentCount = $records->where('Status', 'Present')->count();
-            $unpaidCount = $records->whereIn('Status', ['Absent', 'Sick', 'ShortLeave', 'HalfDayLeave', 'FullDayLeave'])->count();
+
+            $fullDayLeaveRecords = $records->where('Status', 'FullDayLeave');
+            $paidLeaveDayCount = 0;
+            $unpaidLeaveDayCount = 0;
+            foreach ($fullDayLeaveRecords as $rec) {
+                $override = $leaveOverrideByEmpDate[$empId][Carbon::parse($rec->date)->format('Y-m-d')] ?? null;
+                if ($override === 'paid') {
+                    $paidLeaveDayCount++;
+                } else {
+                    $unpaidLeaveDayCount++;
+                }
+            }
+            $presentDayEquivalent += $paidLeaveDayCount;
+            $presentCount += $paidLeaveDayCount;
+            $unpaidCount = $records->whereIn('Status', ['Absent', 'Sick', 'ShortLeave', 'HalfDayLeave'])->count() + $unpaidLeaveDayCount;
 
             $regularOT = $fridayOT = $holidayOT = 0.0;
             foreach ($records as $rec) {

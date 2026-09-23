@@ -474,6 +474,32 @@ class DutyRosterController extends Controller
                 ], 422);
             }
 
+            // Day Off max-accumulation check: only relevant when this save
+            // will produce zero DayOff days this week for every employee in
+            // the batch (DayOffDates is one shared request field, not
+            // per-employee) — a week with at least one day off never adds
+            // to anyone's balance, so nothing to block.
+            if ($DefaultShiftTime == "All" && empty($dayOffDatesArray)) {
+                $dayOffCategory = LeaveCategory::where('resort_id', $resort_id)->where('leave_type', 'Day Off')->first();
+                $dayOffMax = $dayOffCategory->carry_max ?? null;
+                if ($dayOffMax !== null) {
+                    $dayOffCapExceededEmployees = [];
+                    foreach ($rosterEmployees as $emp) {
+                        $balance = Common::getDayOffBalance($emp->id, $resort_id);
+                        if ($balance >= $dayOffMax) {
+                            $empName = trim(($emp->first_name ?? '') . ' ' . ($emp->last_name ?? ''));
+                            $dayOffCapExceededEmployees[] = ($empName ?: 'Employee') . " already has {$balance} accumulated day-off(s) (resort max: {$dayOffMax})";
+                        }
+                    }
+                    if (!empty($dayOffCapExceededEmployees)) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => implode('; ', $dayOffCapExceededEmployees) . '. This week\'s roster must include at least one day off for these employee(s) before it can be saved.',
+                        ], 422);
+                    }
+                }
+            }
+
             // Filter out employees who already have a shift during the specified date range
             $employeesToProcess = [];
             $skippedEmployees = [];
@@ -572,6 +598,28 @@ class DutyRosterController extends Controller
                             $DutyRosterEntry->save();
 
                         }
+
+                        // Day Off crediting: one credit row per employee per
+                        // week where none of the entries just saved are a
+                        // DayOff. week_start_date is $startingDate — this
+                        // save's own range-start, per the UI's convention
+                        // that one "All" save represents one full week.
+                        $weekStart = $startingDate->format('Y-m-d');
+                        $weekHasDayOff = DutyRosterEntry::where('roster_id', $DutyRoster->id)
+                            ->where('Status', 'DayOff')
+                            ->exists();
+                        if ($weekHasDayOff) {
+                            DB::table('employee_day_off_credits')
+                                ->where('emp_id', $Employee)
+                                ->where('resort_id', $resort_id)
+                                ->where('week_start_date', $weekStart)
+                                ->delete();
+                        } else {
+                            DB::table('employee_day_off_credits')->updateOrInsert(
+                                ['emp_id' => $Employee, 'resort_id' => $resort_id, 'week_start_date' => $weekStart],
+                                ['roster_id' => $DutyRoster->id, 'updated_at' => now(), 'created_at' => now()]
+                            );
+                        }
                     }
                     else
                     {
@@ -587,7 +635,12 @@ class DutyRosterController extends Controller
 
                         // Skip creating roster entry if employee has approved leave on this date
                         if (!$leave) {
-                            $singleDateOvertime = $employeeOvertimeHours;
+                            // Honor DayOffDates here too — this single-cell
+                            // save mode previously always hardcoded
+                            // "Present" regardless of DayOffDates, unlike
+                            // the "All" (date-range) mode above.
+                            $isSingleDateDayOff = in_array($singleDate, $dayOffDatesArray);
+                            $singleDateOvertime = $isSingleDateDayOff ? '00:00' : $employeeOvertimeHours;
                             DutyRosterEntry::create([
                                 "roster_id" => $DutyRoster->id,
                                 "Shift_id" => $DutyRoster->Shift_id,
@@ -598,8 +651,27 @@ class DutyRosterController extends Controller
                                 'date' => $singleDate,
                                 'CheckingTime'=>$shitTime->StartTime,
                                 "CheckingOutTime" => $TotalHours,
-                                "Status" => "Present",
+                                "Status" => $isSingleDateDayOff ? "DayOff" : "Present",
                             ]);
+
+                            // A single-cell save never represents a full
+                            // week, so it can't independently CREATE a
+                            // credit — but if it turns a date into a
+                            // DayOff, remove any stale credit for the week
+                            // containing that date (the "edited a
+                            // previously-no-day-off week to add a day off"
+                            // case, reachable from this save mode too).
+                            if ($isSingleDateDayOff) {
+                                $weekOf = \Carbon\Carbon::parse($singleDate);
+                                DB::table('employee_day_off_credits')
+                                    ->where('emp_id', $Employee)
+                                    ->where('resort_id', $resort_id)
+                                    ->whereBetween('week_start_date', [
+                                        $weekOf->copy()->startOfWeek(\Carbon\Carbon::MONDAY)->format('Y-m-d'),
+                                        $weekOf->copy()->endOfWeek(\Carbon\Carbon::SUNDAY)->format('Y-m-d'),
+                                    ])
+                                    ->delete();
+                            }
                         }
                     }
 

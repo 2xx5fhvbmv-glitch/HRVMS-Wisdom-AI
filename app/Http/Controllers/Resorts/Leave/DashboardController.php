@@ -58,52 +58,34 @@ class DashboardController extends Controller
         $userDeptId = $loggedInEmployee->Dept_id ?? null;
         $isFromHRDepartment = $hrDeptId && $userDeptId && (int) $userDeptId === (int) $hrDeptId;
 
-        if ($isFromHRDepartment) {
-            $total_applied_leaves = DB::table('employees_leaves as el')
-                ->where('el.resort_id', $this->resort->resort_id)->where('flag', null)->count();
-            $total_approved_leaves = DB::table('employees_leaves as el')
-                ->where('el.resort_id', $this->resort->resort_id)->where('flag', null)->where('status', 'Approved')->count();
-            $total_pending_leaves = DB::table('employees_leaves as el')
-                ->where('el.resort_id', $this->resort->resort_id)->where('flag', null)->where('status', 'Pending')->count();
-            $total_rejected_leaves = DB::table('employees_leaves as el')
-                ->where('el.resort_id', $this->resort->resort_id)->where('flag', null)->where('status', 'Rejected')->count();
-        } else {
-            $total_applied_leaves = DB::table('employees_leaves as el')
-                ->join('employees as e', 'e.id', '=', 'el.emp_id')->where('flag', null)
-                ->where('el.resort_id', $this->resort->resort_id)
-                ->when($userDeptId, function ($q) use ($userDeptId, $loggedInEmployeeId) {
-                    $q->where(function ($q2) use ($userDeptId, $loggedInEmployeeId) {
-                        $q2->where('e.Dept_id', $userDeptId)->orWhere('el.emp_id', $loggedInEmployeeId);
-                    });
-                })
-                ->when(!$userDeptId, function ($q) use ($loggedInEmployeeId) {
-                    $q->where('e.reporting_to', $this->reporting_to)->orWhere('el.emp_id', $loggedInEmployeeId);
-                })
-                ->count();
+        $baseLeaveQuery = DB::table('employees_leaves as el')
+            ->where('el.resort_id', $this->resort->resort_id);
 
-            $baseNonHR = function ($status = null) use ($userDeptId, $loggedInEmployeeId) {
-                $q = DB::table('employees_leaves as el')
-                    ->join('employees as e', 'e.id', '=', 'el.emp_id')
-                    ->where('flag', null)
-                    ->where('el.resort_id', $this->resort->resort_id);
-                if ($userDeptId) {
-                    $q->where(function ($q2) use ($userDeptId, $loggedInEmployeeId) {
-                        $q2->where('e.Dept_id', $userDeptId)->orWhere('el.emp_id', $loggedInEmployeeId);
-                    });
-                } else {
-                    $q->where(function ($q2) use ($loggedInEmployeeId) {
-                        $q2->where('e.reporting_to', $this->reporting_to)->orWhere('el.emp_id', $loggedInEmployeeId);
-                    });
-                }
-                if ($status) {
-                    $q->where('el.status', $status);
-                }
-                return $q->count();
-            };
-            $total_approved_leaves = $baseNonHR('Approved');
-            $total_pending_leaves = $baseNonHR('Pending');
-            $total_rejected_leaves = $baseNonHR('Rejected');
+        if (!$isFromHRDepartment) {
+            $baseLeaveQuery->join('employees as e', 'e.id', '=', 'el.emp_id');
+            if ($userDeptId) {
+                $baseLeaveQuery->where(function ($q) use ($userDeptId, $loggedInEmployeeId) {
+                    $q->where('e.Dept_id', $userDeptId)->orWhere('el.emp_id', $loggedInEmployeeId);
+                });
+            } else {
+                $baseLeaveQuery->where(function ($q) use ($loggedInEmployeeId) {
+                    $q->where('e.reporting_to', $this->reporting_to)->orWhere('el.emp_id', $loggedInEmployeeId);
+                });
+            }
         }
+
+        // A combined submission is 2 rows sharing one flag pairing — counting
+        // raw rows would count it twice. Group first (see
+        // Common::groupCombinedLeaves()) so each submission counts once,
+        // instead of hiding the flagged half from the widget entirely.
+        $groupedLeaves = Common::groupCombinedLeaves(
+            $baseLeaveQuery->select('el.id', 'el.flag', 'el.leave_category_id', 'el.emp_id', 'el.resort_id', 'el.status', 'el.created_at')->distinct()->get()
+        );
+
+        $total_applied_leaves = $groupedLeaves->count();
+        $total_approved_leaves = $groupedLeaves->where('status', 'Approved')->count();
+        $total_pending_leaves = $groupedLeaves->where('status', 'Pending')->count();
+        $total_rejected_leaves = $groupedLeaves->where('status', 'Rejected')->count();
 
         // Get today's and tomorrow's month-day (dob is stored as Y-m-d, so compare using m-d)
         $todayMd = Carbon::today()->format('m-d');
@@ -175,64 +157,33 @@ class DashboardController extends Controller
         $currentYearStart = Carbon::now()->startOfYear()->format('Y-m-d');
         $currentYearEnd = Carbon::now()->endOfYear()->format('Y-m-d');
 
-        if( $canViewWholeResort ){
-            $total_applied_leaves = DB::table('employees_leaves as el')
-            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)
-            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
-            ->count();
-            $total_approved_leaves = DB::table('employees_leaves as el')
-            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->where('status','Approved')
-            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
-            ->count();
-            $total_pending_leaves = DB::table('employees_leaves as el')
-            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->where('status','Pending')
-            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
-            ->count();
-            $total_rejected_leaves = DB::table('employees_leaves as el')
-            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->where('status','Rejected')
-            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
-            ->count();
+        $baseLeaveQuery = DB::table('employees_leaves as el')
+            ->where('el.resort_id', $this->resort->resort_id)
+            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart);
+
+        if (!$canViewWholeResort) {
+            $baseLeaveQuery->join('employees as e', 'e.id', '=', 'el.emp_id')
+                ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
+                ->where(function ($q) use ($loggedInEmployeeId) {
+                    $q->where('els.approver_id', $loggedInEmployeeId)->orWhere('el.emp_id', $loggedInEmployeeId);
+                });
         }
-        else{
-            $total_applied_leaves = DB::table('employees_leaves as el')
-            ->join('employees as e', 'e.id', '=', 'el.emp_id')->where('flag',null)
-            ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
-            ->where(function ($q) use ($loggedInEmployeeId) {
-                $q->where('els.approver_id',$loggedInEmployeeId)->orWhere('el.emp_id', $loggedInEmployeeId);
-            })
-            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
-            ->where('el.resort_id', $this->resort->resort_id)->count();
 
-            $total_approved_leaves = DB::table('employees_leaves as el')
-            ->join('employees as e', 'e.id', '=', 'el.emp_id')
-            ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
-            ->where(function ($q) use ($loggedInEmployeeId) {
-                $q->where('els.approver_id',$loggedInEmployeeId)->orWhere('el.emp_id', $loggedInEmployeeId);
-            })
-            ->where('flag',null)
-            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
-            ->where('el.resort_id', $this->resort->resort_id)->where('el.status','Approved')->count();
+        // A combined submission is 2 rows sharing one flag pairing — counting
+        // raw rows would count it twice (and the non-HR branch's join to
+        // employees_leaves_status fans out one row per approval stage, so
+        // ->distinct() on the id-level select is needed there too). Group
+        // first (see Common::groupCombinedLeaves()) so each submission
+        // counts once, instead of hiding the flagged half from the widget
+        // entirely.
+        $groupedLeaves = Common::groupCombinedLeaves(
+            $baseLeaveQuery->select('el.id', 'el.flag', 'el.leave_category_id', 'el.emp_id', 'el.resort_id', 'el.status', 'el.created_at')->distinct()->get()
+        );
 
-            $total_pending_leaves = DB::table('employees_leaves as el')
-            ->join('employees as e', 'e.id', '=', 'el.emp_id')
-            ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
-            ->where(function ($q) use ($loggedInEmployeeId) {
-                $q->where('els.approver_id',$loggedInEmployeeId)->orWhere('el.emp_id', $loggedInEmployeeId);
-            })
-            ->where('flag',null)
-            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
-            ->where('el.resort_id', $this->resort->resort_id)->where('el.status','Pending')->count();
-
-            $total_rejected_leaves = DB::table('employees_leaves as el')
-            ->join('employees as e', 'e.id', '=', 'el.emp_id')
-            ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
-            ->where(function ($q) use ($loggedInEmployeeId) {
-                $q->where('els.approver_id',$loggedInEmployeeId)->orWhere('el.emp_id', $loggedInEmployeeId);
-            })
-            ->where('flag',null)
-            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
-            ->where('el.resort_id', $this->resort->resort_id)->where('el.status','Rejected')->count();
-        }
+        $total_applied_leaves = $groupedLeaves->count();
+        $total_approved_leaves = $groupedLeaves->where('status', 'Approved')->count();
+        $total_pending_leaves = $groupedLeaves->where('status', 'Pending')->count();
+        $total_rejected_leaves = $groupedLeaves->where('status', 'Rejected')->count();
 
         // Get today's and tomorrow's month-day (dob is stored as Y-m-d)
         $todayMd = Carbon::today()->format('m-d');
@@ -499,8 +450,7 @@ class DashboardController extends Controller
 
         $baseLeaveQuery = DB::table('employees_leaves as el')
             ->join('employees as e', 'e.id', '=', 'el.emp_id')
-            ->where('el.resort_id', $this->resort->resort_id)
-            ->whereNull('el.flag');
+            ->where('el.resort_id', $this->resort->resort_id);
 
         if ($isFromHRDepartment) {
             // HR department: whole resort
@@ -514,13 +464,21 @@ class DashboardController extends Controller
             });
         }
 
-        $total_applied_leaves = (clone $baseLeaveQuery)->count();
+        // A combined submission is 2 rows sharing one flag pairing — counting
+        // raw rows would count it twice. Group first (see
+        // Common::groupCombinedLeaves()) so each submission counts once,
+        // instead of hiding the flagged half from the widget entirely.
+        $groupedLeaves = Common::groupCombinedLeaves(
+            (clone $baseLeaveQuery)->select('el.id', 'el.flag', 'el.leave_category_id', 'el.emp_id', 'el.resort_id', 'el.status', 'el.created_at')->get()
+        );
 
-        $total_approved_leaves = (clone $baseLeaveQuery)->where('el.status', 'Approved')->count();
+        $total_applied_leaves = $groupedLeaves->count();
 
-        $total_pending_leaves = (clone $baseLeaveQuery)->where('el.status', 'Pending')->count();
+        $total_approved_leaves = $groupedLeaves->where('status', 'Approved')->count();
 
-        $total_rejected_leaves = (clone $baseLeaveQuery)->where('el.status', 'Rejected')->count();
+        $total_pending_leaves = $groupedLeaves->where('status', 'Pending')->count();
+
+        $total_rejected_leaves = $groupedLeaves->where('status', 'Rejected')->count();
 
         $show_department_filter = $isFromHRDepartment;
 
@@ -1016,19 +974,19 @@ class DashboardController extends Controller
             $leaveRequest->profile_picture = Common::getResortUserPicture($leaveRequest->Admin_Parent_id);
 
             // `flag` holds the PAIRED category's leave_category_id, not this
-            // row's own id — matching against $leaveRequest->id (as this
-            // previously did) meant combinedLeave was always null in
-            // practice, so the second leg's total_days/to_date never merged
-            // in (see Common::groupCombinedLeaves() for the flag contract).
-            // Scoped to the same employee/resort — see LeaveController::details()
-            // for why an unscoped `flag` match can pull in an unrelated
-            // employee's leave row.
-            $leaveRequest->combinedLeave = EmployeeLeave::where('flag', $leaveRequest->leave_category_id)
-                ->where('employees_leaves.emp_id', $leaveRequest->emp_id)
-                ->where('employees_leaves.resort_id', $leaveRequest->resort_id)
-                ->where('employees_leaves.id', '!=', $leaveRequest->id)
-                ->join('leave_categories as lc', 'lc.id', '=', 'employees_leaves.leave_category_id')
-                ->first();
+            // row's own id — see Common::findCombinedSibling() for the flag
+            // contract and the emp/resort scoping + created_at
+            // disambiguation (an employee who submitted the same combined
+            // pair more than once needs the sibling from the SAME
+            // submission, not just any row matching the category pair).
+            $siblingRow = Common::findCombinedSibling($leaveRequest);
+            $leaveRequest->combinedLeave = $siblingRow
+                ? DB::table('employees_leaves as cl')
+                    ->join('leave_categories as lc', 'lc.id', '=', 'cl.leave_category_id')
+                    ->where('cl.id', $siblingRow->id)
+                    ->select('cl.*', 'lc.leave_type', 'lc.color')
+                    ->first()
+                : null;
 
             // Status Logic — use main leave status as source of truth
             $statuses = $statusesGrouped[$leaveRequest->id] ?? collect();

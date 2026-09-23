@@ -2083,21 +2083,32 @@ class BudgetController extends Controller
                     ->forCategory($employmentType)
                     ->get();
 
-                if ($selectedYear < (int) date('Y')) {
-                    // WP6(D6) — past year: strict row rule only, no
-                    // active-employee carve-out. A position only belongs
-                    // here if it was actually part of that year's
-                    // submitted manning (has a position_monthly_data row
-                    // under this dept+category's manning_response).
-                    $pastYearPositionIds = $response
-                        ? DB::table('position_monthly_data')
-                            ->where('manning_response_id', $response->id)
-                            ->distinct()
-                            ->pluck('position_id')
-                            ->all()
-                        : [];
-                    $catalogPositions = $catalogPositions->whereIn('id', $pastYearPositionIds)->values();
-                } else {
+                // WP7 issue #1 — the row-rule below (a position only
+                // belongs to this year+dept+category if a
+                // position_monthly_data row ties it to THIS year's
+                // manning_response, same rule GetYearBasePositions()
+                // uses) used to apply only when $selectedYear was in the
+                // past. A Casual/Intern position is created ad hoc per
+                // manning submission (unlike Permanent positions, which
+                // are structural/evergreen) and its resort_positions row
+                // persists afterwards — so leaving the current/future-year
+                // branch unfiltered let a position created for e.g. 2027
+                // keep leaking into every other year's tab, including the
+                // current year and any future year. Apply the same strict
+                // row rule unconditionally; only the active-employee
+                // carve-out (a real employee sitting in a position the
+                // manning data hasn't caught up to yet) stays limited to
+                // the current/future-year branch.
+                $yearPositionIds = $response
+                    ? DB::table('position_monthly_data')
+                        ->where('manning_response_id', $response->id)
+                        ->distinct()
+                        ->pluck('position_id')
+                        ->all()
+                    : [];
+                $catalogPositions = $catalogPositions->whereIn('id', $yearPositionIds)->values();
+
+                if ($selectedYear >= (int) date('Y')) {
                     $employeePositionIds = DB::table('employees')
                         ->where('resort_id', $resortId)
                         ->where('Dept_id', $departmentId)

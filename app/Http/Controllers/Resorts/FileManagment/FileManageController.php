@@ -1773,18 +1773,6 @@ class FileManageController extends Controller
                         $msg = 'Folder created successfully';
                     }
                 return response()->json(['success' => true, 'message' => $msg,'data'=>$string], 200);
-           
-             DB::beginTransaction();
-            try
-            {  } 
-            catch (\Exception $e) 
-            {
-                    \Log::emergency("File: ".$e->getFile());
-                    \Log::emergency("Line: ".$e->getLine());
-                    \Log::emergency("Message: ".$e->getMessage());
-                    return response()->json(['success' => false, 'message' => 'Failed to add Folder.'], 500);
-            }
-
         }
         // ================================= End of Employee File  =====================================//
         // public function MoveFolder(Request $request)
@@ -1886,19 +1874,26 @@ class FileManageController extends Controller
             $newFolderPath = "{$main_folder}/public/{$parent->Folder_unique_id}/";
         
             if (is_array($FilesName)) {
-                foreach ($FilesName as $fileUniqueId) 
+                foreach ($FilesName as $fileUniqueId)
                 {
-                    $this->moveFileOrFolder($fileUniqueId, $parent, $main_folder);
+                    $error = $this->moveFileOrFolder($fileUniqueId, $parent, $main_folder);
+                    if ($error) {
+                        return $error;
+                    }
                 }
             } else {
-                $this->moveFileOrFolder($FilesName, $parent, $main_folder);
+                $error = $this->moveFileOrFolder($FilesName, $parent, $main_folder);
+                if ($error) {
+                    return $error;
+                }
             }
-        
+
             return response()->json(['success' => true, 'message' => 'Successfully moved folder and selected files.'], 200);
         }
-        
+
         /**
          * Handles moving either a file or a folder to a new location.
+         * Returns null on success, or a JSON error response on failure.
          */
         private function moveFileOrFolder($fileUniqueId, $parent, $main_folder)
         {
@@ -1906,75 +1901,131 @@ class FileManageController extends Controller
             $child = ChildFileManagement::where("resort_id", $this->resort->resort_id)
                 ->where('unique_id', $fileUniqueId)
                 ->first();
-        
+
             if ($child) {
                 // Move the file to the new folder
                 $oldFilePath = $child->File_Path;
                 $newFilePath = "{$main_folder}/public/{$parent->Folder_Type}/{$parent->Folder_unique_id}/" . basename($oldFilePath);
-               
+
+                try {
                     StorageHelper::disk()->move($oldFilePath, $newFilePath);
-        
-                    // Update file path in database
+                } catch (\Exception $e) {
+                    Log::error("File move failed, nothing changed. {$oldFilePath} -> {$newFilePath}: " . $e->getMessage());
+                    return response()->json(['success' => false, 'message' => 'Error moving file: ' . $e->getMessage()], 500);
+                }
+
+                DB::beginTransaction();
+                try {
                     $child->update([
                         "Parent_File_ID" => $parent->id,
                         "File_Path" => $newFilePath
                     ]);
-                 try {} catch (\Exception $e) {
-                    return response()->json(['success' => false, 'message' => 'Error moving file: ' . $e->getMessage()], 500);
+                    DB::commit();
+                } catch (\Exception $e) {
+                    DB::rollBack();
+
+                    // Compensate: move the file back so storage and DB agree again.
+                    try {
+                        StorageHelper::disk()->move($newFilePath, $oldFilePath);
+                        Log::error("File move for unique_id {$fileUniqueId} failed and was rolled back cleanly. Error: " . $e->getMessage());
+                        return response()->json(['success' => false, 'message' => 'Error moving file, no changes were made: ' . $e->getMessage()], 500);
+                    } catch (\Exception $rollbackException) {
+                        Log::emergency("File move rollback failed for unique_id {$fileUniqueId}: file is now at '{$newFilePath}' but DB still points to '{$oldFilePath}'. Rollback error: " . $rollbackException->getMessage() . ". Original error: " . $e->getMessage());
+                        return response()->json(['success' => false, 'message' => 'File moved but its record could not be updated, and automatic recovery failed — contact support immediately: ' . $e->getMessage()], 500);
+                    }
                 }
-            } else {
-                // It's a folder, move the entire folder
-                $this->moveFolderWithContents($fileUniqueId, $parent, $main_folder);
+
+                return null;
             }
+
+            // It's a folder, move the entire folder
+            return $this->moveFolderWithContents($fileUniqueId, $parent, $main_folder);
         }
-        
+
         /**
          * Moves a folder and all its contents to a new parent folder.
+         * Returns null on success, or a JSON error response on failure.
          */
         private function moveFolderWithContents($folderUniqueId, $parent, $main_folder)
         {
             $folder = FilemangementSystem::where("resort_id", $this->resort->resort_id)
                 ->where("Folder_unique_id", $folderUniqueId)
                 ->first();
-        
-            if ($folder) {
-                $oldParentFolder = FilemangementSystem::where("resort_id", $this->resort->resort_id)
-                    ->where('id', $folder->UnderON)
-                    ->first();
-        
-                if ($oldParentFolder) {
-                    $oldFolderPath = "{$main_folder}/public/{$oldParentFolder->Folder_unique_id}/{$folder->Folder_unique_id}/";
-                    $newFolderPath = "{$main_folder}/public/{$parent->Folder_unique_id}/{$folder->Folder_unique_id}/";
-        
-                    // Get all files inside the folder and move them
-                    $files = StorageHelper::disk()->allFiles($oldFolderPath);
-                    foreach ($files as $file) {
-                        $newFilePath = str_replace($oldFolderPath, $newFolderPath, $file);
-                        StorageHelper::disk()->move($file, $newFilePath);
-        
-                        // Update file paths in database
-                        ChildFileManagement::where("resort_id", $this->resort->resort_id)
-                            ->where("File_Path", $file)
-                            ->update(["File_Path" => $newFilePath]);
-                    }
-        
-                    // Move subfolders
-                    $subfolders = StorageHelper::disk()->allDirectories($oldFolderPath);
-                    foreach ($subfolders as $subfolder) {
-                        $newSubfolderPath = str_replace($oldFolderPath, $newFolderPath, $subfolder);
-                        StorageHelper::disk()->move($subfolder, $newSubfolderPath);
-                    }
-        
-                    // Update child folders' `UnderON`
-                    FilemangementSystem::where("resort_id", $this->resort->resort_id)
-                        ->where("UnderON", $folder->id)
-                        ->update(["UnderON" => $parent->id]);
-        
-                    // Update moved folder reference
-                    $folder->UnderON = $parent->id;
-                    $folder->save();
-                }
+
+            if (!$folder) {
+                return null;
             }
+
+            $oldParentFolder = FilemangementSystem::where("resort_id", $this->resort->resort_id)
+                ->where('id', $folder->UnderON)
+                ->first();
+
+            if (!$oldParentFolder) {
+                return null;
+            }
+
+            $oldFolderPath = "{$main_folder}/public/{$oldParentFolder->Folder_unique_id}/{$folder->Folder_unique_id}/";
+            $newFolderPath = "{$main_folder}/public/{$parent->Folder_unique_id}/{$folder->Folder_unique_id}/";
+
+            $moved = []; // storage moves actually performed, oldest first, for rollback
+
+            DB::beginTransaction();
+            try {
+                // Get all files inside the folder and move them
+                $files = StorageHelper::disk()->allFiles($oldFolderPath);
+                foreach ($files as $file) {
+                    $newFilePath = str_replace($oldFolderPath, $newFolderPath, $file);
+                    StorageHelper::disk()->move($file, $newFilePath);
+                    $moved[] = ['from' => $file, 'to' => $newFilePath];
+
+                    // Update file paths in database
+                    ChildFileManagement::where("resort_id", $this->resort->resort_id)
+                        ->where("File_Path", $file)
+                        ->update(["File_Path" => $newFilePath]);
+                }
+
+                // Move subfolders
+                $subfolders = StorageHelper::disk()->allDirectories($oldFolderPath);
+                foreach ($subfolders as $subfolder) {
+                    $newSubfolderPath = str_replace($oldFolderPath, $newFolderPath, $subfolder);
+                    StorageHelper::disk()->move($subfolder, $newSubfolderPath);
+                    $moved[] = ['from' => $subfolder, 'to' => $newSubfolderPath];
+                }
+
+                // Update child folders' `UnderON`
+                FilemangementSystem::where("resort_id", $this->resort->resort_id)
+                    ->where("UnderON", $folder->id)
+                    ->update(["UnderON" => $parent->id]);
+
+                // Update moved folder reference
+                $folder->UnderON = $parent->id;
+                $folder->save();
+
+                DB::commit();
+            } catch (\Exception $e) {
+                DB::rollBack();
+
+                // Compensate: move everything already moved on storage back, most recent first.
+                $unrolled = [];
+                foreach (array_reverse($moved) as $m) {
+                    try {
+                        StorageHelper::disk()->move($m['to'], $m['from']);
+                        $unrolled[] = $m;
+                    } catch (\Exception $rollbackException) {
+                        Log::emergency("Folder move rollback failed for '{$folderUniqueId}': could not move '{$m['to']}' back to '{$m['from']}'. DB was rolled back but storage is now inconsistent. Error: " . $rollbackException->getMessage());
+                    }
+                }
+
+                if (count($unrolled) === count($moved)) {
+                    Log::error("Folder move for '{$folderUniqueId}' failed and was fully rolled back. Error: " . $e->getMessage());
+                    return response()->json(['success' => false, 'message' => 'Error moving folder, no changes were made: ' . $e->getMessage()], 500);
+                }
+
+                Log::emergency("Folder move for '{$folderUniqueId}' failed partway and rollback was INCOMPLETE, folder is split across old and new location. Error: " . $e->getMessage());
+                return response()->json(['success' => false, 'message' => 'Error moving folder, and automatic recovery was incomplete — contact support immediately: ' . $e->getMessage()], 500);
+            }
+
+            return null;
         }
 
         public function AdvanceSearch(Request $request)

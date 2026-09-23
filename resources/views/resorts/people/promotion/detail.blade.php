@@ -200,10 +200,14 @@
                 @if($promotion->status == 'Approved')
                     <div class="card-footer">
                         <div class="row g-2">
-                            <div class="col-auto"> 
+                            <div class="col-auto">
+                                <a href="{{ route('promotion.download-letter', $promotion->id) }}" class="btn btn-themeSkyblue btn-sm">
+                                    <i class="fa-solid fa-download"></i>
+                                    Download
+                                </a>
                                 @if($promotion->letter_dispatched == 'No')
                                     <a href="#" class="btn btn-themeNeon btn-sm send-letter" data-id="{{$promotion->id}}" data-type="promotion">
-                                        <i class="fa-regular fa-envelope"></i> 
+                                        <i class="fa-regular fa-envelope"></i>
                                         Send Promotion Letter
                                     </a>
                                 @endif

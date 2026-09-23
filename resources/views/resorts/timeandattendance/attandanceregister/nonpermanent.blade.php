@@ -222,7 +222,9 @@ function npaLoadMonth() {
                     const cls = status || 'none';
                     const label = status ? status.charAt(0) : '';
                     const ot = emp.ot_hours && emp.ot_hours[d] ? ` (OT ${emp.ot_hours[d]}h)` : '';
-                    row += `<td><span class="npa-day-dot ${cls}" title="${status || 'Not marked'}${ot}">${label}</span></td>`;
+                    const leaveDetail = emp.leave_details && emp.leave_details[d];
+                    const leaveInfo = leaveDetail ? ` — ${leaveDetail.leave_type || 'Leave'} (${leaveDetail.is_paid ? 'Paid' : 'Unpaid'})` : '';
+                    row += `<td><span class="npa-day-dot ${cls}" title="${status || 'Not marked'}${leaveInfo}${ot}">${label}</span></td>`;
                 });
                 const summaryParts = Object.keys(npaSummaryLabels)
                     .map(k => `${npaSummaryLabels[k]}:${emp.summary[k] || 0}`)

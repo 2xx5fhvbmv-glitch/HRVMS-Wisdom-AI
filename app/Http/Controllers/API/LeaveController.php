@@ -86,6 +86,11 @@ class LeaveController extends Controller
             'arrival_transportation'    => 'nullable|integer',
             'dept_reason'               => 'nullable',
             'arrival_reason'            => 'nullable',
+
+            // Opt-in to use accumulated Day Off credit against this leave —
+            // system-generated split, not a manual category combine, so it
+            // bypasses the combine_with_other/allow-list check entirely.
+            'include_day_off_days'      => 'nullable|integer|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -222,6 +227,22 @@ class LeaveController extends Controller
             // vanished from the web portal even though nothing was ever
             // actually combined with anything.
             $isCombinedSubmission                       =   count($leaveCategoryIds) == 2;
+
+            // Day Off opt-in split (only for a plain single-category
+            // submission — combining a manual 2-category pairing with a
+            // Day Off split isn't a supported combination). Re-check the
+            // balance server-side rather than trusting the client's
+            // requested quantity; cap it at whatever's actually available.
+            $dayOffSplitQty                             =   0;
+            if (count($leaveCategoryIds) == 1 && (int) ($request->include_day_off_days ?? 0) > 0) {
+                $requestedDayOffQty                     =   (int) $request->include_day_off_days;
+                $primaryFromDate                        =   Carbon::parse($request->from_date[0]);
+                $primaryToDate                           =   Carbon::parse($request->to_date[0]);
+                $primaryWorkingDays                     =   Common::calculateLeaveWorkingDays($primaryFromDate, $primaryToDate);
+                $dayOffBalance                          =   Common::getDayOffBalance($emp_id, $resortId);
+                $dayOffSplitQty                          =   max(0, min($requestedDayOffQty, (int) $dayOffBalance, $primaryWorkingDays));
+            }
+
             foreach ($request->leave_category_id as $key => $categoryId) {
                 $leaveDetails                           =   LeaveCategory::where('id', $categoryId)->where('resort_id',$user->resort_id)->first();
 
@@ -242,8 +263,16 @@ class LeaveController extends Controller
                     ], 200);
                 }
 
-                // Calculate the total days for the leave
-                $totalDays                              =   $fromDate->diffInDays($toDate) + 1;
+                // Calculate the total days for the leave, excluding Fridays
+                // and active public holidays — matches the web portal
+                // exactly via the shared Common::calculateLeaveWorkingDays().
+                $totalDays                              =   Common::calculateLeaveWorkingDays($fromDate, $toDate);
+                // Day Off opt-in: the days charged to Day Off aren't charged
+                // to this category too — reduce what's persisted/checked
+                // against this category's own balance.
+                if ($dayOffSplitQty > 0) {
+                    $totalDays                          -=  $dayOffSplitQty;
+                }
 
                 $leaveCategory                          =   DB::table('leave_categories')->where('id', $categoryId)->first();
                 if (!$leaveCategory) {
@@ -750,6 +779,65 @@ class LeaveController extends Controller
                 }
             }
 
+            // Day Off opt-in split: a second employees_leaves row for the
+            // quantity the employee chose to charge to their accumulated
+            // Day Off balance, sharing the primary row's dates. Linked via
+            // `flag` the same way a manual 2-category combine links its
+            // rows (see $currentFlag above), and reuses the same
+            // $approvalFlow/$leave the single-category loop just built —
+            // Day Off doesn't get the sick/maternity clinic-staff routing,
+            // it gets whatever chain the primary leave got. Bypasses the
+            // combine_with_other/allow-list check entirely: this is a
+            // system-generated split from the employee's yes/no + quantity
+            // answer, not a manual category pairing.
+            if ($dayOffSplitQty > 0) {
+                $dayOffCategory                         =   LeaveCategory::where('resort_id', $resortId)->where('leave_type', 'Day Off')->first();
+                if ($dayOffCategory) {
+                    $dayOffLeave                         =   EmployeeLeave::create([
+                        'resort_id'                     =>  $resortId,
+                        'emp_id'                         =>  $emp_id,
+                        'leave_category_id'              =>  $dayOffCategory->id,
+                        'from_date'                      =>  $primaryFromDate,
+                        'to_date'                        =>  $primaryToDate,
+                        'flag'                           =>  $leave->leave_category_id,
+                        'total_days'                     =>  $dayOffSplitQty,
+                        'reason'                         =>  $request->reason,
+                        'status'                         =>  'Pending',
+                    ]);
+
+                    foreach ($approvalFlow as $approver) {
+                        EmployeeLeaveStatus::create([
+                            'leave_request_id'          =>  $dayOffLeave->id,
+                            'approver_rank'              =>  $approver->rank,
+                            'approver_id'                =>  $approver->id,
+                            'status'                     =>  'Pending',
+                        ]);
+
+                        $sendto = [$approver->id];
+                        if ((int) $approver->rank === 2) {
+                            $sendto = array_unique(array_merge(
+                                $sendto,
+                                Common::getDepartmentApproverIds($resortId, $employee->Dept_id)
+                            ));
+                        }
+
+                        Common::sendMobileNotification(
+                            $resortId,
+                            2,
+                            null,
+                            null,
+                            'Leave Request',
+                            'A request has been sent by ' . $user->first_name . ' ' . $user->last_name . '.',
+                            'Leave',
+                            $sendto,
+                            $dayOffLeave->id,
+                            false,
+                            'leave-pending-approval'
+                        );
+                    }
+                }
+            }
+
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Leave application submitted successfully!'], 200);
         } catch (\Exception $e) {
@@ -904,7 +992,15 @@ class LeaveController extends Controller
                 return response()->json(['success' => false, 'message' => 'Leave Category is not found.'], 200);
             }
 
-            return response()->json(['success' => true, 'message' => 'Leave Category Listing.', 'leave_category' => $leave_categories], 200);
+            $dayOffCategory                             =   LeaveCategory::where('resort_id', $resort_id)->where('leave_type', 'Day Off')->first();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Leave Category Listing.',
+                'leave_category' => $leave_categories,
+                'day_off_balance' => Common::getDayOffBalance($emp_id, $resort_id),
+                'day_off_max' => $dayOffCategory->carry_max ?? null,
+            ], 200);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
@@ -2288,8 +2384,10 @@ class LeaveController extends Controller
                     ], 200);
                 }
 
-                // Calculate the total days for the leave
-                $totalDays                              =   $fromDate->diffInDays($toDate) + 1;
+                // Calculate the total days for the leave, excluding Fridays
+                // and active public holidays — matches the web portal
+                // exactly via the shared Common::calculateLeaveWorkingDays().
+                $totalDays                              =   Common::calculateLeaveWorkingDays($fromDate, $toDate);
 
                 $leaveCategory                          =   DB::table('leave_categories')->where('id', $categoryId)->first();
                 if (!$leaveCategory) {
@@ -2715,6 +2813,7 @@ class LeaveController extends Controller
                                                                     'el.to_date',
                                                                     'el.status',
                                                                     'el.reason',
+                                                                    'el.created_at',
                                                                     'ra.first_name',
                                                                     'ra.last_name',
                                                                     'e.Admin_Parent_id as admin_parent_id',
@@ -2767,6 +2866,7 @@ class LeaveController extends Controller
                                                                 'el.to_date',
                                                                 'el.status',
                                                                 'el.reason',
+                                                                'el.created_at',
                                                                 'ra.first_name',
                                                                 'ra.last_name',
                                                                 // Was never selected — the leave_request list
@@ -3623,16 +3723,25 @@ class LeaveController extends Controller
                     // the PAIRED category's leave_category_id (see
                     // Common::groupCombinedLeaves()); the sibling could be on
                     // either side of that relationship depending on which half
-                    // of the pair was opened.
-                    $combinedSiblingQuery = DB::table('employees_leaves as cl')
-                        ->join('leave_categories as clc', 'clc.id', '=', 'cl.leave_category_id')
-                        ->where('cl.emp_id', $leaveDetail->emp_id)
-                        ->where('cl.resort_id', $resortId)
-                        ->where('cl.id', '!=', $leaveDetail->id)
-                        ->select('cl.id', 'cl.from_date', 'cl.to_date', 'cl.total_days', 'cl.status', 'clc.leave_type', 'clc.color');
-                    $combinedSibling = !empty($leaveDetail->flag)
-                        ? (clone $combinedSiblingQuery)->where('cl.leave_category_id', $leaveDetail->flag)->first()
-                        : (clone $combinedSiblingQuery)->where('cl.flag', $leaveDetail->leave_category_id)->first();
+                    // of the pair was opened. Common::findCombinedSibling()
+                    // is the one disambiguated implementation of this lookup.
+                    $combinedSiblingRow = Common::findCombinedSibling($leaveDetail);
+                    $combinedSibling = $combinedSiblingRow
+                        ? DB::table('employees_leaves as cl')
+                            ->join('leave_categories as clc', 'clc.id', '=', 'cl.leave_category_id')
+                            ->where('cl.id', $combinedSiblingRow->id)
+                            ->select('cl.id', 'cl.from_date', 'cl.to_date', 'cl.total_days', 'cl.status', 'clc.leave_type', 'clc.color')
+                            ->first()
+                        : null;
+
+                    // Day Off standing for the applicant — no per-category
+                    // balance list exists on mobile for HOD/HR the way the
+                    // web portal's Leave Details page has one, so surface
+                    // it here on the one detail screen an approver actually
+                    // opens.
+                    $dayOffCategory = LeaveCategory::where('resort_id', $resortId)->where('leave_type', 'Day Off')->first();
+                    $leaveDetail->day_off_balance = Common::getDayOffBalance($leaveDetail->emp_id, $resortId);
+                    $leaveDetail->day_off_max = $dayOffCategory->carry_max ?? null;
 
                     $leaveDetail->is_combined = (bool) $combinedSibling;
                     if ($combinedSibling) {

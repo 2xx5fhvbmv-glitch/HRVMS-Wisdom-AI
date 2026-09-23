@@ -114,6 +114,24 @@
                                             </div>
                                             <input type="hidden" id="total_days" name="total_days"/>
                                         </div>
+                                        @if(!empty($targetIsCasualOrIntern) && $targetIsCasualOrIntern)
+                                        <div class="row align-items-end g-md-4 g-3 mt-1">
+                                            <div class="col-xl-6 col-sm-8">
+                                                <label class="form-label">PAID / UNPAID<span class="red-mark">*</span></label>
+                                                <div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="is_paid_override" id="isPaidOverridePaid" value="paid" checked data-parsley-required="true">
+                                                        <label class="form-check-label" for="isPaidOverridePaid">Paid</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="is_paid_override" id="isPaidOverrideUnpaid" value="unpaid">
+                                                        <label class="form-check-label" for="isPaidOverrideUnpaid">Unpaid</label>
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted">Casual/Intern leave has no default category setting — set it for this application.</small>
+                                            </div>
+                                        </div>
+                                        @endif
                                     </div>
                                     <a href="#" class="btn leave-btn-accent btn-sm mb-3 append-add" id="rowAdder">Add Another Leave</a>
                                     <div id="newinput"></div>
@@ -290,6 +308,14 @@
                                                     <div id="error"></div>
                                                 </div>
                                             </div>    
+                                        </div>
+                                    </div>
+                                    <div class="col-md-12 d-none" id="dayOffPromptContainer">
+                                        <div class="bg-themeGrayLight p-3 rounded">
+                                            <label for="day_off_quantity" class="form-label">
+                                                You have <span id="dayOffBalanceText">0</span> day(s) off accumulated. Use some in this leave application?
+                                            </label>
+                                            <input type="number" class="form-control" name="day_off_quantity" id="day_off_quantity" min="0" value="0">
                                         </div>
                                     </div>
                                     <div class="col-md-12" id="field-attachment">
@@ -1077,6 +1103,26 @@
 
         $('#dynamic-summary').html(leaveSummary || '<p>No leave requests yet.</p>');
 
+        // Day Off opt-in prompt: only for a plain single-category
+        // application (matches the backend's own restriction) with a
+        // balance to offer. #dynamic-summary is fully replaced above on
+        // every keystroke, so this lives in its own persistent container
+        // (see #dayOffPromptContainer) instead of losing its value there.
+        var $dayOffPrompt = $('#dayOffPromptContainer');
+        var $dayOffQty = $('#day_off_quantity');
+        if ($('.append-block').length === 1 && window.__dayOffBalance > 0 && totalLeaveDays > 0) {
+            var maxDayOffQty = Math.min(window.__dayOffBalance, totalLeaveDays);
+            $('#dayOffBalanceText').text(window.__dayOffBalance);
+            $dayOffQty.attr('max', maxDayOffQty);
+            if (parseInt($dayOffQty.val(), 10) > maxDayOffQty) {
+                $dayOffQty.val(maxDayOffQty);
+            }
+            $dayOffPrompt.removeClass('d-none');
+        } else {
+            $dayOffPrompt.addClass('d-none');
+            $dayOffQty.val(0);
+        }
+
         // Enable or disable the submit button based on form validity, and
         // surface the reason inline next to the button so the user knows
         // exactly what's blocking submission.
@@ -1107,6 +1153,10 @@
     // Set of YYYY-MM-DD public holiday dates from the controller. Used by
     // calculateTotalDays() to subtract holidays from the leave-day count.
     window.__publicHolidaySet = new Set(@json($holidayDates ?? []));
+
+    // Live "Day Off" balance for the opt-in split prompt (see
+    // updateRequestSummary()'s #dayOffPromptContainer handling).
+    window.__dayOffBalance = {{ (int) ($dayOffBalance ?? 0) }};
 
     // Function to calculate total days, EXCLUDING Fridays (resort weekly off)
     // and public holidays — the user shouldn't have those counted against

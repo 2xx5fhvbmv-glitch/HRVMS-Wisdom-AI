@@ -71,6 +71,26 @@ class ConfigController extends Controller
             ],
             'leave_category.*' => 'exists:leave_categories,id',
         ]);
+
+        // "Day Off" is system-managed: guaranteed on resort creation (see
+        // Admin/ResortsController::store()), so a second one here would
+        // break every lookup that assumes exactly one per resort
+        // (Common::getDayOffBalance() etc).
+        if ($validatedData['leave_type'] === 'Day Off'
+            && LeaveCategory::where('resort_id', $resort_id)->where('leave_type', 'Day Off')->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A "Day Off" category already exists for this resort and is system-managed — it cannot be duplicated.'
+            ], 422);
+        }
+        if ($validatedData['leave_type'] === 'Day Off'
+            && ((int) ($validatedData['carry_max'] ?? 0) < 1 || (int) ($validatedData['carry_max'] ?? 0) > 12)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Max Day Off accumulation must be between 1 and 12.'
+            ], 422);
+        }
+
         // When carry forward is Yes and no max is set, store null so all days can carry forward
         if (isset($validatedData['carry_forward']) && (int) $validatedData['carry_forward'] === 1) {
             $validatedData['carry_max'] = isset($validatedData['carry_max']) && $validatedData['carry_max'] !== '' && $validatedData['carry_max'] !== null
@@ -147,6 +167,31 @@ class ConfigController extends Controller
             ],
             'leave_category.*' => 'exists:leave_categories,id',
         ]);
+
+        $leaveCategory = LeaveCategory::where('id', $id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if (!$leaveCategory) {
+            return response()->json(['success' => false, 'message' => 'Leave category not found.'], 404);
+        }
+
+        // "Day Off" is system-managed (drives duty-roster accumulation) —
+        // its leave_type can't be renamed away, though every other field
+        // (color, eligibility, etc.) stays editable normally.
+        if ($leaveCategory->leave_type === 'Day Off' && $validatedData['leave_type'] !== 'Day Off') {
+            return response()->json([
+                'success' => false,
+                'message' => 'The "Day Off" category is system-managed and cannot be renamed.'
+            ], 422);
+        }
+        if ($leaveCategory->leave_type === 'Day Off'
+            && ((int) ($validatedData['carry_max'] ?? 0) < 1 || (int) ($validatedData['carry_max'] ?? 0) > 12)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Max Day Off accumulation must be between 1 and 12.'
+            ], 422);
+        }
+
         // When carry forward is Yes and no max is set, store null so all days can carry forward
         if (isset($validatedData['carry_forward']) && (int) $validatedData['carry_forward'] === 1) {
             $validatedData['carry_max'] = isset($validatedData['carry_max']) && $validatedData['carry_max'] !== '' && $validatedData['carry_max'] !== null
@@ -162,12 +207,6 @@ class ConfigController extends Controller
         }
         $validatedData['eligibility'] = implode(',', $request->eligibility);
 
-        $leaveCategory = LeaveCategory::where('id', $id)
-            ->where('resort_id', $this->resort->resort_id)
-            ->first();
-        if (!$leaveCategory) {
-            return response()->json(['success' => false, 'message' => 'Leave category not found.'], 404);
-        }
         $leaveCategory->update($validatedData);
         return response()->json(['success' => true,'message' => 'Leave category updated successfully!']);
     }
@@ -185,6 +224,16 @@ class ConfigController extends Controller
                     'success' => false,
                     'message' => 'Leave category not found.'
                 ], 404);
+            }
+
+            // "Day Off" is system-managed (drives duty-roster accumulation)
+            // and can never be deleted.
+            if ($leaveCategory->leave_type === 'Day Off') {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The "Day Off" category is system-managed and cannot be deleted.'
+                ], 422);
             }
 
             // Check if the leave category is in use

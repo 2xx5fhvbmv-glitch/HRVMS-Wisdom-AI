@@ -661,50 +661,19 @@ class FinalSettlementService
         ];
         $totalLeaveDays += $phNetDays;
 
-        // Day Off net owed within the CURRENT employment-year cycle.
-        // Policy: 1 day off per week of service. Carry forward inside the
-        // cycle; reset on each employment anniversary (so a 14-month
-        // employee only ever has 2 months' worth of accrual to settle,
-        // not 14).
-        //
-        // Cycle window:
-        //   cycleStart = joining_date + N years where N is the number of
-        //                completed employment years (whole years since
-        //                joining_date that are <= today).
-        //   cycleEnd   = today (or last working day, already capped above)
-        //
-        // Accrual    = floor((today − cycleStart) / 7 days)
-        // Used       = attendance rows with Status='DayOff' since cycleStart
-        //              + total_days of approved Day Off leaves in cycle
-        // Net owed   = max(0, accrual − used)
-        $dayOffNetDays = 0.0;
-        $dayOffAccrued = 0;
-        $dayOffUsed    = 0.0;
+        // Day Off net owed: now reads the same live, duty-roster-driven
+        // balance the Leave module and mobile app use
+        // (Common::getDayOffBalance()) instead of recomputing its own
+        // floor(weeks/7) estimate. approvedOnly=true — a still-pending Day
+        // Off request the resigning employee never actually got approved
+        // hasn't been consumed and shouldn't reduce their payout. Payout
+        // math downstream (available_days × daily rate, encashable, etc.)
+        // is unchanged — only the source of this number changed.
         $dayOffCategoryId = DB::table('leave_categories')
             ->where('resort_id', $resortId)
             ->where('leave_type', 'Day Off')
             ->value('id');
-
-        // ─── Day Off = full weekly off-days inside the cycle window ─
-        // Per HR direction (resort 26): show the count of weekly day-off
-        // entitlements that fall inside (cycleStart → min(today, LWD)).
-        // One per full 7-day week. No roster cross-reference, no
-        // attendance-taken subtraction — HR adjusts manually for any
-        // edge cases (employee took all their offs vs. accumulated some).
-        //
-        // For an employee who joined 09 Apr and left 21 May (42 days),
-        // this resolves to 6 day-offs — matches "how many weekly offs
-        // fell in this employee's tenure".
-        $dayOffAccrued = 0;
-        if ($joiningDate) {
-            $completedYears = (int) floor($joiningDate->floatDiffInYears($now));
-            $cycleStart = $joiningDate->copy()->addYears($completedYears);
-            if ($cycleStart->greaterThan($now)) {
-                $cycleStart = $joiningDate->copy()->addYears(max(0, $completedYears - 1));
-            }
-            $dayOffAccrued = (int) floor($cycleStart->floatDiffInDays($now) / 7);
-            $dayOffNetDays = (float) $dayOffAccrued;
-        }
+        $dayOffNetDays = (float) Common::getDayOffBalance($employee->id, $resortId, true);
 
         $leaveBalances[] = [
             'leave_category_id'     => $dayOffCategoryId,

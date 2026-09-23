@@ -166,6 +166,10 @@
 </div>
 <div class="modal-footer">
     @if($peopleSalaryIncrement->status === 'Approved')
+        <a href="{{ route('people.salary-increment.download-letter', $peopleSalaryIncrement->id) }}" class="btn btn-themeSkyblue">
+            <i class="fa-solid fa-download"></i>
+            Download Increment Letter
+        </a>
         <button type="button" class="btn btn-themeNeon send-increment-letter"
                 data-id="{{ $peopleSalaryIncrement->id }}">
             <i class="fa-regular fa-envelope"></i>

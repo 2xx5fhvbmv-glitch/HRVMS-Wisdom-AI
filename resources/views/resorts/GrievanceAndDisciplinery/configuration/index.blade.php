@@ -25,11 +25,6 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
-                <!-- <div class="col-auto">
-                    <div class="d-flex justify-content-end">
-                        <a href="#" class="btn btn-theme">Request Manning</a>
-                    </div>
-                </div> -->
             </div>
         </div>
         <div class="row g-4">
@@ -1249,7 +1244,6 @@
                 </div>
 
                 <div class="modal-footer">
-                    <!-- <a href="#" class="btn eb-btn-primary">Preview</a> -->
                     <a href="#" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                     <button class="btn eb-btn-primary">Submit</button>
                 </div>

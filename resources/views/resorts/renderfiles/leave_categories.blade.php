@@ -23,7 +23,9 @@
                         data-leave-category="{{ $category->leave_category }}">
                             <img src="{{ URL::asset('resorts_assets/images/edit.svg')}}" alt="icon">
                         </a>
+                        @if($category->leave_type !== 'Day Off')
                         <a href="#" data-leave-id="{{ $category->id }}" class="btn-lg-icon icon-bg-red delete-leave-btn"><img src="{{ URL::asset('resorts_assets/images/trash-red.svg')}}" alt="icon"></a>
+                        @endif
                     </div>
                 </div>
                 <p>{{$category->number_of_days}} Days

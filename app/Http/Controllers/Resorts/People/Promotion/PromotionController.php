@@ -1238,6 +1238,68 @@ class PromotionController extends Controller
         return response()->json(['message' => 'Letter sent successfully.']);
     }
 
+    /**
+     * Sibling of sendPromotionLetter() above — same template resolution,
+     * placeholder substitution and PDF build, just downloaded instead of
+     * emailed. Not gated on letter_dispatched (unlike the Send button),
+     * so HR can still pull the PDF after it's already been sent once.
+     * The view only ever sends type=promotion for this button, so it's
+     * hardcoded here rather than accepted as a query param.
+     */
+    public function downloadPromotionLetter($id)
+    {
+        $promotion = EmployeePromotion::with([
+            'employee.position',
+            'employee.department',
+            'employee.resortAdmin',
+            'currentPosition',
+            'newPosition',
+            'approvals',
+            'createdBy.GetEmployee',
+            'modifiedBy'
+        ])->where('id', $id)->where('resort_id', $this->resort->resort_id)->firstOrFail();
+
+        $type = 'promotion';
+        $resort = Resort::findOrFail($promotion->resort_id);
+
+        $template = ProbationLetterTemplate::where('resort_id', $promotion->resort_id)
+            ->where('type', $type)
+            ->first();
+
+        if (!$template) {
+            abort(404, 'Template not found for this resort and type.');
+        }
+
+        $placeholders = [
+            '{{employee_name}}'       => (string) optional($promotion->employee->resortAdmin)->full_name,
+            '{{employee_code}}'       => (string) $promotion->employee->Emp_id,
+            '{{position_title}}'      => (string) optional($promotion->currentPosition)->position_title,
+            '{{Department_title}}'   => (string) optional($promotion->currentPosition->department)->name,
+            '{{resort_name}}'         => (string) $resort->resort_name,
+            '{{date}}'                => now()->format('d M Y'),
+            '{{employment_type}}'     => (string) $promotion->employee->employment_type,
+            '{{new_position}}'         => (string) optional($promotion->newPosition)->position_title,
+            '{{current_department}}' => (string) optional($promotion->currentPosition->department)->name,
+            '{{new_department}}' => (string) optional($promotion->newPosition->department)->name,
+            '{{new_level}}' => (string) $promotion->new_level,
+            '{{effective_date}}' => (string) Carbon::parse($promotion->effective_date)->format('d M Y'),
+        ];
+
+        $letterContent = strtr($template->content, $placeholders);
+
+        $letterhead = Common::getLetterheadData($promotion->resort_id);
+        $pdf = Pdf::loadView('resorts.people.probation.probation_letter_pdf', [
+            'letterContent'  => $letterContent,
+            'letterhead'     => $letterhead,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($promotion->resort_id),
+            'signatures'     => $this->buildPromotionSignatures($promotion, $letterhead),
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        return $pdf->download('Promotion_Letter_' . ($promotion->employee->Emp_id ?? $promotion->id) . '.pdf');
+    }
+
     public function confirmPromotion(Request $request)
     {
         // Most severe finding in this file per the audit: was

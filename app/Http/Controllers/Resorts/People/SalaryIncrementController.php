@@ -1900,6 +1900,62 @@ class SalaryIncrementController extends Controller
         return response()->json(['success' => true, 'message' => 'Salary increment letter sent successfully.']);
     }
 
+    /**
+     * Sibling of sendSalaryIncrementLetter() above — same template
+     * resolution, placeholder substitution and PDF build, just
+     * downloaded instead of emailed. Not the bulk summary report
+     * (downloadByFormate()/people.salary-increment.download) — this is
+     * the individual signed letter, matching Transfer/Promotion's
+     * per-person download pattern.
+     */
+    public function downloadSalaryIncrementLetter($id)
+    {
+        $increment = PeopleSalaryIncrement::with(['employee.resortAdmin', 'employee.position', 'employee.department'])
+            ->where('id', $id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->firstOrFail();
+
+        $template = ProbationLetterTemplate::where('resort_id', $this->resort->resort_id)
+            ->where('type', 'salary_increment')
+            ->first();
+
+        if (!$template) {
+            abort(404, 'Salary Increment letter template not found for this resort. Please create one in Letter Templates (type: salary_increment).');
+        }
+
+        $resort = Resort::findOrFail($increment->resort_id);
+
+        $placeholders = [
+            '{{employee_name}}'    => (string) optional($increment->employee->resortAdmin)->full_name,
+            '{{employee_code}}'    => (string) $increment->employee->Emp_id,
+            '{{position_title}}'   => (string) optional($increment->employee->position)->position_title,
+            '{{department_name}}'  => (string) optional($increment->employee->department)->name,
+            '{{resort_name}}'      => (string) $resort->resort_name,
+            '{{date}}'             => now()->format('d M Y'),
+            '{{previous_salary}}'  => (string) $increment->previous_salary,
+            '{{new_salary}}'       => (string) $increment->new_salary,
+            '{{increment_amount}}' => (string) $increment->increment_amount,
+            '{{increment_type}}'   => (string) $increment->increment_type,
+            '{{effective_date}}'   => $increment->effective_date
+                ? Carbon::parse($increment->effective_date)->format('d M Y')
+                : '',
+        ];
+
+        $letterContent = strtr($template->content, $placeholders);
+
+        $letterhead = Common::getLetterheadData($increment->resort_id);
+        $pdf = \PDF::loadView('resorts.people.probation.probation_letter_pdf', [
+            'letterContent'  => $letterContent,
+            'letterhead'     => $letterhead,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($increment->resort_id),
+            'signatures'     => $this->buildSalaryIncrementSignatures($increment, $letterhead),
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        return $pdf->download('Salary_Increment_Letter_' . ($increment->employee->Emp_id ?? $increment->id) . '.pdf');
+    }
+
     public function incrementHistory (Request $request){
 
         if(Common::checkRouteWisePermission('people.salary-increment.summary-list',config('settings.resort_permissions.view')) == false && Common::checkRouteWisePermission('people.salary-increment.index',config('settings.resort_permissions.view')) == false){

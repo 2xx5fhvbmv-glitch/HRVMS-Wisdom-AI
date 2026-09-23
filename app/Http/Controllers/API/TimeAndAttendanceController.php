@@ -3565,13 +3565,37 @@ class TimeAndAttendanceController extends Controller
 
             $leaveStatuses                                  =   ['ShortLeave', 'HalfDayLeave', 'FullDayLeave'];
 
-            $employeesOut                                    =   $employees->map(function ($emp) use ($attendanceByEmp, $monthStart, $monthEnd, $leaveStatuses) {
+            // WP7 issue #2 — surface leave type + paid/unpaid on each
+            // FullDayLeave cell instead of only inside payroll's own
+            // calculation. Casual/Intern's paid/unpaid comes from the
+            // per-application is_paid_override (no fixed category setting
+            // applies to them), set at Leave apply time.
+            $leaveCategoryTypes                             =   \App\Models\LeaveCategory::pluck('leave_type', 'id');
+            $leaveByEmpDate                                 =   [];
+            foreach (EmployeeLeave::whereIn('emp_id', $employees->pluck('emp_id'))
+                ->where('status', 'Approved')
+                ->where('from_date', '<=', $monthEnd->format('Y-m-d'))
+                ->where('to_date', '>=', $monthStart->format('Y-m-d'))
+                ->get(['emp_id', 'from_date', 'to_date', 'leave_category_id', 'is_paid_override']) as $leave) {
+                $cursor                                      =   Carbon::parse($leave->from_date)->max($monthStart);
+                $end                                         =   Carbon::parse($leave->to_date)->min($monthEnd);
+                while ($cursor->lte($end)) {
+                    $leaveByEmpDate[$leave->emp_id][$cursor->format('Y-m-d')] = [
+                        'leave_type' => $leaveCategoryTypes[$leave->leave_category_id] ?? null,
+                        'is_paid'    => $leave->is_paid_override === 'paid',
+                    ];
+                    $cursor->addDay();
+                }
+            }
+
+            $employeesOut                                    =   $employees->map(function ($emp) use ($attendanceByEmp, $monthStart, $monthEnd, $leaveStatuses, $leaveByEmpDate) {
                 $rowsByDate                                  =   ($attendanceByEmp->get($emp->emp_id) ?? collect())->keyBy(function ($row) {
                     return Carbon::parse($row->date)->format('Y-m-d');
                 });
 
                 $days                                        =   [];
                 $otHours                                     =   [];
+                $leaveDetails                                =   [];
                 $summary                                     =   ['Present' => 0, 'Absent' => 0, 'Sick' => 0, 'DayOff' => 0, 'leave' => 0, 'not_marked' => 0];
 
                 for ($date = $monthStart->copy(); $date->lte($monthEnd); $date->addDay()) {
@@ -3583,6 +3607,10 @@ class TimeAndAttendanceController extends Controller
                     if (!empty($row->OverTime) && !in_array($row->OverTime, ['0', '0:0', '0:00', '00:00', '00:00:00', '-', ''], true)) {
                         $otParts                            =   explode(':', $row->OverTime);
                         $otHours[$dateStr]                  =   round(((int) ($otParts[0] ?? 0)) + ((int) ($otParts[1] ?? 0)) / 60, 2);
+                    }
+
+                    if ($status === 'FullDayLeave' && isset($leaveByEmpDate[$emp->emp_id][$dateStr])) {
+                        $leaveDetails[$dateStr]              =   $leaveByEmpDate[$emp->emp_id][$dateStr];
                     }
 
                     if (!$status) {
@@ -3603,6 +3631,7 @@ class TimeAndAttendanceController extends Controller
                     'employment_type' => $emp->employment_type,
                     'days'            => $days,
                     'ot_hours'        => $otHours,
+                    'leave_details'   => $leaveDetails,
                     'summary'         => $summary,
                 ];
             })->values();

@@ -20,13 +20,9 @@ class FilePermissionController extends Controller
 {
 
     protected $resort;
-    protected $underEmp_id=[];
     public function __construct()
     {
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
-        if(!$this->resort) return;
-        $reporting_to  = isset($this->globalUser->GetEmployee) ? $this->globalUser->GetEmployee->id:3;
-        $this->underEmp_id = Common::getSubordinates($reporting_to);
     }
 
    
@@ -93,7 +89,8 @@ class FilePermissionController extends Controller
                         </td>
                         <td>'.$file->File_Name.'</td>
                         <td>'.$file->File_Size.'</td>
-                        <td>'.$file->LastModified.'</td>';
+                        <td>'.$file->LastModified.'</td>
+                    </tr>';
             }
         }
         else
@@ -221,7 +218,8 @@ class FilePermissionController extends Controller
                             </td>
                             <td>'.$file->File_Name.'</td>
                             <td>'.$file->File_Size.'</td>
-                            <td>'.$file->LastModified.'</td>';
+                            <td>'.$file->LastModified.'</td>
+                        </tr>';
                 }
             }
             else

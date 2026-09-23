@@ -219,7 +219,9 @@
                                                     data-leave-category="{{ $category->leave_category }}">
                                                         <img src="{{ URL::asset('resorts_assets/images/edit.svg')}}" alt="icon">
                                                     </a>
+                                                    @if($category->leave_type !== 'Day Off')
                                                     <a href="#" data-leave-id="{{ $category->id }}" class="btn-lg-icon icon-bg-red ms-md-2 ms-1 delete-leave-btn"><img src="{{ URL::asset('resorts_assets/images/trash-red.svg')}}" alt="icon"></a>
+                                                    @endif
                                                 </div>
                                             </div>
                                             <p>{{$category->number_of_days}} Days</p>
@@ -267,6 +269,10 @@
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                    <div class="col-sm-6 d-none" id="add_carry_max_wrap">
+                                        <label for="carry_max" class="form-label">MAX DAY OFF ACCUMULATION (1-12) <span class="red-mark">*</span></label>
+                                        <input type="number" name="carry_max" id="carry_max" class="form-control" min="1" max="12" placeholder="e.g. 6">
                                     </div>
                                     <div class="col-xl-6 col-lg-12 col-sm-6">
                                         <label for="" class="form-label">EARNED LEAVE <span class="red-mark">*</span></label>
@@ -444,6 +450,10 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                        <div class="col-sm-6 d-none" id="edit_carry_max_wrap">
+                            <label for="edit_carry_max" class="form-label">MAX DAY OFF ACCUMULATION (1-12) <span class="red-mark">*</span></label>
+                            <input type="number" name="carry_max" id="edit_carry_max" class="form-control" min="1" max="12" placeholder="e.g. 6">
                         </div>
                         <div class="col-sm-6">
                             <label for="" class="form-label">EARNED LEAVE <span class="red-mark">*</span></label>
@@ -828,6 +838,22 @@
             }
         });
 
+        // "Day Off" is system-managed: its carry_max means the resort's max
+        // accumulation cap (Part 4), not the generic carry-forward cap every
+        // other category uses that field for — only show/require it here.
+        $(document).on('input change', 'input[name="leave_type"]', function () {
+            var $form = $(this).closest('form');
+            var $wrap = $form.find('[id$="carry_max_wrap"]');
+            var $carryMax = $form.find('input[name="carry_max"]');
+            if ($.trim($(this).val()) === 'Day Off') {
+                $wrap.removeClass('d-none');
+                $carryMax.attr('required', true);
+            } else {
+                $wrap.addClass('d-none');
+                $carryMax.removeAttr('required').val('');
+            }
+        });
+
         // Add form only: show wrap and init Select2 when "Combine = Yes"
         $(document).on('change select2:select', '#leave-category-form #combine_with_other', function () {
             var val = $(this).val();
@@ -1076,6 +1102,13 @@
             $('#editLeave-modal #number_of_days').val(numberOfDays);
             $('#editLeave-modal #edit_earned_max').val(earnedMax).prop('disabled', earnedLeave !== 1);
             $('#editLeave-modal input[name="carry_forward"][value="' + carryForward + '"]').prop('checked', true);
+            // "Day Off" is system-managed: lock the leave_type field (can't
+            // be renamed away, server also enforces this) and show its
+            // max-accumulation cap field.
+            var isDayOff = (leaveType === 'Day Off');
+            $('#editLeave-modal #leaveType').prop('readonly', isDayOff);
+            $('#editLeave-modal #edit_carry_max_wrap').toggleClass('d-none', !isDayOff);
+            $('#editLeave-modal #edit_carry_max').attr('required', isDayOff).val(carryMax || '');
             $('#editLeave-modal input[name="earned_leave"][value="' + earnedLeave + '"]').prop('checked', true);
             $('#editLeave-modal #edit_eligibility').val(eligibilityValues).trigger('change');
             $('#editLeave-modal #edit_frequency').val(frequency).trigger('change');

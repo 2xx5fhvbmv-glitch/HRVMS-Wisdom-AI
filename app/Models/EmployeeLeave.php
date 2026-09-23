@@ -23,7 +23,8 @@ class EmployeeLeave extends Model
         'from_date',
         'to_date','total_days','flag','extends_leave_id',
         'attachments','reason','task_delegation',
-        'destination','transportation','status','departure_date','arrival_date'
+        'destination','transportation','status','departure_date','arrival_date',
+        'is_paid_override'
     ];
     public static function boot(){
         parent::boot();

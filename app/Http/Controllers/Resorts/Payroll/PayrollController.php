@@ -2338,7 +2338,14 @@ class PayrollController extends Controller
 
                 if ($paidLeave) {
                     $leaveCategory = LeaveCategory::find($paidLeave->leave_category_id);
-                    $isPaidLeave = ($leaveCategory->is_paid ?? 'paid') === 'paid';
+                    // Casual/Intern have no fixed paid/unpaid setting on the
+                    // category itself — is_paid_override is set per
+                    // application instead (same category can be paid for one
+                    // Intern and unpaid for another). Permanent still follows
+                    // the category's own is_paid, unchanged.
+                    $isPaidLeave = Common::manningCategory($employee->employment_type ?? '') !== 'Permanent'
+                        ? $paidLeave->is_paid_override === 'paid'
+                        : ($leaveCategory->is_paid ?? 'paid') === 'paid';
 
                     $leaveDetails->push([
                         'type'  => $leaveCategory->leave_type ?? 'Unknown',

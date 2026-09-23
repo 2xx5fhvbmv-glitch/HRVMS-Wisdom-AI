@@ -409,7 +409,18 @@ class LeaveController extends Controller
             ->unique()
             ->values()
             ->all();
-        return view('resorts.leaves.leave.index', compact('page_title', 'emp_id','leave_categories', 'delegations', 'transportations', 'leaveFormValidation', 'airports', 'holidayDates', 'canApplyForOthers', 'applicableEmployees', 'selectedEmployeeId'));
+        // Paid/unpaid is a per-application override only for Casual/Intern
+        // (the same leave category can be paid for one Casual/Intern and
+        // unpaid for another) — Permanent always follows the leave
+        // category's own is_paid, no toggle needed.
+        $targetIsCasualOrIntern = Common::manningCategory($getEmployee->employment_type ?? '') !== 'Permanent';
+
+        // Day Off is excluded from the applyable-category dropdown above
+        // ($excludedLeaveTypes) — surfaced separately here for the opt-in
+        // prompt instead.
+        $dayOffBalance = $emp_id ? Common::getDayOffBalance($emp_id, $resort_id) : 0;
+
+        return view('resorts.leaves.leave.index', compact('page_title', 'emp_id','leave_categories', 'delegations', 'transportations', 'leaveFormValidation', 'airports', 'holidayDates', 'canApplyForOthers', 'applicableEmployees', 'selectedEmployeeId', 'targetIsCasualOrIntern', 'dayOffBalance'));
     }
 
     /**
@@ -1162,6 +1173,23 @@ class LeaveController extends Controller
             return $grid;
         });
 
+        // Day Off isn't in the benefit-grid-driven query above (it's
+        // accrued from duty-roster data, not a per-rank allocation) —
+        // append it as one more row so HOD/HR see it here too.
+        $dayOffCategory = DB::table('leave_categories')->where('resort_id', $resort_id)->where('leave_type', 'Day Off')->first();
+        if ($dayOffCategory) {
+            $leaveBalances->push((object) [
+                'leave_category_id' => $dayOffCategory->id,
+                'leave_type' => 'Day Off',
+                'color' => $dayOffCategory->color,
+                'carry_forward' => $dayOffCategory->carry_forward,
+                'carry_max' => $dayOffCategory->carry_max,
+                'allocated_days' => null,
+                'used_days' => null,
+                'available_days' => Common::getDayOffBalance($leaveDetail->emp_id, $resort_id),
+            ]);
+        }
+
         // Can approve: (1) applicant's reporting_to, (2) applicant is GM and current user is HR/EXCOM/HOD, (3) current user has a Pending status row, (4) HR/EXCOM can approve any pending leave
         $reportingToInt = (int)($leaveDetail->applicant_reporting_to ?? $leaveDetail->reporting_to ?? 0);
         $currentUserRank = trim((string)($employee->rank ?? ''));
@@ -1480,6 +1508,12 @@ class LeaveController extends Controller
             $applicantEmployeeRecord = $targetEmployee;
         }
 
+        // Paid/unpaid override — required for Casual/Intern (per-application,
+        // since the same leave category can be paid for one Casual/Intern
+        // and unpaid for another), never used for Permanent (their leave
+        // category's own is_paid decides, as before).
+        $targetIsCasualOrIntern = Common::manningCategory($applicantEmployeeRecord->employment_type ?? '') !== 'Permanent';
+
         // Resolve validation rules from first leave category (Mandatory/Optional/Hidden)
         $categoryIds = $request->input('leave_category_id');
         $categoryId = is_array($categoryIds) ? ($categoryIds[0] ?? null) : null;
@@ -1498,6 +1532,9 @@ class LeaveController extends Controller
             'to_date' => 'required|array',
             'to_date.*' => 'required|date_format:d/m/Y',
         ];
+        if ($targetIsCasualOrIntern) {
+            $validatorRules['is_paid_override'] = 'required|in:paid,unpaid';
+        }
         if ($rules['reason'] === 'mandatory') {
             $validatorRules['reason'] = 'required|string|max:2000';
         } else {
@@ -1512,6 +1549,9 @@ class LeaveController extends Controller
             $validatorRules['destination'] = 'nullable|string|max:255';
         }
         $validatorRules['attachments'] = ($rules['attachment'] === 'mandatory') ? 'required|file|mimes:pdf,doc,docx,jpeg,jpg,png,gif,svg,webp,heic,heif|max:5120' : 'nullable|file|mimes:pdf,doc,docx,jpeg,jpg,png,gif,svg,webp,heic,heif|max:5120';
+        // Opt-in to use accumulated Day Off credit against this leave —
+        // system-generated split, not a manual category combine.
+        $validatorRules['day_off_quantity'] = 'nullable|integer|min:0';
 
         $validator = Validator::make($request->all(), $validatorRules);
         if ($validator->fails()) {
@@ -1550,6 +1590,21 @@ class LeaveController extends Controller
                 $request->attachments->move($absolutePath, $fileName);
             }
 
+            // Day Off opt-in split (only for a plain single-category
+            // submission — combining a manual 2-category pairing with a
+            // Day Off split isn't a supported combination). Re-check the
+            // balance server-side rather than trusting the client's
+            // requested quantity; cap it at whatever's actually available.
+            $dayOffSplitQty = 0;
+            if (count($request->leave_category_id) == 1 && (int) ($request->day_off_quantity ?? 0) > 0) {
+                $requestedDayOffQty = (int) $request->day_off_quantity;
+                $primaryFromDate = \Carbon\Carbon::createFromFormat('d/m/Y', $request->from_date[0]);
+                $primaryToDate = \Carbon\Carbon::createFromFormat('d/m/Y', $request->to_date[0]);
+                $primaryWorkingDays = Common::calculateLeaveWorkingDays($primaryFromDate, $primaryToDate);
+                $dayOffBalance = Common::getDayOffBalance($emp_id, $resort_id);
+                $dayOffSplitQty = max(0, min($requestedDayOffQty, (int) $dayOffBalance, $primaryWorkingDays));
+            }
+
             foreach ($request->leave_category_id as $key => $categoryId) {
                 $leaveDetails = LeaveCategory::where('id', $categoryId)->first();
                 $currentFlag = null;
@@ -1581,39 +1636,15 @@ class LeaveController extends Controller
                 // (resort weekly off) and public holidays — must match the
                 // JS in resources/views/resorts/leaves/leave/index.blade.php
                 // so the user's "30 Days" preview matches the persisted
-                // total_days and balance debit.
-                // public_holidays.holiday_date is a string column stored as
-                // d-m-Y, so whereDate()/whereYear() return zero rows. Pull
-                // every active row, normalise to Y-m-d in PHP, then filter
-                // to the leave window.
-                $rangeStart = $fromDate->format('Y-m-d');
-                $rangeEnd   = $toDate->format('Y-m-d');
-                $holidayLookup = PublicHoliday::where('status', 'active')
-                    ->pluck('holiday_date')
-                    ->map(function ($d) {
-                        $d = trim((string) $d);
-                        if ($d === '') return null;
-                        foreach (['d-m-Y', 'd/m/Y', 'Y-m-d', 'Y/m/d', 'd-m-y', 'd/m/y'] as $fmt) {
-                            try {
-                                $c = \Carbon\Carbon::createFromFormat($fmt, $d);
-                                if ($c) return $c->format('Y-m-d');
-                            } catch (\Exception $e) { /* try next */ }
-                        }
-                        try { return \Carbon\Carbon::parse($d)->format('Y-m-d'); }
-                        catch (\Exception $e) { return null; }
-                    })
-                    ->filter()
-                    ->filter(fn($d) => $d >= $rangeStart && $d <= $rangeEnd)
-                    ->flip();
-                $totalDays = 0;
-                $cursor = $fromDate->copy();
-                while ($cursor->lte($toDate)) {
-                    $isFriday = $cursor->isFriday();
-                    $isHoliday = isset($holidayLookup[$cursor->format('Y-m-d')]);
-                    if (!$isFriday && !$isHoliday) {
-                        $totalDays++;
-                    }
-                    $cursor->addDay();
+                // total_days and balance debit. Shared with the mobile API
+                // via Common::calculateLeaveWorkingDays() so both platforms
+                // always agree on a given date range.
+                $totalDays = Common::calculateLeaveWorkingDays($fromDate, $toDate);
+                // Day Off opt-in: the days charged to Day Off aren't charged
+                // to this category too — reduce what's persisted/checked
+                // against this category's own balance.
+                if ($dayOffSplitQty > 0) {
+                    $totalDays -= $dayOffSplitQty;
                 }
 
                 // Check if the leave category ID is valid
@@ -1806,6 +1837,7 @@ class LeaveController extends Controller
                     'destination' => $request->destination,
                     'attachments' => $filePath,
                     'status' => "Pending",
+                    'is_paid_override' => $targetIsCasualOrIntern ? $request->is_paid_override : null,
                 ]);
 
                 // Save transportation and dates if provided
@@ -2123,6 +2155,42 @@ class LeaveController extends Controller
                 }
             }
 
+            // Day Off opt-in split: a second employees_leaves row for the
+            // quantity the employee chose to charge to their accumulated
+            // Day Off balance, sharing the primary row's dates. Linked via
+            // `flag` the same way a manual 2-category combine links its
+            // rows. Reuses $approvalFlow/$fromDate/$toDate as left by the
+            // (single-iteration) loop above — Day Off doesn't get the
+            // sick/maternity clinic-staff routing, it gets whatever chain
+            // the primary leave got. Bypasses combine_with_other/allow-list
+            // entirely: this is a system-generated split from the
+            // employee's yes/no + quantity answer, not a manual pairing.
+            $dayOffLeave = null;
+            if ($dayOffSplitQty > 0) {
+                $dayOffCategory = LeaveCategory::where('resort_id', $resort_id)->where('leave_type', 'Day Off')->first();
+                if ($dayOffCategory) {
+                    $dayOffLeave = EmployeeLeave::create([
+                        'resort_id' => $resort_id,
+                        'emp_id' => $emp_id,
+                        'leave_category_id' => $dayOffCategory->id,
+                        'from_date' => $fromDate,
+                        'to_date' => $toDate,
+                        'total_days' => $dayOffSplitQty,
+                        'reason' => $request->reason,
+                        'flag' => $categoryId,
+                        'status' => 'Pending',
+                    ]);
+
+                    foreach ($approvalFlow as $approver) {
+                        EmployeeLeaveStatus::create([
+                            'leave_request_id' => $dayOffLeave->id,
+                            'approver_rank' => $approver->rank,
+                            'approver_id' => $approver->id,
+                            'status' => 'Pending',
+                        ]);
+                    }
+                }
+            }
 
             DB::commit();
 
@@ -2145,6 +2213,16 @@ class LeaveController extends Controller
                             $approverEmp->id,
                             'Leave'
                         )));
+                        if ($dayOffLeave) {
+                            event(new ResortNotificationEvent(Common::nofitication(
+                                $resort_id, 10,
+                                'Leave Approval Required',
+                                $applicantName . ' has applied for Day Off from ' . $leaveFromFormatted . ' to ' . $leaveToFormatted . '. Please review.',
+                                $dayOffLeave->id,
+                                $approverEmp->id,
+                                'Leave'
+                            )));
+                        }
                     }
                 }
 
@@ -2527,6 +2605,23 @@ class LeaveController extends Controller
             $grid->available_days = max(0, $available);
             return $grid;
         });
+
+        // Day Off isn't in the benefit-grid-driven query above (accrued
+        // from duty-roster data, not a per-rank allocation) — same
+        // append this method's twin, details(), does.
+        $dayOffCategoryPdf = DB::table('leave_categories')->where('resort_id', $resort_id)->where('leave_type', 'Day Off')->first();
+        if ($dayOffCategoryPdf) {
+            $leaveBalances->push((object) [
+                'leave_category_id' => $dayOffCategoryPdf->id,
+                'leave_type' => 'Day Off',
+                'color' => $dayOffCategoryPdf->color,
+                'carry_forward' => $dayOffCategoryPdf->carry_forward,
+                'carry_max' => $dayOffCategoryPdf->carry_max,
+                'allocated_days' => null,
+                'used_days' => null,
+                'available_days' => Common::getDayOffBalance($empIdInt, $resort_id),
+            ]);
+        }
 
         $sitesettings = ResortSiteSettings::where('resort_id', $resort_id)->first(['resort_id', 'header_img', 'footer_img', 'Footer']);
         $ResortData = Resort::find($resort_id);

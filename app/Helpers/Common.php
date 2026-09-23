@@ -6060,12 +6060,13 @@ class Common
             if (empty($leave->flag)) {
                 continue;
             }
-            $sibling = $leaves->first(function ($candidate) use ($leave) {
+            $candidates = $leaves->filter(function ($candidate) use ($leave) {
                 return $candidate->id != $leave->id
                     && $candidate->leave_category_id == $leave->flag
                     && $candidate->emp_id == $leave->emp_id
                     && $candidate->resort_id == $leave->resort_id;
             });
+            $sibling = self::nearestByCreatedAt($candidates, $leave);
             if (!$sibling) {
                 continue;
             }
@@ -6081,6 +6082,55 @@ class Common
             }
             return $leave;
         })->values();
+    }
+
+    /**
+     * The two rows of one combined submission are inserted back-to-back in
+     * the same request (see LeaveController::leaveAdd()), so their
+     * created_at values are always the closest pair among same-category
+     * candidates — a repeat submission of the same category pair months
+     * apart lands far away in time. Matching on category/emp/resort alone
+     * (the only fields the `flag` relationship carries) picks an arbitrary
+     * candidate when an employee has submitted the same pair more than
+     * once; this picks the one actually created together.
+     */
+    private static function nearestByCreatedAt($candidates, $leave)
+    {
+        $candidates = collect($candidates)->values();
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+        if ($candidates->count() === 1 || empty($leave->created_at)) {
+            return $candidates->first();
+        }
+        $leaveTime = strtotime($leave->created_at);
+        return $candidates->sortBy(function ($candidate) use ($leaveTime) {
+            return empty($candidate->created_at) ? PHP_INT_MAX : abs(strtotime($candidate->created_at) - $leaveTime);
+        })->first();
+    }
+
+    /**
+     * Single-row equivalent of groupCombinedLeaves() for detail views that
+     * already have one specific leave record and need just its sibling —
+     * same disambiguated match, without pulling the whole list through
+     * grouping. $leave can be the flagged or the unflagged half of the pair.
+     */
+    public static function findCombinedSibling($leave)
+    {
+        if (empty($leave->flag) && empty($leave->id)) {
+            return null;
+        }
+        $candidates = DB::table('employees_leaves')
+            ->where('emp_id', $leave->emp_id)
+            ->where('resort_id', $leave->resort_id)
+            ->where('id', '!=', $leave->id)
+            ->where(function ($q) use ($leave) {
+                $q->where('leave_category_id', $leave->flag ?? 0)
+                    ->orWhere('flag', $leave->leave_category_id);
+            })
+            ->get();
+
+        return self::nearestByCreatedAt($candidates, $leave);
     }
 
     public static function getBenefitGrid($emp_grade,$resort_id){
@@ -6145,6 +6195,103 @@ class Common
             $employee->Position_id ?? null
         );
         return $empGrade ? self::getBenefitGrid($empGrade, $employee->resort_id) : null;
+    }
+
+    /**
+     * Working days between two dates, inclusive, excluding Fridays (resort
+     * weekly off) and active public holidays. This is the single source of
+     * truth for leave total_days — web (Resorts/Leave/LeaveController) and
+     * mobile (API/LeaveController) must both call this so a submission's
+     * persisted total_days always matches what the UI/app showed the user.
+     * public_holidays.holiday_date is a string column in mixed formats, so
+     * whereDate()/whereYear() would silently return zero rows — normalise
+     * every active row to Y-m-d in PHP first.
+     */
+    public static function calculateLeaveWorkingDays($fromDate, $toDate): int
+    {
+        $fromDate = $fromDate instanceof \Carbon\Carbon ? $fromDate : \Carbon\Carbon::parse($fromDate);
+        $toDate = $toDate instanceof \Carbon\Carbon ? $toDate : \Carbon\Carbon::parse($toDate);
+
+        $rangeStart = $fromDate->format('Y-m-d');
+        $rangeEnd = $toDate->format('Y-m-d');
+        $holidayLookup = PublicHoliday::where('status', 'active')
+            ->pluck('holiday_date')
+            ->map(function ($d) {
+                $d = trim((string) $d);
+                if ($d === '') return null;
+                foreach (['d-m-Y', 'd/m/Y', 'Y-m-d', 'Y/m/d', 'd-m-y', 'd/m/y'] as $fmt) {
+                    try {
+                        $c = \Carbon\Carbon::createFromFormat($fmt, $d);
+                        if ($c) return $c->format('Y-m-d');
+                    } catch (\Exception $e) { /* try next */ }
+                }
+                try { return \Carbon\Carbon::parse($d)->format('Y-m-d'); }
+                catch (\Exception $e) { return null; }
+            })
+            ->filter()
+            ->filter(fn($d) => $d >= $rangeStart && $d <= $rangeEnd)
+            ->flip();
+
+        $totalDays = 0;
+        $cursor = $fromDate->copy();
+        while ($cursor->lte($toDate)) {
+            $isFriday = $cursor->isFriday();
+            $isHoliday = isset($holidayLookup[$cursor->format('Y-m-d')]);
+            if (!$isFriday && !$isHoliday) {
+                $totalDays++;
+            }
+            $cursor->addDay();
+        }
+
+        return $totalDays;
+    }
+
+    /**
+     * Live "Day Off" balance for the CURRENT calendar year only — credits
+     * from duty_roster weeks with zero DayOff entries, minus Day Off leave
+     * already used. Scoping to the current year is what makes unused
+     * day-offs not carry into next year: once the year turns over both the
+     * credit count and the debit count are naturally scoped to the new
+     * year, so the balance starts back at 0 with no reset job needed.
+     *
+     * $approvedOnly=false (default) counts both Approved and Pending usage
+     * as a debit — same convention as every other leave category's balance
+     * check (see the $allocatedDays - $usedDays - $pendingDays pattern in
+     * API/LeaveController::leaveAdd()), so an employee can't submit two
+     * applications that both claim the same accumulated days before either
+     * is approved. Pass $approvedOnly=true only from Final Settlement — a
+     * resigning employee's still-pending Day Off request hasn't actually
+     * been consumed and shouldn't reduce their payout.
+     */
+    public static function getDayOffBalance($empId, $resortId, $approvedOnly = false): float
+    {
+        $yearStart = now()->startOfYear()->format('Y-m-d');
+        $yearEnd = now()->endOfYear()->format('Y-m-d');
+
+        $credits = DB::table('employee_day_off_credits')
+            ->where('emp_id', $empId)
+            ->where('resort_id', $resortId)
+            ->whereBetween('week_start_date', [$yearStart, $yearEnd])
+            ->count();
+
+        $dayOffCategoryId = DB::table('leave_categories')
+            ->where('resort_id', $resortId)
+            ->where('leave_type', 'Day Off')
+            ->value('id');
+
+        $debits = DB::table('employees_leaves')
+            ->where('emp_id', $empId)
+            ->where('resort_id', $resortId)
+            ->where('leave_category_id', $dayOffCategoryId)
+            ->when($approvedOnly, function ($q) {
+                $q->where('status', 'Approved');
+            }, function ($q) {
+                $q->whereIn('status', ['Approved', 'Pending']);
+            })
+            ->whereBetween('from_date', [$yearStart, $yearEnd])
+            ->sum('total_days');
+
+        return max(0, $credits - (float) $debits);
     }
 
     /**

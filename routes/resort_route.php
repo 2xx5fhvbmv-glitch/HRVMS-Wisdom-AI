@@ -1704,6 +1704,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::get('/people/promotion/detail/{id}', 'People\Promotion\PromotionController@detail')->name('promotion.details');
       Route::post('people/promotion/{id}/{action}', 'People\Promotion\PromotionController@handlePromotionApproval')->name('promotion.review.action');
       Route::post('/people/promotion/send-letter', 'People\Promotion\PromotionController@sendPromotionLetter')->name('promotion.send-letter');
+      Route::get('/people/promotion/{id}/download-letter', 'People\Promotion\PromotionController@downloadPromotionLetter')->name('promotion.download-letter');
       Route::post('/people/promotion/confirm-promotion','People\Promotion\PromotionController@confirmPromotion')->name('promotion.confirm');
       Route::get('/people/promotion/history', 'People\Promotion\PromotionController@getHistory')->name('people.promotion.history');
       Route::get('/promotion-history/export/excel', 'People\Promotion\PromotionController@exportExcel')->name('promotion.history.export.excel');
@@ -1792,6 +1793,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::post('people/salary-increment/request-hold', 'People\SalaryIncrementController@holdRequest')->name('people.salary-increment.hold-request');
       Route::get('people/salary-increment/download', 'People\SalaryIncrementController@downloadByFormate')->name('people.salary-increment.download');
       Route::post('people/salary-increment/send-letter', 'People\SalaryIncrementController@sendSalaryIncrementLetter')->name('people.salary-increment.send-letter');
+      Route::get('people/salary-increment/{id}/download-letter', 'People\SalaryIncrementController@downloadSalaryIncrementLetter')->name('people.salary-increment.download-letter');
 
       Route::get('people/salary-increment-history', 'People\SalaryIncrementController@incrementHistory')->name('people.salary-increment.history-list');
 
