@@ -1771,6 +1771,13 @@ class BudgetController extends Controller
             abort(403, 'You do not have access to this resort.');
         }
 
+        // This URL is the AJAX data endpoint of the Consolidated Budget
+        // page; a plain browser GET has no view of its own ('budget.consolidated'
+        // never existed) — send it to the real page instead of a 500.
+        if (!$request->ajax()) {
+            return redirect()->route('resort.budget.consolidatebudget');
+        }
+
         $selectedYear = $request->get('year', Carbon::now()->year);
         $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
 
@@ -2507,23 +2514,13 @@ class BudgetController extends Controller
             }
         }
 
-        // For non-AJAX requests, return the full view
-        return view('budget.consolidated', compact(
-            'consolidatedBudget',
-            'header',
-            'resortCosts',
-            'selectedYear'
-        ));
+        // Non-AJAX requests never reach here (redirected at the top of viewConsolidatedBudget()).
         }; // end $resolveCategory closure
 
         // Non-ajax direct-URL access never participates in the tab
         // feature (the page's own JS always calls this via $.ajax with a
         // category_view) — preserve the exact original single-category
         // (Permanent) behavior/response shape for that path untouched.
-        if (!$request->ajax()) {
-            return $resolveCategory('Permanent');
-        }
-
         $categoryResults = [];
         foreach ($categoriesNeeded as $cat) {
             $categoryResults[$cat] = $resolveCategory($cat);
@@ -2992,6 +2989,20 @@ class BudgetController extends Controller
             StoreManningResponseParent::where("id",$parent_id)
                 ->where('Resort_id', $resortId)
                 ->update(["Total_Department_budget"=>$Total_Department_budget]);
+
+            try {
+                Common::notifyEmployees(
+                    $resortId,
+                    Common::getResortHrEmployeeIds($resortId),
+                    'Budget Updated',
+                    'Position-wise budget figures were edited.',
+                    'WorkForce Planning',
+                    $parent_id ?: null
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Position-wise budget update notification failed: ' . $ne->getMessage());
+            }
+
             return response()->json(['success' => true, 'message' => 'Budget updated successfully']);
         }
         catch   (\Exception $e) {

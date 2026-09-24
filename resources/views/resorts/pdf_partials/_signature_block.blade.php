@@ -50,10 +50,13 @@
                     <div class="wai-sig-line"></div>
                 @endif
                 <div class="wai-sig-name">{{ $sigName }}</div>
-                @if ($sigTimeFormatted)
-                    <div class="wai-sig-time">Signed on {{ $sigTimeFormatted }}</div>
+                {{-- Only claim "signed" when a real signature image is present. --}}
+                @if ($sigDataUri)
+                    @if ($sigTimeFormatted)
+                        <div class="wai-sig-time">Signed on {{ $sigTimeFormatted }}</div>
+                    @endif
+                    <div class="wai-sig-caption">Electronically signed</div>
                 @endif
-                <div class="wai-sig-caption">Electronically signed</div>
             </div>
         @endif
     @endforeach

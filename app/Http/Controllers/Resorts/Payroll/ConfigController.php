@@ -71,6 +71,7 @@ class ConfigController extends Controller
             \Storage::delete($filePath);
             return response()->json(['success' => false, 'message' => 'Failed to read the file. Please make sure it is a valid Excel file and not corrupted.'], 422);
         }
+        $this->notifyHrOfConfigChange('Service charges were bulk-imported from a file.');
         return response()->json(['success' => true, 'message' => 'Service Charges Imported successfully']);
     }
 
@@ -102,6 +103,7 @@ class ConfigController extends Controller
             \Storage::delete($filePath);
             return response()->json(['success' => false, 'message' => 'Failed to read the file. Please make sure it is a valid Excel file and not corrupted.'], 422);
         }
+        $this->notifyHrOfConfigChange('Earnings were bulk-imported from a file.');
         return response()->json(['success' => true, 'message' => 'Earnings Imported successfully']);
     }
 
@@ -133,6 +135,7 @@ class ConfigController extends Controller
             \Storage::delete($filePath);
             return response()->json(['success' => false, 'message' => 'Failed to read the file. Please make sure it is a valid Excel file and not corrupted.'], 422);
         }
+        $this->notifyHrOfConfigChange('Deduction rules were bulk-imported from a file.');
         return response()->json(['success' => true, 'message' => 'Deductions Imported successfully']);
     }
 
@@ -155,6 +158,8 @@ class ConfigController extends Controller
                 'currency' => $earning['currency'],
             ]);
         }
+
+        $this->notifyHrOfConfigChange('New earning(s) added: ' . implode(', ', array_column($validatedData['earnings'], 'allow_name')) . '.');
 
         return response()->json([
             'success' => true,

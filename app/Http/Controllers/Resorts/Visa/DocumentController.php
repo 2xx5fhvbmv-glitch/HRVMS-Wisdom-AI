@@ -75,12 +75,6 @@ class DocumentController extends Controller
         return view('resorts.Visa.document.index',compact('page_title', 'documentTypes','nationalitys','countries','departments','positions',
         'sections','resort_divisions','payrollAllowance','employee_id'));
     }
-    public function Xpatsync(Request $request)
-    {
-        $page_title ="Xpat Sync";
-        return view('resorts.Visa.document.xpatsync',compact('page_title'));
-    }
-
     public function FetchAithrowData(Request $request)
     {
         $url  = env('AI_URL');

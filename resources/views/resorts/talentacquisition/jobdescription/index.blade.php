@@ -454,8 +454,9 @@
                             toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
                         }
                     },
-                    error: function() {
-                        toastr.error('An unexpected error occurred. Please try again.', "Error", { positionClass: 'toast-bottom-right' });
+                    error: function(xhr) {
+                        let msg = (xhr.responseJSON && xhr.responseJSON.message) || 'An unexpected error occurred. Please try again.';
+                        toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
                     }
                 });
             });

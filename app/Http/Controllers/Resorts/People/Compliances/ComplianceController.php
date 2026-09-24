@@ -2290,7 +2290,7 @@ class ComplianceController extends Controller
                     'module_name' => $compliance->module_name,
                     'compliance_breached_name' => $compliance->compliance_breached_name,
                     'employee_id' => $compliance->employee ? $compliance->employee->Emp_id : 'N/A',
-                    'employee_name' => $compliance->employee ? $compliance->employee->resortAdmin->full_name : 'N/A',
+                    'employee_name' => $compliance->employee?->resortAdmin?->full_name ?? 'N/A',
                     'description' => $compliance->description,
                     'reported_on' => $compliance->reported_on ? Carbon::parse($compliance->reported_on)->format('Y-m-d H:i:s') : 'N/A',
                     'status' => $compliance->status
@@ -2477,12 +2477,13 @@ class ComplianceController extends Controller
                          'start' => Carbon::parse($compliance->reported_on)->format('Y-m-d'),
                          'end' => Carbon::parse($compliance->reported_on)->format('Y-m-d'),
                          'description' => $compliance->description,
-                         'employee_name' => $compliance->employee ? $compliance->employee->resortAdmin->full_name : 'N/A',
+                         'employee_name' => $compliance->employee?->resortAdmin?->full_name ?? 'N/A',
                          'status' => $compliance->status
                     ];
                });
 
-          return view('resorts.people.compliance.calendar', compact('compliances'));
+          $page_title = 'Compliance Calendar';
+          return view('resorts.people.compliance.calendar', compact('compliances', 'page_title'));
      }
 
      public function DismissCompliance($id)

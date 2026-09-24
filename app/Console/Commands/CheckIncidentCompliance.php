@@ -74,18 +74,34 @@ class CheckIncidentCompliance extends Command
                                 return $incident;
                             });
 
-        if(!empty($employees))
-        {
-            if($employees)
-            {     
-                $compliance = Compliance::insert($employees);
-
-                $this->info('High severity incident compliance breached for '.count($employees).' employees.');
+        // Cron runs daily: skip breaches already recorded (any status, so a
+        // dismissed one doesn't come back) and notify HR only for new ones.
+        $created = 0;
+        foreach ($employees as $row) {
+            $exists = Compliance::where('resort_id', $row['resort_id'])
+                ->where('employee_id', $row['employee_id'])
+                ->where('module_name', $row['module_name'])
+                ->where('description', $row['description'])
+                ->exists();
+            if ($exists) {
+                continue;
             }
-            else
-            {
-                $this->error('No  compliance  Create For Incident.');
+            Compliance::create($row);
+            $created++;
+
+            try {
+                Common::notifyEmployees(
+                    $row['resort_id'],
+                    Common::getResortHrEmployeeIds($row['resort_id']),
+                    'Incident Compliance Breached',
+                    $row['description'],
+                    'Incident'
+                );
+            } catch (\Throwable $e) {
+                \Log::warning('Incident compliance notification failed: ' . $e->getMessage());
             }
         }
+
+        $this->info('High severity incident compliance breached for ' . $created . ' new incident(s).');
     }
 }

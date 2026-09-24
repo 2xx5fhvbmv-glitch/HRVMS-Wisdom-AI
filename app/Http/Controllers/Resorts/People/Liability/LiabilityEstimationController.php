@@ -6,7 +6,6 @@ use App\Helpers\Common;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Validator;
-use App\Events\ResortNotificationEvent;
 use App\Models\Resort;
 use App\Models\Employee;
 use App\Models\resortAdmin;
@@ -1191,7 +1190,7 @@ class LiabilityEstimationController extends Controller
             return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
         }
 
-        LiabilityManualCost::create([
+        $cost = LiabilityManualCost::create([
             'resort_id' => $resort_id,
             'employee_id' => $employee->id,
             'cost_date' => $request->cost_date,
@@ -1201,6 +1200,19 @@ class LiabilityEstimationController extends Controller
             'description' => $request->description,
             'created_by' => $this->resort->id,
         ]);
+
+        try {
+            Common::notifyEmployees(
+                $resort_id,
+                Common::getResortHrEmployeeIds($resort_id),
+                'Liability Cost Added',
+                'A ' . $request->category . ' cost of ' . number_format((float) $request->amount, 2) . ' was logged against ' . trim(($employee->resortAdmin->full_name ?? '') ?: $employee->Emp_id) . '.',
+                'Liability',
+                $cost->id
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('Liability cost notification failed: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,

@@ -142,20 +142,6 @@ class EvaluationFormController extends Controller
         return response()->json(['success' => 'Form deleted successfully.']);
     }
 
-    public function show($training_id,$participant_id)
-    {
-        $page_title = 'View Evaluation Form';
-        // dd($this->resort);
-        $training_id = base64_decode($training_id);
-        $participant_id = base64_decode($participant_id);
-
-        $form = EvaluationForm::where('position',$position_id)->get();
-        $interviewer_id = $this->resort->id;
-        $interviewee_id = $applicant_id;
-
-        return view('resorts.learning.evaluation.show',compact('form','interviewer_id','interviewee_id','page_title'));
-    }
-
     public function saveResponse(Request $request, $formId)
     {
         // Validate the incoming request data

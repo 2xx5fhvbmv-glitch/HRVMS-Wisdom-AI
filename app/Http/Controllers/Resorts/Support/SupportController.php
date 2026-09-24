@@ -434,6 +434,26 @@ class SupportController extends Controller
             // Don't fail the request — the message is already stored in DB.
         }
 
+        // Reply was email-only: tell the ticket's original submitter and HR
+        // (minus the replier) so the thread activity isn't invisible in-app.
+        try {
+            $submitterId = SupportMessages::where('ticket_id', $ticket->id)->where('sender', 'employee')->orderBy('id')->value('sender_id');
+            $recipients = array_diff(
+                array_merge(Common::getResortHrEmployeeIds($ticket->resort_id), [$submitterId]),
+                [optional($employee)->id]
+            );
+            Common::notifyEmployees(
+                $ticket->resort_id,
+                $recipients,
+                'Support Ticket Reply',
+                $replyBy . ' replied to support ticket ' . $ticket->ticketID . ': ' . $ticket->subject,
+                'Support',
+                $ticket->id
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('Support reply notification failed: ' . $e->getMessage());
+        }
+
         // Return JSON for AJAX callers, fall back to redirect for legacy
         // form posts (any caller without X-Requested-With).
         if ($request->ajax() || $request->wantsJson()) {

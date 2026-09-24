@@ -354,10 +354,14 @@ class JobDescriptionController extends Controller
                     $jobDescription->save();
                 } else {
                     // An element passes when its value is truthy / "Pass".
-                    $isPassed = function ($key) use ($checks) {
+                    // AI verdict AND the deterministic backstop: the backstop can only
+                    // downgrade a pass, never turn a fail into a pass.
+                    $backstop = $this->backstopChecks((string) $jobDescription->jobdescription, Resort::find($jobDescription->Resort_id));
+                    $isPassed = function ($key) use ($checks, $backstop) {
                         $val = $checks[$key] ?? false;
-                        return $val === true || $val === 1
+                        $aiPass = $val === true || $val === 1
                             || (is_string($val) && in_array(strtolower($val), ['pass', 'true', 'yes', '1'], true));
+                        return $aiPass && ($backstop[$key] ?? true);
                     };
                     $missing = [];
                     foreach ($hardElements as $key => $label) {
@@ -397,6 +401,50 @@ class JobDescriptionController extends Controller
 
     }
 
+    /**
+     * Cheap regex sanity checks on the JD body, independent of the AI verdict.
+     * Deliberately blunt (English only, number words limited) — hence used
+     * downgrade-only. Keys match the AI `compliance` keys they gate.
+     */
+    private function backstopChecks(string $html, $resort): array
+    {
+        $text = html_entity_decode(strip_tags(preg_replace('#</(p|li|h\d|div|tr|br)>|<br\s*/?>#i', ' ', $html)), ENT_QUOTES | ENT_HTML5);
+        $text = trim(preg_replace('/\s+/u', ' ', $text));
+
+        $duties = str_word_count($text) >= 30 || preg_match_all('/<li[\s>]/i', $html) >= 2;
+
+        $placeholder = preg_match('/\[[^\]]+\]|<[^>]+>|\bTBD\b|XXX|_{3,}/i', $text);
+        $named = false;
+        foreach ([$resort->resort_name ?? null, $resort->address1 ?? null] as $needle) {
+            if ($needle && mb_strlen(trim($needle)) >= 3 && stripos($text, trim($needle)) !== false) {
+                $named = true;
+            }
+        }
+        $place = !$placeholder && ($named
+            || preg_match('/(place of (employment|work)|work location|location|island|atoll)\W{0,5}[a-z]{3,}/i', $text));
+
+        $words = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|forty|forty-eight|thirty|thirty-six|thirty-eight|forty-five|fifty';
+        $hours = preg_match('/\d+\s*(hours?|hrs?)\b/i', $text)
+            || preg_match('/\b(' . $words . ')[\s-]+hours?\b/i', $text)
+            || preg_match('/\d{1,2}[:.]\d{2}\s*(am|pm)?\s*(-|–|to)\s*\d{1,2}[:.]\d{2}/i', $text)
+            || preg_match('/\bshifts?\b[^.]{0,40}\d/i', $text);
+
+        return [
+            'job_title_duties'    => (bool) $duties,
+            'place_of_employment' => (bool) $place,
+            'working_hours'       => (bool) $hours,
+        ];
+    }
+
+    /** Pending advisory item keys, parsed from the parked "Awaiting HR decision on: ..." reason. */
+    private function pendingAdvisoryKeys(string $reason): array
+    {
+        return array_keys(array_filter([
+            'working_hours' => stripos($reason, 'Working hours') !== false,
+            'place_of_employment' => stripos($reason, 'Place of employment') !== false,
+        ]));
+    }
+
     private function buildAdvisory(JobDescription $jd, array $keys): array
     {
         $resort = Resort::find($jd->Resort_id);
@@ -430,11 +478,7 @@ class JobDescriptionController extends Controller
         if ($jd->compliance !== 'Rejected' || strpos($reason, 'Awaiting HR decision on') !== 0) {
             return response()->json(['success' => false, 'message' => 'No pending advisory for this job description.'], 422);
         }
-        $keys = array_keys(array_filter([
-            'working_hours' => stripos($reason, 'Working hours') !== false,
-            'place_of_employment' => stripos($reason, 'Place of employment') !== false,
-        ]));
-        return response()->json(['success' => true, 'advisory' => $this->buildAdvisory($jd, $keys)]);
+        return response()->json(['success' => true, 'advisory' => $this->buildAdvisory($jd, $this->pendingAdvisoryKeys($reason))]);
     }
 
     /**
@@ -462,10 +506,11 @@ class JobDescriptionController extends Controller
         $decisions = (array) $request->input('items', []);
         $skipped = [];
         $inserted = [];
-        foreach ($labels as $key => $label) {
-            if (!array_key_exists($key, $decisions)) {
-                continue;
-            }
+        // Pending set comes from the parked reason, not the client: a pending
+        // item with no decision counts as skipped, decisions for items that
+        // were never pending are ignored.
+        foreach ($this->pendingAdvisoryKeys((string) $jd->reason) as $key) {
+            $label = $labels[$key];
             $text = trim((string) ($decisions[$key]['text'] ?? ''));
             if (($decisions[$key]['action'] ?? '') === 'insert' && $text !== '') {
                 $inserted[] = $text;
@@ -473,10 +518,6 @@ class JobDescriptionController extends Controller
                 $skipped[] = $label;
             }
         }
-        if (empty($inserted) && empty($skipped)) {
-            return response()->json(['success' => false, 'message' => 'No decision received.'], 422);
-        }
-
         if ($inserted) {
             // JD body is CKEditor HTML (rendered raw), so append as paragraphs.
             $jd->jobdescription = $jd->jobdescription . implode('', array_map(fn ($t) => '<p>' . e($t) . '</p>', $inserted));
@@ -686,6 +727,21 @@ class JobDescriptionController extends Controller
 
         $resortData = Resort::find($jd->Resort_id);
 
+        // Employer signatory is the resort's HR Director, never whoever
+        // clicks Issue. Resolved and validated once, before any record is
+        // created, so a bad setup blocks the whole batch instead of
+        // producing "signed" PDFs with no signature.
+        $director = Common::resolveHrDirector($jd->Resort_id);
+        $directorEmp = $director['employee'];
+        if (!$directorEmp) {
+            return response()->json(['success' => false, 'message' => 'No HR Director configured for this resort.'], 422);
+        }
+        $directorAdmin = $directorEmp->resortAdmin;
+        $directorName = trim(collect([optional($directorAdmin)->first_name, optional($directorAdmin)->middle_name, optional($directorAdmin)->last_name])->filter()->implode(' ')) ?: $directorEmp->Emp_id;
+        if (!$directorAdmin || !Common::signatureImageDataUri($directorAdmin->signature_img)) {
+            return response()->json(['success' => false, 'message' => "HR Director {$directorName} has no e-signature on file; ask them to add one in their profile."], 422);
+        }
+
         $employeeQuery = Employee::where('resort_id', $jd->Resort_id)
             ->where('division_id', $jd->Division_id)
             ->where('Dept_id', $jd->Department_id);
@@ -714,6 +770,7 @@ class JobDescriptionController extends Controller
 
         $issuedCount = 0;
         foreach ($newEmployees as $employee) {
+            $record = null;
             try {
                 // employees has no first_name/last_name of its own — that
                 // identity lives on the linked resort_admins row.
@@ -728,6 +785,10 @@ class JobDescriptionController extends Controller
                     'employer_address'            => $employerAddress ?: null,
                     'employer_nationality'        => self::EMPLOYER_NATIONALITY,
                     'employer_type_of_work'       => self::EMPLOYER_TYPE_OF_WORK,
+                    'employer_signatory_employee_id'    => $directorEmp->id,
+                    'employer_signatory_name'           => $directorName,
+                    'employer_signatory_designation'    => optional($directorEmp->position)->position_title,
+                    'employer_signatory_id_card_number' => $directorEmp->nid ?: $directorEmp->passport_number,
                     'employee_full_name'          => $fullName,
                     'employee_permanent_address'  => $employee->permanent_address ?: $employee->present_address,
                     'employee_current_address'    => $employee->current_address ?: $employee->present_address,
@@ -738,7 +799,10 @@ class JobDescriptionController extends Controller
                     'sent_at'                     => now(),
                 ]);
 
-                $signature = Common::snapshotSignature($this->resort->id, 'job_description', $record->id);
+                $signature = Common::snapshotSignature($directorEmp->Admin_Parent_id, 'job_description_employer', $record->id);
+                if (empty($signature['signature_img']) || !Common::signatureImageDataUri($signature['signature_img'])) {
+                    throw new \Exception('Employer signature snapshot unusable');
+                }
                 $record->employer_signature_path = $signature['signature_img'];
                 $record->save();
 
@@ -756,11 +820,20 @@ class JobDescriptionController extends Controller
 
                 $issuedCount++;
             } catch (\Throwable $e) {
+                // Don't leave a half-built record behind — it would make the
+                // employee look "already issued" and block a retry.
+                if ($record) {
+                    $record->delete();
+                }
                 \Log::error('issueToEmployees failed for employee #' . $employee->id . ' / jd #' . $jd->id . ': ' . $e->getMessage());
             }
         }
 
-        return response()->json(['success' => true, 'message' => "Issued to {$issuedCount} employee(s).", 'issued_count' => $issuedCount]);
+        return response()->json([
+            'success' => true,
+            'message' => "Issued to {$issuedCount} employee(s)." . ($director['warning'] ? ' ' . $director['warning'] : ''),
+            'issued_count' => $issuedCount,
+        ]);
     }
 
     /**

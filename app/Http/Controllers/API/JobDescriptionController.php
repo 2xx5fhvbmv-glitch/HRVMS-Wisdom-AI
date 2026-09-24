@@ -4,6 +4,8 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\JobDescriptionEmployeeRecord;
+use App\Models\ResortDepartment;
+use App\Models\ResortPosition;
 use App\Helpers\Common;
 use App\Helpers\StorageHelper;
 use Illuminate\Http\Request;
@@ -32,7 +34,18 @@ class JobDescriptionController extends Controller
 
         $records = JobDescriptionEmployeeRecord::where('employee_id', $employee->id)
             ->orderBy('id', 'DESC')
-            ->get(['id', 'status', 'sent_at', 'signed_at', 'decline_reason']);
+            ->with('jobDescription:id,Position_id,Department_id')
+            ->get(['id', 'job_description_id', 'status', 'sent_at', 'signed_at', 'decline_reason'])
+            ->map(fn ($r) => [
+                'id'             => $r->id,
+                'job_title'      => optional(ResortPosition::find(optional($r->jobDescription)->Position_id))->position_title,
+                'department'     => optional(ResortDepartment::find(optional($r->jobDescription)->Department_id))->name,
+                'status'         => $r->status,
+                'can_act'        => $r->status === 'Pending',
+                'sent_at'        => $r->sent_at,
+                'signed_at'      => $r->signed_at,
+                'decline_reason' => $r->decline_reason,
+            ]);
 
         return response()->json(['success' => true, 'data' => $records]);
     }
@@ -49,11 +62,52 @@ class JobDescriptionController extends Controller
             return response()->json(['success' => false, 'message' => 'Job description not found'], 404);
         }
 
+        $jd = $record->jobDescription;
+        $data = $record->toArray();
+        $data['job_title']  = optional(ResortPosition::find(optional($jd)->Position_id))->position_title;
+        $data['department'] = optional(ResortDepartment::find(optional($jd)->Department_id))->name;
+        $data['can_act']    = $record->status === 'Pending';
+
         return response()->json([
             'success' => true,
-            'data' => $record,
-            'pdf_url' => $record->pdf_path ? StorageHelper::temporaryUrl($record->pdf_path, 30) : null,
+            'data' => $data,
+            // The stored PDF is encrypted at rest, so a storage temporary URL
+            // would hand the app ciphertext — serve it decrypted via pdf().
+            'pdf_url' => $record->pdf_path ? url('api/job-description/' . $record->id . '/pdf') : null,
+            'has_signature' => $this->hasUsableSignature($employee),
         ]);
+    }
+
+    /**
+     * Streams the decrypted PDF to the owning employee only.
+     */
+    public function pdf($id)
+    {
+        $employee = Auth::guard('api')->user()->GetEmployee;
+        $record = $employee ? JobDescriptionEmployeeRecord::where('employee_id', $employee->id)->find($id) : null;
+        if (!$record || !$record->pdf_path) {
+            return response()->json(['success' => false, 'message' => 'Job description not found'], 404);
+        }
+
+        try {
+            $bytes = Common::decryptFileBytes(StorageHelper::get($record->pdf_path));
+        } catch (\Throwable $e) {
+            \Log::error('JobDescription pdf() failed for record #' . $record->id . ': ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Unable to load the document.'], 500);
+        }
+
+        return response($bytes, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="Job Description.pdf"',
+        ]);
+    }
+
+    // True only when the profile signature actually decrypts to an image,
+    // not merely when a path is stored.
+    private function hasUsableSignature($employee): bool
+    {
+        $admin = $employee->resortAdmin;
+        return $admin && Common::signatureImageDataUri($admin->signature_img) !== null;
     }
 
     /**
@@ -76,12 +130,12 @@ class JobDescriptionController extends Controller
         if ($record->status !== 'Pending') {
             return response()->json(['success' => false, 'message' => 'This job description has already been actioned.'], 422);
         }
-        if (empty($employee->Admin_Parent_id)) {
+        if (!$this->hasUsableSignature($employee)) {
             return response()->json(['success' => false, 'message' => 'No signature on file. Please add your signature in your profile first.'], 422);
         }
 
         $signature = Common::snapshotSignature($employee->Admin_Parent_id, 'job_description', $record->id);
-        if (empty($signature['signature_img'])) {
+        if (empty($signature['signature_img']) || !Common::signatureImageDataUri($signature['signature_img'])) {
             return response()->json(['success' => false, 'message' => 'No signature on file. Please add your signature in your profile first.'], 422);
         }
 
@@ -138,7 +192,7 @@ class JobDescriptionController extends Controller
                 trim($declinerName . ' declined their job description: ' . $request->reason),
                 'TalentAcquisition',
                 $record->id,
-                'job-description-employee-record'
+                'job-description-declined'
             );
         }
 

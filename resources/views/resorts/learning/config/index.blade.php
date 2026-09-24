@@ -546,25 +546,6 @@
                         <div class="col-12 mb-3">
                             <a href="{{route('evaluation-form.create')}}" class="btn lnd-btn-accent btn-sm">Create Evaluation Form</a>
                         </div>
-                        {{-- "Set Rules for Automatic Reminders" — hidden per user request (2026-04-25).
-                             Backing field still exists in the DB for when reminders are re-enabled.
-                        <form id="evaluation_settings">
-                            @csrf
-
-                            <div class="mb-md-4 mb-3">
-                                <label>Set Rules for Automatic Reminders:</label>
-                                <select class="form-control" name="evaluation_reminder" id="evaluation_reminder">
-                                    <option value="after_24_hours" {{$attenndanceParameters->evaluation_reminder == "after_24_hours" ? "Selected" : ""}}>Reminder after 24 hours</option>
-                                    <option value="after_3_days" {{$attenndanceParameters->evaluation_reminder == "after_3_days" ? "Selected" : ""}}>Reminder after 3 days</option>
-                                    <option value="after_7_days" {{$attenndanceParameters->evaluation_reminder == "after_7_days" ? "Selected" : ""}}>Reminder after 7 days</option>
-                                </select>
-                            </div>
-
-                            <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm" id="submitEvaluationSettings">Submit</button>
-                            </div>
-                        </form>
-                        --}}
                     </div>
 
                     <div class="card card-attendancePara mb-30">
@@ -1301,56 +1282,6 @@
                                 positionClass: 'toast-bottom-right'
                             });
                             $('#attendance_parameters').get(0).reset();
-                            $('#categoryTable').DataTable().ajax.reload();
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    },
-                    error: function (response) {
-                        var errors = response.responseJSON.errors;
-                        var errorMessages = '';
-                        $.each(errors, function (key, error) {
-                            errorMessages += error + '<br>';
-                        });
-                        toastr.error(errorMessages, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                });
-            }
-        });
-
-        $('#evaluation_settings').validate({
-            rules: {
-                evaluation_reminder: {
-                    required: true,
-                }
-            },
-            messages: {
-                evaluation_reminder: {
-                    required: "Please Select Reminder.",
-                }
-            },
-            submitHandler: function (form) {
-                var formData = new FormData(form);
-
-                $.ajax({
-                    url: "{{ route('learning.evaluation-reminder.save') }}", // Adjust to your route
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    headers: {
-                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                    },
-                    success: function (response) {
-                        if (response.success) {
-                            toastr.success(response.message, "Success", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                            $('#evaluation_settings').get(0).reset();
                             $('#categoryTable').DataTable().ajax.reload();
                         } else {
                             toastr.error(response.message, "Error", {

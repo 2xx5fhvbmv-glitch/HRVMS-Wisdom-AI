@@ -1043,12 +1043,12 @@ class LeaveController extends Controller
             // resort_id scoping this could (and did) match a completely
             // unrelated employee's leave row, showing their to_date/total_days
             // here instead — a cross-tenant data leak, not just a display bug.
-            $combinedLeave = EmployeeLeave::where('flag',$leaveDetail->leave_category_id)
-                ->where('employees_leaves.emp_id', $leaveDetail->emp_id)
-                ->where('employees_leaves.resort_id', $resort_id)
-                ->where('employees_leaves.id', '!=', $leaveDetail->id)
-                ->join('leave_categories as lc','lc.id','=','employees_leaves.leave_category_id')
-                ->first();
+            $combinedLeave = Common::findCombinedSibling($leaveDetail);
+            if ($combinedLeave) {
+                $cat = DB::table('leave_categories')->where('id', $combinedLeave->leave_category_id)->first();
+                $combinedLeave->leave_type = $cat->leave_type ?? null;
+                $combinedLeave->color = $cat->color ?? null;
+            }
             // dd($combinedLeave);
             // Fetch total leave allocation for the employee (same rank as used in leave balance below)
             $emp_grade = Common::resolveEmpGrade($resort_id, $leaveDetail->rank, $leaveDetail->benefit_grid_level);
@@ -1279,6 +1279,10 @@ class LeaveController extends Controller
         // Select required columns
         $leaveUsageQuery->select(
             'employees_leaves.id',
+            'employees_leaves.emp_id',
+            'employees_leaves.resort_id',
+            'employees_leaves.flag',
+            'employees_leaves.created_at',
             'employees_leaves.leave_category_id',
             'leave_categories.leave_type as leave_category',
             'employees_leaves.reason',
@@ -1327,12 +1331,7 @@ class LeaveController extends Controller
             // Scoped to the same employee/resort — see LeaveController::details()
             // for why an unscoped `flag` match can pull in an unrelated
             // employee's leave row.
-            $combinedLeave = EmployeeLeave::where('flag', $usage->leave_category_id)
-                ->where('employees_leaves.emp_id', $empID)
-                ->where('employees_leaves.resort_id', $this->resort->resort_id)
-                ->where('employees_leaves.id', '!=', $usage->id)
-                ->join('leave_categories as lc', 'lc.id', '=', 'employees_leaves.leave_category_id')
-                ->first();
+            $combinedLeave = Common::findCombinedSibling($usage);
 
             // Resolve approver label from approver_id (Employee.rank) so "Approved by HOD" is correct
             $approverIdInt = (int) ($usage->approver_id ?? 0);

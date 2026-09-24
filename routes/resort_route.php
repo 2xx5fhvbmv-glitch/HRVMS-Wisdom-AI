@@ -1318,7 +1318,6 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
    Route::get('learning/schedule/attendance/history/data/{employee_id}', 'Learning\AttendanceController@getAttendanceHistoryData')->name('attendance.history.data');
    Route::post('learning/schedule/attendance/save', 'Learning\AttendanceController@saveAttendance')->name('attendance.save');
 
-      Route::post('learning/evaluation-reminder/store', 'Learning\ConfigurationController@saveEvaluationReminder')->name('learning.evaluation-reminder.save');
 
    Route::post('learning/attendance-parameters/store', 'Learning\ConfigurationController@saveAttendanceParameters')->name('learning.attendance-parameters.save');
     Route::get('learning/attendance/chart-data', 'Learning\AttendanceController@getAttendanceChartData')->name('learning.attendance.chart-data');
@@ -1462,7 +1461,6 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       // Route::post('visa/document-segmentation', 'Visa\ConfigurationController@DocumentSegmentationStore')->name('resort.visa.DocumentSegmentationStore');
 
       Route::get('visa/document-management', 'Visa\DocumentController@index')->name('resort.visa.DocumentManage');
-      Route::get('visa/xpatsync', 'Visa\DocumentController@Xpatsync')->name('resort.visa.Xpatsync');
 
       // Manual (no-AI) document-extraction endpoints — replace the AI_URL calls
       // so the create-employee wizard advances past step 2 even when the AI
@@ -2248,7 +2246,6 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
     Route::get('people/onboarding/facility-tour-categories/create', 'People\Onboarding\FacilityTourCategoryController@create')->name('people.onboarding.facility-tour-categories.create');
     Route::post('people/onboarding/facility-tour-categories/store', 'People\Onboarding\FacilityTourCategoryController@store')->name('people.onboarding.facility-tour-categories.store');
     Route::get('people/onboarding/facility-tour-categories/view/{id}', 'People\Onboarding\FacilityTourCategoryController@show')->name('people.onboarding.facility-tour-categories.show');
-    Route::get('people/onboarding/facility-tour-categories/edit/{id}', 'People\Onboarding\FacilityTourCategoryController@edit')->name('people.onboarding.facility-tour-categories.edit');
     Route::post('people/onboarding/facility-tour-categories/update/{id?}', 'People\Onboarding\FacilityTourCategoryController@update')->name('people.onboarding.facility-tour-categories.update');
     Route::delete('people/onboarding/facility-tour-categories/destroy/{id}', 'People\Onboarding\FacilityTourCategoryController@destroy')->name('people.onboarding.facility-tour-categories.destroy');
     Route::post('people/onboarding/facility-tour-categories/image-update', 'People\Onboarding\FacilityTourCategoryController@imageUpdate')->name('people.onboarding.facility-tour-categories.image-update');

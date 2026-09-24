@@ -60,6 +60,7 @@ use Illuminate\Support\Facades\Route;
 		// Job Description consent (Part 2.5)
 		Route::get('job-description', [App\Http\Controllers\API\JobDescriptionController::class, 'index']);
 		Route::get('job-description/{id}', [App\Http\Controllers\API\JobDescriptionController::class, 'show']);
+		Route::get('job-description/{id}/pdf', [App\Http\Controllers\API\JobDescriptionController::class, 'pdf']);
 		Route::post('job-description/{id}/consent', [App\Http\Controllers\API\JobDescriptionController::class, 'consent']);
 		Route::post('job-description/{id}/decline', [App\Http\Controllers\API\JobDescriptionController::class, 'decline']);
 

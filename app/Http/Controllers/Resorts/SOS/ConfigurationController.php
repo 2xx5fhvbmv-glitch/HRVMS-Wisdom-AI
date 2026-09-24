@@ -77,6 +77,8 @@ class ConfigurationController extends Controller
             ]
         );
 
+        $this->notifySosConfig([], 'SOS Emergency Contacts Updated', 'The resort emergency contact numbers (police / fire / MNDF) have been updated.');
+
         return response()->json([
             'success' => true,
             'message' => 'Emergency contact numbers updated successfully',

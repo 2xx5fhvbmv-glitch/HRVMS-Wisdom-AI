@@ -489,6 +489,7 @@ class FileManagementController extends Controller
             }
             $folder->Folder_Name = $request->new_name;
             $folder->save();
+            $this->notifyHrOfRename($resortId, $emp, 'folder', $folder->id, $request->new_name);
             return response()->json(['success' => true, 'message' => 'Folder renamed successfully.'], 200);
         }
 
@@ -512,7 +513,28 @@ class FileManagementController extends Controller
             'file_path'    => $file->File_Path,
         ]);
 
+        $this->notifyHrOfRename($resortId, $emp, 'file', $file->id, $request->new_name);
         return response()->json(['success' => true, 'message' => 'File renamed successfully.'], 200);
+    }
+
+    // Mirrors the HR notice deleteFile() sends; never breaks the rename.
+    private function notifyHrOfRename($resortId, $emp, string $kind, $id, string $newName): void
+    {
+        try {
+            $hrEmployeeIds = array_values(array_diff(Common::getResortHrEmployeeIds($resortId), [$emp->id]));
+            if (empty($hrEmployeeIds)) return;
+            Common::notifyEmployees(
+                $resortId,
+                $hrEmployeeIds,
+                ucfirst($kind) . ' Renamed',
+                ($emp->resortAdmin->full_name ?? $emp->Emp_id) . ' renamed a ' . $kind . ' to "' . $newName . '".',
+                'File Management',
+                $id,
+                'file-management-rename'
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('Mobile file rename notification failed: ' . $e->getMessage());
+        }
     }
 
     /**

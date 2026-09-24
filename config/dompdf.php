@@ -93,7 +93,10 @@ return array(
         'allowed_protocols' => [
             "file://" => ["rules" => []],
             "http://" => ["rules" => []],
-            "https://" => ["rules" => []]
+            "https://" => ["rules" => []],
+            // dompdf 3 rejects data: URIs unless listed — e-signatures are
+            // embedded as base64 data URIs (Common::signatureImageDataUri()).
+            "data://" => ["rules" => []]
         ],
 
          /**

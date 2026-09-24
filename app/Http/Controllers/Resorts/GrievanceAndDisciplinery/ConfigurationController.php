@@ -1538,9 +1538,17 @@ class ConfigurationController extends Controller
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'Committee not found.'], 404);
             }
+            $removedCommitteeName = DisciplineryAssignCommittee::where('id', $id)->where('resort_id', $this->resort->resort_id)->value('CommitteeName');
+            $removedMemberIds = DisciplineryCommitteeMembers::where("Parent_committee_id",$id)->pluck('MemberId')->all();
             DisciplineryCommitteeMembers::where("Parent_committee_id",$id)->delete();
             DisciplineryAssignCommittee::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
+
+            try {
+                Common::notifyEmployees($this->resort->resort_id, $removedMemberIds, 'Disciplinary Committee Removed', 'The "' . $removedCommitteeName . '" disciplinary committee was removed; you are no longer a member.', 'Disciplinary');
+            } catch (\Throwable $ne) {
+                \Log::warning('disciplinary committee removal notification failed: ' . $ne->getMessage());
+            }
             return response()->json([
                 'success' => true,
                 'message' => ' Disciplinary Committee Delete Successfully',
@@ -1711,23 +1719,32 @@ class ConfigurationController extends Controller
 
     public function KeyPersonnel(Request $request)
     {
+        $resortId = $this->resort->resort_id;
+        $ids = array_values(array_unique((array) $request->KeyPersonnel));
 
-            if(!empty($request->KeyPersonnel))
-            {
-                GrivanceKeyPerson::where("resort_id",$this->resort->resort_id)->delete();
-                foreach($request->KeyPersonnel as $k)
-                {
+        if (!empty($ids)) {
+            $valid = Employee::where('resort_id', $resortId)->whereIn('id', $ids)->count();
+            if ($valid !== count($ids)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'One or more selected key personnel do not belong to this resort.',
+                ], 422);
+            }
+        }
 
+        DB::beginTransaction();
+        try
+        {
+            if (!empty($ids)) {
+                GrivanceKeyPerson::where("resort_id", $resortId)->delete();
+                foreach ($ids as $k) {
                     GrivanceKeyPerson::create([
-                        "resort_id"=>$this->resort->resort_id,
-                        "emp_ids"=>$k
+                        "resort_id" => $resortId,
+                        "emp_ids" => $k
                     ]);
                 }
-
             }
-            DB::beginTransaction();
-            try
-            {    DB::commit();
+            DB::commit();
             return response()->json([
                 'success' => true,
                 'message' => 'Key Personnel Updated Successfully',
@@ -1739,7 +1756,7 @@ class ConfigurationController extends Controller
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::emergency("Message: " . $e->getMessage());
-            return response()->json(['error' => 'Failed to Add Investing Hearing '], 500);
+            return response()->json(['error' => 'Failed to update Key Personnel'], 500);
         }
     }
     // DisciplinaryDelegationRule
@@ -3531,9 +3548,17 @@ class ConfigurationController extends Controller
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'Committee not found.'], 404);
             }
+            $removedCommitteeName = GrievanceCommitteeMemberParent::where('id', $id)->where('resort_id', $this->resort->resort_id)->value('Grivance_CommitteeName');
+            $removedMemberIds = GrievanceCommitteeMemberChild::where("Parent_id",$id)->pluck('Committee_Member_Id')->all();
             GrievanceCommitteeMemberChild::where("Parent_id",$id)->delete();
             GrievanceCommitteeMemberParent::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
+
+            try {
+                Common::notifyEmployees($this->resort->resort_id, $removedMemberIds, 'Grievance Committee Removed', 'The "' . $removedCommitteeName . '" grievance committee was removed; you are no longer a member.', 'Grievance And Disciplinery');
+            } catch (\Throwable $ne) {
+                \Log::warning('grievance committee removal notification failed: ' . $ne->getMessage());
+            }
             return response()->json([
                 'success' => true,
                 'message' => ' Grivevance Committee Delete Successfully',

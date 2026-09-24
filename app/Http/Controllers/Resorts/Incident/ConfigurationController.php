@@ -506,10 +506,18 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
+            $removedCommitteeName = IncidentCommittee::where('id', $id)->where('resort_id', $this->resort->resort_id)->value('commitee_name');
+            $removedMemberIds = IncidentCommitteeMember::where("commitee_id",$id)->pluck('member_id')->all();
             IncidentCommitteeMember::where("commitee_id",$id)->delete();
             IncidentCommittee::where("id",$id)->delete();
 
             DB::commit();
+
+            try {
+                Common::notifyEmployees($this->resort->resort_id, $removedMemberIds, 'Incident Committee Removed', 'The "' . $removedCommitteeName . '" incident committee was removed; you are no longer a member.', 'Incident');
+            } catch (\Throwable $ne) {
+                \Log::warning('incident committee removal notification failed: ' . $ne->getMessage());
+            }
             return response()->json([
                 'success' => true,
                 'message' => 'Committee Delete Successfully',

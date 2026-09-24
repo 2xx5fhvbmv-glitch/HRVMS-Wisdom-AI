@@ -5,7 +5,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Validator;
-use App\Events\ResortNotificationEvent;
 use App\Models\Resort;
 use App\Models\Employee;
 use App\Models\FacilityTourCategories;
@@ -44,7 +43,6 @@ class FacilityTourCategoryController extends Controller
             return datatables()->of($facilityTourCategories)
                 ->addColumn('action', function ($category) {
 
-                    $edit_route = route('people.onboarding.facility-tour-categories.edit',base64_encode($category->id));
                     $view_route = route('people.onboarding.facility-tour-categories.show',base64_encode($category->id));
                     $viewBtn = '<a href="'.$view_route.'" data-id="'.$category->id.'" class="view-row-btn "><i class="fas fa-eye"></i></a>';
                     $editBtn = '<a href="javascript:void(0)" class="edit-row-btn ml-1" data-id="'.$category->id.'"><i class="fas fa-edit"></i></a>';
@@ -126,6 +124,8 @@ class FacilityTourCategoryController extends Controller
             }
         }
 
+        $this->notifyHr('Facility Tour Category Created', 'Facility tour category "' . $request->facilityTourName . '" was created.', $facilityTourCategory->id);
+
         return response()->json(['success' => true, 'message' => 'Facility Tour Category created successfully.'], 200);
 
     }
@@ -144,13 +144,6 @@ class FacilityTourCategoryController extends Controller
     }
 
 
-    public function edit($id)
-    {
-        $facilityTourCategory = FacilityTourCategories::where('resort_id', $this->resort->resort_id)->findOrFail($id);
-        $facilityTourImages = FacilityTourImages::where('facility_tour_category_id', $id)->get();
-        return view('resorts.people.onboarding.facility_tour_categories.edit', compact('facilityTourCategory', 'facilityTourImages'));
-    }
-
     public function update(Request $request, $id)
     {
        
@@ -164,6 +157,8 @@ class FacilityTourCategoryController extends Controller
             ]);
         }
         
+        $this->notifyHr('Facility Tour Category Updated', 'Facility tour category "' . $facilityTourCategory->name . '" was updated.', $facilityTourCategory->id);
+
         return response()->json(['success' => true, 'message' => 'Facility Tour Category updated successfully.'], 200);
       
     }   
@@ -183,10 +178,22 @@ class FacilityTourCategoryController extends Controller
             $image->delete();
         }
 
+        $categoryName = $facilityTourCategory->name;
         $facilityTourCategory->delete();
+        $this->notifyHr('Facility Tour Category Deleted', 'Facility tour category "' . $categoryName . '" was deleted.');
         return response()->json(['success' => true, 'message' => 'Facility Tour Category deleted successfully.']);
 
     } 
+
+    // HR notice for onboarding-content changes; never breaks the request.
+    private function notifyHr(string $title, string $message, $requestId = null): void
+    {
+        try {
+            Common::notifyEmployees($this->resort->resort_id, Common::getResortHrEmployeeIds($this->resort->resort_id), $title, $message, 'Onboarding', $requestId);
+        } catch (\Throwable $e) {
+            \Log::warning('Facility tour notification failed: ' . $e->getMessage());
+        }
+    }
 
     public function imageUpdate(Request $request){
 

@@ -424,23 +424,4 @@ class ConfigurationController extends Controller
             'message' => 'Attendance Parameters saved successfully.',
         ]);
     }
-
-    public function saveEvaluationReminder(Request $request)
-    {
-        $request->validate([
-            'evaluation_reminder' => 'nullable|string|max:255',
-        ]);
-
-        AttendanceParameters::updateOrCreate(
-            ['resort_id' => auth()->user()->resort_id],
-            [
-                'evaluation_reminder' => $request->evaluation_reminder,
-            ]
-        );
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Reminder saved successfully.',
-        ]);
-    }
 }

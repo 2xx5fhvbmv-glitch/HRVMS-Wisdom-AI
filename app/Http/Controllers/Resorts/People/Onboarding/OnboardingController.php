@@ -1537,15 +1537,14 @@ class OnboardingController extends Controller
                     "📅 Arrival Date: " . Common::formatDate($onboardingItinerary->arrival_date) . "\n" .
                     "🕒 Arrival Time: " . Common::formatDisplayTime($onboardingItinerary->arrival_time) . "\n";
 
-                event(new ResortNotificationEvent(Common::nofitication(
+                Common::notifyEmployees(
                     $this->resort->resort_id,
-                    10,
+                    [$employee->id],
                     $isUpdate ? 'Your Onboarding Itinerary was Updated' : 'Your Onboarding Itinerary is Ready',
                     $msg,
-                    0,
-                    $employee->id,
-                    'People'
-                )));
+                    'People',
+                    $onboardingItinerary->id
+                );
             }
 
             // Notify pickup assigned employee
@@ -1556,15 +1555,14 @@ class OnboardingController extends Controller
                     "📅 Arrival Date: " . Common::formatDate($onboardingItinerary->arrival_date) . "\n" .
                     "🕒 Arrival Time: " . Common::formatDisplayTime($onboardingItinerary->arrival_time) . "\n";
 
-                event(new ResortNotificationEvent(Common::nofitication(
+                Common::notifyEmployees(
                     $this->resort->resort_id,
-                    10,
+                    [$pickupEmployee->id],
                     $isUpdate ? 'Pickup Assignment Updated' : 'Pickup Assignment Notification',
                     $msg,
-                    0,
-                    $pickupEmployee->id,
-                    'People'
-                )));
+                    'People',
+                    $onboardingItinerary->id
+                );
             }
 
             // Notify medical accompany employee
@@ -1575,15 +1573,14 @@ class OnboardingController extends Controller
                     "📅 Arrival Date: " . Common::formatDate($onboardingItinerary->arrival_date) . "\n" .
                     "🕒 Arrival Time: " . Common::formatDisplayTime($onboardingItinerary->arrival_time) . "\n";
 
-                event(new ResortNotificationEvent(Common::nofitication(
+                Common::notifyEmployees(
                     $this->resort->resort_id,
-                    10,
+                    [$medicalEmployee->id],
                     $isUpdate ? 'Medical Accompaniment Assignment Updated' : 'Medical Accompaniment Assignment',
                     $msg,
-                    0,
-                    $medicalEmployee->id,
-                    'People'
-                )));
+                    'People',
+                    $onboardingItinerary->id
+                );
             }
 
             // Notify meeting participants (from comma-separated string)
@@ -1600,15 +1597,14 @@ class OnboardingController extends Controller
                             "⏰ Time: " . Common::formatDisplayTime($meeting->meeting_time) . "\n" .
                             "🔗 Link: {$meeting->meeting_link}";
 
-                        event(new ResortNotificationEvent(Common::nofitication(
-                            $this->resort->resort_id,
-                            10,
-                            $isUpdate ? 'Onboarding Meeting Updated' : 'Onboarding Meeting Invitation',
-                            $msg,
-                            0,
-                            $participant->id,
-                            'People'
-                        )));
+                        Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    [$participant->id],
+                    $isUpdate ? 'Onboarding Meeting Updated' : 'Onboarding Meeting Invitation',
+                    $msg,
+                    'People',
+                    $onboardingItinerary->id
+                );
                     }
                 }
             }

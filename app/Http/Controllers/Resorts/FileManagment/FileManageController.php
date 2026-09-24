@@ -451,6 +451,21 @@ class FileManageController extends Controller
         
                         if ($existingFile && $File_structure->Folder_Type == "uncategorized") {
                             $fileVersion = $this->CreateFileVersion($existingFile->id, $fileRecord->id);
+                            $sharedWith = $this->sharedEmployeeIdsFor('file', $existingFile->id);
+                            if (!empty($sharedWith)) {
+                                try {
+                                    Common::notifyEmployees(
+                                        $this->resort->resort_id,
+                                        $sharedWith,
+                                        'Shared File Updated',
+                                        'A new version of "' . $existingFile->File_Name . '", shared with you, has been uploaded.',
+                                        'File Management',
+                                        $existingFile->id
+                                    );
+                                } catch (\Exception $e) {
+                                    \Log::warning('File version notification failed: ' . $e->getMessage());
+                                }
+                            }
                         }
     
                         AuditLogs::create([
@@ -1874,17 +1889,44 @@ class FileManageController extends Controller
             $newFolderPath = "{$main_folder}/public/{$parent->Folder_unique_id}/";
         
             if (is_array($FilesName)) {
+                $done = 0;
                 foreach ($FilesName as $fileUniqueId)
                 {
                     $error = $this->moveFileOrFolder($fileUniqueId, $parent, $main_folder);
                     if ($error) {
-                        return $error;
+                        // Earlier items stay moved; tell the user exactly where the batch stopped.
+                        $data = $error->getData(true);
+                        $data['message'] .= " Batch stopped: {$done} of " . count($FilesName) . " item(s) were moved before this failure; the remaining item(s) were not attempted.";
+                        return response()->json($data, $error->status());
                     }
+                    $done++;
                 }
             } else {
                 $error = $this->moveFileOrFolder($FilesName, $parent, $main_folder);
                 if ($error) {
                     return $error;
+                }
+            }
+
+            // Tell anyone the moved items are shared with — location changed under them.
+            foreach ((array) $FilesName as $movedUniqueId) {
+                $file = ChildFileManagement::where('resort_id', $this->resort->resort_id)->where('unique_id', $movedUniqueId)->first();
+                $folder = $file ? null : FilemangementSystem::where('resort_id', $this->resort->resort_id)->where('Folder_unique_id', $movedUniqueId)->first();
+                $item = $file ?? $folder;
+                if (!$item) continue;
+                $sharedWith = $this->sharedEmployeeIdsFor($file ? 'file' : 'folder', $item->id);
+                if (empty($sharedWith)) continue;
+                try {
+                    Common::notifyEmployees(
+                        $this->resort->resort_id,
+                        $sharedWith,
+                        $file ? 'Shared File Moved' : 'Shared Folder Moved',
+                        'A ' . ($file ? 'file' : 'folder') . ' shared with you ("' . ($file ? $file->File_Name : $folder->Folder_name) . '") was moved to "' . $parent->Folder_name . '".',
+                        'File Management',
+                        $item->id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('File move notification failed: ' . $e->getMessage());
                 }
             }
 
@@ -1908,7 +1950,9 @@ class FileManageController extends Controller
                 $newFilePath = "{$main_folder}/public/{$parent->Folder_Type}/{$parent->Folder_unique_id}/" . basename($oldFilePath);
 
                 try {
-                    StorageHelper::disk()->move($oldFilePath, $newFilePath);
+                    if (!StorageHelper::disk()->move($oldFilePath, $newFilePath)) {
+                        throw new \RuntimeException('file not found or could not be moved in storage');
+                    }
                 } catch (\Exception $e) {
                     Log::error("File move failed, nothing changed. {$oldFilePath} -> {$newFilePath}: " . $e->getMessage());
                     return response()->json(['success' => false, 'message' => 'Error moving file: ' . $e->getMessage()], 500);
@@ -1926,7 +1970,9 @@ class FileManageController extends Controller
 
                     // Compensate: move the file back so storage and DB agree again.
                     try {
-                        StorageHelper::disk()->move($newFilePath, $oldFilePath);
+                        if (!StorageHelper::disk()->move($newFilePath, $oldFilePath)) {
+                            throw new \RuntimeException('move back returned false');
+                        }
                         Log::error("File move for unique_id {$fileUniqueId} failed and was rolled back cleanly. Error: " . $e->getMessage());
                         return response()->json(['success' => false, 'message' => 'Error moving file, no changes were made: ' . $e->getMessage()], 500);
                     } catch (\Exception $rollbackException) {
@@ -1953,7 +1999,7 @@ class FileManageController extends Controller
                 ->first();
 
             if (!$folder) {
-                return null;
+                return response()->json(['success' => false, 'message' => 'File or folder not found. It may have been deleted.'], 404);
             }
 
             $oldParentFolder = FilemangementSystem::where("resort_id", $this->resort->resort_id)
@@ -1961,7 +2007,7 @@ class FileManageController extends Controller
                 ->first();
 
             if (!$oldParentFolder) {
-                return null;
+                return response()->json(['success' => false, 'message' => 'Folder has no valid parent, cannot move.'], 404);
             }
 
             $oldFolderPath = "{$main_folder}/public/{$oldParentFolder->Folder_unique_id}/{$folder->Folder_unique_id}/";
@@ -1975,7 +2021,9 @@ class FileManageController extends Controller
                 $files = StorageHelper::disk()->allFiles($oldFolderPath);
                 foreach ($files as $file) {
                     $newFilePath = str_replace($oldFolderPath, $newFolderPath, $file);
-                    StorageHelper::disk()->move($file, $newFilePath);
+                    if (!StorageHelper::disk()->move($file, $newFilePath)) {
+                        throw new \RuntimeException("could not move '{$file}' in storage");
+                    }
                     $moved[] = ['from' => $file, 'to' => $newFilePath];
 
                     // Update file paths in database
@@ -1988,7 +2036,9 @@ class FileManageController extends Controller
                 $subfolders = StorageHelper::disk()->allDirectories($oldFolderPath);
                 foreach ($subfolders as $subfolder) {
                     $newSubfolderPath = str_replace($oldFolderPath, $newFolderPath, $subfolder);
-                    StorageHelper::disk()->move($subfolder, $newSubfolderPath);
+                    if (!StorageHelper::disk()->move($subfolder, $newSubfolderPath)) {
+                        throw new \RuntimeException("could not move '{$subfolder}' in storage");
+                    }
                     $moved[] = ['from' => $subfolder, 'to' => $newSubfolderPath];
                 }
 
@@ -2009,7 +2059,9 @@ class FileManageController extends Controller
                 $unrolled = [];
                 foreach (array_reverse($moved) as $m) {
                     try {
-                        StorageHelper::disk()->move($m['to'], $m['from']);
+                        if (!StorageHelper::disk()->move($m['to'], $m['from'])) {
+                            throw new \RuntimeException('move back returned false');
+                        }
                         $unrolled[] = $m;
                     } catch (\Exception $rollbackException) {
                         Log::emergency("Folder move rollback failed for '{$folderUniqueId}': could not move '{$m['to']}' back to '{$m['from']}'. DB was rolled back but storage is now inconsistent. Error: " . $rollbackException->getMessage());

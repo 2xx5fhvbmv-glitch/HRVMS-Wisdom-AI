@@ -5,7 +5,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Validator;
-use App\Events\ResortNotificationEvent;
 use App\Models\Resort;
 use App\Models\Employee;
 use App\Models\resortAdmin;

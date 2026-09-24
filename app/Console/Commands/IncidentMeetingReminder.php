@@ -79,15 +79,15 @@ class IncidentMeetingReminder extends Command
                         $msg = "📝 Meeting: {$meeting->meeting_subject}\n📅 Date: " . Common::formatDate($meeting->meeting_date)
                             . "\n⏰ Time: " . Common::formatDisplayTime($meeting->meeting_time) . "\n📍 Location: {$meeting->location}";
 
-                        event(new ResortNotificationEvent(Common::nofitication(
-                            $meeting->resort_id, // Make sure `resort_id` exists on the `meetings` table
-                            10,
+                        // notifyEmployees = in-app row + mobile push (was in-app only).
+                        Common::notifyEmployees(
+                            $meeting->resort_id,
+                            [$employeeId],
                             'Upcoming Investigation Meeting Reminder',
                             $msg,
-                            0,
-                            $employeeId,
-                            'Incident'
-                        )));
+                            'Incident',
+                            $meeting->id
+                        );
                     }
                 }
             }

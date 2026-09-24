@@ -8034,6 +8034,22 @@ class Common
             case 'talent acquisition':
                 return url('resort/talent-acquisition/view-vacancies');
 
+            // Job Description issuance/decline pings (module 'TalentAcquisition',
+            // no space) — land HR on the JD list, not the generic notification list.
+            case 'talentacquisition':
+                if (str_starts_with((string) ($notification->page_id ?? ''), 'job-description')) {
+                    return url('resort/talent-acquisition/get/job-description');
+                }
+                return url('resort/talent-acquisition/view-vacancies');
+
+            // Job Description issue/decline notifications (module is sent
+            // without a space, so it never matched 'talent acquisition').
+            case 'talentacquisition':
+                if (in_array($notification->page_id ?? null, ['job-description-declined', 'job-description-employee-record'], true)) {
+                    return url('resort/talent-acquisition/get/job-description');
+                }
+                return url('resort/talent-acquisition/view-vacancies');
+
             case 'survey':
                 return url('resort/survey/list');
 
@@ -11156,6 +11172,12 @@ class Common
                 return null;
             }
             $contents = self::decryptFileBytes(StorageHelper::get($path));
+            // A plaintext (never-encrypted) or corrupt file either fails to
+            // decrypt above or decrypts to garbage — never treat it as a
+            // usable signature.
+            if (@getimagesizefromstring($contents) === false) {
+                return null;
+            }
             // Not StorageHelper::disk()->mimeType($path) — that sniffs the
             // on-disk (encrypted) bytes, which no longer have a real image
             // header to detect. Every signature write path saves a .png.
@@ -11164,6 +11186,52 @@ class Common
             \Log::warning('signatureImageDataUri failed for path ' . $path . ': ' . $e->getMessage());
             return null;
         }
+    }
+
+    /**
+     * The resort's HR Director — employer signatory on Job Descriptions,
+     * independent of whoever presses Issue. Active EXCOM (rank 1) of the
+     * HR department or anyone titled Director of HR / HR Director /
+     * Director of Human Resources / Human Resources Director; falls back
+     * to the HR department's HOD (rank 2). HR department matching mirrors
+     * getResortHrEmployeeIds(). Multiple matches: prefer rank 1 + title,
+     * then lowest employee id, and return a warning naming who was chosen.
+     *
+     * @return array{employee: ?\App\Models\Employee, warning: ?string}
+     */
+    public static function resolveHrDirector($resortId): array
+    {
+        $hrAliases = ['hr', 'human resources', 'human resource'];
+        $hrDeptIds = \App\Models\ResortDepartment::where('resort_id', $resortId)
+            ->get(['id', 'name', 'short_name', 'code'])
+            ->filter(fn($d) => in_array(strtolower(trim($d->name ?? '')), $hrAliases, true)
+                || in_array(strtolower(trim($d->short_name ?? '')), $hrAliases, true)
+                || in_array(strtolower(trim($d->code ?? '')), $hrAliases, true))
+            ->pluck('id')->all();
+
+        $active = fn($q) => $q->where(fn($qq) => $qq->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary'));
+        $isDirectorTitle = fn($e) => (bool) preg_match(
+            '/^\s*(director\s+of\s+(hr|human\s+resources?)|(hr|human\s+resources?)\s+director)\s*$/i',
+            optional($e->position)->position_title ?? ''
+        );
+
+        $candidates = \App\Models\Employee::with('position')->where('resort_id', $resortId)->tap($active)->get()
+            ->filter(fn($e) => (in_array($e->Dept_id, $hrDeptIds) && (int) $e->rank === 1) || $isDirectorTitle($e))
+            ->sortBy([fn($a, $b) => (int) ($isDirectorTitle($b) && (int) $b->rank === 1) <=> (int) ($isDirectorTitle($a) && (int) $a->rank === 1), ['id', 'asc']])
+            ->values();
+
+        if ($candidates->isEmpty() && !empty($hrDeptIds)) {
+            $candidates = \App\Models\Employee::with('position')->where('resort_id', $resortId)
+                ->whereIn('Dept_id', $hrDeptIds)->where('rank', 2)->tap($active)->orderBy('id')->get();
+        }
+
+        $chosen = $candidates->first();
+        $warning = null;
+        if ($chosen && $candidates->count() > 1) {
+            $names = $candidates->map(fn($e) => optional($e->resortAdmin)->first_name . ' ' . optional($e->resortAdmin)->last_name)->implode(', ');
+            $warning = 'Multiple HR Director candidates found (' . $names . '); used ' . trim(optional($chosen->resortAdmin)->first_name . ' ' . optional($chosen->resortAdmin)->last_name) . '.';
+        }
+        return ['employee' => $chosen, 'warning' => $warning];
     }
 
     /**
@@ -11205,19 +11273,11 @@ class Common
             $resortData = Resort::find($record->resort_id);
             $sitesettings = ResortSiteSettings::where('resort_id', $record->resort_id)->first(['resort_id', 'header_img', 'footer_img', 'Footer']);
 
-            $signatures = [
-                ['name' => $record->employer_name, 'signature_img' => $record->employer_signature_path, 'timestamp' => $record->sent_at],
-            ];
-            if ($record->employee_signature_path) {
-                $signatures[] = ['name' => $record->employee_full_name, 'signature_img' => $record->employee_signature_path, 'timestamp' => $record->signed_at];
-            }
-
             $pdf = \PDF::loadView('resorts.talentacquisition.jobdescription.employee_download', [
                 'record' => $record,
                 'j' => $jobDescription,
                 'sitesettings' => $sitesettings,
                 'ResortData' => $resortData,
-                'signatures' => $signatures,
             ]);
             $pdf->setPaper('a4', 'portrait');
             $pdfBinary = $pdf->output();
