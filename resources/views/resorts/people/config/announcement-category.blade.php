@@ -165,7 +165,7 @@
         var Main_id = $(this).attr('data-cat-id');
         var Category_Name = $row.find("input").eq(0).val();
         $.ajax({
-            url: "{{ route('announcement.categories.inlineUpdate', '') }}/" + Main_id,
+            url: "{{ route('announcement.categories.inlineUpdate', '__id__') }}".replace('__id__', Main_id),
             type: "PUT",
             data: {
                 Main_id:Main_id,

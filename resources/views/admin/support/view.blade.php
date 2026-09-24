@@ -420,7 +420,7 @@
         $('#ViewModeOfFiles').html('<div class="text-center"><p>A file link is being generated. Please wait...</p><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>');
         $('#bdVisa-iframeModel-modal-lg').modal('show');
         $.ajax({
-            url: '{{ route("resort.visa.XpactEmpFileDownload", "") }}/' + childId,
+            url: '{{ route("resort.visa.XpactEmpFileDownload", "__id__") }}'.replace("__id__", childId),
             type: 'GET',
             data: { child_id: childId, _token: '{{ csrf_token() }}' },
             success: function (response) {

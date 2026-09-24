@@ -163,7 +163,7 @@
         var Main_id = $(this).attr('data-cat-id');
         var outcome_type = $row.find("input").eq(0).val();
         $.ajax({
-            url: "{{ route('incident.outcome-type.inlineUpdate', '') }}/" + Main_id,
+            url: "{{ route('incident.outcome-type.inlineUpdate', '__id__') }}".replace('__id__', Main_id),
             type: "PUT",
             data: {
                 Main_id:Main_id,

@@ -912,7 +912,7 @@
             var category_weightage = $row.find("input").eq(1).val();
 
             $.ajax({
-                url: "{{ route('Performance.config.ReviewTypes.inlineUpdate', '') }}/" + id,
+                url: "{{ route('Performance.config.ReviewTypes.inlineUpdate', '__id__') }}".replace('__id__', id),
                 type: "PUT",
                 data: {
                     category_title : category_title,
@@ -993,7 +993,7 @@
 
                     $.ajax({
                         type: "delete",
-                        url: "{{ route('Performance.DestroyReviewTypes','') }}/"+main_id,
+                        url: "{{ route('Performance.DestroyReviewTypes', '__id__') }}".replace('__id__', main_id),
                         dataType: "json",
                     }).done(function(result) {
                         if (result.success == true) {

@@ -185,7 +185,7 @@
                 let status = $row.find(".status").val();
 
                 $.ajax({
-                    url: "{{ route('people.onboarding.facility-tour-categories.update', '') }}/" + Main_id,
+                    url: "{{ route('people.onboarding.facility-tour-categories.update', '__id__') }}".replace('__id__', Main_id),
                     type: "POST",
                     data: {
                         id: Main_id,

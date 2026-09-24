@@ -744,7 +744,7 @@
             var updatedColor = $row.find("input").eq(1).val();
     
             $.ajax({
-                url: "{{ route('learning.category.inlineUpdatecategory', '') }}/" + categoryId,
+                url: "{{ route('learning.category.inlineUpdatecategory', '__id__') }}".replace('__id__', categoryId),
                 type: "PUT",
                 data: {
                     category : updatedCategory,
@@ -823,7 +823,7 @@
                 {
                     $.ajax({
                         type: "delete",
-                        url: "{{ route('learning.category.destroy','') }}/"+main_id,
+                        url: "{{ route('learning.category.destroy', '__id__') }}".replace('__id__', main_id),
                         dataType: "json",
                     }).done(function(result) {
                         if (result.success == true) {

@@ -380,7 +380,7 @@ $(document).ready(function() {
             if (imgUrl) downloadPosterImage(imgUrl);
             return;
         }
-        window.location.href = "{{ route('resort.ta.jobadvertisment.download', '') }}/" + vacancyId;
+        window.location.href = "{{ route('resort.ta.jobadvertisment.download', '__id__') }}".replace('__id__', vacancyId);
     });
 
         $('#jobAD-form').validate({

@@ -248,7 +248,7 @@
         //      (controller already does); we still send the value so
         //      validation runs.
         $.ajax({
-            url: "{{ route('people.notice-period.update', '') }}/" + Main_id,
+            url: "{{ route('people.notice-period.update', '__id__') }}".replace('__id__', Main_id),
             type: "POST",
             headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
             data: {

@@ -5771,9 +5771,11 @@ html,
 
 .login-form .btn-themeNeon:hover {
     color: #dfff00;
-    /* Fixed #222222, not var(--darkblack) — a dark-invert hover fill
-       regardless of theme, unlike --darkblack's now-themed text role. */
-    background-color: #222222;
+    /* Brand teal box with lime text on hover (was a #222 fill with a lime
+       border) — literal #014653, not var(--teal), so the login pages keep
+       the brand color regardless of theme. */
+    background-color: #014653;
+    border-color: #014653;
 }
 
 .login-slider {

@@ -173,7 +173,7 @@ $(document).ready(function(){
 
                     $.ajax({
                         type: "delete",
-                        url: "{{ route('Performance.cycle.destory','') }}/"+main_id,
+                        url: "{{ route('Performance.cycle.destory', '__id__') }}".replace('__id__', main_id),
                         dataType: "json",
                     }).done(function(result) {
                         if (result.success == true) {

@@ -14,7 +14,7 @@
     <link href="{{ URL::asset('resorts_assets/css/all.min.css')}}" rel=stylesheet>
     <link href="{{ URL::asset('resorts_assets/css/dataTables.min.css')}}" rel=stylesheet>
 
-    <link href="{{ URL::asset('resorts_assets/css/default.css')}}" rel=stylesheet>
+    <link href="{{ URL::asset('resorts_assets/css/default.css')}}?v={{ @filemtime(public_path('resorts_assets/css/default.css')) }}" rel=stylesheet>
     <link href="{{ URL::asset('resorts_assets/css/media.css')}}" rel=stylesheet>
     <link rel="stylesheet" href="{{ URL::asset('admin_assets/plugins/toastr/toastr.min.css') }}">
     <link rel="stylesheet" href="{{ URL::asset('resorts_assets/css/toastr-theme.css') }}">
@@ -37,7 +37,8 @@
                 <div class="img-obj cover"><img src="{{ URL::asset('resorts_assets/images/login.jpg')}}" alt="image"></div>
                 <div class="row g-sm-3 g-1 justify-content-between align-items-center ">
                     <div class="col-auto">
-                        <a href="index.html" class="brand-logo"><img src="{{ URL::asset('resorts_assets/images/wisdom-ai.png')}}"></a>
+                        <a href="{{ route('resort.loginindex') }}" class="brand-logo">
+                          <img style="height: 80px" src="{{ URL::asset('resorts_assets/images/Brand color 1@3x.png')}}"></a>
                     </div>
 
                 </div>
@@ -75,7 +76,7 @@
                 </div>
                 <div class="row g-sm-3 g-1 justify-content-between align-items-center">
                     <div class="col-auto">
-                        <a href="index.html">Privacy Policy</a>
+                        <a href="https://www.thewisdom.ai/privacy-policy">Privacy Policy</a>
                     </div>
                     <div class="col-auto">
                         <a href="#">Terms of services</a>
@@ -140,6 +141,7 @@
                         <label for="password">Password</label>
                         <i class="fa-regular fa-eye-slash toggle-password" id="togglePassword" style="position:absolute; top:50%; right:10px; transform:translateY(-50%); cursor:pointer;"></i>
                     </div>
+                    <div class="form-text">At least 12 characters, with an uppercase letter, a lowercase letter and a number.</div>
                     <div id="div-password" style="color:red;"></div>
                 </div>
 
@@ -176,7 +178,7 @@
 
     <script src="{{ URL::asset('resorts_assets/js/select2.min.js') }}"></script>
     <script src="{{ URL::asset('resorts_assets/js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ URL::asset('resorts_assets/assets/js/slick.min.js') }}"></script>
+    <script src="{{ URL::asset('resorts_assets/js/slick.min.js') }}"></script>
     <script src="{{ URL::asset('admin_assets/plugins/toastr/toastr.min.js') }}"></script>
     <script src="{{ URL::asset('admin_assets/plugins/holdon/holdon.min.js') }}"></script>
     <script src="{{ URL::asset('assets/js/jquery.validate.min.js') }}"></script>
@@ -276,7 +278,7 @@
                 messages: {
                     'email': {
                         required: "The email is required",
-                        email: "Enter valid email"
+                        email: "Enter a valid email"
                     },
                     'password': {
                         required: "The password is required",
@@ -284,7 +286,7 @@
                     },
                     'password_confirmation': {
                         required: "The confirm password is required",
-                        equalTo: "The password must match",
+                        equalTo: "The passwords must match",
                         minlength: "Your confirm password must be at least 12 characters long"
                     }
                 },

@@ -135,6 +135,7 @@
                         <label for="email" class="form-label">Password</label>
                         <input type="password" name="password" id="password" class="form-control" placeholder="Password">
 
+                        <div class="form-text">At least 12 characters, with an uppercase letter, a lowercase letter and a number.</div>
                         <div id="div-password" style="color:var(--error);"></div>
                     </div>
                     <div class="mb-4">
@@ -168,7 +169,7 @@
 
     <script src="{{ URL::asset('resorts_assets/js/select2.min.js') }}"></script>
     <script src="{{ URL::asset('resorts_assets/js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ URL::asset('resorts_assets/assets/js/slick.min.js') }}"></script>
+    <script src="{{ URL::asset('resorts_assets/js/slick.min.js') }}"></script>
     <script src="{{ URL::asset('admin_assets/plugins/toastr/toastr.min.js') }}"></script>
     <script>
         // Toastr re-theme glue (see toastr-theme.css) — standalone page, kept
@@ -270,7 +271,7 @@
                     },
                     'password_confirmation': {
                     required: "The confirm password is required",
-                    equalTo: 'The password must match',
+                    equalTo: 'The passwords must match',
                     minlength: "Your confirm password must be at least 12 characters long"
                     }
                 },

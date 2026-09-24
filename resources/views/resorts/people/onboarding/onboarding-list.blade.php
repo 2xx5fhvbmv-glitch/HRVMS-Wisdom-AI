@@ -112,7 +112,7 @@
                     if(result.isConfirmed){
                         $.ajax({
                             type:'DELETE',
-                            url:"{{ route('onboarding.itinerary-template.destroy', '') }}/" + itineraryId,
+                            url:"{{ route('onboarding.itinerary-template.destroy', '__id__') }}".replace('__id__', itineraryId),
                             dataType:'json',
                             headers:{
                                 'X-CSRF-TOKEN':$('meta[name="csrf-token"]').attr('content')

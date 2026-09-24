@@ -181,7 +181,7 @@ $(document).ready(function() {
         var id = $(this).data('id');
         $.ajax({
             type: "PUT",
-            url: "{{ route('resort.ta.documentTemplate.setDefault', '') }}/" + id,
+            url: "{{ route('resort.ta.documentTemplate.setDefault', '__id__') }}".replace('__id__', id),
             data: { _token: "{{ csrf_token() }}" },
             dataType: "json",
         }).done(function(response) {
@@ -209,7 +209,7 @@ $(document).ready(function() {
             if (result.isConfirmed) {
                 $.ajax({
                     type: "DELETE",
-                    url: "{{ route('resort.ta.documentTemplate.destroy', '') }}/" + id,
+                    url: "{{ route('resort.ta.documentTemplate.destroy', '__id__') }}".replace('__id__', id),
                     data: { _token: "{{ csrf_token() }}" },
                     dataType: "json",
                 }).done(function(response) {

@@ -184,7 +184,7 @@
         var committeeMembers = $row.find(".committee-members-select").val(); // Get selected members as an array
 
         $.ajax({
-            url: "{{ route('incident.committees.inlineUpdate', '') }}/" + Main_id,
+            url: "{{ route('incident.committees.inlineUpdate', '__id__') }}".replace('__id__', Main_id),
             type: "PUT",
             data: {
                 committee_name: committeeName,

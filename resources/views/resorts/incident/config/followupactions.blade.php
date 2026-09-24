@@ -162,7 +162,7 @@
         var Main_id = $(this).attr('data-cat-id');
         var followupAction = $row.find("input").eq(0).val();
         $.ajax({
-            url: "{{ route('incident.followup-actions.inlineUpdate', '') }}/" + Main_id,
+            url: "{{ route('incident.followup-actions.inlineUpdate', '__id__') }}".replace('__id__', Main_id),
             type: "PUT",
             data: {
                 Main_id:Main_id,

@@ -14,7 +14,7 @@
     <link href="{{ URL::asset('resorts_assets/css/all.min.css')}}" rel=stylesheet>
     <link href="{{ URL::asset('resorts_assets/css/dataTables.min.css')}}" rel=stylesheet>
 
-    <link href="{{ URL::asset('resorts_assets/css/default.css')}}" rel=stylesheet>
+    <link href="{{ URL::asset('resorts_assets/css/default.css')}}?v={{ @filemtime(public_path('resorts_assets/css/default.css')) }}" rel=stylesheet>
     <link href="{{ URL::asset('resorts_assets/css/media.css')}}" rel=stylesheet>
     <link rel="stylesheet" href="{{ URL::asset('admin_assets/plugins/toastr/toastr.min.css') }}">
     <link rel="stylesheet" href="{{ URL::asset('resorts_assets/css/toastr-theme.css') }}">
@@ -245,18 +245,7 @@
                 },
                 error: function (result) {
                   HoldOn.close();
-                  $( "#er-message" ).fadeIn();
-                  var data = result.responseJSON;
-                  if( data.status == false ) {
-                    if( data.account_not_verified == 1 ) {
-                      $("#formLogin").addClass('d-none');
-                      $("#formResendOtp").removeClass('d-none');
-                      $("#formTitle").text("Verify account");
-                    }
-                    $( "#er-message" ).html('<span> '+data.message+'</span>');
-                  } else {
-                    $( "#er-message" ).html('<span><i class="fa fa-exclamation-triangle"></i> something went wrong please try again</span>');
-                  }
+                  toastr.error( result.status === 429 ? "Too many attempts. Please wait a minute and try again." : "Something went wrong. Please try again.", "Error", { positionClass: 'toast-bottom-right'} );
                 }
               });
             }

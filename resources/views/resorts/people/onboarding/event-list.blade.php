@@ -186,7 +186,7 @@
                 let notification_timing = $row.find(".notification_timing").val();
 
                 $.ajax({
-                    url: "{{ route('onboarding.events.inlineUpdate', '') }}/" + Main_id,
+                    url: "{{ route('onboarding.events.inlineUpdate', '__id__') }}".replace('__id__', Main_id),
                     type: "POST",
                     data: {
                         Main_id: Main_id,

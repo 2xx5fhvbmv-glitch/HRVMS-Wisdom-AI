@@ -762,6 +762,7 @@ document.getElementById('file').addEventListener('change', function (e) {
                     success: function (response) {
                         if (response.success === true) {
                             $("#FolderName").html(response.data);
+                            wisdomDD.rebuild('#FolderName');
                         }
                     },
                     error: function (xhr, status, error) {

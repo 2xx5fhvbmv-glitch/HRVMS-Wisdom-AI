@@ -143,7 +143,7 @@
             let show_unknown = $('#unknownFilter').is(':checked');
 
             $.ajax({
-                url: "{{ route('sos.filterEmployeeSafetyDetails', '') }}/" + sosHistoryId,
+                url: "{{ route('sos.filterEmployeeSafetyDetails', '__id__') }}".replace('__id__', sosHistoryId),
                 type: "POST",
                 data: {
                     "_token": "{{ csrf_token() }}",
@@ -178,7 +178,7 @@
 
         function loadMassInstructionHistory() {
             $.ajax({
-                url: "{{ route('sos.massInstructionHistory', '') }}/" + $('#sos_history_id').val(),
+                url: "{{ route('sos.massInstructionHistory', '__id__') }}".replace('__id__', $('#sos_history_id').val()),
                 method: "GET",
                 success: function(response) {
                     if (response.success) {

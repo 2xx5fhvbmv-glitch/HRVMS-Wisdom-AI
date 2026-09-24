@@ -152,7 +152,7 @@
             let show_unack = $('#unAckFilter').is(':checked');
 
             $.ajax({
-                url: "{{ route('sos.filterTeamActivityDetails', '') }}/" + sosHistoryId,
+                url: "{{ route('sos.filterTeamActivityDetails', '__id__') }}".replace('__id__', sosHistoryId),
                 type: "POST",
                 data: {
                     "_token": "{{ csrf_token() }}",

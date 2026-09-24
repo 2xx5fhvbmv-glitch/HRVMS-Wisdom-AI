@@ -487,7 +487,7 @@
 
                 // Now send this data via AJAX to the server
                 $.ajax({
-                    url: "{{ route('resort.budget.update', '') }}/" + smrpChildId,
+                    url: "{{ route('resort.budget.update', '__id__') }}".replace('__id__', smrpChildId),
                     method: 'PUT',
                     data: {
                         basic_salary: basic_salary,

@@ -260,7 +260,7 @@
             var priority = $row.find("select").eq(1).val();
 
             $.ajax({
-                url: "{{ route('incident.subcategories.inlineUpdate', '') }}/" + Main_id,
+                url: "{{ route('incident.subcategories.inlineUpdate', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id: Main_id, 

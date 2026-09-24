@@ -1151,7 +1151,7 @@
             item.innerHTML = avatar +
                 '<div class="cw">' +
                     '<div class="r1"><span class="cn">' + escapeHtml(c.name) + '</span>' +
-                    '<span class="ct">' + timeAgo(c.last_seen) + '</span></div>' +
+                    '<span class="ct">' + timeAgo(c.last_message_time || c.last_seen) + '</span></div>' +
                     '<div class="r2">' +
                         '<span class="cs' + (c.last_msg ? '' : ' crow-cs-none') + '">' + (c.last_msg ? escapeHtml(c.last_msg) : 'No messages yet') + '</span>' +
                         (unread ? '<span class="dot"></span>' : '') +

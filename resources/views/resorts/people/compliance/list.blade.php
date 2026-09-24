@@ -398,7 +398,7 @@
                }).then((result) => {
                     if (result.isConfirmed) {
                          $.ajax({
-                              url: "{{ route('people.compliances.dismiss', '') }}/" + complianceId,
+                              url: "{{ route('people.compliances.dismiss', '__id__') }}".replace('__id__', complianceId),
                               type: 'GET',
                               success: function(response) {
                                    wisdomAlert({

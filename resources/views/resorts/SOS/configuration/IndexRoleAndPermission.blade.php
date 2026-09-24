@@ -190,7 +190,7 @@
         var role_name = $row.find("input").eq(0).val();
         var permission = $row.find("select").eq(0).val();
         $.ajax({
-            url: "{{ route('sos.config.SOSRoleAndPerminlineUpdate', '') }}/" + Main_id,
+            url: "{{ route('sos.config.SOSRoleAndPerminlineUpdate', '__id__') }}".replace('__id__', Main_id),
             type: "PUT",
             data: {
                 Main_id:Main_id,

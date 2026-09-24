@@ -511,7 +511,7 @@
             var team_name = $row.find("input").eq(0).val();
             var description = $row.find("textarea").val();
             $.ajax({
-                url: "{{ route('sos.config.SOSTeamManagementinlineUpdate', '') }}/" + Main_id,
+                url: "{{ route('sos.config.SOSTeamManagementinlineUpdate', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id:Main_id,

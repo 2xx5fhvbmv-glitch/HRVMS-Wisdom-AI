@@ -485,7 +485,7 @@
             $("#bdVisa-iframeModel-modal-lg").modal('show');
 
             $.ajax({
-                url: "{{ route('resort.visa.XpactEmpFileDownload', '') }}/" + childId,
+                url: "{{ route('resort.visa.XpactEmpFileDownload', '__id__') }}".replace('__id__', childId),
                 type: 'GET',
                 data: { child_id: childId, "_token":"{{csrf_token()}}"},
                 success: function(response)

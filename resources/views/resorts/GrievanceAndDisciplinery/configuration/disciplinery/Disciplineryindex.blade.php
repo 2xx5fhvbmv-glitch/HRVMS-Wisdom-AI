@@ -176,7 +176,7 @@
 
                    
             $.ajax({
-                url: "{{ route('GrievanceAndDisciplinery.config.DisciplineryCategoryinlineUpdate', '') }}/" + Main_id,
+                url: "{{ route('GrievanceAndDisciplinery.config.DisciplineryCategoryinlineUpdate', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id:Main_id,

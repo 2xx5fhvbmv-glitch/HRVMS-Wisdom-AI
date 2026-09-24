@@ -167,7 +167,7 @@
             var updatedName = $row.find("input").eq(0).val();
 
             $.ajax({
-                url: "{{ route('resort.accommodation.BuildingUpdate', '') }}/" + CatId,
+                url: "{{ route('resort.accommodation.BuildingUpdate', '__id__') }}".replace('__id__', CatId),
                 type: "PUT",
                 data: {
                     BuildingName : updatedName,

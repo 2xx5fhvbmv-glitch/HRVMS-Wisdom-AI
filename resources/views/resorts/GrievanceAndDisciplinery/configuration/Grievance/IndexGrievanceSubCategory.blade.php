@@ -196,7 +196,7 @@
             var Grievance_Cat_id = $row.find("select").eq(0).val();
             var Sub_Category_Name = $row.find("input").eq(0).val();
             $.ajax({
-                url: "{{ route('GrievanceAndDisciplinery.config.GrievanceSubCategorinlineUpdate', '') }}/" + Main_id,
+                url: "{{ route('GrievanceAndDisciplinery.config.GrievanceSubCategorinlineUpdate', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id:Main_id,

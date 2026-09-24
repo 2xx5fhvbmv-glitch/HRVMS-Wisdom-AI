@@ -186,7 +186,7 @@
         var title = $row.find("input.title").val();
      var Status = $row.find("select.status").val();
         $.ajax({
-            url: "{{ route('people.increment-types.update', '') }}/" + Main_id,
+            url: "{{ route('people.increment-types.update', '__id__') }}".replace('__id__', Main_id),
             type: "POST",
             data: {
                 Main_id: Main_id,

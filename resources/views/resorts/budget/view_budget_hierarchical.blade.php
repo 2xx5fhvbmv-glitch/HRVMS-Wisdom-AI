@@ -487,13 +487,13 @@
                 'all'          => 'All Combined',
             ] as $tabValue => $tabLabel)
                 <a href="{{ route('resort.budget.viewbudget', ['year' => request()->get('year', date('Y')), 'category_view' => $tabValue]) }}"
-                   class="btn btn-sm {{ $vbCategoryView === $tabValue ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}">{{ $tabLabel }}</a>
+                   class="btn btn-sm {{ $vbCategoryView === $tabValue ? 'wfp-btn-accent' : 'wfp-btn-neutral' }}">{{ $tabLabel }}</a>
             @endforeach
             @if($vbCategoryView === 'nonpermanent')
                 <div class="vb-sub-toggle" style="display:flex;gap:4px;margin-left:8px;padding-left:8px;border-left:1px solid var(--line,#EEF2F2);">
                     @foreach (['Casual' => 'Casual', 'Intern' => 'Intern'] as $subValue => $subLabel)
                         <a href="{{ route('resort.budget.viewbudget', ['year' => request()->get('year', date('Y')), 'category_view' => 'nonpermanent', 'sub' => $subValue]) }}"
-                           class="btn btn-xs {{ ($activeSub ?? 'Casual') === $subValue ? 'wfp-btn-accent' : 'wfp-btn-secondary' }}">{{ $subLabel }}</a>
+                           class="btn btn-xs {{ ($activeSub ?? 'Casual') === $subValue ? 'wfp-btn-accent' : 'wfp-btn-neutral' }}">{{ $subLabel }}</a>
                     @endforeach
                 </div>
             @endif

@@ -39,12 +39,15 @@
                             @csrf
                             <input type="hidden" name="year" id="SendToFinanceYear" value="{{ $year }}">
                             <p class="mb-0 fw-500 departmentBudget"></p>
+                            {{-- Send To Finance / Send To GM now live only on Consolidated Budget (it is the
+                                 consolidated budget that is forwarded, not the manning). Commented out, not deleted.
                             @if($employeeRankPosition['position'] == 'HR')
                                 <button type="submit" class="btn btn-theme SendToFinance" {{ $isBudgetCompleted ? '' : 'disabled' }}>Send To Finance</button>
                             @endif
                             @if($employeeRankPosition['position'] == 'Finance')
                                 <button type="submit" class="btn btn-theme SendToGM" {{ $isBudgetCompleted ? '' : 'disabled' }}>Send To GM</button>
                             @endif
+                            --}}
                             @if($employeeRankPosition['position'] == 'GM')
                                 {{-- Was type="submit" inside this shared form —
                                      that posted to resort.SendToFinance.manning.notification
@@ -83,6 +86,18 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        {{-- Category tabs sit on the teal band above the card (same as View Budget): lime = active, opaque grey = the others. --}}
+        <div class="vm-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
+            @foreach ([
+                'permanent'    => 'Permanent',
+                'nonpermanent' => 'Casual & Intern',
+                'all'          => 'All Combined',
+            ] as $tabValue => $tabLabel)
+                <a href="{{ route('resort.budget.manning', ['year' => $year, 'category_view' => $tabValue]) }}"
+                   class="btn btn-sm {{ ($categoryView ?? 'permanent') === $tabValue ? 'wfp-btn-accent' : 'wfp-btn-neutral' }}">{{ $tabLabel }}</a>
+            @endforeach
         </div>
 
     <div>
@@ -195,16 +210,6 @@
             }
         @endphp
 
-        <div class="vm-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
-            @foreach ([
-                'permanent'    => 'Permanent',
-                'nonpermanent' => 'Casual & Intern',
-                'all'          => 'All Combined',
-            ] as $tabValue => $tabLabel)
-                <a href="{{ route('resort.budget.manning', ['year' => $year, 'category_view' => $tabValue]) }}"
-                   class="btn btn-sm {{ $vmCategoryView === $tabValue ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}">{{ $tabLabel }}</a>
-            @endforeach
-        </div>
         <div class="vm-tools">
             <form method="GET" action="{{ route('resort.budget.manning') }}" id="yearFilterForm">
                 <input type="hidden" name="category_view" value="{{ $vmCategoryView }}">
@@ -278,6 +283,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @include('resorts._dropdown_styles')
 @include('resorts.budget._view_manning_styles')
 @endsection

@@ -220,7 +220,7 @@
             var RoomNo = $row.find("input").eq(1).val();
 
             $.ajax({
-                url: "{{ route('resort.accommodation.FloorAndRoomUpdate', '') }}/" + Main_id,
+                url: "{{ route('resort.accommodation.FloorAndRoomUpdate', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id:Main_id,

@@ -80,6 +80,7 @@
                 </div>
               </div>
             </div>
+            <div class="form-text">At least 12 characters, with an uppercase letter, a lowercase letter and a number.</div>
             <div id="div-password"></div>
           </div>
 
@@ -204,7 +205,7 @@
         messages: {
           'email': {
             required: "The email is required",
-            email: "Enter valid email"
+            email: "Enter a valid email"
           },
           'password': {
             required: "The password is required",
@@ -212,7 +213,7 @@
           },
           'password_confirmation': {
             required: "The confirm password is required",
-            equalTo: 'The password must match',
+            equalTo: 'The passwords must match',
             minlength: "Your confirm password must be at least 12 characters long"
           }
         },
@@ -256,7 +257,7 @@
                             toastr.success(result.msg, "Success", {
                                 positionClass: 'toast-bottom-right'
                             });
-                            window.location.href = result.redirect_url;
+                            setTimeout(function () { window.location.href = result.redirect_url; }, 1000);
                         } 
                         else {
                             toastr.error(result.msg, "Error", {

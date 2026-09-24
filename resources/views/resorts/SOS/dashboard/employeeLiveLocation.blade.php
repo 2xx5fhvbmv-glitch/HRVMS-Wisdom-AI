@@ -314,7 +314,7 @@
             let roleId = $('#roleFilter').val();
 
             $.ajax({
-                url: "{{ route('sos.filterMapEmployeeList', '') }}/" + sosHistoryId,
+                url: "{{ route('sos.filterMapEmployeeList', '__id__') }}".replace('__id__', sosHistoryId),
                 type: "POST",
                 data: {
                     "_token": "{{ csrf_token() }}",
@@ -383,7 +383,7 @@
                 let formData = new FormData(this);
                 
                 $.ajax({
-                    url: "{{ route('sos.filterMapEmployeeList', '') }}/" + sosHistoryId,
+                    url: "{{ route('sos.filterMapEmployeeList', '__id__') }}".replace('__id__', sosHistoryId),
                     type: "POST",
                     data: formData,
                     processData: false,

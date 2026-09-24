@@ -302,7 +302,7 @@ $(document).ready(function() {
         window._editBeds = [];
         window._editRoomId = $btn.data('id');
         $.ajax({
-            url: "{{ route('resort.accommodation.getBeds', '') }}/" + $btn.data('id'),
+            url: "{{ route('resort.accommodation.getBeds', '__id__') }}".replace('__id__', $btn.data('id')),
             type: 'GET',
             success: function(res) {
                 if (res.success) {
@@ -370,7 +370,7 @@ $(document).ready(function() {
         $btn.prop('disabled', true).text('Saving...');
 
         $.ajax({
-            url: "{{ route('resort.accommodation.AvailableAccommodationUpdate', '') }}/" + $('#editAccommodationId').val(),
+            url: "{{ route('resort.accommodation.AvailableAccommodationUpdate', '__id__') }}".replace('__id__', $('#editAccommodationId').val()),
             type: 'PUT',
             data: function() {
                 var d = {
@@ -423,7 +423,7 @@ $(document).ready(function() {
         }).then(function(result) {
             if (result.isConfirmed) {
                 $.ajax({
-                    url: "{{ route('resort.accommodation.AvailableAccommodationDestroy', '') }}/" + id,
+                    url: "{{ route('resort.accommodation.AvailableAccommodationDestroy', '__id__') }}".replace('__id__', id),
                     type: 'DELETE',
                     data: { _token: '{{ csrf_token() }}' },
                     success: function(response) {

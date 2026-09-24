@@ -1166,7 +1166,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                     return;
                 }
         $.ajax({
-            url: "{{ route('manning.divisions.inlineUpdate', '') }}/" + divisionId,
+            url: "{{ route('manning.divisions.inlineUpdate', '__id__') }}".replace('__id__', divisionId),
             type: "PUT",
             data: {
                 name: updatedName,
@@ -1228,7 +1228,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         if (result.isConfirmed) {
                 $.ajax({
                     type: "DELETE",
-                    url: "{{ route('manning.divisons.destroy', '') }}/" + divisionId,
+                    url: "{{ route('manning.divisons.destroy', '__id__') }}".replace('__id__', divisionId),
                     dataType: "json",
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -1418,7 +1418,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                     return;
                 }
         $.ajax({
-            url: "{{ route('manning.departments.inlineUpdate', '') }}/" + dept_id,
+            url: "{{ route('manning.departments.inlineUpdate', '__id__') }}".replace('__id__', dept_id),
             type: "PUT",
             data: {
                 name: updatedName,
@@ -1492,7 +1492,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             if (result.isConfirmed) {
                 $.ajax({
                     type: "DELETE",
-                    url: "{{ route('manning.departments.destroy', '') }}/" + dept_id,
+                    url: "{{ route('manning.departments.destroy', '__id__') }}".replace('__id__', dept_id),
                     dataType: "json",
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -1781,7 +1781,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             if (result.isConfirmed) {
                 $.ajax({
                     type: "DELETE",
-                    url: "{{ route('manning.sections.destroy', '') }}/" + section_id,
+                    url: "{{ route('manning.sections.destroy', '__id__') }}".replace('__id__', section_id),
                     dataType: "json",
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -1997,7 +1997,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         var updatedStatus = $row.find("select").eq(4).val();
 
         $.ajax({
-            url: "{{ route('manning.positions.inlineUpdate', '') }}/" + position_id,
+            url: "{{ route('manning.positions.inlineUpdate', '__id__') }}".replace('__id__', position_id),
             type: "PUT",
             data: {
                 name: updatedName,
@@ -2085,7 +2085,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             if (result.isConfirmed) {
                 $.ajax({
                     type: "DELETE",
-                    url: "{{ route('manning.positions.destroy', '') }}/" + position_id,
+                    url: "{{ route('manning.positions.destroy', '__id__') }}".replace('__id__', position_id),
                     dataType: "json",
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')

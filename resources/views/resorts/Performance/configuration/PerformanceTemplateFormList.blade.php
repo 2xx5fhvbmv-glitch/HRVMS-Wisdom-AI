@@ -357,7 +357,7 @@
 
                         $.ajax({
                             type: "delete",
-                            url: "{{ route('Performance.DestroyPerformanceTemplateForm','') }}/"+main_id,
+                            url: "{{ route('Performance.DestroyPerformanceTemplateForm', '__id__') }}".replace('__id__', main_id),
                             dataType: "json",
                         }).done(function(result) {
                             if (result.success == true) {

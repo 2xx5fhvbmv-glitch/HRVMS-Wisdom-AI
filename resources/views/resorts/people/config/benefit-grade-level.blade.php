@@ -259,7 +259,7 @@
         var gradeId = $(this).data('grade-id');
         var name = $row.find('input').val();
         $.ajax({
-            url: "{{ route('resort.benefitgradelevel.inlineUpdate', '') }}/" + gradeId,
+            url: "{{ route('resort.benefitgradelevel.inlineUpdate', '__id__') }}".replace('__id__', gradeId),
             type: 'PUT',
             data: { Main_id: gradeId, name: name },
             success: function (response) {
@@ -283,7 +283,7 @@
     $(document).on('click', '.map-rank-btn', function () {
         currentGradeId = $(this).data('grade-id');
         $('#map-ranks-select').val(null);
-        $.get("{{ route('resort.benefitgradelevel.ranksFor', '') }}/" + currentGradeId, function (response) {
+        $.get("{{ route('resort.benefitgradelevel.ranksFor', '__id__') }}".replace('__id__', currentGradeId), function (response) {
             $('#map-ranks-select').val((response.ranks || []).map(String));
         }).always(function () {
             $('#mapRanksModal').modal('show');
@@ -294,7 +294,7 @@
         e.preventDefault();
         var ranks = $('#map-ranks-select').val() || [];
         $.ajax({
-            url: "{{ route('resort.benefitgradelevel.updateRanks', '') }}/" + currentGradeId,
+            url: "{{ route('resort.benefitgradelevel.updateRanks', '__id__') }}".replace('__id__', currentGradeId),
             type: 'POST',
             data: { ranks: ranks, "_token": "{{ csrf_token() }}" },
             success: function (response) {
@@ -315,7 +315,7 @@
     $(document).on('click', '.map-services-btn', function () {
         currentGradeId = $(this).data('grade-id');
         $('#map-services-select').val(null);
-        $.get("{{ route('resort.benefitgradelevel.housekeepingServicesFor', '') }}/" + currentGradeId, function (response) {
+        $.get("{{ route('resort.benefitgradelevel.housekeepingServicesFor', '__id__') }}".replace('__id__', currentGradeId), function (response) {
             $('#map-services-select').val((response.service_ids || []).map(String));
         }).always(function () {
             $('#mapServicesModal').modal('show');
@@ -326,7 +326,7 @@
         e.preventDefault();
         var serviceIds = $('#map-services-select').val() || [];
         $.ajax({
-            url: "{{ route('resort.benefitgradelevel.updateHousekeepingServices', '') }}/" + currentGradeId,
+            url: "{{ route('resort.benefitgradelevel.updateHousekeepingServices', '__id__') }}".replace('__id__', currentGradeId),
             type: 'POST',
             data: { service_ids: serviceIds, "_token": "{{ csrf_token() }}" },
             success: function (response) {

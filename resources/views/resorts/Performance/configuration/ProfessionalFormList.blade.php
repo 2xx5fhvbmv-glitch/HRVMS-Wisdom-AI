@@ -436,7 +436,7 @@ $(document).ready(function ()
                     {
                         $.ajax({
                             type: "delete",
-                            url: "{{ route('Performance.DestroyProfessionalForm','') }}/"+main_id,
+                            url: "{{ route('Performance.DestroyProfessionalForm', '__id__') }}".replace('__id__', main_id),
                             dataType: "json",
                         }).done(function(result) {
                             if (result.success == true) {

@@ -200,7 +200,7 @@
             var assign_members = $row.find("select").val();
                    
             $.ajax({
-                url: "{{ route('GrievanceAndDisciplinery.config.GrivanceCommitteeinlineUpdate', '') }}/" + Main_id,
+                url: "{{ route('GrievanceAndDisciplinery.config.GrivanceCommitteeinlineUpdate', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id:Main_id,

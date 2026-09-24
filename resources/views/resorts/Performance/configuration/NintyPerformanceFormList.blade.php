@@ -383,7 +383,7 @@
 
                     $.ajax({
                         type: "delete",
-                        url: "{{ route('Performance.DestroyNintyDayPerformanceForm','') }}/"+main_id,
+                        url: "{{ route('Performance.DestroyNintyDayPerformanceForm', '__id__') }}".replace('__id__', main_id),
                         dataType: "json",
                     }).done(function(result) {
                         if (result.success == true) {

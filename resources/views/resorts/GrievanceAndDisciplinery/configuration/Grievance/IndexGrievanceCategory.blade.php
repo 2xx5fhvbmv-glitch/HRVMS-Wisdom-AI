@@ -174,7 +174,7 @@
             var Category_Name = $row.find("input").eq(0).val();
             var Category_Description = $row.find("textarea").val();
             $.ajax({
-                url: "{{ route('GrievanceAndDisciplinery.config.GrievanceCategorinlineUpdate', '') }}/" + Main_id,
+                url: "{{ route('GrievanceAndDisciplinery.config.GrievanceCategorinlineUpdate', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id:Main_id,

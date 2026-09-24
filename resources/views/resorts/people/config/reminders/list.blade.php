@@ -169,7 +169,7 @@
         var days = $row.find("input.days").val();
 
         $.ajax({
-            url: "{{ route('people.reminders.update', '') }}/" + Main_id,
+            url: "{{ route('people.reminders.update', '__id__') }}".replace('__id__', Main_id),
             type: "POST",
             data: {
                 Main_id: Main_id,

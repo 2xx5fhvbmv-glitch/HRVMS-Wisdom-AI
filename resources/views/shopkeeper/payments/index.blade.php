@@ -136,7 +136,7 @@
 
         $(document).on('click', '.payment-qr-icon', function() {
             var paymentId = $(this).data('payment-id');
-            var url = "{{ route('shopkeeper.payment.qr-image', '') }}/" + paymentId;
+            var url = "{{ route('shopkeeper.payment.qr-image', '__id__') }}".replace('__id__', paymentId);
             $('#payment-qr-modal-img').attr('src', url);
             var qrModal = new bootstrap.Modal(document.getElementById('payment-qr-modal'));
             qrModal.show();

@@ -190,7 +190,7 @@
         var Status = $row.find("select.status").val();
 
         $.ajax({
-            url: "{{ route('people.resignation-reasons.inlineUpdate', '') }}/" + Main_id,
+            url: "{{ route('people.resignation-reasons.inlineUpdate', '__id__') }}".replace('__id__', Main_id),
             type: "POST",
             data: {
                 Main_id: Main_id,

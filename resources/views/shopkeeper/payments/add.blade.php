@@ -349,7 +349,7 @@
             return;
         }
         $.ajax({
-            url: "{{ route('employees.details.get', '') }}/" + empId,
+            url: "{{ route('employees.details.get', '__id__') }}".replace('__id__', empId),
             type: 'GET',
             success: function(response) {
                 if (response.error) {

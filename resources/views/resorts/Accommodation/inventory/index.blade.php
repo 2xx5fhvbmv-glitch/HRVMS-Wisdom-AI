@@ -670,7 +670,7 @@ if ( $(".historical_inventory").is(':checked'))
             var occupied = $row.find(".edit-occupied").val();
             var assignmentType = $row.find(".edit-assignment-type").val();
             $.ajax({
-                url: "{{ route('resort.accommodation.Inventoryupdated', '') }}/" + inventory_id,
+                url: "{{ route('resort.accommodation.Inventoryupdated', '__id__') }}".replace('__id__', inventory_id),
                 type: "PUT",
                 data: {
                     qty: qty,

@@ -295,7 +295,7 @@
             var childId = $(this).data('id');
             if (!childId) return;
             $.ajax({
-                url: "{{ route('resort.visa.XpactEmpFileDownload', '') }}/" + childId,
+                url: "{{ route('resort.visa.XpactEmpFileDownload', '__id__') }}".replace('__id__', childId),
                 type: 'GET',
                 success: function (response) {
                     if (response && response.NewURLshow) {

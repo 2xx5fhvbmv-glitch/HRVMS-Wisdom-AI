@@ -240,7 +240,7 @@
             var member_id = $row.find("select").eq(0).val();
             var role_id = $row.find("select").eq(1).val();
             $.ajax({
-                url: "{{ route('sos.config.SOSTeamMemberinlineUpdate', '') }}/" + Main_id,
+                url: "{{ route('sos.config.SOSTeamMemberinlineUpdate', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id:Main_id,

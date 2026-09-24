@@ -300,8 +300,11 @@
     <div class="modal fade" id="sendRespond-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-xl">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Response</h5>
+                <div class="modal-header manning-modal-header">
+                    <div class="manning-modal-heading">
+                        <h5 class="modal-title" id="staticBackdropLabel">Submit manning plan — {{ $department_details[0]->name ?? '' }}</h5>
+                        <p class="manning-modal-sub">Planned headcount by position · Jan–Dec {{ date('Y') + 1 }}</p>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="manningResponseForm" method="POST" action="{{ route('manning.responses.store') }}">
@@ -319,10 +322,11 @@
                                 <label for="employment_type-intern">Intern</label>
                             </div>
                         </div>
-                        <div class="form-check mb-3 fw-500">
-                            <input class="form-check-input" type="checkbox" value="" id="flexCheckChecked">
-                            <label class="form-check-label" for="flexCheckChecked">
-                                Same As This Year
+                        <div class="mb-3">
+                            <label class="wfp-switch">
+                                <input type="checkbox" id="flexCheckChecked">
+                                <span class="wfp-switch-track"></span>
+                                <span class="wfp-switch-label">Same As This Year</span>
                             </label>
                         </div>
                         @php
@@ -343,17 +347,19 @@
                         <input type="hidden" name="Budget_id" id="Budget_id" value="">
                         <div class="position-count-summary">
                             <h4>Position Counts</h4>
-                            <div>
-                                Total Filled Positions:
-                                <span id="overall_filled_positions" class="badge bg-info">0</span>
-                            </div>
-                            <div>
-                                Total Vacant Positions:
-                                <span id="overall_vacant_positions" class="badge bg-info">0</span>
-                            </div>
-                            <div>
-                                Total Headcount:
-                                <span id="total-headcount" class="badge bg-info">0</span>
+                            <div class="pcs-caps">
+                                <span class="pcs-cap">
+                                    <span class="pcs-cl">Total Filled Positions</span>
+                                    <span class="pcs-cv" id="overall_filled_positions">0</span>
+                                </span>
+                                <span class="pcs-cap">
+                                    <span class="pcs-cl">Total Vacant Positions</span>
+                                    <span class="pcs-cv" id="overall_vacant_positions">0</span>
+                                </span>
+                                <span class="pcs-cap">
+                                    <span class="pcs-cl">Total Headcount</span>
+                                    <span class="pcs-cv" id="total-headcount">0</span>
+                                </span>
                             </div>
                         </div>
                         <div class="card">
@@ -379,7 +385,7 @@
                                                 <input type="hidden" name="positions[]" id="pos-{{ $pos->id }}" value="{{ $pos->id }}">
                                                 <tr>
                                                     <td>
-                                                        {{$pos->position_title}} ({{$pos->no_of_positions}})
+                                                        {{$pos->position_title}} (<span id="pos-total-{{ $pos->id }}">0</span>)
                                                         <button type="button" class="table-icon collapsed ms-2" data-bs-toggle="collapse" data-bs-target="#collapse-{{$pos->id}}" aria-expanded="false" aria-controls="collapse-{{$pos->id}}" data-position-id="{{ $pos->id }}">
                                                             <i class="fa-solid fa-angle-down"></i>
                                                         </button>
@@ -414,7 +420,9 @@
                                                 </tr>
                                                 <!-- Hidden details for positions -->
                                                 <tr class="collapse" id="collapse-{{$pos->id}}">
-                                                    <td><span class="badge-headcount" id="head-count">2024 HEADCOUNT = 00 <br/> 2025 HEADCOUNT <br/> 2025 Filled COUNT <br/> 2025 Vacant COUNT </span></td>
+                                                    {{-- Head-count summary hidden for now (not needed):
+                                                    <td><span class="badge-headcount" id="head-count">2024 HEADCOUNT = 00 <br/> 2025 HEADCOUNT <br/> 2025 Filled COUNT <br/> 2025 Vacant COUNT </span></td> --}}
+                                                    <td></td>
                                                     <td id="january-{{$pos->id}}" data-month="January"></td>
                                                     <td id="february-{{$pos->id}}" data-month="February"></td>
                                                     <td id="march-{{$pos->id}}" data-month="March"></td>
@@ -439,10 +447,12 @@
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer justify-content-start">
-                        <button type="button" class="btn wfp-btn-neutral" id="saveDraftBtn">Save As Draft</button>
-                        <button type="button" class="btn btn-sm wfp-btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn wfp-btn-primary">Submit</button>
+                    <div class="modal-footer justify-content-between">
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn wfp-btn-neutral" id="saveDraftBtn">Save as draft</button>
+                            <button type="button" class="btn btn-sm wfp-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        </div>
+                        <button type="submit" class="btn wfp-btn-primary">Submit plan</button>
                     </div>
                 </form>
 
@@ -522,6 +532,62 @@
 @section('import-css')
 @include('resorts.workforce_planning._wfp_buttons_v2_styles')
 <style>
+    /* Manning modal header — two-line title + muted subtitle, close stays top-right */
+    .manning-modal-header { align-items: flex-start; }
+    .manning-modal-heading .modal-title { font-weight: 600; }
+    .manning-modal-sub {
+        margin: 2px 0 0;
+        font-size: 13px;
+        font-weight: 400;
+        color: var(--muted, #5D6F75);
+    }
+
+    /* Position Counts — capsule / pill style */
+    .position-count-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+
+    /* +/- stepper — the global `.input-group i` rule (right-aligned field icons) was pushing these icons off-centre */
+    #manningResponseForm .inputCounter-group .btn-number { display: inline-flex; align-items: center; justify-content: center; }
+    #manningResponseForm .inputCounter-group .btn-number i { position: static; transform: none; }
+
+    /* Requests card — HR's request message in a lighter, slightly smaller style */
+    .dfs h5 { font-size: 16px; font-weight: 400; }
+    .position-count-summary h4 { font-size: 15px; font-weight: 600; margin: 0 2px 0 0; }
+    .pcs-caps { display: flex; flex-wrap: wrap; gap: 10px; }
+    .pcs-cap {
+        display: inline-flex; align-items: center; gap: 10px;
+        background: #E7F1F7; border: 1px solid #d7e7f0;
+        border-radius: 999px; padding: 5px 6px 5px 15px;
+    }
+    .pcs-cl { font-size: 12.5px; font-weight: 600; color: #145A7A; white-space: nowrap; }
+    .pcs-cv {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 26px; height: 26px; padding: 0 8px;
+        background: #fff; color: #145A7A; border-radius: 999px;
+        font-size: 13px; font-weight: 600;
+        box-shadow: 0 1px 2px rgba(20, 90, 122, .12);
+    }
+
+    /* "Same As This Year" — toggle switch */
+    .wfp-switch { display: inline-flex; align-items: center; gap: 11px; cursor: pointer; user-select: none; }
+    .wfp-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+    .wfp-switch-track {
+        width: 42px; height: 24px; border-radius: 999px;
+        background: #C7CDCF; position: relative; transition: background .18s; flex: none;
+    }
+    .wfp-switch-track::after {
+        content: ''; position: absolute; top: 2px; left: 2px;
+        width: 20px; height: 20px; border-radius: 50%; background: #fff;
+        transition: transform .2s cubic-bezier(.34, 1.56, .64, 1);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+    }
+    .wfp-switch input:checked + .wfp-switch-track { background: var(--teal, #014653); }
+    .wfp-switch input:checked + .wfp-switch-track::after { transform: translateX(18px); }
+    .wfp-switch input:focus-visible + .wfp-switch-track { outline: 2px solid var(--teal, #014653); outline-offset: 2px; }
+    .wfp-switch-label { font-size: 14px; font-weight: 500; color: #3A4145; }
+    @media (prefers-reduced-motion: reduce) {
+        .wfp-switch-track, .wfp-switch-track::after { transition: none; }
+    }
+
     /* Manning category selector — hidden-radio + :checked sibling label
        technique, same as the av-seg pattern used for Employee Type /
        Status elsewhere (talentacquisition/vacancies/_add_vacancy_styles).
@@ -809,6 +875,10 @@
         $('#manningResponseForm').submit(function(e) {
             e.preventDefault();
 
+            // Dept_id/year/resort_id are private to the $(document).ready() block above.
+            const Dept_id = $('#dept_id').val();
+            const year = $('#year').val();
+
             const categoryVal = $('input[name="employment_type"]:checked').val() || 'Permanent';
             const categoryLabel = $('label[for="employment_type-' + categoryVal.toLowerCase() + '"]').text().trim() || categoryVal;
             const liveHeadcount = parseInt($('#total_headcount').val()) || 0;
@@ -894,6 +964,11 @@
         // the HOD is told exactly which went through and which didn't
         // rather than being left unsure mid-sequence.
         function submitMultipleCategories(categories) {
+            const resort_id = $('#resort_id').val();
+            const Dept_id = $('#dept_id').val();
+            const year = $('#year').val();
+            // Same rule as doManningSubmit(); resolved once up front because the modal-open handler blanks #Submit_message_id.
+            $("#Submit_message_id").val($("#BudgetRejacted_message_id").val()?.trim() || $("#message_id").val());
             const activeCategory = $('input[name="employment_type"]:checked').val() || 'Permanent';
             const categoryKeys = Object.keys(categories);
             const results = [];
@@ -1512,6 +1587,10 @@
         }
 
         function updateHeadcountDisplay(positionId, totalHeadcount, totalFilledCount, totalVacantCount) {
+            // Bracket next to the position name = its peak monthly headcount (totalHeadcount is the max across months).
+            const positionTotal = document.getElementById(`pos-total-${positionId}`);
+            if (positionTotal) positionTotal.textContent = totalHeadcount;
+
             let headcountElement = document.querySelector(`#collapse-${positionId} .badge-headcount`);
 
             if (headcountElement) {
@@ -1784,7 +1863,7 @@
             let html = '';
             positions.forEach(function (pos) {
                 html += `<input type="hidden" name="positions[]" id="pos-${pos.id}" value="${pos.id}">`;
-                html += `<tr><td>${$('<div>').text(pos.position_title).html()} (${pos.no_of_positions || 0})
+                html += `<tr><td>${$('<div>').text(pos.position_title).html()} (<span id="pos-total-${pos.id}">0</span>)
                     <button type="button" class="table-icon collapsed ms-2" data-bs-toggle="collapse" data-bs-target="#collapse-${pos.id}" aria-expanded="false" aria-controls="collapse-${pos.id}" data-position-id="${pos.id}">
                         <i class="fa-solid fa-angle-down"></i>
                     </button>
@@ -1812,8 +1891,10 @@
                 }
                 html += '</tr>';
 
+                // Head-count summary hidden for now (not needed); updateHeadcountDisplay() skips when the span is absent.
+                // <td><span class="badge-headcount" id="head-count">2024 HEADCOUNT = 00 <br/> 2025 HEADCOUNT <br/> 2025 Filled COUNT <br/> 2025 Vacant COUNT </span></td>
                 html += `<tr class="collapse" id="collapse-${pos.id}">
-                    <td><span class="badge-headcount" id="head-count">2024 HEADCOUNT = 00 <br/> 2025 HEADCOUNT <br/> 2025 Filled COUNT <br/> 2025 Vacant COUNT </span></td>`;
+                    <td></td>`;
                 monthNames.forEach(function (m) {
                     html += `<td id="${m.toLowerCase()}-${pos.id}" data-month="${m}"></td>`;
                 });

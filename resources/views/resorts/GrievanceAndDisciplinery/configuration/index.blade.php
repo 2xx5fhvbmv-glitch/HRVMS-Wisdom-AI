@@ -4133,7 +4133,7 @@
         var name = $row.find('.fu-edit-name').val();
         var desc = $row.find('.fu-edit-desc').val();
         $.ajax({
-            url: "{{ route('GrievanceAndDisciplinery.config.FollowUpActionInlineUpdate', '') }}/" + id,
+            url: "{{ route('GrievanceAndDisciplinery.config.FollowUpActionInlineUpdate', '__id__') }}".replace('__id__', id),
             type: 'PUT',
             data: { _token: "{{ csrf_token() }}", name: name, description: desc },
             success: function (resp) {

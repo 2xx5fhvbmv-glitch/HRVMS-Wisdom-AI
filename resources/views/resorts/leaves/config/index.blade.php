@@ -910,7 +910,7 @@
                 {
                     $.ajax({
                         type: "delete",
-                        url: "{{ route('resort.ta.destroyAgentList','') }}/"+main_id,
+                        url: "{{ route('resort.ta.destroyAgentList', '__id__') }}".replace('__id__', main_id),
                         dataType: "json",
                     }).done(function(result) {
                         if (result.success == true) {
@@ -1013,7 +1013,7 @@
             var updatedEmail = $row.find("input").eq(1).val();
 
             $.ajax({
-                url: "{{ route('resort.ta.inlineUpdateAgent', '') }}/" + agentId,
+                url: "{{ route('resort.ta.inlineUpdateAgent', '__id__') }}".replace('__id__', agentId),
                 type: "PUT",
                 data: {
                     name : updatedName,

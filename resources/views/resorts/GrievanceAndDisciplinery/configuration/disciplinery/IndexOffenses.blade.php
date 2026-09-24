@@ -211,7 +211,7 @@
             var Description = $row.find("textarea").val();
                    
             $.ajax({
-                url: "{{ route('GrievanceAndDisciplinery.config.OffensesinlineUpdate', '') }}/" + Main_id,
+                url: "{{ route('GrievanceAndDisciplinery.config.OffensesinlineUpdate', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id:Main_id,

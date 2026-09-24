@@ -213,7 +213,7 @@ $(document).on('click', '.delete-row-btn', function (e) {
             var Nationality = $row.find("select").val();
             var Amount = $row.find("input").val();
             $.ajax({
-                url: "{{ route('resort.visa.nationality.update','')}}/" + Main_id,
+                url: "{{ route('resort.visa.nationality.update', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id:Main_id,

@@ -147,7 +147,7 @@
                 if (result.isConfirmed) {
                     $.ajax({
                         type: "DELETE",
-                        url: "{{ route('shopkeeper.products.destroy', '') }}/" + productId,
+                        url: "{{ route('shopkeeper.products.destroy', '__id__') }}".replace('__id__', productId),
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') // Ensure CSRF token is included
                         },
@@ -241,7 +241,7 @@
 
             // AJAX call to update the product
             $.ajax({
-                url: "{{ route('shopkeeper.products.inlineUpdate', '') }}/" + productId,
+                url: "{{ route('shopkeeper.products.inlineUpdate', '__id__') }}".replace('__id__', productId),
                 type: "PUT",
                 data: {
                     name: updatedName,

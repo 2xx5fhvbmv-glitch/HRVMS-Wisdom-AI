@@ -130,11 +130,17 @@
                                  was actually looking at. --}}
                             <input type="hidden" name="employment_type" id="SendToFinanceEmploymentType" value="Permanent">
                             <p class="mb-0 fw-500 departmentBudget"></p>
+                            {{-- Locked until every department has submitted; the tooltip (title on the wrapper,
+                                 since a disabled button shows none) explains why. Updated by cbSetSendButtons(). --}}
                             @if($employeeRankPosition['position'] == 'HR')
-                                <button type="submit" class="btn wfp-btn-primary SendToFinance" id="SendToFinanceButton" >Send To Finance</button>
+                                <span class="d-inline-block cb-send-tip" title="Checking which departments have submitted their budget...">
+                                    <button type="submit" class="btn wfp-btn-primary SendToFinance" id="SendToFinanceButton" disabled style="pointer-events:none;">Send To Finance</button>
+                                </span>
                             @endif
                             @if($employeeRankPosition['position'] == 'Finance')
-                                <button type="submit" class="btn wfp-btn-primary SendToGM" id="SendToGMButton" >Send To GM</button>
+                                <span class="d-inline-block cb-send-tip" title="Checking which departments have submitted their budget...">
+                                    <button type="submit" class="btn wfp-btn-primary SendToGM" id="SendToGMButton" disabled style="pointer-events:none;">Send To GM</button>
+                                </span>
                             @endif
                             @if($employeeRankPosition['position'] == 'GM')
                                 {{-- Was type="submit" inside the shared #SendToFinance form —
@@ -311,6 +317,35 @@
         fetchConsolidatedBudget(document.getElementById('year').value);
     }
 
+    // Send To Finance / Send To GM are enabled only when every department has submitted its budget.
+    // The server must return totalDepartments, submittedDepartments and missingDepartments (names);
+    // without them the button stays locked rather than guessing.
+    function cbSetSendButtons(response) {
+        const total = response ? response.totalDepartments : undefined;
+        const submitted = response ? response.submittedDepartments : undefined;
+        const missing = (response && Array.isArray(response.missingDepartments)) ? response.missingDepartments : [];
+        const known = Number.isInteger(total) && Number.isInteger(submitted);
+        const ready = known && response.isBudgetCompleted === true && submitted === total && missing.length === 0;
+
+        $('.cb-send-tip').each(function () {
+            const $wrap = $(this);
+            const $btn = $wrap.find('button');
+            const target = $btn.attr('id') === 'SendToGMButton' ? 'GM' : 'Finance';
+            let tip;
+            if (ready) {
+                tip = 'All ' + total + ' departments have submitted their budget.';
+            } else if (!known) {
+                tip = 'Send To ' + target + ' stays locked until every department has submitted its budget. The submission status could not be loaded.';
+            } else {
+                tip = submitted + ' of ' + total + ' departments have submitted their budget.'
+                    + (missing.length ? ' Still waiting for: ' + missing.join(', ') + '.' : '')
+                    + ' Send To ' + target + ' unlocks once every department has submitted.';
+            }
+            $wrap.attr('title', tip);
+            $btn.prop('disabled', !ready).css('pointer-events', ready ? '' : 'none');
+        });
+    }
+
     function fetchConsolidatedBudget(selectedYear) {
 
         document.getElementById('SendToFinanceYear').value = selectedYear;
@@ -330,20 +365,7 @@
                     $('#accordionViewBudget').html(response.html); // Update this to match your HTML structure
                     $('#cbSearchInput').val('');
                     cbUpdateSummaryCards();
-                    // WP7(D4) — was inverted (disabled the buttons when
-                    // isBudgetCompleted was true), the opposite of View
-                    // Manning's `@{{ $isBudgetCompleted ? '' : 'disabled' }}`
-                    // convention. Combined with the backend's old hardcoded
-                    // `true`, the buttons were simply always disabled.
-                    var missingList = (response.missingDepartments || []).join(', ');
-                    var tooltip = missingList ? ('Waiting on: ' + missingList) : '';
-                    if (response.isBudgetCompleted === true) {
-                        $("#SendToFinanceButton").prop("disabled", false).attr('title', '');
-                        $("#SendToGMButton").prop("disabled", false).attr('title', '');
-                    } else {
-                        $("#SendToFinanceButton").prop("disabled", true).attr('title', tooltip);
-                        $("#SendToGMButton").prop("disabled", true).attr('title', tooltip);
-                    }
+                    cbSetSendButtons(response);
 
                     // NOTE: do NOT call recalculateAllTotals here. The server
                     // already rendered each level's `calculated_total` using
@@ -359,6 +381,7 @@
                 },
                 error: function(xhr) {
                     console.error('Error fetching data:', xhr);
+                    cbSetSendButtons(null);
                     alert('Failed to load budget data. Please try again.');
                 }
             });

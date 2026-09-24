@@ -112,7 +112,7 @@
                 if (result.isConfirmed) {
                     $.ajax({
                         type: "DELETE",
-                        url: "{{ route('resort.ta.jobadvertisment.destroy', '') }}/" + id,
+                        url: "{{ route('resort.ta.jobadvertisment.destroy', '__id__') }}".replace('__id__', id),
                         dataType: "json",
                     }).done(function(response) {
                         if (response.success) {

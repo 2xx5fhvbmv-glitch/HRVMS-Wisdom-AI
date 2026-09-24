@@ -569,7 +569,7 @@ $(document).ready(function()
 
         // Perform the AJAX update request here
         $.ajax({
-            url: "{{ route('resort.budget.inlinecostupdate', '') }}/" + costId,
+            url: "{{ route('resort.budget.inlinecostupdate', '__id__') }}".replace('__id__', costId),
             type: "PUT",
             data: {
                 cost_title: updatedName,
@@ -667,7 +667,7 @@ $(document).ready(function()
             if (result.isConfirmed) {
                 $.ajax({
                     type: "DELETE",
-                    url: "{{ route('resort.budget.destroycost', '') }}/" + costId,
+                    url: "{{ route('resort.budget.destroycost', '__id__') }}".replace('__id__', costId),
                     dataType: "json",
                 }).done(function(result) {
                     if (result.success == true) {

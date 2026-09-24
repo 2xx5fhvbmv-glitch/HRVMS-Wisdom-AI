@@ -216,7 +216,7 @@
         var id = $btn.data('shopkeeper-id');
 
         $.ajax({
-            url: "{{ route('shopkeeper.inlineUpdate', '') }}/" + id,
+            url: "{{ route('shopkeeper.inlineUpdate', '__id__') }}".replace('__id__', id),
             type: 'PUT',
             data: {
                 name: $tr.find('.f-name').val(),
@@ -279,7 +279,7 @@
 
         $.ajax({
             type: 'DELETE',
-            url: "{{ route('shopkeeper.destroy', '') }}/" + id,
+            url: "{{ route('shopkeeper.destroy', '__id__') }}".replace('__id__', id),
             dataType: 'json',
         }).done(function (result) {
             if (result.success) {

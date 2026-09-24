@@ -256,7 +256,7 @@
             var Gri_Sub_cat_id = $row.find("select").eq(1).val();
             var Priority_Level = $row.find("select").eq(2).val();
             $.ajax({
-                url: "{{ route('GrievanceAndDisciplinery.config.GrievanceCatAndSubCategoryinlineUpdate', '') }}/" + Main_id,
+                url: "{{ route('GrievanceAndDisciplinery.config.GrievanceCatAndSubCategoryinlineUpdate', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id:Main_id,

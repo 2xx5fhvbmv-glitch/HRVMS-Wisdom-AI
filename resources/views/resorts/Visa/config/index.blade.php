@@ -1072,7 +1072,7 @@ $("#DocumentSegmentationForm").on("submit", function(e)
             var WalletName = $row.find("input[name='WalletName']").val();
             var Amount = $row.find("input[name='Amt']").val();
             $.ajax({
-                url: "{{ route('resort.visa.UpdateWallet','')}}/" + Main_id,
+                url: "{{ route('resort.visa.UpdateWallet', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id:Main_id,
@@ -1294,7 +1294,7 @@ $("#DocumentSegmentationForm").on("submit", function(e)
             var Main_id = $(this).attr('data-cat-id');
             var documentname = $row.find("input").val();
             $.ajax({
-                url: "{{ route('resort.visa.DocumentType.update','')}}/" + Main_id,
+                url: "{{ route('resort.visa.DocumentType.update', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id:Main_id,

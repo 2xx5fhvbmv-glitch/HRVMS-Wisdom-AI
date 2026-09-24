@@ -370,7 +370,7 @@ $(document).ready(function()
         var updatedStatus = $row.find("select").eq(5).val();
 
         $.ajax({
-            url: "{{ route('resort.budget.nonpermanent.inlinecostupdate', '') }}/" + costId,
+            url: "{{ route('resort.budget.nonpermanent.inlinecostupdate', '__id__') }}".replace('__id__', costId),
             type: "PUT",
             data: {
                 cost_title: updatedName,
@@ -430,7 +430,7 @@ $(document).ready(function()
             if (result.isConfirmed) {
                 $.ajax({
                     type: "DELETE",
-                    url: "{{ route('resort.budget.nonpermanent.destroycost', '') }}/" + costId,
+                    url: "{{ route('resort.budget.nonpermanent.destroycost', '__id__') }}".replace('__id__', costId),
                     dataType: "json",
                 }).done(function(result) {
                     if (result.success == true) {

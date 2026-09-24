@@ -190,7 +190,7 @@
             var Del_Rule = $row.find("input").val();
 
             $.ajax({
-                url: "{{ route('GrievanceAndDisciplinery.config.DisciplineryDeletgationRuleinlineUpdate', '') }}/" + Main_id,
+                url: "{{ route('GrievanceAndDisciplinery.config.DisciplineryDeletgationRuleinlineUpdate', '__id__') }}".replace('__id__', Main_id),
                 type: "PUT",
                 data: {
                     Main_id:Main_id,
