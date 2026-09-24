@@ -1,11 +1,11 @@
 <div class="modal fade" id="jdAdvisory-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Compliance advisory</h5>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted">The required sections are present, but the items below are missing. Choose how to proceed.</p>
+                    <p class="text-muted mb-1">The items below were not found in this job description. For each one, choose an option, then press <strong>Confirm</strong> at the bottom to save your choice.</p>
                     <div id="jdAdvisoryPanels"></div>
                 </div>
                 <div class="modal-footer">
@@ -29,14 +29,26 @@
                     '<input type="radio" class="btn-check" name="adv_' + it.key + '" id="adv_' + it.key + '_i" value="insert" checked><label class="btn btn-outline-primary btn-sm" for="adv_' + it.key + '_i">Insert as-is</label>' +
                     '<input type="radio" class="btn-check" name="adv_' + it.key + '" id="adv_' + it.key + '_e" value="edit"><label class="btn btn-outline-primary btn-sm" for="adv_' + it.key + '_e">Edit then insert</label>' +
                     '<input type="radio" class="btn-check" name="adv_' + it.key + '" id="adv_' + it.key + '_s" value="skip"><label class="btn btn-outline-secondary btn-sm" for="adv_' + it.key + '_s">Skip</label>' +
-                    '</div></div>';
+                    '</div><div class="small mt-2 jd-adv-hint text-muted"></div></div>';
             });
             $('#jdAdvisoryPanels').html(html);
+            $('.jd-adv-panel').each(function () { jdAdvRefresh($(this)); });
             $('#jdAdvisoryConfirm').data('jd', advisory.jd_id);
             $('#jdAdvisory-modal').modal('show');
         }
+        var jdAdvHints = {
+            insert: 'This exact sentence will be added to the end of the job description when you press Confirm.',
+            edit: 'You can now change the sentence above. It will be added to the end of the job description when you press Confirm.',
+            skip: 'Nothing will be added for this item. The job description will be saved as "HR Approved", not "Compliance Passed".'
+        };
+        function jdAdvRefresh($panel) {
+            var v = $panel.find('input[type=radio]:checked').val();
+            $panel.find('textarea').prop('readonly', v !== 'edit').css('opacity', v === 'skip' ? 0.5 : 1);
+            $panel.find('.jd-adv-hint').text(jdAdvHints[v]);
+            if (v === 'edit') { $panel.find('textarea').trigger('focus'); }
+        }
         $(document).on('change', '.jd-adv-panel input[type=radio]', function () {
-            $(this).closest('.jd-adv-panel').find('textarea').prop('readonly', $(this).val() !== 'edit');
+            jdAdvRefresh($(this).closest('.jd-adv-panel'));
         });
         $('#jdAdvisoryConfirm').on('click', function () {
             const items = {};

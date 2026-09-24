@@ -318,7 +318,8 @@
                     method: "GET",
                     success: function(response) {
 
-                        $("#ShowJobDescription").val(response.data);
+                        // Stored text comes from CKEditor with HTML entities (e.g. &#39; for an apostrophe); a textarea shows them literally, so decode first.
+                        $("#ShowJobDescription").val($("<textarea>").html(response.data).text());
 
 
                     },
