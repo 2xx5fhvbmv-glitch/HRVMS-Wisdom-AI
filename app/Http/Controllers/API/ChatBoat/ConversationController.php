@@ -110,7 +110,6 @@ class ConversationController extends Controller
      */
     private function messageThread($resort, $type, $otherPartyId)
     {
-        $readAt = null;
         if ($type === 'group') {
             $messages = Conversation::where('resort_id', $resort->resort_id)
                 ->where('type', 'group')
@@ -131,33 +130,39 @@ class ConversationController extends Controller
                 ->get(['id','type', 'type_id', 'sender_id', 'message','attachment', 'created_at']);
 
             $messages = $sent->merge($received)->sortBy('created_at')->values();
-
-            // markAsRead() is thread-level, not per-message — it flips one
-            // chat_message_read row (conversation_id = the thread partner's
-            // id) to Read with a read_at timestamp. That was never surfaced
-            // back in the message list at all, so a sender's message stayed
-            // "sent" forever even after the recipient opened and read it —
-            // this is what actually determines the tick shown. Any message
-            // I (the caller) sent with created_at <= the other party's
-            // read_at (on THEIR record of reading MY thread, i.e.
-            // conversation_id = my own id) counts as read by them.
-            $theirReadRecord = ChatMessageRead::where('conversation_id', $resort->id)
-                ->where('user_id', $otherPartyId)
-                ->where('status', 'Read')
-                ->first();
-            $readAt = $theirReadRecord ? $theirReadRecord->read_at : null;
         }
+
+        // One chat_message_read row per (message, recipient): conversation_id
+        // is the MESSAGE id, user_id the recipient. Receipts for my own sent
+        // messages come from those rows — sent (no delivered_at) -> delivered
+        // -> read. A group message is 'read' only once every recipient read it.
+        $mineIds = $messages->where('sender_id', $resort->id)->pluck('id');
+        $receipts = $mineIds->isEmpty()
+            ? collect()
+            : ChatMessageRead::whereIn('conversation_id', $mineIds)
+                ->get(['conversation_id', 'status', 'delivered_at'])
+                ->groupBy('conversation_id');
 
         // 'attachment' stores the raw disk path AWSEmployeeFileUpload() returned
         // (e.g. "26/public/EmployeesChatAttachments/.../file.jpg") — not a URL
         // the app can load directly, same as every other tenant-uploaded file;
         // must go through StorageHelper (per house convention), never raw.
-        return $messages->map(function ($message) use ($resort, $readAt) {
+        return $messages->map(function ($message) use ($resort, $receipts) {
             if (!empty($message->attachment)) {
                 $message->attachment = \App\Helpers\StorageHelper::temporaryUrl($message->attachment);
             }
             if ((int) $message->sender_id === (int) $resort->id) {
-                $message->read_status = ($readAt && $message->created_at <= $readAt) ? 'read' : 'sent';
+                $rows = $receipts->get($message->id, collect());
+                $total = $rows->count();
+                $read = $rows->where('status', 'Read')->count();
+                $delivered = $rows->filter(fn ($r) => $r->status === 'Read' || $r->delivered_at)->count();
+                $message->read_status = $total && $read === $total ? 'read'
+                    : ($total && $delivered === $total ? 'delivered' : 'sent');
+                if ($message->type === 'group') {
+                    $message->recipient_count = $total;
+                    $message->delivered_count = $delivered;
+                    $message->read_count = $read;
+                }
             }
             return $message;
         })->values()->all();
@@ -240,11 +245,20 @@ class ConversationController extends Controller
             'attachment' => isset($status) ? $status['path'] : null,
         ]);
 
-        ChatMessageRead::create([
+        // One receipt row per recipient. Individual: the other person.
+        // Group: every member except the sender (this used to store the GROUP
+        // id as user_id, so group unread counts/ticks could never work).
+        $receiptUserIds = $request->type === 'group'
+            ? array_values(array_diff($group->groupMembers()->pluck('user_id')->all(), [$resort->id]))
+            : [(int) $request->type_id];
+        $now = Carbon::now();
+        ChatMessageRead::insert(array_map(fn ($uid) => [
             'conversation_id' => $conversation->id,
-            'user_id' => $conversation->type_id,
+            'user_id' => $uid,
             'status' => 'Unread',
-        ]);
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $receiptUserIds));
 
       
 
@@ -343,21 +357,163 @@ class ConversationController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Legacy single-message read (kept for existing clients). Prefer
+     * markThreadRead().
+     */
     public function markAsRead(Request $request)
     {
         $resort = $this->resort;
-        $conversationId = $request->conversation_id;
 
-        $chatMessageRead = ChatMessageRead::where('conversation_id', $conversationId)
+        $rows = ChatMessageRead::where('conversation_id', $request->conversation_id)
             ->where('user_id', $resort->id)
-            ->first();
+            ->where('status', 'Unread')
+            ->whereHas('conversation', fn ($q) => $q->where('resort_id', $resort->resort_id))
+            ->with('conversation:id,type,type_id,sender_id')
+            ->get();
 
-        if ($chatMessageRead) {
-            $chatMessageRead->status = 'Read';
-            $chatMessageRead->read_at = Carbon::now();
-            $chatMessageRead->save();
-        }
+        $this->stamp($resort, $rows, true);
 
         return response()->json(['success' => true, 'message' => 'Conversation marked as read']);
+    }
+
+    /**
+     * Bulk read: everything unread addressed to me in one thread, one call.
+     * Broadcasts MessageReceipt(read) to each affected sender.
+     * POST { type: individual|group, type_id }
+     */
+    public function markThreadRead(Request $request)
+    {
+        $v = Validator::make($request->all(), [
+            'type' => 'required|in:individual,group',
+            'type_id' => 'required|integer',
+        ]);
+        if ($v->fails()) {
+            return response()->json(['success' => false, 'errors' => $v->errors()], 400);
+        }
+        $resort = $this->resort;
+        if (!$resort) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $rows = $this->pendingReceiptRows($resort, $request->type, $request->type_id)
+            ->where('status', 'Unread')
+            ->get();
+        $ids = $this->stamp($resort, $rows, true);
+
+        return response()->json(['success' => true, 'count' => count($ids), 'message_ids' => $ids]);
+    }
+
+    /**
+     * Delivery ack: the client received the message(s) (socket event, push,
+     * or app open). type/type_id optional — omit both to ack everything
+     * undelivered addressed to me (call on app open / socket reconnect).
+     * POST { type?, type_id? }
+     */
+    public function markDelivered(Request $request)
+    {
+        $resort = $this->resort;
+        if (!$resort) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $rows = $this->pendingReceiptRows($resort, $request->type, $request->type_id)
+            ->where('status', 'Unread')
+            ->whereNull('delivered_at')
+            ->get();
+        $ids = $this->stamp($resort, $rows, false);
+
+        return response()->json(['success' => true, 'count' => count($ids), 'message_ids' => $ids]);
+    }
+
+    /**
+     * Per-recipient receipt detail for one message I sent ("seen by" list,
+     * mainly for groups). GET chat/message-status/{message_id}
+     */
+    public function messageStatus($messageId)
+    {
+        $resort = $this->resort;
+        if (!$resort) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $message = Conversation::where('id', $messageId)
+            ->where('resort_id', $resort->resort_id)
+            ->where('sender_id', $resort->id)
+            ->first();
+        if (!$message) {
+            return response()->json(['success' => false, 'message' => 'Message not found.'], 404);
+        }
+
+        $rows = ChatMessageRead::where('conversation_id', $message->id)->get();
+        $admins = ResortAdmin::whereIn('id', $rows->pluck('user_id'))->get()->keyBy('id');
+
+        return response()->json([
+            'success' => true,
+            'message_id' => $message->id,
+            'recipients' => $rows->map(fn ($r) => [
+                'id' => $r->user_id,
+                'name' => isset($admins[$r->user_id]) ? $admins[$r->user_id]->first_name . ' ' . $admins[$r->user_id]->last_name : 'Unknown',
+                'status' => $r->status === 'Read' ? 'read' : ($r->delivered_at ? 'delivered' : 'sent'),
+                'delivered_at' => $r->delivered_at ?: ($r->status === 'Read' ? $r->read_at : null),
+                'read_at' => $r->read_at,
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * My receipt rows (user_id = me), tenant-scoped, optionally narrowed to
+     * one thread. For an individual thread the other party is the sender;
+     * for a group the conversation's type_id is the group id.
+     */
+    private function pendingReceiptRows($resort, $type, $typeId)
+    {
+        return ChatMessageRead::where('user_id', $resort->id)
+            ->whereHas('conversation', function ($q) use ($resort, $type, $typeId) {
+                $q->where('resort_id', $resort->resort_id);
+                if ($type === 'individual') {
+                    $q->where('type', 'individual')->where('sender_id', $typeId);
+                } elseif ($type === 'group') {
+                    $q->where('type', 'group')->where('type_id', $typeId);
+                }
+            })
+            ->with('conversation:id,type,type_id,sender_id');
+    }
+
+    /**
+     * Apply delivered/read to the given rows and tell each sender live.
+     * Returns the affected message ids. A read also counts as delivered.
+     */
+    private function stamp($resort, $rows, bool $read): array
+    {
+        if ($rows->isEmpty()) {
+            return [];
+        }
+        $now = Carbon::now();
+
+        $update = $read
+            ? ['status' => 'Read', 'read_at' => $now, 'delivered_at' => \DB::raw("COALESCE(delivered_at, '" . $now->toDateTimeString() . "')")]
+            : ['delivered_at' => $now];
+        ChatMessageRead::whereIn('id', $rows->pluck('id'))->update($update);
+
+        // Receipt push must never fail the read/ack itself.
+        try {
+            foreach ($rows->groupBy(fn ($r) => $r->conversation->sender_id) as $senderId => $group) {
+                $first = $group->first()->conversation;
+                broadcast(new \App\Events\MessageReceipt(
+                    $senderId,
+                    $read ? 'read' : 'delivered',
+                    $first->type,
+                    $first->type === 'group' ? $first->type_id : $resort->id,
+                    $resort->id,
+                    $group->pluck('conversation_id')->map(fn ($i) => (int) $i)->all(),
+                    $now
+                ))->toOthers();
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Chat receipt broadcast failed: ' . $e->getMessage());
+        }
+
+        return $rows->pluck('conversation_id')->map(fn ($i) => (int) $i)->all();
     }
 }

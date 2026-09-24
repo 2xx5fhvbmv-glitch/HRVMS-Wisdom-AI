@@ -4778,6 +4778,31 @@ class Common
     }
 
     /**
+     * Notify the L&D Manager that a training was requested for an employee
+     * from a Monthly Check-In. Never throws — a notification failure must not
+     * roll back the check-in transaction.
+     */
+    public static function notifyLearningManagerOfCheckinRequest($resortId, $learningRequest, $requesterName, $employeeId)
+    {
+        try {
+            $program = \App\Models\LearningProgram::find($learningRequest->learning_id);
+            $emp     = Employee::with('resortAdmin')->find($employeeId);
+            $empName = $emp && $emp->resortAdmin ? $emp->resortAdmin->full_name : 'an employee';
+            self::notifyEmployees(
+                $resortId,
+                [$learningRequest->learning_manager_id],
+                'New Training Request',
+                $requesterName . ' has requested "' . ($program->name ?? 'a training program') . '" for ' . $empName . ' via Monthly Check-In.',
+                'Learning',
+                $learningRequest->id,
+                'learning-request-created'
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('notifyLearningManagerOfCheckinRequest failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Record one accommodation lifecycle event (initial assign, move, or
      * unassign) as a transfer_accommodations row. Centralized so every
      * write path (web assign, web move, web unassign, API assign) produces
@@ -5331,6 +5356,20 @@ class Common
      * request, mirroring getResortFinanceEmployeeIds/
      * getResortSecurityEmployeeIds's department-scoped shape.
      */
+    /**
+     * True for a Housekeeping-department HOD/EXCOM. Housekeeping work
+     * (schedules, requests) is *their* queue regardless of which
+     * department the guest employee belongs to — scoping their list by the
+     * requester's department (getScopedDepartmentIds) hid every request from
+     * them unless the request happened to be for a Housekeeping employee.
+     */
+    public static function isHousekeepingHodXcom($employee): bool
+    {
+        return $employee
+            && in_array((int) $employee->rank, [1, 2], true)
+            && self::isHousekeepingDepartment($employee->Dept_id ?? null);
+    }
+
     public static function getResortHousekeepingHodXcomEmployeeIds($resortId)
     {
         $hkDeptIds = \App\Models\ResortDepartment::where('resort_id', $resortId)
@@ -5367,6 +5406,19 @@ class Common
     public static function sosOpenStatuses(): array
     {
         return ['Active', 'Drill-Active', 'Real-Active', 'In-Progress'];
+    }
+
+    /**
+     * The single SOS currently blocking new ones for a resort: anything not
+     * closed (Pending awaiting the manager, or open). Newest first so a stale
+     * older row can never shadow the current one.
+     */
+    public static function activeSosForResort($resortId, bool $lock = false)
+    {
+        $q = \App\Models\SOSHistoryModel::where('resort_id', $resortId)
+            ->whereNotIn('status', self::sosClosedStatuses())
+            ->orderByDesc('id');
+        return ($lock ? $q->lockForUpdate() : $q)->first();
     }
 
     public static function sosClosedStatuses(): array

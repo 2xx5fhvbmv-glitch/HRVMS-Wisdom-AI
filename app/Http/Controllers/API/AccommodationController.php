@@ -1444,12 +1444,7 @@ class AccommodationController extends Controller
                                                                     ->where('status', 'Pending')
                                                                     ->first();
 
-            if ($housekeepingSchCheck) {// Add department head to the approval flow — HOD (rank 2), falls back to EXCOM (rank 1)
-                        $hodApprover                             =   Common::FindResortHODDepartment($user->resort_id, $employee->Dept_id);
-                        if ($hodApprover ) {
-                            $passApprovalFlow->push($hodApprover); // Second approver: HOD
-                        }
-
+            if ($housekeepingSchCheck) {
                 $response['status']                         =   true;
                 $response['message']                        =   'Room no-' . $request->room . ' Already Schedule.';
                 // $response['data']                           =   $housekeepingSchCheck;
@@ -1484,6 +1479,25 @@ class AccommodationController extends Controller
             }
 
             DB::commit();
+
+            // HR raising a schedule never told the Housekeeping HOD/XCOM —
+            // the request only surfaced if they happened to open the app.
+            if ($houseKeepingSchAdd) {
+                try {
+                    Common::notifyEmployees(
+                        $this->resort_id,
+                        array_diff(Common::getResortHousekeepingHodXcomEmployeeIds($this->resort_id), [$this->user->GetEmployee->id ?? null]),
+                        'New Housekeeping Schedule',
+                        'A housekeeping schedule for room ' . $request->room . ' on ' . $request->date . ' has been raised by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                        'Accommodation',
+                        $houseKeepingSchAdd->id,
+                        'housekeeping-schedule-created'
+                    );
+                } catch (\Throwable $e) {
+                    \Log::warning('houseKeepingAddSchedules HOD notify failed: ' . $e->getMessage());
+                }
+            }
+
             $response['status']                             =   true;
             $response['message']                            =   'Housekeeping schedule created successfully.';
             $response['accomodation_data']                  =   $houseKeepingSchAdd;
@@ -1554,14 +1568,31 @@ class AccommodationController extends Controller
 
             // HOD (2) and EXCOM (1) — was HOD-only, so an EXCOM-headed
             // department showed no contact here at all.
+            // "Please Select Employee" only ever offered rank 1/2 — HR could not
+            // pick anyone else. Now every active employee in the resort, with
+            // an optional ?search= (name / employee id) for the picker.
+            $search                                         =   trim((string) request('search', ''));
             $hodData                                        =   Employee::join('resort_admins', 'resort_admins.id', "=", 'employees.Admin_Parent_id')
+                                                                    ->leftJoin('resort_departments as rd', 'rd.id', '=', 'employees.Dept_id')
                                                                     ->where('employees.resort_id', $this->resort_id)
-                                                                    ->whereIn("employees.rank", [1, 2])
-                                                                    ->get(['employees.id', 'employees.Admin_Parent_id', 'employees.resort_id', 'employees.Emp_id', 'resort_admins.first_name', 'resort_admins.last_name']);
+                                                                    ->where('employees.status', 'Active')
+                                                                    ->when($search !== '', function ($q) use ($search) {
+                                                                        $q->where(function ($w) use ($search) {
+                                                                            $w->where('resort_admins.first_name', 'like', "%{$search}%")
+                                                                              ->orWhere('resort_admins.last_name', 'like', "%{$search}%")
+                                                                              ->orWhere('employees.Emp_id', 'like', "%{$search}%")
+                                                                              ->orWhereRaw("CONCAT(resort_admins.first_name, ' ', resort_admins.last_name) like ?", ["%{$search}%"]);
+                                                                        });
+                                                                    })
+                                                                    ->orderBy('resort_admins.first_name')
+                                                                    ->get(['employees.id', 'employees.Admin_Parent_id', 'employees.resort_id', 'employees.Emp_id', 'employees.rank', 'employees.Dept_id', 'rd.name as department_name', 'resort_admins.first_name', 'resort_admins.last_name']);
             // Prepare response data
+            // Who the request was already sent to, so the app can show it and
+            // keep the picker locked instead of asking HR to choose again.
             $scheduleRes                                    =   [
                 'housekeeping_data'                         =>  $housekeepingScheView,
-                'hod_data'                                  =>  $hodData
+                'hod_data'                                  =>  $hodData,
+                'assigned_to_data'                          =>  $housekeepingScheView ? $this->housekeepingAssigneeInfo($housekeepingScheView->Assigned_To) : null,
             ];
 
             // Check if the record exists
@@ -1601,16 +1632,25 @@ class AccommodationController extends Controller
         try {
 
             DB::beginTransaction();
+            // Both ids came straight from the client with no resort check.
+            $scheduleRow                                    =   HousekeepingSchedules::where('id', $request->housekeeping_id)->where('resort_id', $this->resort_id)->first();
+            $assignee                                       =   Employee::where('id', $request->hod_id)->where('resort_id', $this->resort_id)->first();
+            if (!$scheduleRow || !$assignee) {
+                DB::rollBack();
+                return response()->json(['status' => false, 'message' => 'Housekeeping schedule or employee not found.'], 404);
+            }
+
             $assignToHODExists                              =   ChildHouseKeepingSchedules::where("housekeeping_id", $request->housekeeping_id)->where('ApprovedBy', $request->hod_id)->exists();
 
             if ($assignToHODExists) {
+                DB::rollBack();
                 return response()->json([
                     'status'                                =>  false,
                     'message'                               =>  'This housekeeping schedule is already assigned to the specified HOD.',
                 ], 200);
             }
 
-            $housekeepingSchedules                      =   HousekeepingSchedules::where("id", $request->housekeeping_id)->update(['Assigned_To' =>  $request->hod_id, 'Status' => 'Open']);
+            $housekeepingSchedules                      =   HousekeepingSchedules::where("id", $request->housekeeping_id)->where('resort_id', $this->resort_id)->update(['Assigned_To' =>  $request->hod_id, 'Status' => 'Open']);
             $assignToHOD                                =   ChildHouseKeepingSchedules::where("housekeeping_id", $request->housekeeping_id)->update(['ApprovedBy' => $this->user->GetEmployee->id, 'Status' => 'Open']);
 
             if (!$assignToHOD) {
@@ -1629,26 +1669,46 @@ class AccommodationController extends Controller
                 'status'                                =>  'Pending',
             ]);
 
-            // Send In App Notification to each approver
-            Common::sendMobileNotification(
-                $this->resort_id,
-                2,
-                null,
-                null,
-                'Housekeeping Request',
-                'Housekeeping request has been assigned to you by ' . $this->user->first_name . ' ' . $this->user->last_name,
-                'Accommodation',
-                [$request->hod_id],
-                $childHouseKeepingSchedules->id,
-                false,
-                'housekeeping-request-assigned'
-            );
-
             DB::commit();
+
+            // The picked assignee AND the Housekeeping HOD/XCOM — HR could
+            // pick any employee, and the Housekeeping HOD then heard
+            // nothing. Deep-link to the schedule (not the child row).
+            try {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    array_diff(
+                        array_merge([$assignee->id], Common::getResortHousekeepingHodXcomEmployeeIds($this->resort_id)),
+                        [$this->user->GetEmployee->id ?? null]
+                    ),
+                    'Housekeeping Request',
+                    'Housekeeping request for room ' . $scheduleRow->RoomNo . ' has been assigned by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                    'Accommodation',
+                    $scheduleRow->id,
+                    'housekeeping-request-assigned'
+                );
+            } catch (\Throwable $e) {
+                \Log::warning('houseKeepingAssingHRtoHOD notify failed: ' . $e->getMessage());
+            }
+
+            // Return the fresh schedule so the app can refresh in place
+            // instead of the user leaving and re-entering the screen. The
+            // new child row is an internal 'Pending' placeholder for the
+            // next hop; showing its status made detail read "Pending" while
+            // the listing (schedule status) read "Open". One status, the
+            // schedule's, everywhere.
+            $freshSchedule                                  =   HousekeepingSchedules::join('building_models as bm', 'bm.id', '=', 'housekeeping_schedules.BuildingName')
+                                                                    ->where('housekeeping_schedules.id', $scheduleRow->id)
+                                                                    ->select('housekeeping_schedules.*', 'bm.BuildingName as BName')
+                                                                    ->first();
+            $childArr                                       =   $childHouseKeepingSchedules->toArray();
+            $childArr['status']                             =   $freshSchedule->status;
 
             $response['status']                             =   true;
             $response['message']                            =   'Housekeeping schedule successfully assigned to HOD.';
-            $response['hr_to_assing_data']                  =   $childHouseKeepingSchedules;
+            $response['hr_to_assing_data']                  =   $childArr;
+            $response['housekeeping_data']                  =   $freshSchedule;
+            $response['assigned_to_data']                   =   $this->housekeepingAssigneeInfo($assignee->id);
             return response()->json($response);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1657,6 +1717,18 @@ class AccommodationController extends Controller
             \Log::error($e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
+    }
+
+    private function housekeepingAssigneeInfo($employeeId)
+    {
+        if (!$employeeId) {
+            return null;
+        }
+        return Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+            ->leftJoin('resort_departments as rd', 'rd.id', '=', 'employees.Dept_id')
+            ->where('employees.id', $employeeId)
+            ->where('employees.resort_id', $this->resort_id)
+            ->first(['employees.id', 'employees.Emp_id', 'employees.rank', 'ra.first_name', 'ra.last_name', 'rd.name as department_name']);
     }
 
     public function hodHouseKeepingDashboard(Request $request)
@@ -1683,6 +1755,13 @@ class AccommodationController extends Controller
                                                                         $q->where('housekeeping_schedules.Assigned_To', $callerEmployee->id);
                                                                         if ($callerDeptId) {
                                                                             $q->orWhere('assignedEmp.Dept_id', $callerDeptId);
+                                                                        }
+                                                                        // HR can assign to any employee (e.g. an F&B HOD by
+                                                                        // mistake); housekeeping schedules are still the
+                                                                        // Housekeeping HOD/XCOM's queue, so they see every
+                                                                        // schedule that has been sent on to a HOD.
+                                                                        if (Common::isHousekeepingHodXcom($callerEmployee)) {
+                                                                            $q->orWhereNotNull('housekeeping_schedules.Assigned_To');
                                                                         }
                                                                     })
                                                                     ->whereDate('housekeeping_schedules.date', $filterDate);
@@ -1741,10 +1820,12 @@ class AccommodationController extends Controller
         }
 
         try {
-            $scopedDeptIds = Common::getScopedDepartmentIds($this->user->GetEmployee);
+            $scopedDeptIds = Common::isHousekeepingHodXcom($this->user->GetEmployee)
+                ? null
+                : Common::getScopedDepartmentIds($this->user->GetEmployee);
 
-            $requests = HousekeepingRequest::join('employees as t1', 't1.id', '=', 'housekeeping_requests.employee_id')
-                ->join('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
+            $requests = HousekeepingRequest::leftJoin('employees as t1', 't1.id', '=', 'housekeeping_requests.employee_id')
+                ->leftJoin('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
                 ->join('housekeeping_service_catalog as hsc', 'hsc.id', '=', 'housekeeping_requests.housekeeping_service_id')
                 ->where('housekeeping_requests.resort_id', $this->resort_id)
                 ->when($scopedDeptIds !== null, function ($query) use ($scopedDeptIds) {

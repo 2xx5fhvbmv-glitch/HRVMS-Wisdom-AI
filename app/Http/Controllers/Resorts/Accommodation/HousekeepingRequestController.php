@@ -237,7 +237,11 @@ class HousekeepingRequestController extends Controller
     public function list(Request $request)
     {
         $resortId = $this->resort->resort_id;
-        $scopedDeptIds = Common::getScopedDepartmentIds($this->resort->GetEmployee);
+        // Housekeeping HOD/XCOM own this queue resort-wide (see
+        // Common::isHousekeepingHodXcom); everyone else stays dept-scoped.
+        $scopedDeptIds = Common::isHousekeepingHodXcom($this->resort->GetEmployee)
+            ? null
+            : Common::getScopedDepartmentIds($this->resort->GetEmployee);
 
         $rows = HousekeepingRequest::leftJoin('employees as emp', 'emp.id', '=', 'housekeeping_requests.employee_id')
             ->leftJoin('resort_admins as emp_admin', 'emp_admin.id', '=', 'emp.Admin_Parent_id')

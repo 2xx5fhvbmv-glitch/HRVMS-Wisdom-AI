@@ -204,10 +204,17 @@ class HousekeepingRequestController extends Controller
             // theirs" gap: nothing distinguished "everything" from "my
             // department's queue". Scope it the same way every other
             // department-keyed list in this app already does.
-            $scopedDeptIds = Common::getScopedDepartmentIds($this->user->GetEmployee);
+            // Housekeeping HOD/XCOM own this queue resort-wide — scoping by
+            // the guest employee's department hid every request from them
+            // unless it was for a Housekeeping employee.
+            $scopedDeptIds = Common::isHousekeepingHodXcom($this->user->GetEmployee)
+                ? null
+                : Common::getScopedDepartmentIds($this->user->GetEmployee);
 
-            $requests = HousekeepingRequest::join('employees as t1', 't1.id', '=', 'housekeeping_requests.employee_id')
-                ->join('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
+            // leftJoin: room-only requests (raised on web, no employee) were
+            // silently dropped from this list by the inner join.
+            $requests = HousekeepingRequest::leftJoin('employees as t1', 't1.id', '=', 'housekeeping_requests.employee_id')
+                ->leftJoin('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
                 ->join('housekeeping_service_catalog as hsc', 'hsc.id', '=', 'housekeeping_requests.housekeeping_service_id')
                 ->where('housekeeping_requests.resort_id', $this->resort_id)
                 ->when($scopedDeptIds !== null, function ($query) use ($scopedDeptIds) {
@@ -243,8 +250,8 @@ class HousekeepingRequestController extends Controller
         try {
             $id = base64_decode($id, true);
 
-            $requestRow = HousekeepingRequest::join('employees as t1', 't1.id', '=', 'housekeeping_requests.employee_id')
-                ->join('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
+            $requestRow = HousekeepingRequest::leftJoin('employees as t1', 't1.id', '=', 'housekeeping_requests.employee_id')
+                ->leftJoin('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
                 ->join('housekeeping_service_catalog as hsc', 'hsc.id', '=', 'housekeeping_requests.housekeeping_service_id')
                 ->where('housekeeping_requests.resort_id', $this->resort_id)
                 ->where('housekeeping_requests.id', $id)
@@ -312,6 +319,22 @@ class HousekeepingRequestController extends Controller
             $housekeepingRequest->completed_at = now();
         }
         $housekeepingRequest->save();
+
+        // Decision side of the flow: tell whoever raised the request and the
+        // employee it is for (the create side already notifies).
+        try {
+            $actorEmpId = $this->user->GetEmployee->id ?? null;
+            Common::notifyEmployees(
+                $this->resort_id,
+                array_diff([$housekeepingRequest->raised_by, $housekeepingRequest->employee_id], [$actorEmpId]),
+                'Housekeeping Request ' . $housekeepingRequest->status,
+                'Your housekeeping request is now ' . $housekeepingRequest->status . '.',
+                'Housekeeping Request',
+                $housekeepingRequest->id
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('HousekeepingRequestController::updateStatus notify failed: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,

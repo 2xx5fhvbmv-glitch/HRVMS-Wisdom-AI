@@ -50,7 +50,8 @@
      data-uc-create-group-url="{{ route('resort.chat.createGroup') }}"
      data-uc-view-url-tpl="{{ route('resort.chat.view', ['type' => '__type__', 'type_id' => '__id__']) }}"
      data-uc-send-url="{{ route('resort.chat.send') }}"
-     data-uc-mark-read-url="{{ route('resort.chat.markRead') }}"
+     data-uc-mark-read-url="{{ route('resort.chat.threadRead') }}"
+     data-uc-delivered-url="{{ route('resort.chat.delivered') }}"
      data-uc-new-member-url-tpl="{{ route('resort.chat.newEmployeeList', ['type_id' => '__id__']) }}"
      data-uc-add-member-url-tpl="{{ route('resort.chat.addMember', ['type_id' => '__id__']) }}"
      data-uc-remove-member-url-tpl="{{ route('resort.chat.removeMember', ['type_id' => '__id__']) }}"
@@ -771,6 +772,7 @@
     var VIEW_URL_TPL = root.dataset.ucViewUrlTpl;
     var SEND_URL = root.dataset.ucSendUrl;
     var MARK_READ_URL = root.dataset.ucMarkReadUrl;
+    var DELIVERED_URL = root.dataset.ucDeliveredUrl;
     var NEW_MEMBER_URL_TPL = root.dataset.ucNewMemberUrlTpl;
     var ADD_MEMBER_URL_TPL = root.dataset.ucAddMemberUrlTpl;
     var REMOVE_MEMBER_URL_TPL = root.dataset.ucRemoveMemberUrlTpl;
@@ -930,6 +932,8 @@
 
     function handleIncomingMessage(data) {
         if (parseInt(data.sender_id, 10) === MY_ID) return; // echo of my own send
+        // Delivery ack -> sender's tick goes to double-grey.
+        postReceipt(DELIVERED_URL, data.type, data.type === 'group' ? data.type_id : data.sender_id);
         var open = state.current;
         var forOpenThread = open && data.type === open.type && String(data.type_id) === String(
             open.type === 'individual' ? MY_ID : open.id
@@ -1028,7 +1032,8 @@
             subscribedChannels[myChannel] = true;
             window.Echo.private(myChannel)
                 .listen('MessageSent', handleIncomingMessage)
-                .listen('UserTyping', handleTypingReceived);
+                .listen('UserTyping', handleTypingReceived)
+                .listen('MessageReceipt', handleReceipt);
         }
     }
     function subscribeToGroups(list) {
@@ -1314,7 +1319,7 @@
                     state.current.profile = res.body.data.profile;
                 }
                 renderMessages(res.body.messages || []);
-                markRead(res.body.messages || []);
+                markRead();
                 loadConversations(); // refresh the notch/panel unread count now that these are read
             })
             .catch(function () { msgsEl.innerHTML = '<div class="uc-empty">Something went wrong.</div>'; });
@@ -1377,7 +1382,7 @@
             }
             bubble += '<div class="uc-bt">' + ucTimeLabel(m.created_at);
             if (mine && m.read_status) {
-                bubble += ' <i class="fa-solid ' + (m.read_status === 'read' ? 'fa-check-double uc-tick-read' : 'fa-check uc-tick-sent') + '"></i>';
+                bubble += ' <i data-mid="' + m.id + '" class="fa-solid uc-tick ' + (m.read_status === 'read' ? 'fa-check-double uc-tick-read' : m.read_status === 'delivered' ? 'fa-check-double uc-tick-sent' : 'fa-check uc-tick-sent') + '"></i>';
             }
             bubble += '</div>';
             bubble += '</div>';
@@ -1389,16 +1394,31 @@
         msgsEl.scrollTop = msgsEl.scrollHeight;
     }
 
-    function markRead(messages) {
-        messages.forEach(function (m) {
-            if (parseInt(m.sender_id, 10) !== MY_ID) {
-                fetch(MARK_READ_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
-                    body: JSON.stringify({ conversation_id: m.id })
-                });
-            }
+    // One bulk call per thread open (server flips every unread message to
+    // Read and pushes a MessageReceipt to each sender).
+    function postReceipt(url, type, typeId) {
+        fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ type: type, type_id: typeId })
+        }).catch(function () {});
+    }
+    function markRead() {
+        postReceipt(MARK_READ_URL, state.current.type, state.current.id);
+    }
+
+    // Live tick upgrade from the server's MessageReceipt push.
+    function handleReceipt(d) {
+        if (!state.current) return;
+        var ids = d.message_ids || [];
+        ids.forEach(function (id) {
+            var el = document.querySelector('#uc-messages .uc-tick[data-mid="' + id + '"]');
+            if (!el) return;
+            if (d.type === 'group') return; // group ticks need every member — refreshed on next load
+            if (d.status === 'read') el.className = 'fa-solid fa-check-double uc-tick uc-tick-read';
+            else if (el.className.indexOf('uc-tick-read') < 0) el.className = 'fa-solid fa-check-double uc-tick uc-tick-sent';
         });
+        if (d.type === 'group' && ids.length && String(d.type_id) === String(state.current.id)) loadThread();
     }
 
     document.getElementById('uc-attachment').addEventListener('change', function () {

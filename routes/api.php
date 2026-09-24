@@ -675,6 +675,9 @@ use Illuminate\Support\Facades\Route;
 		Route::get('chat/get-messages/{type}/{type_id}', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'chatView']);
 		Route::get('chat/messages/mark-read', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'markAsRead']);
 		Route::post('chat/typing', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'typing']);
+		Route::post('chat/read', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'markThreadRead']);
+		Route::post('chat/delivered', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'markDelivered']);
+		Route::get('chat/message-status/{message_id}', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'messageStatus']);
 
 		// Pusher private/presence channel auth for mobile (Passport/api guard) —
 		// the default Broadcast::routes() auth endpoint only works under the

@@ -373,6 +373,7 @@ class MonthlyCheckingController extends Controller
                         "employee_id" =>$e->id,
                         "learning_request_id" =>$l->id,
                     ]);
+                    Common::notifyLearningManagerOfCheckinRequest($this->resort->resort_id, $l, $this->resort->first_name.' '.$this->resort->last_name, $e->id);
 
             }
             $msg                                =   'Meeting scheduled by HR for Monthly Check-In. Subject: ' . ($request->Area_of_Improvement ?? $request->Area_of_Discussion);
@@ -813,6 +814,7 @@ class MonthlyCheckingController extends Controller
                     'employee_id'         => $checkin->emp_id,
                     'learning_request_id' => $l->id,
                 ]);
+                Common::notifyLearningManagerOfCheckinRequest($this->resort->resort_id, $l, $this->resort->first_name.' '.$this->resort->last_name, $checkin->emp_id);
             }
 
             $title      = 'Monthly Check-In Submitted';

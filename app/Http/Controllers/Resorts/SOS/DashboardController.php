@@ -38,6 +38,13 @@ class DashboardController extends Controller
     }
     public function index(Request $request)
     {
+        // This page + its DataTables ajax had no permission check at all —
+        // the sidebar hid the link, but any resort-admin could open the URL
+        // and read the full SOS history.
+        if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
+            return abort(403, 'Unauthorized action.');
+        }
+
         $page_title="Dashboard";
 
         $query = SOSHistoryModel::with(['getSos','employee','employee.resortAdmin'])->where('resort_id',$this->resort->resort_id);

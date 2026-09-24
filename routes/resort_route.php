@@ -2277,6 +2277,9 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
       Route::post('chat/send', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'sendMessage'])->name('resort.chat.send');
       Route::post('chat/mark-read', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'markAsRead'])->name('resort.chat.markRead');
       Route::post('chat/typing', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'typing'])->name('resort.chat.typing');
+      Route::post('chat/read', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'markThreadRead'])->name('resort.chat.threadRead');
+      Route::post('chat/delivered', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'markDelivered'])->name('resort.chat.delivered');
+      Route::get('chat/message-status/{message_id}', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'messageStatus'])->name('resort.chat.messageStatus');
 
       // Clinic — temporary (third-party/agency) doctor accounts. HR-only
       // (Common::hasFullDataAccess(), checked in the controller); mobile

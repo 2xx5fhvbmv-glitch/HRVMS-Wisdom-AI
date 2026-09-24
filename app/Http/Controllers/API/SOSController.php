@@ -121,8 +121,21 @@ class SOSController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
         
-        // DB::beginTransaction();
         try {
+            // One live SOS per resort. Locked check + insert in one
+            // transaction so two simultaneous triggers can't both pass.
+            DB::beginTransaction();
+            $existingSos                                =   Common::activeSosForResort($this->resort_id, true);
+            if ($existingSos) {
+                DB::rollBack();
+                return response()->json([
+                    'success'                           =>  false,
+                    'code'                              =>  'SOS_ALREADY_ACTIVE',
+                    'message'                           =>  'An SOS is already in progress. Please wait until it is closed before raising a new one.',
+                    'data'                              =>  ['sos_id' => $existingSos->id, 'status' => $existingSos->status],
+                ], 409);
+            }
+
             $SOSHistoryAdd                              =   SOSHistoryModel::create([
                 'resort_id'                             =>  $this->resort_id,
                 'emergency_id'                          =>  $request->emergency_id,
@@ -135,6 +148,7 @@ class SOSController extends Controller
                 'time'                                  =>  Carbon::now()->format('H:i:s'),
                 'emergency_description'                 =>  $request->emergency_description,
             ]);
+            DB::commit();
 
             // Web dashboard had no way to know a new SOS came in except
             // manually refreshing — see routes/channels.php's
@@ -1208,10 +1222,9 @@ class SOSController extends Controller
                                                                 ->join('resort_positions as rp', 'e.position_id', '=', 'rp.id')
                                                                 ->join('sos_emergency_types as set', 'sos_history.emergency_id', '=', 'set.id')
                                                                 ->where('sos_history.resort_id', $this->resort_id)
-                                                                ->whereDate('sos_history.date', $currentDate)
-                                                                ->whereNotIn('sos_history.status', ['Completed','Rejected','Drill-Rejected','Drill-Completed'])
+                                                                ->whereNotIn('sos_history.status', Common::sosClosedStatuses())
                                                                 ->select('sos_history.*', 'set.name as emergency_name', 'ra.first_name', 'ra.last_name', 'ra.profile_picture','rp.position_title', 'e.Admin_Parent_id')
-                                                                ->orderBy('created_at', 'ASC')->first();
+                                                                ->orderByDesc('sos_history.id')->first();
             if (!$SOSEmergencyTypesModel) {
                 return response()->json(['success' => false, 'message' => 'SOS not found'], 200);
             }
@@ -1288,7 +1301,6 @@ class SOSController extends Controller
                                                                 ->join('resort_positions as rp', 'e.position_id', '=', 'rp.id')
                                                                 ->join('sos_emergency_types as set', 'sos_history.emergency_id', '=', 'set.id')
                                                                 ->where('sos_history.resort_id', $this->resort_id)
-                                                                ->whereDate('sos_history.date', $currentDate)
                                                                 ->whereIn('sos_history.status', Common::sosOpenStatuses())
                                                                 ->whereNotExists(function ($query) use ($employeeId) {
                                                                     $query->select(DB::raw(1))
@@ -1298,7 +1310,7 @@ class SOSController extends Controller
                                                                         ->whereIn('sos_history_employee_status.status', ['Safe', 'Unsafe']);
                                                                 })
                                                                 ->select('sos_history.*', 'set.name as emergency_name', 'ra.first_name', 'ra.last_name', 'ra.profile_picture', 'rp.position_title', 'e.Admin_Parent_id')
-                                                                ->orderBy('sos_history.created_at', 'ASC')
+                                                                ->orderByDesc('sos_history.id')
                                                                 ->get();
 
             $data                                        =   $openIncidents->map(function ($incident) use ($employeeId) {
@@ -1545,16 +1557,23 @@ class SOSController extends Controller
             $body                                   =   "SOS Alert: Incident was reported and is now under control. For your safety, please remain calm and proceed to the nearest designated assembly point.";
             $moduleName                             =   'SOS';
             
-            // Broadcast to every other active employee in the resort. This used
-            // to push only (sendPushNotificationForMobile against raw device
-            // tokens) — unlike every other SOS transition, it left no
-            // resort_notifications row, so anyone who missed the push had no
-            // record the all-clear ever happened. notifyEmployees() writes the
-            // row and pushes exactly once per employee (no separate push call
-            // needed here — pairing both would double-push, see Common.php's
-            // own doc comment on notifyEmployees).
-            $allEmpIds                               =   Employee::where('resort_id', $this->resort_id)->where('status', 'Active')->where('id', '!=', $this->user->GetEmployee->id)->pluck('id')->toArray();
-            Common::notifyEmployees($this->resort_id, $allEmpIds, $title, $body, $moduleName, $sosHistory->id, 'sos-all-clear');
+            // Web dashboards otherwise only learn of the close on refresh.
+            try {
+                event(new \App\Events\SosTriggered($this->resort_id, $sosHistory->id, $sosHistory->status, SOSEmergencyTypesModel::where('id', $sosHistory->emergency_id)->value('name'), $sosHistory->location, null));
+            } catch (\Throwable $e) {
+                \Log::warning('SosTriggered broadcast failed on completeSOSUpdateStatus: ' . $e->getMessage());
+            }
+
+            // All-clear fan-out (one DB row + broadcast per employee) took
+            // 10s+ inline, holding the manager's spinner. Respond first,
+            // notify after — notifyEmployees() writes the row and pushes once.
+            $resortId                                   =   $this->resort_id;
+            $managerEmpId                               =   $this->user->GetEmployee->id;
+            $sosId                                      =   $sosHistory->id;
+            dispatch(function () use ($resortId, $managerEmpId, $sosId, $title, $body, $moduleName) {
+                $allEmpIds                              =   Employee::where('resort_id', $resortId)->where('status', 'Active')->where('id', '!=', $managerEmpId)->pluck('id')->toArray();
+                Common::notifyEmployees($resortId, $allEmpIds, $title, $body, $moduleName, $sosId, 'sos-all-clear');
+            })->afterResponse();
 
             // DB::commit();
             return response()->json([
