@@ -125,7 +125,7 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | S4-03 | 4 | MEDIUM | Changing your password logs out only the current phone — other devices stay logged in | OPEN |
 | S4-04 | 4 | MEDIUM | Mobile tokens last one year (Passport default) — decided: 90 days | OPEN |
 | S5-01 | 5 | LOW | CORS config is dormant but misleading — one wrong edit would open the API to every website | OPEN |
-| P-01 | 6 · Payroll | HIGH | Anyone with a portal login can see every salary and run/change payroll — decided: HR + Finance only | OPEN (GM-approval point awaiting confirmation) |
+| P-01 | 6 · Payroll | HIGH | Anyone with a portal login can see every salary and run/change payroll — decided: HR + Finance only | OPEN |
 | P-02 | 6 · Payroll | HIGH | Payroll figures are taken from the browser and can be changed after approval | OPEN |
 | P-03 | 6 · Payroll | MEDIUM | Mobile payslip PDFs saved with guessable names in one shared folder, never deleted | OPEN |
 | P-04 | 6 · Payroll | LOW | Payroll import files kept forever on local disk; one unscoped deductions read | OPEN |
@@ -1138,23 +1138,23 @@ Each module is checked for four things:
 - **HODs / EXCOM of every other department: no payroll access at all**, not even their own department's totals.
 - **Everyone else, including L&D managers: no payroll access.** They see only their **own** payslip (mobile app / own profile).
 
-**⚠️ OPEN — needs the product owner's confirmation before implementing:** the GM is currently the **final approver** in three flows:
+**✅ DECIDED by the product owner (2026-09-26) — GM keeps the final-approver role (option (a) below).** The GM is currently the **final approver** in three flows, and **stays** the final approver in all three:
 - payroll run: Finance EXCOM → HR EXCOM → **GM** (`PayrollController.php:1482-1489`, `getApprovalStepForUser`)
 - final settlement: HR EXCOM → Finance EXCOM → **GM** (`PayslipController.php:908-910`, `:980`)
 - salary advance / loan: HR → Finance → **GM** (`AdvanceSalaryController.php:735+`)
 
-"No payroll access" for the GM would block these at the last step. Choose one:
-- **(a) Recommended: GM approves only.** The GM can open **only** the specific payroll, final settlement or advance that is **waiting for the GM's approval**, read-only, and approve or reject it. No payroll menu, no browsing other payrolls or payslips, no running, editing or configuring.
-- **(b) Remove the GM from the approval chains.** Payroll and final settlement end after the HR EXCOM / Finance EXCOM steps, and salary advances end at Finance. That changes the business process and needs code changes in all three flows.
+"No payroll access" for the GM would have blocked these at the last step, so the two options were:
+- **(a) ✅ CHOSEN — GM approves only.** The GM can open **only** the specific payroll, final settlement or advance that is **waiting for the GM's approval**, read-only, and approve or reject it. No payroll menu, no browsing other payrolls or payslips, no running, editing or configuring.
+- **(b) Rejected — remove the GM from the approval chains.** Payroll and final settlement end after the HR EXCOM / Finance EXCOM steps, and salary advances end at Finance. That changes the business process and needs code changes in all three flows.
 
-Until this is confirmed, **implement everything else in P-01 and keep the GM's existing approval steps working exactly as they are** (option (a) behaviour), so approvals don't break in production.
+So: **the approval chains stay exactly as they are** (Finance → HR → GM for payroll runs, HR → Finance → GM for final settlements, HR → Finance → GM for salary advances). The GM loses everything else in payroll: menu, browsing, payslips, running, editing, configuring, reports.
 
 **Fix:**
 1. Add **one** helper, e.g. `Common::canAccessPayroll($employee = null): bool`, that returns `true` only for HR and Finance as defined above (plus master admin). Build it on `getEmployeeRankPosition()`. **Don't** reuse `hasFullDataAccess()`: it lets in the GM and L&D managers, which the decision excludes. Don't change `hasFullDataAccess()` itself either, because other modules depend on it.
 2. Call it at the top of **every** method in `PayrollController`, `ConfigController`, `DashboardController`, `EWTController`, `PensionController`, `CasualPayrollController`, `PaymentConsentController`, the payslip + final-settlement methods of `PayslipController`, and the payroll/salary-advance report methods. Return `403` JSON for AJAX, `abort(403)` for pages. **Keep** the existing, stricter approval-step checks in `approvePayroll` / `approveFinalSettlement` / `AdvanceSalaryController::updateStatus`; the new gate goes *in front of* them, not instead of them.
 3. Replace the three `checkRouteWisePermission('payslip.finalsettlement', …)` calls with the new helper.
 4. In the two report controllers (`PayrollReportController`, `SalaryAdvanceLoanReportController`), gate every method with the new helper. Non-HR/Finance users (HODs, EXCOM, GM, L&D) get `403`, **not** a department-filtered view.
-5. GM approval (until the open point is confirmed): let the three approval endpoints (`approvePayroll`, `approveFinalSettlement`, `AdvanceSalaryController::updateStatus` with `action_by=gm`) and the **one** read-only view needed to review the item awaiting approval through for the GM, **only when** that item's pending approval step is the GM's. Everything else returns `403` to the GM.
+5. GM approval (decided, option (a)): let the three approval endpoints (`approvePayroll`, `approveFinalSettlement`, `AdvanceSalaryController::updateStatus` with `action_by=gm`) and the **one** read-only view needed to review the item awaiting approval through for the GM, **only when** that item's pending approval step is the GM's. Everything else returns `403` to the GM.
 6. Payroll-related menu entries should be hidden for users the helper rejects (frontend), so they don't click into `403` pages. Hiding a menu is **not** the protection, though: the server-side gate in steps 2-4 is.
 
 **VERIFY:** pick users of **one** resort: (a) HR, (b) a Finance-department user, (c) the GM, (d) a HOD/EXCOM of another department (e.g. F&B), (e) an L&D manager if the resort has one, and (f) a rank-4+ ordinary portal user. For **each** route in the table above, plus the payroll report routes, call it through the §0.5 harness pattern (same resort) and paste a table: `Route | HR | Finance | GM | other HOD | L&D | ordinary`. Expected: HR and Finance succeed; **GM, other HOD, L&D and ordinary users all get `403`**; nothing changes in the DB for any `403` row (compare `payroll_review` / `payroll` row counts and `updated_at` before and after). Separately: with a payroll in `pending_approval` at step 3, the GM **can** open that payroll's approval view and approve it (option (a)). Also confirm users (d), (e) and (f) can still see **their own** payslip in the mobile app.
