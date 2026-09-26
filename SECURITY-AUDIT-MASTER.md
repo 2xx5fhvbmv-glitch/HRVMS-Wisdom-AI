@@ -120,8 +120,11 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | S3-05 | 3 | HIGH | Chat sender identity (id, type, name, photo) is taken from the browser — messages can be faked | OPEN |
 | S3-06 | 3 | MEDIUM | Support reply sends email to any address the user types, with the user's text | OPEN |
 | S3-07 | 3 | LOW | Upload type gaps (SVG on tickets, no type check on chat) + raw name column in admin list | OPEN |
-| — | 4 | — | Passport token expiry | PENDING AUDIT |
-| — | 5 | — | CORS allows every origin | PENDING AUDIT |
+| S4-01 | 4 | HIGH | People who leave or are deactivated keep full mobile access (tokens never revoked, no status check) | OPEN |
+| S4-02 | 4 | HIGH | Login status checks are wrong: `Terminated`/`Resigned`/`Suspended` can log in; admin "inactive" check never matches; deactivated resorts not blocked on mobile | OPEN |
+| S4-03 | 4 | MEDIUM | Changing your password logs out only the current phone — other devices stay logged in | OPEN |
+| S4-04 | 4 | MEDIUM | Mobile tokens last one year (Passport default) | DECISION NEEDED |
+| S5-01 | 5 | LOW | CORS config is dormant but misleading — one wrong edit would open the API to every website | OPEN |
 | — | 6+ | — | Module-by-module sweep (tenant isolation + frontend XSS + uploads) | PENDING AUDIT |
 
 ---
@@ -946,8 +949,133 @@ Expected: *(no output)*, or only a line that is **not** used as the `Mail::to()`
 - Ticket **subject and description** are escaped in the super-admin view (`view.blade.php:36, 71`).
 - The super-admin routes are all behind `auth:admin` (`routes/admin_route.php:15`).
 - In the super-admin live chat, the **message text** itself is escaped (`admin/support/chat.blade.php:400`). Only the name, photo and file-name fields aren't (S3-04).
-## 5. STAGE 4 — Passport token expiry  ·  PENDING AUDIT
-## 6. STAGE 5 — CORS  ·  PENDING AUDIT
+## 5. STAGE 4 — Mobile login tokens & account lifecycle
+
+**Scope audited:** mobile login and logout (`app/Http/Controllers/API/LoginController.php`), password change (`app/Http/Controllers/API/ProfileController.php`), the `api` guard (`config/auth.php:43-47`, driver `passport`, Passport `v13.8.0`), the mobile route middleware (`routes/api.php`), every place an employee is deactivated, and the web-portal login (`app/Http/Controllers/Resorts/ResortLoginController.php`) for comparison.
+
+**Correction to an earlier chat claim:** tokens were described as "never expire". They **do** expire, after **one year**, Passport's default (`vendor/laravel/passport/src/Passport.php:296, 324`; nothing in the app overrides it). The real problems are that tokens **aren't cut off when they should be** (S4-01 to S4-03).
+
+**Already done well (don't redo):** login is rate-limited, compares passwords in constant time, caps each account at 5 live tokens and revokes the oldest (`LoginController.php:105-115`, `MAX_ACTIVE_TOKENS = 5` at `:30`); logout revokes the token (`:162-168`); every "forgot password" reset deletes **all** of that user's tokens (`Resorts/ResortforgotPasswordController.php:107` and the admin/shopkeeper equivalents).
+
+---
+
+### S4-01 · HIGH · People who leave or are deactivated keep full mobile access
+
+**What it is:** when an employee is deactivated or leaves, **nothing revokes their mobile tokens**, and **nothing checks their status on later requests**. Their app keeps working for up to a year. If they were HR, a HOD or GM, that includes approving leave, seeing their team's data, and everything else their role allows.
+
+**Where employees are deactivated, none of which touch tokens:**
+
+| File:line | Path |
+|---|---|
+| `app/Http/Controllers/Resorts/People/Employee/EmployeeController.php:2913` | HR sets employee `Inactive` |
+| `app/Http/Controllers/Resorts/People/Employee/EmployeeController.php:2933` | HR sets employee `Inactive` (second path) |
+| `app/Http/Controllers/Resorts/People/ExitClearance/ExitClearanceController.php:1185` | exit clearance completed → `Terminated` |
+| `app/Console/Commands/ApplyEmployeeLastWorkingDay.php:46` | nightly job: last working day passed → `Inactive` |
+| `app/Http/Controllers/Admin/ResortsController.php:323, 568` | super-admin sets a resort admin account `inactive` |
+
+**No per-request check:** the mobile routes use only `auth:api` (+ `applyResortSmtp`, and `check.rank:*` on some groups, `routes/api.php:24, 158+`). `CheckUserRankForAPI` checks rank, not status. Nothing re-checks `employees.status`, `resort_admins.status` or `resorts.status` after login.
+
+(Web portal: a deactivated user's **existing browser session** also keeps working until it idles out (30 minutes, `config/session.php:34`), because `resort_route.php:62` middleware doesn't check status either. Lower risk than a year-long mobile token, but fix it the same way.)
+
+**Fix (both parts are needed: part 1 cuts off the obvious paths, part 2 catches every path, including ones added later):**
+1. **Revoke on deactivation.** Add one helper in `Common.php`, e.g. `Common::revokeAllApiTokens(ResortAdmin $admin)` → `$admin->tokens()->update(['revoked' => true]);`, and call it at every row in the table above, right after the status change is saved (for employees, via `$employee->resortAdmin` / `Admin_Parent_id`). Wrap it in try/catch so a revoke failure never rolls back the HR action. **Invariant #7:** grep for any other place that sets `employees.status` or `resort_admins.status` (`grep -rnE "status'?\s*(=>|=)\s*['\"](Inactive|inactive|Terminated|Resigned|Suspended)['\"]" app`) and cover those too.
+2. **Check status on every mobile request.** Add a small middleware (e.g. `EnsureAccountActive`) to the `auth:api` group at `routes/api.php:24`. It rejects with `401` when the employee, the resort-admin account, or the **resort** isn't allowed (use the same allow-list as S4-02), and revokes the token it was called with. Add the same check to the web-portal group at `resort_route.php:62` (log out + redirect to login).
+
+**VERIFY:**
+- Tinker (transaction, rolled back): take an active employee with a live token (`$admin->tokens()->where('revoked', false)->count() > 0`), run the **real** deactivation code path (e.g. call the controller method at `EmployeeController.php:2913` with the harness pattern from §0.5), then `$admin->tokens()->where('revoked', false)->count()` → `0`. Repeat for the exit-clearance path and the `ApplyEmployeeLastWorkingDay` command. Paste all three results.
+- Middleware: with a token for an employee, set their status to `Terminated` **inside a transaction**, make an authenticated request through the HTTP kernel (e.g. `$this->withToken($t)->getJson('/api/...')` in a PHPUnit test using `DatabaseTransactions`, or `app()->handle(Request::create(...))` in tinker) → `401`. Set it back to `Active` → `200`.
+- `HUMAN` on staging with a real phone: log in on the app, have HR deactivate that employee in the portal, pull to refresh in the app → it must log out or show "account deactivated" **immediately**, not after a year.
+
+---
+
+### S4-02 · HIGH · Login status checks are wrong
+
+**Where:** `API/LoginController.php` `apiLogin()`, status checks right after the password check (`:71` employee, `:90` resort-admin), and `Resorts/ResortLoginController.php:73-99` for the web portal.
+
+**Confirmed problems:**
+1. **Block-list instead of allow-list.** The mobile login only blocks `employees.status == "Inactive"`. The status column (`database/migrations/2026_05_28_120000_add_offboarding_to_employees_status_enum.php:26-30`) also has `Terminated`, `Resigned`, `Suspended` (plus `Active`, `On Leave`, `Onboarding`, `Offboarding`). **A `Terminated`, `Resigned` or `Suspended` employee can log in to the mobile app.** Exit clearance sets exactly `Terminated` (`ExitClearanceController.php:1185`). The web portal has the same gap (`ResortLoginController.php:91` checks only `=== 'Inactive'`).
+2. **Wrong case, so the check never matches.** The mobile login checks `$resortAdmin->status == "Inactive"` (capital I, `:90`). The super-admin form saves `resort_admins.status` as lowercase `active` / `inactive` (`resources/views/admin/resorts/edit.blade.php:766-767`, saved at `Admin/ResortsController.php:323, 568`), and the web login correctly checks lowercase `'inactive'` (`ResortLoginController.php:82, 99`). PHP string comparison is case-sensitive, so **a resort-admin account the super-admin has deactivated can still log in to the mobile app.**
+3. **Deactivated resort not checked on mobile.** The web login blocks users of a resort whose `resorts.status` is `inactive` (`ResortLoginController.php:73`). The mobile login has **no resort check at all**. When a client resort is switched off (contract ended), its staff can still use the mobile app.
+
+**Fix:**
+1. Put one allow-list in `Common.php` (or on the `Employee` model), e.g. `Employee::LOGIN_ALLOWED_STATUSES = ['Active', 'On Leave', 'Onboarding', 'Offboarding']`. `HUMAN` confirms the list first: should `On Leave` / `Onboarding` / `Offboarding` employees have app access? Recommended: yes for all three. Block `Inactive`, `Terminated`, `Resigned`, `Suspended`.
+2. Use it in **both** logins and in the S4-01 middleware.
+3. Compare `resort_admins.status` and `resorts.status` **case-insensitively** (`strtolower($x) === 'inactive'`, or better, allow only `strtolower($x) === 'active'`).
+4. Add the resort-status check to the mobile login.
+5. Use the same "Account is deactivated" message and response shape for every blocked case (don't reveal *which* status blocked it).
+
+**VERIFY:** tinker (transaction, rolled back), with a real employee and password (or set a known password inside the transaction):
+| Case (set inside transaction) | Expected mobile login result | Expected web login result |
+|---|---|---|
+| employee `Active`, admin `active`, resort `active` | success | success |
+| employee `Terminated` | blocked | blocked |
+| employee `Resigned` | blocked | blocked |
+| employee `Suspended` | blocked | blocked |
+| admin `inactive` (lowercase, as the form saves it) | blocked | blocked |
+| resort `inactive` | blocked | blocked |
+Call `apiLogin` / the web login method directly with the harness pattern and paste the filled table.
+
+---
+
+### S4-03 · MEDIUM · Changing your password logs out only the current phone
+
+**Where:** `API/ProfileController.php:389-390`. After a successful password change it does `$employee->token()->revoke()`, which revokes **only the token used for this request**. Up to 4 other live tokens (other phones, an old tablet, **or whoever stole the password**) stay valid.
+
+**Why it matters:** "change my password" is exactly what a user does when they suspect someone else has their account. Today that doesn't lock the other person out.
+
+**Fix:** revoke **all** of the user's tokens: `$employee->tokens()->update(['revoked' => true]);`, the same as the forgot-password flows already do. (The current request's token is included, so the app must send the user back to login, which it already does today because the current token is revoked.) `HUMAN`/Ankit: also check any portal action where **HR resets an employee's password** and apply the same rule there (`grep -rn "Hash::make" app/Http/Controllers/Resorts | grep -i password`).
+
+**VERIFY:** tinker (transaction, rolled back): create 3 tokens for one user (`$admin->createToken('t1')` ×3), call the change-password method with one of them as the current token, then `$admin->tokens()->where('revoked', false)->count()` → `0`. Paste it.
+
+---
+
+### S4-04 · MEDIUM · DECISION NEEDED · Mobile tokens last one year
+
+**Where:** no `Passport::personalAccessTokensExpireIn(...)` call anywhere in `app/Providers`, so Passport's default of **1 year** applies (`vendor/laravel/passport/src/Passport.php:324`). Tokens are personal access tokens (`LoginController.php:119`, `createToken('ResortAdminToken')`), which have **no refresh token**. A shorter lifetime means users have to type their password again when it runs out.
+
+**Why it matters:** a stolen phone or copied token stays usable for up to a year. After S4-01/S4-03 this matters less (leavers and password changes are handled), which is why it's MEDIUM and a product decision.
+
+**Options (Ankit + product owner choose, and record the choice here):**
+- **A (simple):** `Passport::personalAccessTokensExpireIn(now()->addDays(90));` in `AppServiceProvider::boot()`. Users log in again every 90 days. The mobile app must treat a `401` as "go to login" (check it already does).
+- **B (better UX, more work):** switch to Passport's password grant with refresh tokens: short access tokens (e.g. 1 day), long refresh tokens (e.g. 90 days), and the app refreshes silently. Needs mobile-app changes.
+- Recommended: **A now**, B later if users complain.
+
+**VERIFY (after the choice):** `php artisan tinker --execute="echo \Laravel\Passport\Passport::personalAccessTokensExpireIn()->days;"` → the chosen number of days. Log in through the mobile login endpoint on staging, and check the new row: `oauth_access_tokens.expires_at` ≈ now + chosen period.
+
+---
+
+## 6. STAGE 5 — CORS
+
+**Correction to an earlier chat claim:** CORS was described as "allowing every origin". The config file says so, but **the setting is dormant**:
+- `config/cors.php` has `'allowed_origins' => ['*']`, but **no `paths` key**.
+- Laravel's `HandleCors` middleware (registered at `app/Http/Kernel.php:20`) only adds CORS headers when the request path matches `cors.paths`. With no paths, it **never adds any CORS headers** (`vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php`, `hasMatchingPath()` returns `false`).
+- Nothing else in `app/`, `config/`, `routes/`, `public/.htaccess` or `public/web.config` sets `Access-Control-Allow-*` headers.
+- Result: browsers apply the normal same-origin rule, and **other websites can't read this app's responses**. That's the safe state. The mobile app isn't affected, since CORS is a browser-only rule.
+
+### S5-01 · LOW · CORS config is dormant but misleading
+
+**Why it's still listed:** the file *looks* wide open, and the obvious "fix" if someone needs CORS for one thing is to add `'paths' => ['*']`. That would instantly apply `allowed_origins: *` to the whole app. Worse, if someone also sets `supports_credentials => true`, Laravel's CORS handling **echoes back whatever origin asks**, which lets **any website read logged-in portal pages using the victim's session cookie**. That would be a full cross-site data leak.
+
+**Fix:** make the file say what's actually intended:
+```php
+'paths' => [],                                  // no browser cross-origin access needed today
+'allowed_origins' => [],                        // add exact origins only when a real need appears
+'allowed_origins_patterns' => [],
+'supports_credentials' => false,               // never true together with a wildcard origin
+```
+Add a one-line comment at the top: "Mobile app doesn't need CORS. Only add explicit https origins here, never '*', never with supports_credentials=true."
+
+**VERIFY:**
+```bash
+php -r '$c = require "config/cors.php"; var_export([$c["paths"] ?? null, $c["allowed_origins"], $c["supports_credentials"]]);'
+```
+Expected: `array ( 0 => array ( ), 1 => array ( ), 2 => false, )`
+```bash
+# HUMAN, against production (checks the web server doesn't add CORS headers either):
+curl -s -D - -o /dev/null -H 'Origin: https://evil.example' https://<prod-domain>/api/login -X OPTIONS | grep -i '^access-control-allow'
+curl -s -D - -o /dev/null -H 'Origin: https://evil.example' https://<prod-domain>/resort/ | grep -i '^access-control-allow'
+```
+Expected: *(no output)* for both. If an `Access-Control-Allow-Origin` header **does** appear, it's coming from nginx/Apache or a CDN. Find and remove it; that would be a real finding.
 ## 7. STAGE 6+ — Module-by-module sweep  ·  PENDING AUDIT
 
 ---
