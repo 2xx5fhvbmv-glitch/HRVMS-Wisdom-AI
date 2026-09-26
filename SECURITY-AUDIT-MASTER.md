@@ -125,7 +125,11 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | S4-03 | 4 | MEDIUM | Changing your password logs out only the current phone — other devices stay logged in | OPEN |
 | S4-04 | 4 | MEDIUM | Mobile tokens last one year (Passport default) — decided: 90 days | OPEN |
 | S5-01 | 5 | LOW | CORS config is dormant but misleading — one wrong edit would open the API to every website | OPEN |
-| — | 6+ | — | Module-by-module sweep (tenant isolation + frontend XSS + uploads) | PENDING AUDIT |
+| P-01 | 6 · Payroll | HIGH | Anyone with a portal login can see every salary and run/change payroll (no role checks) | DECISION NEEDED (who may access payroll) |
+| P-02 | 6 · Payroll | HIGH | Payroll figures are taken from the browser and can be changed after approval | OPEN |
+| P-03 | 6 · Payroll | MEDIUM | Mobile payslip PDFs saved with guessable names in one shared folder, never deleted | OPEN |
+| P-04 | 6 · Payroll | LOW | Payroll import files kept forever on local disk; one unscoped deductions read | OPEN |
+| — | 6 · next modules | — | Visa & employee documents → People/Employee → Disciplinary → … | PENDING AUDIT |
 
 ---
 
@@ -1085,7 +1089,138 @@ curl -s -D - -o /dev/null -H 'Origin: https://evil.example' https://<prod-domain
 curl -s -D - -o /dev/null -H 'Origin: https://evil.example' https://<prod-domain>/resort/ | grep -i '^access-control-allow'
 ```
 Expected: *(no output)* for both. If an `Access-Control-Allow-Origin` header **does** appear, it's coming from nginx/Apache or a CDN. Find and remove it; that would be a real finding.
-## 7. STAGE 6+ — Module-by-module sweep  ·  PENDING AUDIT
+## 7. STAGE 6 — Module-by-module sweep
+
+Each module is checked for four things:
+1. **Tenant isolation** — can resort A read or change resort B's records?
+2. **Role access** — inside one resort, can someone see or do more than their role should allow (see X-01)?
+3. **XSS** — is text a user typed printed back as raw HTML?
+4. **Uploads** — are file types checked, and are files stored through `StorageHelper` in a safe place?
+
+**How the tenant-isolation check was done (so it can be repeated):** a script lists every query that looks up a record by an ID (`find()`, `findOrFail()`, `where('id', …)`, `whereIn('id', …)`, `where('<x>_id', $request…)`) and flags each **statement** that has no `resort_id` in it. Every flagged line was then **traced by hand**. Most turned out to be scoped another way (through a parent record already checked against the resort, or `whereHas('employee', resort_id)`). Only real problems are listed below.
+
+---
+
+### 7.1 Payroll
+
+**Scope audited:** `app/Http/Controllers/Resorts/Payroll/` (all 9 controllers: `PayrollController`, `PayslipController` incl. Final Settlement, `CasualPayrollController`, `ConfigController`, `DashboardController`, `EWTController`, `PensionController`, `ShopkeeperController`, `PaymentConsentController`), salary advances and repayments (`app/Http/Controllers/Resorts/People/Employee/AdvanceSalaryController.php`, `AdvanceSalaryRepaymentTrackerController.php`), payroll reports (`PayrollReportController.php`, `SalaryAdvanceLoanReportController.php`), mobile (`app/Http/Controllers/API/PayrollController.php`, salary-advance/guarantor methods in `API/RequestController.php`), the payroll import jobs (`app/Jobs/Import*Job.php`, `app/Imports/*`), and views under `resources/views/resorts/payroll/`. **124 web routes + 10 mobile routes.**
+
+**Good news first — tenant isolation in Payroll is clean.** 97 ID lookups were flagged by the script, and **every one** traced back to a resort check. Ankit's earlier hardening held across payroll runs, reviews, approvals, payslips, final settlements, salary advances, repayments, shopkeepers, payment consent and all mobile endpoints. **Don't re-audit these for cross-resort access.** The payroll problems are **inside** a resort: who can see and change salaries.
+
+---
+
+#### P-01 · HIGH · DECISION NEEDED · Anyone with a portal login can see every salary and run/change payroll
+
+**What it is:** because of X-01, only **11 of the 124** payroll routes are listed in `module_pages` (`payroll.run`, `payroll.dashboard`, `payroll.configration`, `payroll.ewt.index`, `payroll.pension.index`, `payroll.final.settlement`, `final.settlement.list`, `people.advance-salary.index`, `people.advance-salary-repayment-tracker.index`, `resort.casualPayroll.index`, `shopkeepers.create`). Those are the **menu pages**. The endpoints that actually return or change the data aren't listed, so they're open to **every logged-in portal user in the resort**. `PayrollController` (66 methods), `ConfigController`, `DashboardController`, `EWTController`, `PensionController` and `PaymentConsentController` contain **no permission checks** of their own.
+
+**What any portal user (e.g. a line supervisor with portal access) can do today:**
+
+| Action | Route → method |
+|---|---|
+| **See every employee's full payroll** (basic, allowances, OT, service charge, deductions, net) | `GET payroll/data/{id}` → `getPayrollData`; `GET payroll/view/{id}` → `viewPayroll` |
+| **Download / export the whole payroll** | `GET payroll/download/{id}` → `downloadPayroll`; `GET payroll/export-review/{id}/{type}` → `exportReview` |
+| **See anyone's payslip / email it to them** | `POST payroll/payslip/view` → `viewPayslip` + `GET payslip/show`; `POST payroll/payslip/share` |
+| **Build and edit a payroll run** | `POST payroll/save-draft`, `save-employees`, `save-attendance`, `save-attendance-note`, `save-service-charges`, `save-deductions`, `save-reviews`, `save-summary`, `send-for-approval` |
+| **Change pay configuration for everyone** (earning/deduction types, cutoff day, bulk imports) | `POST payroll/earnings/submit`, `payroll/deductions/submit`, `PUT/DELETE payroll/deductions/{id}`, `POST payroll/import-earnings`, `import-deductions`, `import-service-charges`, `save-cutoff-day` |
+| **Create / submit final settlements** (leaver pay-outs) | `POST final-settlement/store`, `final-settlement/submit` |
+
+**Also confirmed:**
+- **Final Settlement's own permission checks do nothing.** `PayslipController.php:400, 756, 1325` call `checkRouteWisePermission('payslip.finalsettlement', …)`, but **no route has that name**. An unknown route is treated as "unlisted", so the check **always passes**.
+- **Payroll reports**: `PayrollReportController` and `SalaryAdvanceLoanReportController` check the generic `resort.report.index` permission, then narrow by `Common::getScopedDepartmentIds()`. That helper (`app/Helpers/Common.php:5624`) gives **every non-HR employee their whole department**, whatever their rank. `Common::hasFullDataAccess()` (`:5559`) also gives **L&D / Training managers** (`'Training Director', 'L&D Manager', 'Learning & Development Head'`) **full access**, which in payroll reports means **every salary in the resort**. That rule was written for L&D data, not payroll.
+- **What is correctly protected:** payroll **approval** (`approvePayroll`, `PayrollController.php:1304+`: only Finance EXCOM → HR EXCOM → GM, in order, resort-scoped); salary-advance **approval** (`AdvanceSalaryController::updateStatus`, `:539+`: HR / Finance / GM checked on the server, with delegation); the mobile payslip endpoints (always the caller's own payslip).
+
+**`HUMAN` decision needed (record it here before fixing):** who may access payroll? Recommended default:
+- **Full payroll (view + run + configure + final settlements):** HR (rank 3, or HR-department rank 1-2), **Finance department** (as `Common::getEmployeeRankPosition()` already defines it: department "Finance"/"Accounting"), GM (rank 8), master admin.
+- **HODs / EXCOM outside HR/Finance:** decide between **no payroll access** (recommended) or **their own department's totals only, no individual salaries**.
+- **Everyone else, including L&D managers:** no payroll access. They see only their **own** payslip (mobile app / own profile).
+
+**Fix (after the decision):**
+1. Add **one** helper, e.g. `Common::canAccessPayroll($employee = null): bool`, implementing the decided list. Build it on the existing `getEmployeeRankPosition()` and the HR rule from `hasFullDataAccess()`, but **without** the L&D-title rule. Don't change `hasFullDataAccess()` itself: other modules depend on it.
+2. Call it at the top of **every** method in `PayrollController`, `ConfigController`, `DashboardController`, `EWTController`, `PensionController`, `CasualPayrollController`, `PaymentConsentController`, the payslip + final-settlement methods of `PayslipController`, and the payroll/salary-advance report methods. Return `403` JSON for AJAX, `abort(403)` for pages. **Keep** the existing, stricter approval-step checks in `approvePayroll` / `approveFinalSettlement` / `AdvanceSalaryController::updateStatus`; the new gate goes *in front of* them, not instead of them.
+3. Replace the three `checkRouteWisePermission('payslip.finalsettlement', …)` calls with the new helper.
+4. In the two report controllers, use the new helper instead of `getScopedDepartmentIds()` for salary figures (or apply the HOD rule from the decision).
+
+**VERIFY:** pick three users of **one** resort: (a) HR, (b) a Finance-department user, (c) a rank-4+ non-HR, non-Finance portal user, and (d) an L&D manager if the resort has one. For **each** route in the table above, call it through the §0.5 harness pattern (same resort) and paste a table: `Route | HR | Finance | other | L&D`. Expected: HR and Finance succeed, "other" and "L&D" get `403`, and nothing changes in the DB for the `403` rows (compare `payroll_review` / `payroll` row counts and `updated_at` before and after). Also confirm (c) **can** still see their own payslip in the mobile app.
+```bash
+grep -n "payslip.finalsettlement" app/Http/Controllers/Resorts/Payroll/PayslipController.php
+```
+Expected: *(no output)*
+
+---
+
+#### P-02 · HIGH · Payroll figures are taken from the browser and can be changed after approval
+
+**Where:**
+- `PayrollController::saveReviewsToPayroll()` (`:1002-1125`) writes each employee's `earned_salary`, `earnings_basic`, `earnings_normal`, `earnings_allowance`, every allowance line, all overtime figures, `service_charge`, `service_provider_commission` and `total_deductions` **exactly as the browser sends them** in `reviewData[]`, then computes `net_salary` from those numbers (`:1036-1060`). The server doesn't recompute them from attendance, allowances or the benefit grid.
+- **None** of the `save*` endpoints check the payroll's status before writing: `saveEmployeesToPayroll` (`:471`), `saveAttendanceToPayroll` (`:546`), `saveAttendanceNote` (`:647`), `saveServiceChargesToPayroll` (`:772`), `saveDeductionsToPayroll` (`:900`), `saveReviewsToPayroll` (`:1002`), `saveSummaryToPayroll` (`:1160`), `sendForApproval` (`:1262`). Statuses in use: `draft` → `locked` (`:1189`) → `pending_approval` (`:1293`) → `approved` (`:1392`), or back to `draft` on rejection (`:1365`).
+- `saveDraftPayroll` (`:381+`) finds the payroll for the same resort, category and dates with `updateOrCreate` and **sets its status to `draft`**. It only refuses when a `locked` one exists (`:424-429`), so a payroll that is **`pending_approval` or already `approved` gets pushed back to `draft`**.
+
+**Why it matters:** combined with P-01, any portal user can open DevTools and raise their own (or anyone's) `earned_salary` in `reviewData[]`, **even after Finance, HR and the GM have approved** the payroll. The approved totals the approvers saw no longer match what's stored. Even after P-01 is fixed, a payroll user can still change an approved payroll by mistake, or on purpose, with no audit trail. For a payroll system this is a **financial-integrity** finding that auditors look for specifically.
+
+**Fix:**
+1. Add one private guard in `PayrollController`, e.g. `assertPayrollEditable(Payroll $payroll)`, that refuses (`422`, "This payroll is locked/awaiting approval/approved and can no longer be changed") unless `$payroll->status === 'draft'`. Call it in **every** `save*` method and `sendForApproval` right after the existing resort-scoped payroll lookup. `saveSummaryToPayroll` is the step that moves `draft → locked`, so it must also refuse unless the status is `draft`.
+2. In `saveDraftPayroll`, refuse (instead of resetting) when the matching payroll's status is anything other than `draft`. Treat `locked`, `pending_approval` and `approved` the same.
+3. In `saveReviewsToPayroll`, **recompute** the money fields on the server from the already-saved attendance, allowances, service charge and deductions for that payroll + employee (the same calculation the review screen's JavaScript does today), and ignore the client values. Keep accepting only genuinely manual inputs (if any exist, e.g. a manual adjustment field), and log them with who and when. If a full server-side recompute is too big for this pass, the **minimum** is: after step 1, compare the client figures with a server recompute and reject differences above a small rounding tolerance.
+4. Record every change to a non-draft payroll attempt in the existing payroll activity log (`payroll_attendance_activity_log` / `showActivityLog`) so there's an audit trail.
+
+**VERIFY:**
+- Tinker (transaction, rolled back): take an `approved` payroll of resort A. As an HR user of A, call `saveReviewsToPayroll` with `payroll_id` = that payroll and one `reviewData` row with `earnedSalary` = original + 1000 → expect `422`, and `PayrollReview` for that employee **unchanged**. Repeat with a `pending_approval` payroll and a `locked` payroll → `422` both.
+- Same test calling `saveDraftPayroll` with that approved payroll's resort, category and dates → `422`, and `Payroll::find(id)->status` is still `approved`.
+- Draft control: on a `draft` payroll, send `earnedSalary` inflated by 1000 → the stored value equals the **server-computed** value, not the inflated one (or the request is rejected, if the minimum version of step 3 was chosen). Paste before/after values.
+- Normal flow still works end to end on staging: create a draft → fill all steps → save summary (locks) → send for approval → approve ×3 → `approved`.
+
+---
+
+#### P-03 · MEDIUM · Mobile payslip PDFs saved with guessable names in one shared folder, never deleted
+
+**Where:** `API/PayrollController::downloadPayslip()` — `API/PayrollController.php:805-807`:
+```php
+$relativePath = trim(config('settings.PayslipPdf'), '/') . '/' . time() . '_payslip.pdf';   // uploads/payslip/<unix-second>_payslip.pdf
+StorageHelper::put($relativePath, $pdf->output());
+$pdfUrl = StorageHelper::temporaryUrl($relativePath);
+```
+
+**Why it matters:**
+1. **Same-second collision:** the name is only the current second, with no resort, employee or random part. At month-end, when many staff open their payslip at once, two employees in the same second write to the **same file**, and one of them gets a link to the **other person's payslip** (full salary breakdown).
+2. **Guessable, permanent links on local-disk servers:** on Wasabi (production), `temporaryUrl` is signed and expires after 30 minutes. But `StorageHelper::temporaryUrl()` (`app/Helpers/StorageHelper.php`) returns a **plain public URL** when the disk isn't cloud. On any server running with local disk (staging, test, a fallback), anyone can walk `…/uploads/payslip/<timestamp>_payslip.pdf` second by second and download **everyone's** payslips.
+3. **Never deleted:** every download leaves another salary document in storage forever.
+
+**Fix:** don't store the PDF at all. Stream it straight back (`return $pdf->download('Payslip_<month>_<year>.pdf')`) if the mobile app can accept a file response. If the app needs a URL, store under `payslips/<resort_id>/<employee_id>/<Str::uuid()>.pdf`, return the signed URL, and delete it after a short time (a scheduled cleanup of files older than 1 hour). `HUMAN`: check with the mobile developer which of the two the app supports. `HUMAN`: delete the existing files under `uploads/payslip/` on every server and bucket.
+
+**VERIFY:**
+```bash
+grep -n "time() . '_payslip.pdf'" app/Http/Controllers/API/PayrollController.php
+```
+Expected: *(no output)*
+- Tinker: call `downloadPayslip` for two different employees back to back in the same second (loop without sleeping). The two returned URLs/paths must be different, and each PDF must contain its own employee's name.
+
+---
+
+#### P-04 · LOW · Import files kept forever on local disk; one unscoped deductions read
+
+| Where | Issue | Fix |
+|---|---|---|
+| `Payroll/ConfigController.php:67, 99, 131` | Uploaded pay-component spreadsheets saved with raw `$file->storeAs('imports', …)` (default local disk, not `StorageHelper`, against invariant #2) and only deleted when the import **fails**. Successful imports stay on disk forever. The extension allow-list is based on the client file name only. | Delete the file after a successful import too (or read it from the upload's temp path without storing it). Add `mimes:csv,xls,xlsx,ods` to the validator. |
+| `PayrollController.php:2637-2639` (inside `fetchTimeAttendance`) | `PayrollDeduction::where('payroll_id', $request->payrollId)` has no resort check. Impact is minimal: results are only merged into **this** resort's employee rows by key. It's the one unscoped read left in payroll. | Add a `Payroll::where('id', $request->payrollId)->where('resort_id', $resortId)->exists()` check before it (the same check the method already does in its other branches at `:2060-2064`). |
+
+**VERIFY:** after a successful import, `storage/app/imports/` doesn't contain the new file. `sed -n 2630,2645p app/Http/Controllers/Resorts/Payroll/PayrollController.php` shows the ownership check before the `PayrollDeduction` query.
+
+---
+
+#### Payroll — XSS and uploads: checked and found clean
+- The `{!! !!}` outputs in payroll views (`payslip/final_settlement_review.blade.php`, `dashboard/dashboard.blade.php`, `dashboard/drafts.blade.php`) all print `Common::formatCurrency(<number>)`, so no user text reaches them.
+- Raw DataTable columns in payroll (`PayrollController.php:371, 3623`, `PayslipController.php:131, 1415`, `PensionController.php:275, 418`, `AdvanceSalaryController.php:177`, `AdvanceSalaryRepaymentTrackerController.php:125`) build HTML from employee names, departments, positions and fixed status badges, all HR-controlled. No free text typed by employees was found in them. (Keep in mind for the People module: if employees can ever edit their own name, these become XSS.)
+- Payroll has no other upload paths besides the three imports in P-04.
+
+#### Payroll — non-security bug noticed (backlog)
+| File:line | Bug |
+|---|---|
+| `routes/resort_route.php:1817` | `people/advance-salary-repayment-tracker/update-status` points to `AdvanceSalaryRepaymentTrackerController@updateStatus`, **which doesn't exist**. Any button using this route fails with a 500. |
+
+---
+
+### 7.2 Next modules  ·  PENDING AUDIT
+Planned order (most sensitive first): Visa & employee documents → People / Employee profiles → Disciplinary → Leave & Island Pass → Time & Attendance → Performance → Incidents → Accommodation → Learning → Talent Acquisition → Survey → File Management → SOS → Wisdom AI.
 
 ---
 
