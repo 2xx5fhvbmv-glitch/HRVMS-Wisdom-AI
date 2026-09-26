@@ -139,7 +139,7 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | T-02 | 6 · Talent Acquisition | HIGH | Stored XSS: text typed by **anonymous applicants** runs as code in HR's browser (5 places) + HTML injected into interviewer emails | OPEN |
 | T-03 | 6 · Talent Acquisition | HIGH | Public applicant uploads not type-checked (CV, passport, other documents, SVG photos; video endpoint validation switched off) | OPEN |
 | T-04 | 6 · Talent Acquisition | HIGH | Cross-resort writes: edit another resort's interview assessment form; pull another resort's applicant into your interviews | OPEN |
-| T-05 | 6 · Talent Acquisition | HIGH | Any portal user can download all applicant documents (passports), delete applicants, send offers/contracts, set salaries | DECISION NEEDED (who may access recruitment) |
+| T-05 | 6 · Talent Acquisition | HIGH | Any portal user can download all applicant documents (passports), delete applicants, send offers/contracts, set salaries — decided: HR full, GM approvals, HOD own dept, interviewers assigned only | OPEN |
 | T-06 | 6 · Talent Acquisition | MEDIUM | Public forms have no rate limit / bot check; expired application links still work; submissions not tied to a valid open link | OPEN |
 | T-07 | 6 · Talent Acquisition | LOW | CV-extraction AI URL read with `env()`; public "remove video" deletes row #1; two smaller raw outputs | OPEN |
 | — | 6 · next modules | — | Visa & employee documents → People/Employee → Disciplinary → … | PENDING AUDIT |
@@ -1524,7 +1524,7 @@ Expected: *(no output)*
 
 ---
 
-#### T-05 · HIGH · DECISION NEEDED · Any portal user can open applicant documents and run hiring actions
+#### T-05 · HIGH · Any portal user can open applicant documents and run hiring actions  ·  ✅ DECIDED
 
 **What it is:** only **10 of 149** Talent Acquisition routes are listed in `module_pages` (X-01), mostly menu pages. `ApplicantsController` has a lot of **interview-round** logic (which rank interviews in which round), but the actions below have **no role check at all**. Every portal user in the resort can call them:
 
@@ -1540,7 +1540,7 @@ Expected: *(no output)*
 
 (Vacancy **approval** is correctly role-checked: `ConfigController::TaApprovedVcanciesNotification` resolves the approver's rank from the logged-in user and scopes the request to the resort.)
 
-**`HUMAN` decision needed (record it here before fixing) — who may access recruitment?** Recommended default:
+**✅ DECIDED by the product owner (2026-09-26) — who may access recruitment** (the recommended default below was accepted as-is):
 - **HR (the talent acquisition team):** full access: all vacancies and applicants, documents, offers, contracts, salary allocation, settings, templates, job adverts.
 - **GM:** vacancy approvals and final hiring approvals **as the existing interview/approval rounds already define**, plus read access to the applicants in those approvals. No settings, no deleting.
 - **HOD / EXCOM:** raise vacancy requests for **their own department**, and see and interview **only applicants for their own department's vacancies**, in the rounds assigned to them. No offers, contracts or salary, no settings, no bulk document download.
