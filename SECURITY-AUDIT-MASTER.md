@@ -144,7 +144,13 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | T-05 | 6 · Talent Acquisition | HIGH | Any portal user can download all applicant documents (passports), delete applicants, send offers/contracts, set salaries — decided: HR full, GM approvals, HOD own dept, interviewers assigned only | OPEN |
 | T-06 | 6 · Talent Acquisition | MEDIUM | Public forms have no rate limit / bot check; expired application links still work; submissions not tied to a valid open link | OPEN |
 | T-07 | 6 · Talent Acquisition | LOW | CV-extraction AI URL read with `env()`; public "remove video" deletes row #1; two smaller raw outputs | OPEN |
-| — | 6 · next modules | — | Visa & employee documents → People/Employee → Disciplinary → … | PENDING AUDIT |
+| V-01 | 6 · Visa | HIGH | Mobile app: any employee can download **every colleague's** documents (passports) | OPEN |
+| V-02 | 6 · Visa | HIGH | Any portal user can open expat passport/visa/work-permit data and run visa payments, deposits and wallet transfers | DECISION NEEDED (who may access Visa) |
+| V-03 | 6 · Visa | MEDIUM | Payment requests accept employees of other resorts | OPEN |
+| V-04 | 6 · Visa | MEDIUM | Upload gaps: bulk documents not type-checked, SVG allowed, AI helpers forward any file | OPEN |
+| V-05 | 6 · Visa | MEDIUM | Passports and visas are sent to the AI extraction service — confirm where it runs and that it's encrypted | HUMAN CHECK |
+| V-06 | 6 · Visa | LOW | Small items: unused unscoped lookup, leftover debug function, raw receipt number, import file kept | OPEN |
+| — | 6 · next modules | — | People/Employee → Disciplinary → Leave & Island Pass → … | PENDING AUDIT |
 
 ---
 
@@ -1702,8 +1708,126 @@ Expected: *(no output)*
 
 ---
 
-### 7.4 Next modules  ·  PENDING AUDIT
-Planned order (most sensitive first): Visa & employee documents → People / Employee profiles → Disciplinary → Leave & Island Pass → Time & Attendance → Performance → Incidents → Accommodation → Learning → Talent Acquisition → Survey → File Management → SOS → Wisdom AI.
+### 7.4 Visa & employee documents
+
+**Scope audited:** `app/Http/Controllers/Resorts/Visa/` (all 12 controllers: `ConfigurationController`, `DashboardController`, `DocumentController`, `ExpiryController`, `FetchDataAiController`, `FundTransferController`, `LiabilitiesController`, `PaymentDepositRequestController`, `PaymentRequestController`, `RenewalController`, `VisaReportController`, `XpactEmployeeController`, ~10,000 lines), mobile `app/Http/Controllers/API/EmployeeDocumentController.php` and the visa methods of `API/ProfileController.php` (`getVisaCategory`, `getVisaData`), the shared file-link helper `Common::GetAWSFile()` (`app/Helpers/Common.php:9137`), and views in `resources/views/resorts/Visa/`. **82 web routes + 4 mobile routes.** All five sweep criteria applied (§7 intro).
+
+**Why this module matters:** it holds expatriate staff's **passports, visas, work permits, medical and insurance records**, and the resort's visa **money**: payment requests, deposits, liabilities and wallet balances.
+
+**Good news first:**
+- **Tenant isolation is clean apart from V-03.** 35 lookups were flagged by the script and traced. Every employee-driven method checks the employee belongs to the caller's resort (`RenewalController::UploadSeparetFileUsingAi`, `UploadQuotaSlot`, `SubmitVerifiedDetails` `:1217`, `UpdateExpiryRecord`; `XpactEmployeeController::UpdateXpatDetails`, `PastTransectionHistory`, `EmployeeWiseVisaDocumentUpload`, `QuotaSlotMakrasPaid`; `PaymentDepositRequestController::DepositeRefundStore`; the payment schedule helper `currentScheduleCycle` and `resolveAdvanceFeeRows` are resort-scoped).
+- **File links can't cross resorts:** `Common::GetAWSFile()` only returns a file whose `child_file_management` row belongs to the given resort (`Common.php:9139-9140`).
+- **Mobile self-service is correct** except V-01: `getVisaData` returns only the caller's own records (`ProfileController`, `where('employee_id', $user->GetEmployee->id)`), and document **upload** (`employeeDocument`) always files the document under the caller themselves and validates the type (`:28`).
+- **XSS is clean:** the `{!! !!}` in Visa views only print `Common::formatMvr(<number>)`, and the one free-text field shown in a raw column (fund-transfer comment) is escaped with `e()` (`FundTransferController.php:179`).
+
+---
+
+#### V-01 · HIGH · Mobile app: any employee can download every colleague's documents (passports)
+
+**Where:** `POST resort/get-employees-docs` (`routes/api.php:69`) → `API/EmployeeDocumentController::getEmployeeDocument()` (`:112`):
+```php
+// EmployeeDocumentController.php:133-135
+$employeesDoc = EmployeesDocument::where('resort_id', $resortId)
+    ->where('document_category', $request->document_category)
+    ->get();
+```
+It filters by **resort** and **category** only, **not by employee**, then turns every row into a working signed download link (`:145+`, via `Common::GetAWSFile`). Any staff member with the mobile app who asks for `document_category = Passport` (or any other category) gets **every colleague's documents in their resort**, with download links.
+
+**Why it matters:** this is exactly the "pretending to be someone else / seeing someone else's data" case (criterion 5). The sibling upload endpoint (`employeeDocument`, `:40-49`) correctly files documents under the caller only, so this read side was clearly meant to be "my documents" too.
+
+**Fix:** add `->where('employee_id', $user->GetEmployee->id)` to the query at `:133` (the upload side stores `employee_id = $employee->id`, `:45`). If HR ever needs a resort-wide document list, that belongs in the **web** Visa module behind V-02's rules, not the mobile self-service endpoint.
+
+**VERIFY:** with mobile tokens for two employees A and B of the same resort, where B has uploaded a document in category `X`: A calls `get-employees-docs` with `document_category = X` → the response contains **none** of B's documents (only A's own, or "No documents found"). B calls it → B's documents are returned. Paste both responses (IDs and file names only, not the URLs).
+
+---
+
+#### V-02 · HIGH · DECISION NEEDED · Any portal user can open expat documents and run visa payments
+
+**What it is:** only **12 of 82** Visa routes are listed in `module_pages` (X-01), mostly the menu pages. Almost none of the controllers check roles in the method: `ConfigurationController`, `DocumentController`, `ExpiryController`, `FetchDataAiController`, `FundTransferController`, `LiabilitiesController`, `PaymentDepositRequestController`, `RenewalController` (14 methods) have **no** permission checks. `PaymentRequestController`, `XpactEmployeeController` and `VisaReportController` check only a few menu pages. So **any portal user in the resort** (any HOD, manager, clinic or security user) can:
+
+| Action | Where |
+|---|---|
+| Open any expat's passport, visa, work permit, medical, insurance details and documents | `XpactEmployeeController` (details, documents, transaction history), `RenewalController` (renewal views, `GetEmployeeDetails`) |
+| Upload / replace an employee's visa documents and run the AI extraction on them | `RenewalController::UploadSeparetFileUsingAi`, `UploadQuotaSlot`, `XpactEmployeeController::EmployeeWiseVisaDocumentUpload`, `DocumentController::CreateEmployee`, `FetchDataAiController` |
+| Change expiry dates / verified details | `RenewalController::UpdateExpiryRecord`, `SubmitVerifiedDetails` |
+| Create visa **payment requests**, mark fees **paid** | `PaymentRequestController::PaymentRequestSubmit`, `XpactEmployeeController::QuotaSlotMakrasPaid` |
+| Refund **deposits** | `PaymentDepositRequestController::DepositeRefundStore` |
+| **Move money between visa wallets** | `FundTransferController::VisaWalletToWalletTransfer` |
+| Change visa configuration (fees, nationality rates, wallets) | `ConfigurationController` (20 methods, 0 checks) |
+
+**`HUMAN` decision needed (record it here before fixing) — who may access Visa?** Recommended default:
+- **HR:** full access to all Visa screens and actions.
+- **Finance:** payment requests, marking fees paid, deposits, liabilities, wallets and fund transfers. Read access to the expat list and amounts. No document uploads or expiry changes.
+- **GM:** read-only dashboards and reports.
+- **HOD / EXCOM / everyone else, including L&D and clinic staff:** **no access.** Employees see only their **own** visa details and documents in the mobile app (already how `getVisaData` works; V-01 fixes the documents list).
+
+**Fix (after the decision):** gate every Visa route through the extended Permission module (X-01), with the rules above as the default ticks. Add in-method checks for the money actions (`VisaWalletToWalletTransfer`, `DepositeRefundStore`, `QuotaSlotMakrasPaid`, `PaymentRequestSubmit`) so they require HR or Finance even if a tick is set by mistake.
+
+**VERIFY:** users of one resort: HR, Finance, GM, a HOD, a clinic user. For each row of the table, call the endpoint and paste `Action | HR | Finance | GM | HOD | clinic`. Expected: matches the decided rules. For every `403`, no document, payment, deposit, wallet or expiry row changed.
+
+---
+
+#### V-03 · MEDIUM · Payment requests accept employees of other resorts
+
+**Where:** `PaymentRequestController::PaymentRequestSubmit()` (`:599`). The employees come from the keys of the `employee_ids` request array (`$employee_id = base64_decode($key)`, `:659`), and a `PaymentRequestChild` is created for each (`:704`) **without checking the employee belongs to the caller's resort**. The per-employee amounts (`VisaAmt`, `InsuranceAmt`, `WorkPermitAmt`, `MedicalAmt`, `QuotaAmt`) are taken from the browser too.
+
+**Impact:** a user can put another resort's employee into their own resort's payment request. That person's name and visa details then appear in the request's details and PDF (`PaymentRequestDetails` / `DownloadPymentRequest` load `RequestedEmployees.resortAdmin`). The fee rows it later marks paid are resort-scoped (`resolveAdvanceFeeRows`), so the other resort's records aren't changed, but the name/visa leak and the junk request are real.
+
+**Fix:** before the loop, check that **every** decoded employee id belongs to the resort (`Employee::whereIn('id', $ids)->where('resort_id', $rid)->count() === count($ids)`), else `422`. Recompute each fee amount on the server from the live schedule, as `resolveAdvanceFeeRows` already does for work permits and quota slots, instead of trusting `VisaAmt` etc. from the browser.
+
+**VERIFY:** §0.5 harness: submit with one resort-B employee id in `employee_ids` → `422`, no `payment_requests` / `payment_request_children` row created. Submit with a tampered `VisaAmt` for a resort-A employee → stored amount equals the server-computed fee.
+
+---
+
+#### V-04 · MEDIUM · Upload gaps
+
+| Where | Problem | Fix |
+|---|---|---|
+| `DocumentController::CreateEmployee` (`:164`, files read at `:195`, stored at `:234`) | `documents[]` (and `photo`, `:252`) have **no type or size validation** and go straight into the employee's File Management folder via `AWSEmployeeFileUpload`. | `documents.*` → `file|mimes:pdf,jpg,jpeg,png,heic,heif|max:5120`; `photo` → `image|mimes:jpg,jpeg,png,heic,heif|max:5120`. |
+| `RenewalController.php:278` | Renewal document rule allows **`svg`** (can carry script). | Remove `svg` (and `gif` unless needed). |
+| `RenewalController::PassportExpiry` (`:1534`), `CheckCv` (`:1646`), `Education` (`:1699`), `Experience` (`:1755`) | Forward **any** uploaded file to the AI service with no type or size check. Nothing is stored, but anyone with access can push arbitrary files at the AI service. | `mimes:pdf,jpg,jpeg,png,heic,heif|max:5120` on each. |
+| `FetchDataAiController::store` (`:57-66`) | "PDF only" is checked by the **file name extension** (`getClientOriginalExtension`), not the content. | Use `mimes:pdf` / `mimetypes:application/pdf`. |
+
+**VERIFY:** upload `test.html` renamed `test.pdf` to `FetchDataAiController::store` → rejected. Upload `x.svg` to renewal → rejected. `CreateEmployee` with a `.exe` in `documents[]` → rejected. Normal PDF/JPG uploads still work end to end.
+
+---
+
+#### V-05 · MEDIUM · HUMAN CHECK · Passports and visas are sent to the AI extraction service
+
+**Where:** visa and passport scans are uploaded to an AI extraction service to read the fields automatically: `RenewalController.php:311, 344, 1540` (`config('services.ai_extract.url')`), `FetchDataAiController.php:182-236` (`config('services.ai_extract.base_url')` → `extract_async` / `extract_result`). `config/services.php:84-87`:
+```php
+'ai_extract' => [
+    'url'      => env('AI_extract_work_details_URL'),
+    'base_url' => env('AI_URL', 'http://localhost:8001/'),
+],
+```
+
+**Why it's a check, not a confirmed bug:** the default is `http://localhost:8001` (a service on the same server, which is fine). But if production points `AI_URL` / `AI_extract_work_details_URL` at **another server**, then:
+- with `http://` instead of `https://`, **passport images cross the network unencrypted**;
+- if that service is operated by a **third party** (or sends data on to one, e.g. an LLM API), the international client's HR/legal team will need to know, because this is personal data leaving the system.
+
+**`HUMAN` answers (record here):**
+1. Where does the AI extraction service run (same server / our other server / third party)? What are the production values of `AI_URL` and `AI_extract_work_details_URL` (host only, and whether they're `https`)?
+2. Does that service keep the uploaded images, and does it send them to any outside AI provider?
+3. If it's not on the same server: it must use `https`, and the call should send an API key (the current curl calls send none, `FetchDataAiController.php:195-206`), so nobody else can use the service.
+
+**VERIFY:** the recorded answers above, plus `php artisan tinker --execute="echo parse_url(config('services.ai_extract.base_url'), PHP_URL_SCHEME), ' ', parse_url(config('services.ai_extract.base_url'), PHP_URL_HOST);"` on production → either `http localhost`/`127.0.0.1`, or `https <host>`.
+
+---
+
+#### V-06 · LOW · Small items
+
+| Where | Item | Fix |
+|---|---|---|
+| `RenewalController::GetEmployeeDetails` (`:85`) | Loads the employee with **no resort check**. The result is **never used** (all returned data is resort-scoped), so nothing leaks today. | Add the resort filter or delete the line. |
+| `DocumentController::FetchAithrowData` (`:78-82`) | Leftover debug function that just runs `dd(env('AI_URL'))`. Not routed today, but it would print the internal AI address if it ever were. | Delete it. |
+| `XpactEmployeeController.php:879-881` (`ReceiptNo` column, listed in `rawColumns` at `:888`) | HR-typed receipt number printed raw. | Wrap in `e()`. |
+| `ConfigurationController.php:284` | Nationality import file saved with raw `->store('imports')` and kept (same as P-04 / W-06). | Delete after import. |
+
+---
+
+### 7.5 Next modules  ·  PENDING AUDIT
+Done so far: Payroll (7.1), Manning & Budgeting (7.2), Talent Acquisition (7.3), Visa & employee documents (7.4). Remaining (most sensitive first): People / Employee profiles → Disciplinary → Leave & Island Pass → Time & Attendance → Performance → Incidents → Accommodation → Learning → Survey → File Management → SOS → Wisdom AI.
 
 ---
 
