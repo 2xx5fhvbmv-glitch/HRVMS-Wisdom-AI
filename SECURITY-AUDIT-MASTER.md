@@ -85,6 +85,14 @@ try {
 
 **Before-fix proof is required:** run the harness once **before** changing the code and paste the output that shows the leak (`CHANGED: …`). Then fix, re-run, and paste the passing output. A fix with no "before" proof doesn't count as verified.
 
+### 0.6 "How to reproduce" blocks (added 2026-09-26 at the product owner's request)
+
+Findings include a **How to reproduce** block written for a non-developer tester: **who to log in as**, **exact steps** (usually a browser-console snippet), **what you see today** (the problem) and **what you should see after the fix**. Rules for using them:
+- Only ever on **staging**, with **test employees / test records**. Never against production data.
+- Portal requests need the page's CSRF token. Every snippet reads it from `document.querySelector('meta[name=csrf-token]').content` (present in `resources/views/resorts/layouts/app.blade.php:9`), so run it from a page of the portal while logged in.
+- Record numbers (the `123` in URLs) come from DevTools → **Network** while an authorised user (usually HR) uses the screen normally.
+- Claude Code: when you fix an issue that has a How-to-reproduce block, run it **before** the fix (expect the "today" result) and **after** (expect the "after fix" result), and paste both outputs, in addition to the VERIFY block.
+
 ---
 
 ## 1. STATUS BOARD
@@ -1869,6 +1877,22 @@ The rest of People follows the same pattern: `AnnouncementController`, `BenefitG
 - **HOD / EXCOM:** read-only view of **their own department** (as today). No edits, no export, no credentials, no bank or salary view.
 - **Everyone else:** no access to other people's records.
 - **Bank account changes** additionally need a second step: notify the employee (push + email) whenever their bank details change, so fraud is noticed immediately.
+
+**How to reproduce (staging only):** *the F&B Manager changes a Housekeeping employee's bank account.*
+- **Setup:** an HR login; an F&B Manager login with **no** employee-edit permission ticked; a **test** employee in **Housekeeping** who has bank details.
+1. As **HR**: open the test employee → Bank Details → Edit. In DevTools → Network, note the number at the end of `…/people/employee/update-bank-details/123` (here **123**).
+2. Log in as the **F&B Manager**. Confirm the Housekeeping employee is **not** in their employee list (that part is correct).
+3. Still as the F&B Manager, press **F12 → Console**, paste and press Enter:
+   ```js
+   fetch('/resort/people/employee/update-bank-details/123', {
+     method: 'POST',
+     headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'X-Requested-With': 'XMLHttpRequest' },
+     body: new URLSearchParams({ bank_name: 'TEST BANK', bank_branch: 'Test', account_type: 'Savings', IFSC_BIC: 'TEST', account_holder_name: 'F&B Manager', account_no: '999999999', currency: 'MVR', IBAN: 'TEST' })
+   }).then(r => r.text()).then(console.log);
+   ```
+- **Today (the problem):** the console prints `Bank details updated successfully.`; as HR, the employee's account number is now **999999999**.
+- **After the fix:** the console shows a `403` / "not allowed" response, and the account number is unchanged.
+- The same pattern works for the other rows of the table (e.g. `changeStatus`, `updateSalary`), with their own URL and fields from DevTools → Network.
 
 **Fix (after the decision):** gate every method in the table through the extended Permission module (X-01) with the decided default ticks, plus an in-method check on the most dangerous actions (`updateBankDetails`, `addBankDetails`, `updateSalary`, `changeStatus`, `activate`, `sendCredentials`, `updateEmploymentData`, `delete`, `bulkDelete`, `exportSelected`) so they require HR even if a tick is set by mistake. Add the bank-change notification. For HOD read access, keep using `getScopedDepartmentIds()` as the list/profile already do.
 
