@@ -123,7 +123,7 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | S4-01 | 4 | HIGH | People who leave or are deactivated keep full mobile access (tokens never revoked, no status check) | OPEN |
 | S4-02 | 4 | HIGH | Login status checks are wrong: `Terminated`/`Resigned`/`Suspended` can log in; admin "inactive" check never matches; deactivated resorts not blocked on mobile | OPEN |
 | S4-03 | 4 | MEDIUM | Changing your password logs out only the current phone — other devices stay logged in | OPEN |
-| S4-04 | 4 | MEDIUM | Mobile tokens last one year (Passport default) | DECISION NEEDED |
+| S4-04 | 4 | MEDIUM | Mobile tokens last one year (Passport default) — decided: 90 days | OPEN |
 | S5-01 | 5 | LOW | CORS config is dormant but misleading — one wrong edit would open the API to every website | OPEN |
 | — | 6+ | — | Module-by-module sweep (tenant isolation + frontend XSS + uploads) | PENDING AUDIT |
 
@@ -998,7 +998,8 @@ Expected: *(no output)*, or only a line that is **not** used as the `Mail::to()`
 3. **Deactivated resort not checked on mobile.** The web login blocks users of a resort whose `resorts.status` is `inactive` (`ResortLoginController.php:73`). The mobile login has **no resort check at all**. When a client resort is switched off (contract ended), its staff can still use the mobile app.
 
 **Fix:**
-1. Put one allow-list in `Common.php` (or on the `Employee` model), e.g. `Employee::LOGIN_ALLOWED_STATUSES = ['Active', 'On Leave', 'Onboarding', 'Offboarding']`. `HUMAN` confirms the list first: should `On Leave` / `Onboarding` / `Offboarding` employees have app access? Recommended: yes for all three. Block `Inactive`, `Terminated`, `Resigned`, `Suspended`.
+1. Put one allow-list in `Common.php` (or on the `Employee` model): `Employee::LOGIN_ALLOWED_STATUSES = ['Active', 'On Leave', 'Onboarding', 'Offboarding']`.
+   **✅ DECIDED by the product owner (2026-09-26):** employees who are `On Leave`, `Onboarding` or `Offboarding` (working their notice) **keep** app access. Access must end **immediately** when an employee is marked `Inactive`, `Terminated`, `Resigned` or `Suspended`. "Immediately" means S4-01 (revoke tokens at the moment the status changes, plus the per-request middleware) is required, not optional. Blocking only at the next login isn't enough. Any **new** status added to the enum later is **blocked by default** until it's added to this allow-list on purpose.
 2. Use it in **both** logins and in the S4-01 middleware.
 3. Compare `resort_admins.status` and `resorts.status` **case-insensitively** (`strtolower($x) === 'inactive'`, or better, allow only `strtolower($x) === 'active'`).
 4. Add the resort-status check to the mobile login.
@@ -1029,7 +1030,7 @@ Call `apiLogin` / the web login method directly with the harness pattern and pas
 
 ---
 
-### S4-04 · MEDIUM · DECISION NEEDED · Mobile tokens last one year
+### S4-04 · MEDIUM · Mobile tokens last one year  ·  ✅ DECIDED: 90 days (Option A)
 
 **Where:** no `Passport::personalAccessTokensExpireIn(...)` call anywhere in `app/Providers`, so Passport's default of **1 year** applies (`vendor/laravel/passport/src/Passport.php:324`). Tokens are personal access tokens (`LoginController.php:119`, `createToken('ResortAdminToken')`), which have **no refresh token**. A shorter lifetime means users have to type their password again when it runs out.
 
@@ -1040,7 +1041,15 @@ Call `apiLogin` / the web login method directly with the harness pattern and pas
 - **B (better UX, more work):** switch to Passport's password grant with refresh tokens: short access tokens (e.g. 1 day), long refresh tokens (e.g. 90 days), and the app refreshes silently. Needs mobile-app changes.
 - Recommended: **A now**, B later if users complain.
 
-**VERIFY (after the choice):** `php artisan tinker --execute="echo \Laravel\Passport\Passport::personalAccessTokensExpireIn()->days;"` → the chosen number of days. Log in through the mobile login endpoint on staging, and check the new row: `oauth_access_tokens.expires_at` ≈ now + chosen period.
+**✅ DECIDED by the product owner (2026-09-26): Option A, 90 days.** Staff will have to enter their password again every 90 days; that trade-off is accepted. Implement exactly `Passport::personalAccessTokensExpireIn(now()->addDays(90));` in `AppServiceProvider::boot()`. **Existing tokens** were issued with a one-year expiry, which the new setting doesn't shorten. `HUMAN` decides whether to cut them to 90 days with a one-off **migration** (`UPDATE oauth_access_tokens SET expires_at = LEAST(expires_at, created_at + INTERVAL 90 DAY) WHERE revoked = 0`). Recommended: yes, so the rule applies to everyone from day one.
+
+**VERIFY:**
+```bash
+php artisan tinker --execute="echo now()->diffInDays(now()->add(\Laravel\Passport\Passport::personalAccessTokensExpireIn()));"
+```
+Expected: `90` (or `89`/`90` depending on the clock).
+- Log in through the mobile login endpoint (`POST /api/login`) on staging, then check the newest `oauth_access_tokens` row for that user: `expires_at` ≈ `created_at` + 90 days. Paste both timestamps.
+- Mobile app check (`HUMAN`, staging only): temporarily change the lifetime to `now()->addMinutes(2)` on the staging server, log in on a test phone, wait 3 minutes, reopen the app. It must go to the login screen cleanly (no crash, no endless spinner). Then set it back to 90 days. (No manual DB edits, per CLAUDE.md invariant #1.)
 
 ---
 
