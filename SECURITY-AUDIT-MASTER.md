@@ -130,8 +130,8 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | P-03 | 6 · Payroll | MEDIUM | Mobile payslip PDFs saved with guessable names in one shared folder, never deleted | OPEN |
 | P-04 | 6 · Payroll | LOW | Payroll import files kept forever on local disk; one unscoped deductions read | OPEN |
 | W-01 | 6 · Manning & Budget | HIGH | Mobile app: any employee can read **another resort's** budget costs and org structure by changing `resort_id` | OPEN |
-| W-02 | 6 · Manning & Budget | HIGH | Anyone with a portal login can **approve** a department budget, or all budgets for the year | OPEN |
-| W-03 | 6 · Manning & Budget | HIGH | Salary-level budget data (every employee's current + proposed salary) readable and editable by any portal user | DECISION NEEDED (who may access budgets) |
+| W-02 | 6 · Manning & Budget | HIGH | Anyone with a portal login can **approve** a department budget, or all budgets for the year — decided: GM only | OPEN |
+| W-03 | 6 · Manning & Budget | HIGH | Salary-level budget data (every employee's current + proposed salary) readable and editable by any portal user — decided: HR/Finance full, GM view+approve, HOD own dept | OPEN |
 | W-04 | 6 · Manning & Budget | MEDIUM | A HOD can submit or overwrite **another department's** manning budget | OPEN |
 | W-05 | 6 · Manning & Budget | LOW | Records from other resorts accepted as references (cost items, parent division/department/section, employee) | OPEN |
 | W-06 | 6 · Manning & Budget | LOW | Budget/occupancy import files kept forever on local disk | OPEN |
@@ -1278,7 +1278,7 @@ Expected for **all five**: `403`, or data belonging to **resort A only** (check 
 
 ---
 
-#### W-02 · HIGH · Anyone with a portal login can approve a department budget, or all budgets for the year
+#### W-02 · HIGH · Anyone with a portal login can approve a department budget, or all budgets for the year  ·  ✅ DECIDED: GM only
 
 **Where:**
 - `BudgetController::approveBudget()` (`:3013`, route `POST /budget/approve`, `resort.budget.approve`): marks one department's manning budget `Approved`, writes an `Approved` `BudgetStatus` row, notifies HR and the HOD.
@@ -1295,13 +1295,13 @@ if (($pos['position'] ?? null) !== 'GM') {
     return response()->json(['success' => false, 'message' => 'Only the GM can approve budgets.'], 403);
 }
 ```
-`HUMAN` confirms: is the GM the **only** approver, for both single-department and approve-all? The screen suggests yes. Also check the budget is actually at the GM stage (`budget_process_status === 'GM'`) before approving, so an approval can't skip the HR → Finance steps.
+**✅ DECIDED by the product owner (2026-09-26): only the GM approves budgets**, for both single-department approval (`approveBudget`) and approve-all (`approveAllDepartmentBudgets`). HR, Finance, HODs and everyone else get `403` on both. Also check the budget is actually at the GM stage (`budget_process_status === 'GM'`) before approving, so an approval can't skip the HR → Finance steps.
 
 **VERIFY:** §0.5 harness, same resort: call `approveBudget` and `approveAllDepartmentBudgets` as (a) a HOD, (b) HR, (c) Finance, (d) the GM, each on a budget that is at the GM stage. Expected: (a), (b), (c) → `403` and `budget_process_status` unchanged; (d) → success. Also as the GM on a budget still at the **HR** stage → refused. Paste the results table.
 
 ---
 
-#### W-03 · HIGH · DECISION NEEDED · Salary-level budget data readable and editable by any portal user
+#### W-03 · HIGH · Salary-level budget data readable and editable by any portal user  ·  ✅ DECIDED
 
 **What it is:** the budget screens themselves (`ViewBudget`, `ConsolidateBudget`, `ViewManning`, `CompareBudget`) do check rank. But the **data endpoints behind them** have **no role or department check**, only a resort check. Any portal user can call them directly:
 
@@ -1318,7 +1318,7 @@ if (($pos['position'] ?? null) !== 'GM') {
 | `/budget/cost/*`, `/budget/cost/nonpermanent/*` | `BudgetCostController`, `NonpermanentBudgetCostController` (no permission checks) | Create / edit / delete the resort's cost items (allowances, benefits, rates) |
 | `/store-occupancy`, `/store-import-datas`, `/store-bulk-occupancy` | `OccupancyController` (no permission checks) | Change the occupancy forecast that drives staffing numbers |
 
-**`HUMAN` decision needed (record it here before fixing) — who may access manning & budgets?** Recommended default, matching the intended process above:
+**✅ DECIDED by the product owner (2026-09-26) — who may access manning & budgets** (the recommended default below was accepted as-is):
 - **HR and Finance:** full access (view all departments, edit, configure costs, export).
 - **GM:** view the consolidated budget and approve (W-02). The GM doesn't edit figures.
 - **HODs / EXCOM:** **only their own department's** manning request and budget (fill in, save draft, submit, view). No other department, no resort-wide totals, no cost configuration, no export.
