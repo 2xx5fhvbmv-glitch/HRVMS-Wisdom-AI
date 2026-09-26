@@ -112,7 +112,9 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | S2-09 | 2 | MEDIUM | Grievant's app shows witness statements — decided: hide statements, keep committee notes for now | OPEN |
 | S2-10 | 2 | LOW | Grievance numbers are one global sequence across all resorts | OPEN |
 | S2-11 | 2 | LOW | Mobile witness-statement lookup not scoped (safe today, defence in depth) | OPEN |
-| X-01 | cross-cutting | HIGH | Portal permission check allows every route not listed in `module_pages` (~91% of routes) | DECISION NEEDED |
+| X-01 | cross-cutting | HIGH | Portal permission check allows every route not listed in `module_pages` (~91% of routes) — decided: extend the Permission module | OPEN |
+| X-02 | cross-cutting | HIGH | Mobile app: 5 endpoints let a user act on / view **any** employee (other resorts or colleagues) by changing an ID | OPEN |
+| X-03 | cross-cutting | MEDIUM | Super-admin "log in as resort user": any admin-panel account can use it, no audit trail, ends in a broken route | OPEN |
 | S3-01 | 3 | CRITICAL | Live support chat runs on public channels — anyone can read every resort's support chats | OPEN |
 | S3-02 | 3 | CRITICAL (LIKELY) | Support reply attachments: any file type saved into the web root (possible code execution) | OPEN |
 | S3-03 | 3 | HIGH | Stored XSS in the support ticket email thread (super-admin view + resort view) | OPEN |
@@ -718,27 +720,76 @@ Expected: *(no output)* — both replaced by scoped versions.
 
 ---
 
-### X-01 · HIGH · DECISION NEEDED · Portal permission check allows every unlisted route
+### X-01 · HIGH · Portal permission check allows every unlisted route  ·  ✅ DECIDED: extend the existing Permission module
 
-**Where:** `Common::checkRouteWisePermission()` (`app/Helpers/Common.php`), called for every portal request by `app/Http/Middleware/CheckResortPermission.php`:
+#### How the Permission module works today (plain-language explanation)
+
+1. **Where HR sets it:** HR → Permissions (`app/Http/Controllers/Resorts/ResortInternalPermission.php`). HR picks a **department + position**, and for each **page** ticks **View / Create / Edit / Delete**. Saved in `resort_interal_pages_permissions` (per resort, department, position, page, permission type).
+2. **What a "page" is:** one row in `module_pages` = **one route name** (`internal_route`). Payroll, for example, has 7 tickable pages: Dashboard (`payroll.dashboard`), Shopkeepers (`shopkeepers.create`), **Run Pay Roll (`payroll.run`)**, Pension, EWT, Final Settlement, Configuration (`database/seeders/ResortModulePagesSeeder.php:454-505`).
+3. **What's checked on every portal request:** `app/Http/Middleware/CheckResortPermission.php` → `Common::checkRouteWisePermission()` looks up the **exact** route name being called in `module_pages`:
+   - **Listed page** → checks the user's position has the **View** tick (`Common::resortHasPermission`). ✅ This works. It's why an HOD without the tick doesn't see the menu or the page.
+   - **Not a listed page** → `if(!$pagesList){ return true; // No page found for this route }` → **allowed for every logged-in portal user.**
+4. **The gap:** a screen like *Run Pay Roll* is one route (`payroll.run`), but it works by calling **many other routes in the background**: `payroll.getData`, `payroll.saveReviews`, `payroll.saveSummary`, `payroll.download`, `payroll.export.review`, `payroll.send.approval`… **None are listed pages, so all are allowed for anyone logged in.** Unticking "Run Pay Roll" hides the page and menu (the door), but the data and actions behind it (the windows) stay open. Anyone who calls those addresses directly, or changes an ID in one, gets through.
+5. **Two more weaknesses:**
+   - The middleware always checks **View**, even for saving and deleting. HR's **Create / Edit / Delete** ticks aren't enforced by it at all.
+   - Matching is by **exact** route name only, with no "this route belongs to that page" concept.
+6. **Who this affects:** everyone who can log into the portal. The login blocks only **Supervisors (rank 5) and Line Workers (rank 6)** (`ResortLoginController.php`, "Web-portal access gate"). Every HOD, EXCOM, Manager, Finance, GM, MD, Security Officer, Engineering HOD and Clinic user can log in.
+
+**Scale:** in the repo's seed files, about **140 of 1,544** portal route names are listed pages (~9%). The super-admin can add pages in the admin panel, so the **live** number may be higher. `HUMAN` runs this **read-only** command on production to get the exact picture (it changes nothing):
 ```php
-if(!$pagesList){
-    return true; // No page found for this route
-}
+php artisan tinker --execute='
+$listed = \App\Models\ModulePages::whereNull("deleted_at")->pluck("internal_route")->filter()->unique();
+$portal = collect(\Illuminate\Support\Facades\Route::getRoutes())->filter(fn($r) => in_array("checkResortPermission", $r->gatherMiddleware()))->map(fn($r) => $r->getName())->filter()->unique();
+echo "portal routes: ".$portal->count().PHP_EOL."listed as permission pages: ".$portal->intersect($listed)->count().PHP_EOL."NOT covered by the Permission module: ".$portal->diff($listed)->count().PHP_EOL;
+file_put_contents(storage_path("app/unprotected_routes.txt"), $portal->diff($listed)->sort()->implode(PHP_EOL));
+echo "full list written to storage/app/unprotected_routes.txt".PHP_EOL;'
 ```
-Also: the middleware always checks the **view** permission, even for create/edit/delete routes.
 
-**Scale:** about **140 of the 1,544** named portal routes appear in `module_pages` seeders/migrations, so **about 91% of portal routes skip the role/permission system**. They rely only on whatever each method checks itself, which in the grievance module was almost nothing (S2-06). This figure comes from the repo's seeders; the live `module_pages` table may contain more rows. `HUMAN` confirms with a read-only query:
+#### ✅ DECIDED fix plan (product owner, 2026-09-26): extend the Permission module HR already uses
+
+Goal: **HR's ticks become the single control for every portal address**, not just for the page that opens a screen. HR keeps using the same Permissions screen; nothing changes for them.
+
+**Step 1 — Give every route an owner page and a required tick.**
+Create `config/route_permissions.php`: a map from **every** portal route name to the page it belongs to and the tick it needs:
 ```php
-php artisan tinker --execute="echo \App\Models\ModulePages::whereNotNull('internal_route')->distinct('internal_route')->count('internal_route');"
+return [
+    // route name                => [owner page (module_pages.internal_route), required permission]
+    'payroll.getData'            => ['payroll.run', 'view'],
+    'payroll.download'           => ['payroll.run', 'view'],
+    'payroll.export.review'      => ['payroll.run', 'view'],
+    'payroll.saveReviews'        => ['payroll.run', 'edit'],
+    'payroll.saveSummary'        => ['payroll.run', 'edit'],
+    'payroll.send.approval'      => ['payroll.run', 'edit'],
+    'deductions.delete'          => ['payroll.configration', 'delete'],
+    // …one line per route…
+    // Routes every logged-in portal user genuinely needs (own profile, notifications, global search,
+    // dashboards' widget endpoints, chat) are listed explicitly:
+    'resort.getMenuData'         => ['*', 'any_authenticated'],
+];
 ```
+Rule of thumb for the tick: `GET` that reads data → `view`; creating → `create`; changing → `edit`; removing → `delete`. Build the first version by module, starting with the most sensitive: **Payroll → Manning & Budget → Talent Acquisition → Grievance & Disciplinary → Visa & Documents → People**. Use `storage/app/unprotected_routes.txt` from the command above as the checklist.
 
-**Why it's a decision, not a quick fix:** flipping the default to "deny" would instantly **lock users out of about 1,400 routes** (every AJAX endpoint, every detail page) and take the portal down. Options, for Ankit to choose:
-- **A (recommended):** keep the default, and fix each module's sensitive actions with explicit in-method role checks during the module sweep (as S2-06 does for grievance). Safe, gradual.
-- **B:** list every route in `module_pages` with the right permission, then flip to deny-by-default. Correct in the end, but a large project with outage risk.
-- **C:** a middle path: deny-by-default only for `POST`/`PUT`/`DELETE` routes not listed, after an audit of which ones legitimately need to stay open.
+**Step 2 — Make the middleware enforce the map, in "report-only" mode first.**
+Change `Common::checkRouteWisePermission()` / `CheckResortPermission` so that for the current route it:
+1. uses the route's own `module_pages` row if it has one (today's behaviour), otherwise the owner page from `config/route_permissions.php`;
+2. checks the **required tick** from the map (not always View);
+3. `any_authenticated` → allow;
+4. **route in neither place** → during report-only: **allow but log** (`Log::warning('UNMAPPED_ROUTE', [route, user, resort])`); after switch-over: **deny (403)**.
 
-**Action:** Ankit records the choice here. The module-by-module sweep (Stage 6+) will list each module's unprotected sensitive actions either way.
+Run report-only in production for **about 1-2 weeks**, fix every `UNMAPPED_ROUTE` in the log (add it to the map), then flip the switch (`config('route_permissions.enforce_unmapped') = true`). This avoids the outage risk of a sudden "deny everything".
+
+**Step 3 — Keep the record-level rules in code.**
+HR's ticks are per **position**, so they can't express "only **their own department's** applicants/budget", "only the applicants **assigned** to this interviewer", or "the GM only sees the item **waiting for the GM's approval**". Those stay as the in-method checks already specified per module (S2-06, P-01, W-03, W-04, T-05 and later modules). The two layers work together: the **tick** decides whether the user may use the feature at all, and the **code** decides which records they may touch.
+
+**Step 4 — Seed sensible default ticks** so a fresh resort isn't wide open or locked out: via a **migration**, not the seeder alone (see CLAUDE.md on `module_pages`). HR, Finance and GM ticks follow the decisions already recorded in this file (P-01, W-02/W-03, T-05, S4-02).
+
+**What this does NOT replace:** the per-module tenant checks (`resort_id`) and the per-module role decisions above. It's the outer lock. Those are the inner ones.
+
+**VERIFY:**
+- After Step 1: re-run the read-only command. **`NOT covered by the Permission module` must be 0** (every portal route is either a listed page or in the map).
+- During Step 2 report-only: `grep -c UNMAPPED_ROUTE storage/logs/laravel*.log` trends to **0** over the report period. Paste the counts per day.
+- After switch-over, for each module fixed so far, as an HOD whose position has **no** tick on that module: call 3 background routes directly (e.g. `payroll.getData`, `payroll.saveReviews`, `payroll.download`) → all `403`. Tick **View only** for that position → the read routes work, `saveReviews` still `403`. Tick **Edit** → `saveReviews` works. Paste the table.
+- Regression: an HR user and a GM user click through every menu of every module on staging with no unexpected `403`.
 
 ---
 
@@ -970,6 +1021,59 @@ Expected: *(no output)*, or only a line that is **not** used as the `Mail::to()`
 - Ticket **subject and description** are escaped in the super-admin view (`view.blade.php:36, 71`).
 - The super-admin routes are all behind `auth:admin` (`routes/admin_route.php:15`).
 - In the super-admin live chat, the **message text** itself is escaped (`admin/support/chat.blade.php:400`). Only the name, photo and file-name fields aren't (S3-04).
+### X-02 · HIGH · Mobile app: acting on, or viewing, any employee by changing an ID
+
+**How this was found:** a scan of **every** mobile API method (`app/Http/Controllers/API/*.php`) for request fields naming an employee (`emp_id`, `employee_id`, `employee_ids`, `user_id`, …). Each hit was mapped to the route's rank guard (`routes/api.php` groups: `check.rank:*`, `security.manager`, `clinic.manager`) and to the method's own checks. 16 methods take an employee ID from the request; **11 are correctly guarded** (see the clean list below). These **5 aren't**:
+
+| # | Endpoint (`routes/api.php`) | Method | Who can call it | What's wrong |
+|---|---|---|---|---|
+| a | `POST monthlycheckin/monthly-checkin-store` (`:469`) | `MonthlyCheckInController::monthlyCheckInStore` (`:218`) | **any** logged-in employee (no rank guard) | `emp_id` is only `'required'` (`:232`). Creates a monthly check-in record and a learning request **about any employee of any resort** (`:249-276`), looks them up with bare `Employee::find()` (`:287`), and **pushes a notification to their phone** (`:313`). |
+| b | `POST …/housekeeping-assign-hod-to-emp` (`:188`, `check.rank:HOD,EXCOM`) | `AccommodationController::houseKeepingAssingHODtoEmp` (`:2020`) | HOD / EXCOM of any resort | `HousekeepingSchedules::where("id", $request->housekeeping_id)->update(['Assigned_To' => $request->emp_id])` (`:2047`): **no resort check** on the schedule (cross-resort write), and `emp_id` is only `'required'` (`:2027`), so any employee anywhere can be assigned and notified (`:2077`). |
+| c | `SOPassAssign` (`:270`, `security.manager`) | `BoardingPassController::SOPassAssign` (`:1940`) | a resort's security manager | `employee_ids` is only `required|array` (`:1949`). Travel-pass assignments are created for, and notifications pushed to, **employees of other resorts**. |
+| d | `manifestSOAssign` (`:271`, `security.manager`) | `BoardingPassController::manifestSOAssign` (`:2020`) | a resort's security manager | Same: `employee_ids` only `required|array` (`:2031`). The manifest and passes are scoped, but the **employees aren't**. |
+| e | `POST timeandattendance/get-employee-month-data-preview` (`:308`) | `TimeAndAttendanceController::getEmployeeMonthDataPreviewList` (`:4112`) | **any** logged-in employee | Scoped to the caller's resort (`:4154`), but there's **no check that the caller is that employee or their manager**. Any employee can read **any colleague's** month of attendance, overtime and leave (including leave types such as sick leave). |
+
+**Fix:**
+- **a:** the check-in is meant to be done by the employee's manager. Require that the caller is HR, or the `reporting_to` manager / HOD of `emp_id`'s department, and validate `emp_id` with `Rule::exists('employees','id')->where('resort_id', $this->resort_id)`. Replace the bare `find()` with a resort-scoped lookup.
+- **b:** scope the schedule (`HousekeepingSchedules::where('resort_id', $this->resort_id)->where('id', …)`, 404 if missing), validate `emp_id` against the resort, and (per W-style department rules) against the HOD's own department.
+- **c, d:** `'employee_ids.*' => ['integer', Rule::exists('employees','id')->where('resort_id', $this->resort_id)]`.
+- **e:** allow only when the caller **is** `employee_id`, **or** is HR/GM, **or** is the HOD/manager of that employee's department (reuse the pattern `hodMarkAttendancePresent` already uses at `TimeAndAttendanceController.php:3170-3180`). Otherwise `403`.
+- Going forward, every module sweep checks criterion 5 (§7 intro) for **both** mobile and web endpoints.
+
+**VERIFY:** with mobile tokens for (1) an ordinary employee of resort A and (2) a HOD / security manager of resort A:
+- a: (1) posts a check-in with `emp_id` = a resort-B employee → `422`/`403`, no `monthly_checkings` row, no notification. (1) with a resort-A colleague they don't manage → `403`.
+- b: (2) with a resort-B `housekeeping_id` → `404`, schedule unchanged. With a resort-B `emp_id` → `422`.
+- c, d: (2) with `employee_ids` containing a resort-B employee → `422`, no `employee_travel_pass_assigns` row.
+- e: (1) with a colleague's `employee_id` → `403`; with their **own** id → `200`; (2) as that colleague's HOD → `200`.
+Paste all results.
+
+**Checked and found clean (mobile, criterion 5):** `assignAccommodationToEmp`, `moveAccommodationForEmp` (resort-scoped, HR/GM/HOD/EXCOM only); `treatmentAdd`, `medicalCertificateStore` (clinic staff only, resort-scoped); `createRequest` (housekeeping, rank-guarded, scoped); `hodViewDutyRoster` (scoped); `hodMarkAttendancePresent` (resort **and** HOD's department, `:3170-3180`); `manifestStore` (checks role in the method, `:1622`); Grievance `GetEmployeeDetails` (resort-scoped lookup); every self-service endpoint in Payroll, Grievance and salary advance (always uses the logged-in employee's own ID).
+
+---
+
+### X-03 · MEDIUM · Super-admin "log in as resort user" (impersonation)
+
+**Where:** `app/Http/Controllers/Admin/LoginController::AdminToResort()` (`:110-168`), route `POST /admin/admin-to-resort` (`routes/admin_route.php:22`).
+
+**What it does:** the super-admin panel can log straight into a resort's portal as a resort user, for support. That's a legitimate feature, but:
+1. **Any admin-panel account can use it.** The route is inside `auth:admin` but **before** the `hasModuleAccess` group (`routes/admin_route.php:29`) that limits what other admin accounts can do. A limited support account can become any resort's user.
+2. **It picks whichever resort user is first in the table** (`ResortAdmin::where('resort_id', $resort_id)->first()`, `:115`), not a chosen or dedicated support identity, so the admin acts with that person's full rights.
+3. **No audit trail.** It stores `session(['impersonated_by' => Auth::id()])` (`:136`), but `Auth::id()` reads the **default `web` guard** (`config/auth.php:17`), not the `admin` guard, so the value is **always empty**. Nothing records which admin logged in as which resort user, or when. Everything done during the session looks like the resort user did it.
+4. **"End impersonation" is broken.** `routes/admin_route.php:23` points to `LoginController@endImpersonation`, **which doesn't exist**, so there's no clean way back and the resort session just stays open.
+
+**Why it matters for the international client:** their auditors will ask "can your vendor log into our HR system as our staff, and is it recorded?" Today the answer is "yes, and no".
+
+**Fix:**
+1. Move the route inside the `hasModuleAccess` group, or add an explicit check that only full super-admins (not limited admin accounts) can impersonate.
+2. Record every impersonation in a new `impersonation_logs` table (**migration**): admin id (`Auth::guard('admin')->id()`), resort id, resort user id, start and end time, IP. Also fix the session value to use `Auth::guard('admin')->id()`.
+3. Let the admin **choose** which resort user to log in as (or use a dedicated, clearly named support account per resort) instead of "the first row".
+4. Implement `endImpersonation()`: log out the `resort-admin` guard, close the log row, redirect back to the admin panel. Show a visible "You are impersonating X — End" banner in the resort portal while `impersonated_by` is set.
+5. `HUMAN`: decide whether resorts (especially the international client) should be able to **opt out** of impersonation, or be notified when it happens.
+
+**VERIFY:** as a limited admin account (no module access) → `POST /admin/admin-to-resort` → `403`. As a super-admin → works, and a row exists in `impersonation_logs` with the real admin id. The banner shows. "End" returns to the admin panel and the log row gets an end time. `grep -n "Auth::id()" app/Http/Controllers/Admin/LoginController.php` → no output.
+
+---
+
 ## 5. STAGE 4 — Mobile login tokens & account lifecycle
 
 **Scope audited:** mobile login and logout (`app/Http/Controllers/API/LoginController.php`), password change (`app/Http/Controllers/API/ProfileController.php`), the `api` guard (`config/auth.php:43-47`, driver `passport`, Passport `v13.8.0`), the mobile route middleware (`routes/api.php`), every place an employee is deactivated, and the web-portal login (`app/Http/Controllers/Resorts/ResortLoginController.php`) for comparison.
@@ -1113,6 +1217,7 @@ Each module is checked for four things:
 2. **Role access** — inside one resort, can someone see or do more than their role should allow (see X-01)?
 3. **XSS** — is text a user typed printed back as raw HTML?
 4. **Uploads** — are file types checked, and are files stored through `StorageHelper` in a safe place?
+5. **Acting as someone else** *(added 2026-09-26 at the product owner's request)* — can a user make the server act **as, or on behalf of, a different person** by changing an ID or a "who is acting" field in the request (e.g. `emp_id`, `employee_id`, `sender_id`, `action_by`, `approver_id`), instead of the server using the logged-in user? Can they **see another person's** personal data (same resort or another) just by changing an ID?
 
 **How the tenant-isolation check was done (so it can be repeated):** a script lists every query that looks up a record by an ID (`find()`, `findOrFail()`, `where('id', …)`, `whereIn('id', …)`, `where('<x>_id', $request…)`) and flags each **statement** that has no `resort_id` in it. Every flagged line was then **traced by hand**. Most turned out to be scoped another way (through a parent record already checked against the resort, or `whereHas('employee', resort_id)`). Only real problems are listed below.
 
