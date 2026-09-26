@@ -159,10 +159,10 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | V-05 | 6 · Visa | MEDIUM | Passports and visas are sent to the AI extraction service — confirm where it runs and that it's encrypted | HUMAN CHECK |
 | V-06 | 6 · Visa | LOW | Small items: unused unscoped lookup, leftover debug function, raw receipt number, import file kept | OPEN |
 | PE-01 | 6 · People | HIGH | Employee **edits** aren't limited by role/department: any portal user can change status, salary, **bank account**, employment data, reset logins, delete or export any employee in the resort — decided: HR only | OPEN |
-| PE-05 | 6 · People | HIGH | Promotion: "Confirm" applies a promotion (rank + salary) **without any approval**; salary/position still editable after approval | OPEN |
-| PE-06 | 6 · People | HIGH | Salary increment: amount still editable **after GM approval**; the edited salary is what gets paid | OPEN |
-| PE-07 | 6 · People | MEDIUM | Approval chains let people approve **their own** promotion / transfer / increment | OPEN |
-| PE-08 | 6 · People | MEDIUM | Salary increment approval step taken from the browser when the caller isn't Finance/GM; promotion action word not restricted; legacy "save increment" edits budget salaries with no approval | OPEN |
+| PE-05 | 6 · People | HIGH | Promotion: "Confirm" applies a promotion (rank + salary) **without any approval**; salary/position still editable after approval — decided: MUST FIX | OPEN — MUST FIX BEFORE GO-LIVE |
+| PE-06 | 6 · People | HIGH | Salary increment: amount still editable **after GM approval**; the edited salary is what gets paid — decided: MUST FIX | OPEN — MUST FIX BEFORE GO-LIVE |
+| PE-07 | 6 · People | HIGH | Approval chains let people approve **their own** promotion / transfer / increment — decided: never allowed | OPEN — MUST FIX BEFORE GO-LIVE |
+| PE-08 | 6 · People | MEDIUM | Salary increment approval step taken from the browser when the caller isn't Finance/GM; promotion action word not restricted; legacy "save increment" edits budget salaries with no approval — decided: MUST FIX | OPEN — MUST FIX BEFORE GO-LIVE |
 | PE-02 | 6 · People | HIGH | Onboarding: another resort's new-hire meeting (date, link, participants) can be overwritten | OPEN |
 | PE-03 | 6 · People | MEDIUM | Announcements can be created about another resort's employee (and push-notify them) | OPEN |
 | PE-04 | cross-cutting | MEDIUM | Employee names are printed raw in ~50 tables; employees can change their own name (via info-update) | OPEN |
@@ -1958,6 +1958,20 @@ For each file listed, show the matching `addColumn` builder uses `e(...)` / `htm
 
 ---
 
+#### ✅ Product-owner rules for ALL approval chains (decided 2026-09-26 — must be fixed before go-live)
+
+These rules apply to **Promotion, Transfer and Salary Increment**, and to any future approval chain. They override the softer alternatives offered in PE-05 to PE-08 below.
+
+1. **Nothing is applied without the full chain.** A promotion, transfer or salary increment changes the employee's position, rank, department or salary **only** after **every** step of its chain is **Approved**. There's no "confirm", "apply" or shortcut that skips a step.
+2. **Approved means locked.** Once the final approval is given, the request's figures (salary, increment amount, new position, effective date, department) **can't be edited by anyone**. Once it's confirmed or applied, it's also permanently locked. If something must change after approval, the only way is to **reject/cancel it and raise a new request**, which goes through the whole chain again.
+3. **No one approves their own request.** The employee the request is about can never act on any step of it, whether directly, as a delegate or through a role pool.
+4. **The server alone decides who is approving and at which step,** from the logged-in user. Nothing sent by the browser (step name, approver, rank, action word outside Approved / Rejected / On Hold) is trusted.
+5. **Every approval, rejection and hold is recorded** with who, when and which step (already done via the approval rows + signature snapshot; keep it).
+
+**⚠️ One point for Ankit to confirm with the product owner before coding PE-05:** the product owner described the promotion chain as **HR → Finance → GM**. The code today is **HOD of the employee's department → Finance → GM**, with HR only *initiating* (`PromotionController.php:253-296`). Confirm which is intended (replace HOD with HR, or HR + HOD + Finance + GM), and record the answer here. Rules 1-5 apply either way.
+
+**⚠️ Open (rule 3 edge case):** when the **only** person who can approve a step is the employee themselves (e.g. the GM's own salary increment, or the only Finance Manager's own promotion), who approves instead? **Interim default until the product owner decides:** block the request with "No eligible approver — contact the system administrator", and never let it self-approve. Record the final answer here.
+
 #### Approval chains — how each one works today (deep trace)
 
 | | Promotion | Transfer | Salary increment |
@@ -1973,7 +1987,7 @@ For each file listed, show the matching `addColumn` builder uses `e(...)` / `htm
 
 ---
 
-#### PE-05 · HIGH · Promotion: "Confirm" applies a promotion without any approval; salary still editable after approval
+#### PE-05 · HIGH · Promotion: "Confirm" applies a promotion without any approval; salary still editable after approval  ·  ✅ DECIDED: MUST FIX (rules 1-2)
 
 **Where:**
 1. `PromotionController::confirmPromotion()` (`:1303`, route `POST /people/promotion/confirm-promotion`, `routes/resort_route.php:1709`) writes the new **department, position, division, rank, basic salary, increment date and benefit-grid level** onto the employee (`:1334-1341`, e.g. `$employee->basic_salary = $promotion->new_salary;` at `:1338`) **without checking `$promotion->status === 'Approved'`**. The HOD → Finance → GM chain can be skipped entirely: submit a promotion, then "confirm" it straight away.
@@ -1994,15 +2008,15 @@ For each file listed, show the matching `addColumn` builder uses `e(...)` / `htm
 - **After the fix:** `422` "Promotion is not approved yet"; the employee is unchanged.
 - *Variant (post-approval edit):* take a promotion that is fully **Approved** and call `POST /resort/people/promotion/inline-update` with its `id` and `new_salary: 12345` → today it saves; after the fix it's refused.
 
-**Fix:**
-- `confirmPromotion`: refuse unless `$promotion->status === 'Approved'` **and** every row in `$promotion->approvals` is `Approved`. Also refuse if it has already been applied (record an `applied_at` timestamp, same idea as `effective_day_applied_at` for increments).
-- `inlineUpdate`: allow only while **no** approval has been given yet (`status === 'Pending'` and all approvals `Pending`). If HR changes figures after anyone has approved, reset **all** approvals to `Pending` and re-notify (the same thing `SalaryIncrementController::update` does for stalled rows, `:490-506`).
+**Fix (decided — rules 1 and 2 above):**
+- `confirmPromotion`: refuse (`422` "Promotion is not fully approved") unless `$promotion->status === 'Approved'` **and every** row in `$promotion->approvals` is `Approved`. Refuse (`422` "Already applied") if it has already been applied: add an `applied_at` column (**migration**) and stamp it on apply, like `effective_day_applied_at` for increments. Check the scheduled/automatic apply path (`dispatchEffectiveDateNotifications`, called at `:949`) uses the same guard.
+- `inlineUpdate`: allow **only** while the promotion is `Pending` **and no** approval row has been acted on. Once **any** approver has approved, refuse edits (`422` "Promotion is under approval / approved — reject it and raise a new one to change it"). After final approval or confirmation, **no edits at all**.
 
 **VERIFY:** the reproduce steps above, before and after. Plus: a fully approved promotion can still be confirmed (normal path works) and shows the **approved** salary.
 
 ---
 
-#### PE-06 · HIGH · Salary increment: amount still editable after GM approval
+#### PE-06 · HIGH · Salary increment: amount still editable after GM approval  ·  ✅ DECIDED: MUST FIX (rule 2)
 
 **Where:** `People/SalaryIncrementController::update()` (`:448`, route `POST people/salary-increment/update/{id}`, `routes/resort_route.php:1786`) and `bulkUpdate()` (`:934`) recompute `increment_amount` and `new_salary` (`:484`) from the request for **any** status. Only "stalled" rows (Rejected / Hold / Change-Request) are sent back through approval (`:463-468`). An **Approved** increment stays "Approved" with the **new** figure. For a future-dated increment, the daily job `salary-increment:apply-effective` → `applyApprovedIncrementToEmployee()` (`:101-117`) then writes that edited `new_salary` into the employee's `basic_salary` (`:110`).
 
@@ -2019,13 +2033,13 @@ For each file listed, show the matching `addColumn` builder uses `e(...)` / `htm
 - **Today (the problem):** success; the increment still shows **Approved**, but `new_salary` = previous + **5000**, and that's what will be paid from the effective date.
 - **After the fix:** `422` "Approved increments can't be edited", or the edit resets it to Pending and it needs Finance + GM again.
 
-**Fix:** in `update` and `bulkUpdate`, refuse edits when `status === 'Approved'` (or any approval row is Approved). The alternative is to treat an edit like the stalled case: reset every approval row to `Pending` and re-notify Finance. Also refuse once `effective_day_applied_at` is set.
+**Fix (decided — rule 2 above):** in `update` and `bulkUpdate`, refuse (`422` "Approved increments can't be changed — reject it and raise a new one") when `status === 'Approved'`, when **any** approval row is `Approved`, or when `effective_day_applied_at` is set. Keep the existing behaviour for **stalled** rows (Rejected / Hold / Change-Request → HR fixes the values → chain restarts from Pending, `:490-506`), because those aren't approved. **Don't** offer "edit and reset to Pending" for approved rows: the product owner decided approved means locked.
 
 **VERIFY:** the reproduce steps before and after; the normal Pending → Finance → GM → applied flow still works.
 
 ---
 
-#### PE-07 · MEDIUM · Approval chains let people approve their own promotion / transfer / increment
+#### PE-07 · HIGH · Approval chains let people approve their own promotion / transfer / increment  ·  ✅ DECIDED: MUST FIX (rule 3)
 
 | Chain | How self-approval happens today | Where |
 |---|---|---|
@@ -2033,7 +2047,7 @@ For each file listed, show the matching `addColumn` builder uses `e(...)` / `htm
 | Transfer | No exclusion at all. If the employee being transferred is in the Finance pool (`isFinanceApprover`, `:1203`) or is the GM (`isGmApprover`, `:1232`), they can approve their own step (`:866-876`). | `TransferController.php` |
 | Salary increment | No exclusion. The Finance Manager / Director of Finance can approve the Finance step of **their own** increment, and the GM the GM step of **theirs** (`:1353-1381`). | `People/SalaryIncrementController.php` |
 
-**Fix (one rule, three places):** in each approval handler, before accepting the action: `if ((int) $currentEmployee->id === (int) $<promotion|transfer|increment>->employee_id) → 403 "You cannot approve your own request."`. Also exclude that employee from any pool fallback. `HUMAN`: when the **only** person who can approve a step is the employee concerned (e.g. the GM's own increment), who approves instead? Recommended: **escalate to the resort's master admin or a named alternate**, recorded here.
+**Fix (decided — rule 3 above, one rule in three places):** in each approval handler (`PromotionController::handlePromotionApproval`, `TransferController::handleApproval`, `SalaryIncrementController::updateStatus` **and** its siblings `requestChange`, `holdRequest`), before accepting any action: `if ((int) $currentEmployee->id === (int) $<promotion|transfer|increment>->employee_id) → 403 "You cannot act on your own request."`. Also remove that employee from **every** pool fallback (`findActionableApproval`, Transfer's Finance/GM pool loop at `:858-878`) and from delegation. When creating a chain (`submitPromotion`, `TransferController::store`, increment creation), if a step has **no** eligible approver other than the employee, apply the interim default above (block with a clear message) rather than creating a step they could act on.
 
 **How to reproduce (staging only):** create a promotion for a test employee who is the **HOD** of their department (with at least one other HOD/EXCOM in that department, so the chain is created). Log in **as that HOD** and approve the HOD step from the approval page. **Today:** it's accepted. **After the fix:** `403`.
 
@@ -2041,7 +2055,7 @@ For each file listed, show the matching `addColumn` builder uses `e(...)` / `htm
 
 ---
 
-#### PE-08 · MEDIUM · Smaller approval-logic weaknesses
+#### PE-08 · MEDIUM · Smaller approval-logic weaknesses  ·  ✅ DECIDED: all must be fixed (rule 4 above)
 
 | Where | Weakness | Fix |
 |---|---|---|
