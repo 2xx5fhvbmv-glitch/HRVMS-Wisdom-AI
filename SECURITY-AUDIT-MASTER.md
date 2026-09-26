@@ -135,6 +135,13 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | W-04 | 6 · Manning & Budget | MEDIUM | A HOD can submit or overwrite **another department's** manning budget | OPEN |
 | W-05 | 6 · Manning & Budget | LOW | Records from other resorts accepted as references (cost items, parent division/department/section, employee) | OPEN |
 | W-06 | 6 · Manning & Budget | LOW | Budget/occupancy import files kept forever on local disk | OPEN |
+| T-01 | 6 · Talent Acquisition | CRITICAL (LIKELY) | **Public, no-login** draft upload saves any file into the public web folder and tells the uploader where (possible code execution) | OPEN |
+| T-02 | 6 · Talent Acquisition | HIGH | Stored XSS: text typed by **anonymous applicants** runs as code in HR's browser (5 places) + HTML injected into interviewer emails | OPEN |
+| T-03 | 6 · Talent Acquisition | HIGH | Public applicant uploads not type-checked (CV, passport, other documents, SVG photos; video endpoint validation switched off) | OPEN |
+| T-04 | 6 · Talent Acquisition | HIGH | Cross-resort writes: edit another resort's interview assessment form; pull another resort's applicant into your interviews | OPEN |
+| T-05 | 6 · Talent Acquisition | HIGH | Any portal user can download all applicant documents (passports), delete applicants, send offers/contracts, set salaries | DECISION NEEDED (who may access recruitment) |
+| T-06 | 6 · Talent Acquisition | MEDIUM | Public forms have no rate limit / bot check; expired application links still work; submissions not tied to a valid open link | OPEN |
+| T-07 | 6 · Talent Acquisition | LOW | CV-extraction AI URL read with `env()`; public "remove video" deletes row #1; two smaller raw outputs | OPEN |
 | — | 6 · next modules | — | Visa & employee documents → People/Employee → Disciplinary → … | PENDING AUDIT |
 
 ---
@@ -1391,7 +1398,200 @@ These don't leak another resort's data **directly**. They let a user store a lin
 
 ---
 
-### 7.3 Next modules  ·  PENDING AUDIT
+### 7.3 Talent Acquisition (recruitment)
+
+**Scope audited:** internal portal: `app/Http/Controllers/Resorts/TalentAcquisition/` (all 10 controllers: `ApplicantsController`, `VacancyController`, `ConfigController`, `InterviewAssessmentController`, `JobAdvertisementController`, `JobDescriptionController`, `OfflineInterviewController`, `QuestionnaireController`, `TaDocumentTemplateController`, `TaEmailTemplateController`) + `TalentAcquisitionDashboardController.php`. **Public, no-login side** (`routes/resort_route.php:17-58`): `ApplicantController.php` (application form), `InterviewInvitationController.php`, `OfferLetterResponseController.php`, `ContractResponseController.php`, `ConsentResponseController.php`, `AvailabilityResponseController.php`. Helpers `Common::TalentAcquisitionFolder()` / `ApplicantWiseStorefileaws()`. Views in `resources/views/resorts/{talentacquisition,applicant_form,offer_letter,contract,consent,availability,interview_invitation,offline-interview}/`. **149 portal routes + 24 public routes.** No mobile API.
+
+**Why this module is different:** it's the only module that takes input from **anonymous people on the internet** (job applicants). Anything an applicant types or uploads ends up in front of HR. So an applicant is effectively an untrusted attacker who gets to put content on HR's screen.
+
+**Good news first:**
+- **Tenant isolation is almost entirely clean.** 176 lookups were flagged by the script and traced. Applicant files, the passport/CV zip download, applicant delete, offers, contracts, salary allocation, notes, AI analysis, talent pool, questionnaires and vacancy approvals are all resort-scoped (Ankit's earlier Talent Acquisition leak fix held). Only the two write paths in T-04 are open.
+- **The emailed response links are safe to guess against:** interview, offer, contract, consent and availability tokens are random UUIDs (`ApplicantsController.php:1430, 3134, 3275, 3364, 3411`), and each response page checks the current status before accepting or declining again.
+- Applicant drafts are stored in the visitor's own **session**, so one applicant can't read another's draft.
+- Applicant names are escaped in the server-built tables (`InterviewAssessmentController.php:117-118` uses `e()`, `VacancyController.php:2314` uses `htmlspecialchars`) and in the comments block (`Applicants/index.blade.php`, `commentHtml` uses `.text()`). The AI summary text is escaped too. The problems are the specific spots in T-02.
+
+---
+
+#### T-01 · CRITICAL (LIKELY — confirm on server) · Public, no-login upload into the public web folder
+
+**Where:** `ApplicantController::saveDraft()`, public route `POST /resort/applicant-form/save-draft` (`routes/resort_route.php:20`), **no login, no CSRF exemption needed (the form page gives the token to anyone)**:
+```php
+// ApplicantController.php:132-135
+if ($request->hasFile('video')) {
+    $video = $request->file('video');
+    $path = $video->store('temp/videos', 'public');   // no type rule, no size rule
+    $sessionData['video_path'] = $path;
+```
+and `getDraftStepData()` (`POST /resort/applicant-form/get-draft`, `:150-160`) returns the saved step data, **including `video_path`**, to the same visitor.
+
+**Why it's critical:** the `public` disk is `storage/app/public`, served to the web via the `public/storage` link (`config/filesystems.php:101-102`). `store()` names the file with a random name plus an extension **guessed from the file's content**, so a file whose content is PHP code gets a `.php` extension. An anonymous visitor can:
+1. open any application link (they're public job ads);
+2. POST a "video" that is actually a PHP script to `save-draft`;
+3. call `get-draft` to learn its exact path;
+4. open `https://<domain>/storage/temp/videos/<name>.php`.
+
+If the web server runs PHP inside `public/storage` (the default nginx/Apache Laravel setup does), that's **code execution on the server with no login at all**: every resort's data, the `.env`, everything. This is the same server weakness as **S3-02**, but reachable by **anyone on the internet** instead of a logged-in user. Even if PHP doesn't run there, the endpoint lets anyone store unlimited files of any size in the public folder: HTML pages served from **your domain** (phishing), or enough junk to fill the disk.
+
+**Fix:**
+1. `saveDraft`: validate the video exactly like the real video question does: `'video' => 'nullable|file|mimetypes:video/mp4,video/webm,video/ogg,video/quicktime|max:51200'`. Store it through `StorageHelper` on a **non-public** path (e.g. `temp/applicant-drafts/<session id>/<Str::uuid()>.<mp4|webm|…>`, choosing the extension from the **validated MIME type**, never the client name or content guess).
+2. `getDraftStepData`: don't return internal storage paths. Return a flag like `has_video: true` instead.
+3. Apply the server-level rule from **S3-02 step 3** (no PHP execution under `/storage/`). That single nginx/Apache rule neutralises T-01 and S3-02 together, and should be done **first**, today.
+4. `HUMAN`: list `storage/app/public/temp/videos/` on every server. Any file that isn't a real video (especially `.php`, `.phtml`, `.phar`, `.html`, `.svg`) → treat as a possible compromise and investigate before deleting.
+
+**VERIFY:**
+```bash
+grep -n "store('temp/videos', 'public')" app/Http/Controllers/Resorts/ApplicantController.php
+```
+Expected: *(no output)*
+- `HUMAN` on staging **before** the fix (to confirm severity), logged out: open an application link, then from the browser console POST `FormData` with `step=1` and a file `v.mp4` whose content is `<?php echo "RCE-" . (7*6);` to `/resort/applicant-form/save-draft`, call `get-draft` for `step=1`, and open `/storage/<video_path>`. If the page shows `RCE-42`, it's **confirmed unauthenticated code execution**: escalate immediately. **After** the fix: the upload is rejected (422), `get-draft` doesn't return any path, and a `.php` placed manually under `public/storage` returns `403`.
+
+---
+
+#### T-02 · HIGH · Stored XSS: text typed by anonymous applicants runs as code in HR's browser  ·  *mostly a Frontend fix (JavaScript)*
+
+**How the attack works:** an applicant (anyone) puts `<img src=x onerror="…">` in their **name** on the public application form, or in the **reason** box when declining an interview, offer or contract on the public response pages. When HR opens that applicant in the portal, the script runs **as HR**, inside HR's logged-in session, and can do anything HR can: read every applicant's passport, change offers, and so on.
+
+| # | Where it's rendered raw | Field (who types it) |
+|---|---|---|
+| a | `resources/views/resorts/talentacquisition/Applicants/index.blade.php:707` — AI match-score popup (`resort.ta.WaiInsights` success handler, request at `:699`): `'<span class="fw-bold">' + (res.applicant || 'Applicant') + '</span>'` | applicant's **first + last name** (public form, `ApplicantController.php:314-315`, only `string|max:100`) |
+| b | `Applicants/index.blade.php:951` and its sibling at `:1205`: `<strong>Reason:</strong> ${response.data.rejectionReason}` | reason typed when **declining an offer letter or contract** (public pages, `OfferLetterResponseController.php` / `ContractResponseController.php` `reject()`, stored as `applicant_offer_contracts.rejection_reason`) |
+| c | `Applicants/index.blade.php:817`, `:942`, `:1071`: `<strong>Reason:</strong> ${…interviewRejectionReason}` | reason typed when **declining an interview invitation** (public page, `InterviewInvitationController::reject()`, stored as `rejection_reason`) |
+| d | **Email**, not a web page: `InterviewInvitationController::notifyInterviewer()` (`:169`) puts the raw decline reason into an HTML table in the email sent to the interviewer | same interview decline reason — lets an applicant put **links / fake content inside an internal email** from your system |
+| e | `resources/views/resorts/talentacquisition/Applicants/rejected.blade.php:204-205` — `render: function(data) { return '<span … title="'+data+'">'+data+'</span>' }` | HR rejection comments (`ApplicantsController.php:2932`, `Comments`). Internal text, lower risk, but same fix. |
+
+**Fix (JavaScript/Blade — no backend change needed for a-c, e):**
+1. Add one small escape helper to the Talent Acquisition views (or reuse the one from S3-04):
+   ```js
+   function escHtml(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
+   ```
+2. Wrap every value in the table: `escHtml(res.applicant || 'Applicant')`, `${escHtml(response.data.rejectionReason)}`, `${escHtml(nr.interviewRejectionReason)}`, `${escHtml(response.data.interviewRejectionReason)}`, and in `rejected.blade.php` both the `title` attribute and the text.
+3. **Invariant #7:** grep **all** of `resources/views/resorts/talentacquisition/` and `offline-interview/` for other `${…}` / `' + x + '` insertions of applicant-sourced fields (`first_name`, `last_name`, `email`, `mobile`, `address`, `job_title`, `employer_name`, `institute_name`, questionnaire answers, `rejection_reason`) and wrap them the same way. The audit found only the lines above, but confirm.
+4. **Email (d), backend:** in `notifyInterviewer()`, escape the reason: `e($reason)` (and `nl2br` if line breaks matter). Check the other TA emails that include applicant text (candidate name in subjects/bodies) the same way.
+5. Defence in depth, backend: add `max:1000` and strip control characters on the three public `rejection_reason` inputs (right now there's no validation at all). This limits damage; it does **not** replace escaping on output.
+
+**VERIFY:**
+```bash
+grep -nE '\$\{(response\.data\.rejectionReason|nr\.interviewRejectionReason|response\.data\.interviewRejectionReason)\}|\(res\.applicant \|\| ' resources/views/resorts/talentacquisition/Applicants/index.blade.php
+```
+Expected: *(no output)*
+- `HUMAN` browser test on staging (required): submit an application with first name `<img src=x onerror=alert('XSS-name')>`. Get it to interview stage, then decline the interview from the emailed link with reason `<img src=x onerror=alert('XSS-int')>`. For a second test applicant, send an offer and decline it with reason `<img src=x onerror=alert('XSS-offer')>`. As HR, open each applicant's detail row and the AI match-score popup, and the Rejected list. **No alert may appear anywhere**; the text shows literally. Also check the interviewer's email shows the reason as plain text.
+
+---
+
+#### T-03 · HIGH · Public applicant uploads not type-checked
+
+**Where (all public, no login):**
+
+| Endpoint | Line | Problem |
+|---|---|---|
+| `POST /resort/applicant_form/store` → `applicant_formStore` | `ApplicantController.php:316-317` | `curriculum_file` and `passport`: `required|file|max:5120`, **any file type** (`.html`, `.svg`, `.exe`, `.js`, macro-enabled Office files…). HR will open these. |
+| same | `:318-319` | `profile_picture`, `full_length_photo` allow **`svg`**, which can contain script. |
+| same | `:429-438` | `other_document[]`: **no validation at all** (type, size or count). |
+| `POST /resort/applicant_temp/video-store` → `applicant_tempVideoStore` | `:747-800` | Validation **commented out** (`:751-756`). Takes **`resort_id` and `vacancy_id` from the request** and writes the file into **that resort's** talent-acquisition folder (`Common::TalentAcquisitionFolder()`), keeping the **uploader's own file extension**, then returns the storage path. Anyone can drop any file into any resort's recruitment storage. |
+
+**Why it matters:** files from anonymous applicants are the classic way into an HR team: a "CV" that's really an HTML phishing page, a script-bearing SVG, or malware. Unlimited uploads also let anyone fill your storage bucket at your cost.
+
+**Fix:**
+1. `curriculum_file`: `mimes:pdf,doc,docx|max:5120` (the same list `extractCv` already enforces at `:175`). `passport`: `mimes:pdf,jpg,jpeg,png,heic,heif|max:5120`. Photos: **remove `svg`**. `other_document`: `array|max:5`, `other_document.*` → `file|mimes:pdf,doc,docx,jpg,jpeg,png,heic,heif|max:5120`.
+2. `applicant_tempVideoStore`: restore validation (`'video' => 'required|file|mimetypes:video/mp4,video/webm,video/ogg,video/quicktime|max:51200'`), and **don't trust `resort_id` / `vacancy_id` from the request**: resolve them from a valid, unexpired application link (see T-06), the same way `showapplicantForm` does. Choose the stored extension from the validated MIME type.
+3. In `Common::TalentAcquisitionFolder()` / `ApplicantWiseStorefileaws()`, stop using `getClientOriginalExtension()` for the stored name. Use the validated file's `extension()` instead.
+
+**VERIFY:** as an anonymous visitor on staging, submit the application form with `cv.html`, `passport.svg`, a `.svg` profile picture, and an `other_document` `.exe` → each is rejected with a 422 naming the field. POST a `.php` file to `applicant_temp/video-store` with any `resort_id` → 422. A normal submission (PDF CV, JPG passport and photos, MP4 video) still succeeds end to end.
+
+---
+
+#### T-04 · HIGH · Cross-resort writes in two places
+
+| Where | What an authenticated user of resort A can do to resort B |
+|---|---|
+| `TalentAcquisition/InterviewAssessmentController::update()` (`:187-213`, route `POST /interview-assessment/update/{id}`) | `InterviewAssessmentForm::findOrFail($id)` with **no resort check**, then overwrites the form's name, position and **entire question structure**. The siblings `edit` (`:171`), `delete` (`:216`), `saveResponse`, `viewResponse` and `downloadResponsePdf` are all scoped. Only `update` was missed. |
+| `TalentAcquisition/ApplicantsController::InterviewRequest()` (`:1313+`) | `ApplicantID` and `ApplicantStatus_id` come from the request (`:1320-1321`) and are loaded with bare `find()` (`:1375, 1377, 1394, 1435`). An interview record is created **in resort A for resort B's applicant** (`:1416-1431`), and the interviewer is notified with that applicant's name. From then on resort B's applicant (name, contact, CV via the interview screens) shows up in resort A's pipeline. |
+
+**Fix:**
+- `update`: `InterviewAssessmentForm::where('resort_id', $this->resort->resort_id)->findOrFail($id)`, exactly like `edit` at `:179`.
+- `InterviewRequest`: right after decoding, load the applicant **scoped**, and load the status **through** that applicant:
+  ```php
+  $applicant = Applicant_form_data::where('resort_id', $this->resort->resort_id)->find($ApplicantID);
+  $status    = $applicant ? ApplicantWiseStatus::where('Applicant_id', $applicant->id)->find($ApplicantStatus_id) : null;
+  if (!$applicant || !$status) return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
+  ```
+  Then use `$applicant` / `$status` everywhere below instead of the four `find()` calls.
+
+**VERIFY:** §0.5 harness:
+- `InterviewAssessmentController@update` with a **resort B** form id and `form_name = 'X'` → `404`, and the B form's `form_name` / `form_structure` are unchanged.
+- `ApplicantsController@InterviewRequest` with `ApplicantID = base64(<resort B applicant id>)` and a matching B status id → `404`, and `ApplicantInterViewDetails::where('Applicant_id', <B applicant>)->where('resort_id', <A>)->exists()` → `false`.
+- Same-resort control for both → still succeed.
+
+---
+
+#### T-05 · HIGH · DECISION NEEDED · Any portal user can open applicant documents and run hiring actions
+
+**What it is:** only **10 of 149** Talent Acquisition routes are listed in `module_pages` (X-01), mostly menu pages. `ApplicantsController` has a lot of **interview-round** logic (which rank interviews in which round), but the actions below have **no role check at all**. Every portal user in the resort can call them:
+
+| Action | Method (`ApplicantsController.php` unless noted) |
+|---|---|
+| Open any applicant's documents / **download all their files as a ZIP** (passport, CV, photos, certificates) | `GetAwsFiles` (`:2671`), `GetAllAwsFiles` (`:2742`), `DownloadAllFilesZip` (`:2802`) |
+| **Delete** an applicant (and all their interviews, languages, education) | `destoryApplicant` (`:1920`), `deleteTalentPoolApplicant` (`:3475`) |
+| **Send an offer letter / contract**, request consent, check availability | `sendOfferLetter` (`:3064`), `sendContract` (`:3207`), `sendConsentRequest` (`:3347`), `checkAvailability` (`:3393`) |
+| **Set the new hire's salary** | `saveSalaryAllocation` (`:3503`) |
+| Revert an applicant's status, delete pending interviews, send interview emails | `RevertBack` (`:2634`), `DeletePendingInterview` (`:1628`), `SendInterviewEmail` (`:1568`) |
+| Run AI analysis on applicants | `WaiApplicantInsights` (`:77`), `GenerateApplicantAiAnalysis` (`:723`) |
+| Recruitment settings, email templates, document templates, job adverts, offline interviews | `ConfigController` (20 methods, **0** checks), `TaEmailTemplateController`, `TaDocumentTemplateController`, `JobAdvertisementController`, `OfflineInterviewController` (no permission checks) |
+
+(Vacancy **approval** is correctly role-checked: `ConfigController::TaApprovedVcanciesNotification` resolves the approver's rank from the logged-in user and scopes the request to the resort.)
+
+**`HUMAN` decision needed (record it here before fixing) — who may access recruitment?** Recommended default:
+- **HR (the talent acquisition team):** full access: all vacancies and applicants, documents, offers, contracts, salary allocation, settings, templates, job adverts.
+- **GM:** vacancy approvals and final hiring approvals **as the existing interview/approval rounds already define**, plus read access to the applicants in those approvals. No settings, no deleting.
+- **HOD / EXCOM:** raise vacancy requests for **their own department**, and see and interview **only applicants for their own department's vacancies**, in the rounds assigned to them. No offers, contracts or salary, no settings, no bulk document download.
+- **Interviewers (anyone assigned to an interview round):** only the applicants they're assigned to, for that round.
+- **Everyone else, including L&D managers:** no access.
+
+**Fix (after the decision):** add one helper, e.g. `Common::recruitmentAccess($employee, ?Applicant_form_data $applicant = null): string` (`'full' | 'approve' | 'own_department' | 'assigned' | 'none'`), built on `Common::getEmployeeRankPosition()` and the existing interview-round assignments. Gate every method in the table. File downloads and ZIP must require `'full'`, or the applicant must be in the caller's own department / assigned interview. Offers, contracts, salary, delete and settings → `'full'` only.
+
+**VERIFY:** users of one resort: HR, GM, HOD of department X, HOD of department Y, an assigned interviewer, an ordinary portal user. Take an applicant for a department-X vacancy and call each method in the table. Paste `Action | HR | GM | HOD-X | HOD-Y | interviewer | ordinary`. Expected: matches the decided rules. For every `403`, nothing was sent, deleted or downloaded (check `applicant_offer_contracts`, `applicant_form_data`, mail log).
+
+---
+
+#### T-06 · MEDIUM · Public forms: no rate limit, expired links still work, submissions not tied to a valid link
+
+**Where:**
+- **No rate limiting or bot protection** on any public Talent Acquisition POST (`routes/resort_route.php:20-34`: `save-draft`, `get-draft`, `applicant_form/store`, `applicant-form/cv-extract`, `applicant_temp/video-store`, `applicant_temp/video-remove`). A script can flood any resort with fake applicants, fill storage, and run **unlimited AI CV extractions** (`extractCv` calls the AI service for every request, `:183-203`) at your cost.
+- **Expired application links still work:** `showapplicantForm` checks `link_Expiry_date`, but the `return` that should stop an expired link is **commented out** (`ApplicantController.php:91-100`), so the form loads anyway.
+- **Submission isn't tied to the link:** `applicant_formStore` takes `resort_id` and `vacancy_id` straight from hidden form fields (`:320-321`, only `integer`). Anyone can submit an application into **any resort / any vacancy**, including closed ones, without ever having a link. The vacancy isn't checked against the resort either (`showapplicantForm` `:103` loads the vacancy by id alone).
+
+**Fix:**
+1. Add `->middleware('throttle:<name>')` to all six public POST routes, with a named limiter in `RouteServiceProvider` (e.g. 10/minute per IP for form steps, 3/minute per IP for `cv-extract` and `video-store`, 5/hour per IP + email for `applicant_form/store`). Follow the pattern of the existing `mobile-login` / `resort-login` limiters.
+2. Restore the expired-link block at `:91-100`: return the expired-link view / redirect.
+3. Put the **encoded link id** (the same `{id}` the form page was opened with) in the form, and in `applicant_formStore` / `applicant_tempVideoStore` re-resolve `resort_id` + `vacancy_id` **from the `ApplicationLink` record** (checking it exists, isn't expired, and its vacancy belongs to that resort and is open). Ignore the hidden `resort_id` / `vacancy_id` fields.
+4. Optional, recommended for an international launch: add a CAPTCHA (e.g. Cloudflare Turnstile / reCAPTCHA) to the final submit.
+
+**VERIFY:** 20 quick POSTs to `cv-extract` from one IP → later ones get `429`. Opening an application link whose `link_Expiry_date` is in the past → the expired page, not the form. Submitting the form with a tampered `resort_id` / `vacancy_id` (different resort, or a closed vacancy) → rejected, and no `applicant_form_data` row created.
+
+---
+
+#### T-07 · LOW · Smaller items
+
+| Where | Issue | Fix |
+|---|---|---|
+| `ApplicantController.php:183` | `extractCv` reads the AI service URL with `env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')`. With config cached in production (see S2-07 evidence), `env()` returns null, so it **always calls `localhost:8001`**. CV auto-fill is probably broken live. | Add the URL to `config/services.php` (e.g. `'cv_extractor' => ['url' => env('AI_BASE_URL', env('AI_URL'))]`) and read it with `config(...)`. |
+| `ApplicantController.php:816-819` (public `POST /resort/applicant_temp/video-remove`) | Always runs `Temp_language_video_store::find('1')->delete()`: deletes **row #1** for anyone who calls it (and 500s once it's gone). | Remove the route or make it delete only the caller's own temp video (by an id stored in their session). |
+| `Applicants/index.blade.php:793` | Interview `MeetingLink` (typed by HR) is put into `href` unchecked. A `javascript:` link would run code when clicked. | Allow only `https://` links when saving and when rendering. |
+| `ApplicantController.php:766` (`applicant_tempVideoStore`) | Stores the **server's** `php_uname()` (OS, hostname, kernel) in `temp_language_video_store.os` for every upload. Not exposed today, but it's server information that doesn't belong in app data. | Remove it. |
+
+**VERIFY:** `grep -n "env('AI_BASE_URL')" app/Http/Controllers/Resorts/ApplicantController.php` → no output. `grep -n "find('1')" app/Http/Controllers/Resorts/ApplicantController.php` → no output.
+
+---
+
+#### Talent Acquisition — checked and found clean
+- All five emailed response flows use random UUID tokens and re-check status before accepting or declining.
+- `applicant-form/cv-extract` validates the CV (`mimes:pdf,doc,docx|max:5120`).
+- Server-built applicant HTML fragments (`TaUserApplicantsSideBar`, `getApplicantWiseGridWise` → Blade partials) use escaped `{{ }}`. The only `{!! !!}` in these views print pagination, the HR-written job description (CKEditor), and the resort's own terms and conditions.
+- Tenant isolation: see "Good news" above. Everything except T-04 is scoped.
+
+---
+
+### 7.4 Next modules  ·  PENDING AUDIT
 Planned order (most sensitive first): Visa & employee documents → People / Employee profiles → Disciplinary → Leave & Island Pass → Time & Attendance → Performance → Incidents → Accommodation → Learning → Talent Acquisition → Survey → File Management → SOS → Wisdom AI.
 
 ---
