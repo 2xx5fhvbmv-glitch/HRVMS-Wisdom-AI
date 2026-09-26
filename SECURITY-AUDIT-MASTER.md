@@ -158,7 +158,11 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | V-04 | 6 · Visa | MEDIUM | Upload gaps: bulk documents not type-checked, SVG allowed, AI helpers forward any file | OPEN |
 | V-05 | 6 · Visa | MEDIUM | Passports and visas are sent to the AI extraction service — confirm where it runs and that it's encrypted | HUMAN CHECK |
 | V-06 | 6 · Visa | LOW | Small items: unused unscoped lookup, leftover debug function, raw receipt number, import file kept | OPEN |
-| PE-01 | 6 · People | HIGH | Employee **edits** aren't limited by role/department: any portal user can change status, salary, **bank account**, employment data, reset logins, delete or export any employee in the resort | DECISION NEEDED (who may edit employee records) |
+| PE-01 | 6 · People | HIGH | Employee **edits** aren't limited by role/department: any portal user can change status, salary, **bank account**, employment data, reset logins, delete or export any employee in the resort — decided: HR only | OPEN |
+| PE-05 | 6 · People | HIGH | Promotion: "Confirm" applies a promotion (rank + salary) **without any approval**; salary/position still editable after approval | OPEN |
+| PE-06 | 6 · People | HIGH | Salary increment: amount still editable **after GM approval**; the edited salary is what gets paid | OPEN |
+| PE-07 | 6 · People | MEDIUM | Approval chains let people approve **their own** promotion / transfer / increment | OPEN |
+| PE-08 | 6 · People | MEDIUM | Salary increment approval step taken from the browser when the caller isn't Finance/GM; promotion action word not restricted; legacy "save increment" edits budget salaries with no approval | OPEN |
 | PE-02 | 6 · People | HIGH | Onboarding: another resort's new-hire meeting (date, link, participants) can be overwritten | OPEN |
 | PE-03 | 6 · People | MEDIUM | Announcements can be created about another resort's employee (and push-notify them) | OPEN |
 | PE-04 | cross-cutting | MEDIUM | Employee names are printed raw in ~50 tables; employees can change their own name (via info-update) | OPEN |
@@ -1848,11 +1852,11 @@ It filters by **resort** and **category** only, **not by employee**, then turns 
 - **Employee list and profile view are department-scoped** (CLAUDE.md invariant #5): `index`, `fetchEmployeesGrid`, `fetchEmployeesList`, `getAllEmployeeIds`, `create`, `details` use `getScopedDepartmentIds()`. The gap is the **edit** actions (PE-01).
 - **XSS:** information-change requests are shown escaped (`resources/views/resorts/people/info_update/show_details.blade.php:64, 70`), and resignation / exit / promotion comments are escaped (`{{ }}`). The one pattern that isn't is employee **names** in tables (PE-04).
 
-**Not deep-audited here (say so, don't assume):** the *correctness* of the multi-step approval chains inside Transfer, Promotion and Salary Increment. They contain substantial rank logic (Promotion 25, Transfer 23 rank references; Salary Increment gates on HR / Finance / GM steps), and every record they touch is resort-scoped, but whether each step can only be approved by the right person wasn't traced line by line in this pass. Treat them like payroll/budget approvals: include them in the PE-01 test matrix.
+**Approval chains (Promotion, Transfer, Salary Increment): deep-traced line by line** at the product owner's request. Results are in PE-05 to PE-08 below.
 
 ---
 
-#### PE-01 · HIGH · DECISION NEEDED · Employee edits aren't limited by role or department
+#### PE-01 · HIGH · Employee edits aren't limited by role or department  ·  ✅ DECIDED: HR only
 
 **What it is:** a HOD only **sees** their own department's employees (list and profile are scoped), but **every action that changes an employee** takes an employee id and only checks it's in the same **resort**. None of the ~30 edit methods in `app/Http/Controllers/Resorts/People/Employee/EmployeeController.php` check the caller's role or department, and only a handful of the 254 People routes are listed in `module_pages` (X-01). So any portal user (e.g. the F&B manager) can, for **any employee in the resort**:
 
@@ -1870,7 +1874,17 @@ It filters by **resort** and **category** only, **not by employee**, then turns 
 
 The rest of People follows the same pattern: `AnnouncementController`, `BenefitGradeLevelController`, `ConfigController`, `FacilityTourCategoryController` and all `configuration/*` controllers have **no** permission checks. `ComplianceController`, `ExitClearanceController`, `ProbationController`, `OnboardingController` and `SalaryIncrementController` check only a few pages.
 
-**`HUMAN` decision needed (record it here before fixing) — who may create/edit/delete employee records?** Recommended default:
+**✅ DECIDED by the product owner (2026-09-26): only HR may create, edit, delete, export and reset credentials for employee records. No one else may access other people's records.**
+
+**Consequences Ankit must implement deliberately (this is stricter than today):**
+- **HOD / EXCOM lose the department view they have today** (employee list and profile of their own department via `getScopedDepartmentIds()` in `EmployeeController::index`, `fetchEmployeesGrid`, `fetchEmployeesList`, `getAllEmployeeIds`, `create`, `details`). After the fix they see **no** other employees' records in People.
+- **GM loses the all-employees view** (today via `hasFullDataAccess()`).
+- **Finance** gets no People access. Finance still sees salaries **inside Payroll** (decided in P-01); that's unaffected.
+- Other modules that legitimately show *names* of colleagues (leave approvals, rosters, attendance, grievance committees, org chart) are **not** covered by this decision and keep working. This decision is about the People employee records (profile, personal data, salary, bank, documents).
+- Everyone still sees **their own** record in the mobile app.
+- Keep the bank-change notification to the employee (below) as a fraud alarm, even though only HR can make the change.
+
+*(Original recommendation, superseded by the decision above:)*
 - **HR:** full create / edit / delete / export / credentials for all employees.
 - **Finance:** **read-only** salary, allowance and bank details (for payroll). No edits.
 - **GM:** read-only view of all employees (as today via `hasFullDataAccess`). No edits.
@@ -1941,6 +1955,101 @@ A user of resort A can send any `meeting_id` and overwrite **another resort's** 
 grep -rnE "rawColumns\(\[[^]]*'(employee_name|Employee_Name|EmployeeName|name|Name|employee|Employee|Employeee)'" app/Http/Controllers | cut -d: -f1 | sort -u
 ```
 For each file listed, show the matching `addColumn` builder uses `e(...)` / `htmlspecialchars(...)` on the name. `HUMAN` staging test: submit an info-update request with first name `<img src=x onerror=alert('XSS-name')>` → it's rejected (422). As a second check, set a test employee's name to `<b>Bold</b>` directly through HR's edit screen, then open the resignation list, exit-clearance list and grievance history: the name shows literally as `<b>Bold</b>`, not bold.
+
+---
+
+#### Approval chains — how each one works today (deep trace)
+
+| | Promotion | Transfer | Salary increment |
+|---|---|---|---|
+| Steps | HOD of the employee's dept → Finance → GM (`PromotionController.php:253-296`) | Finance → GM (`TransferController.php:171-267`) | Finance → GM (`People/SalaryIncrementController.php:1341+`) |
+| Who can act on a step | the assigned person, their **delegate**, anyone in that step's **pool** (Finance pool / GM / HOD+EXCOM of the same dept) (`findActionableApproval`, `:1546-1585`) | assigned person, Finance/GM **pool** (`:858-878`), delegate | Finance = logged-in user with position "Director of Finance" / "Finance Manager"; GM = rank 8 (`:1346-1381`) |
+| Earlier steps must be approved first | ✅ `:880-891` | ✅ `:891-903` | ✅ GM needs Finance approved (`:1411-1424`) |
+| Record resort-scoped | ✅ `:826-832` | ✅ `:840-846` | ✅ `:1392` |
+| Action word restricted | ❌ any value written (see PE-08) | ✅ `:829` | n/a |
+| Applied to the employee only after **final** approval | ❌ **"Confirm" skips it** (PE-05) | ✅ `:1006` then post-approval apply | ✅ only on GM Approved + effective date (`:1487-1502`, `applyApprovedIncrementToEmployee` `:101-117`) |
+| Figures locked after approval | ❌ `inlineUpdate` (PE-05) | ✅ no edit route | ❌ `update` / `bulkUpdate` (PE-06) |
+| Person concerned can't approve their own | ⚠️ excluded when the chain is **created** (`:273-276`) but **not** in the approval-time fallback (PE-07) | ❌ no guard (PE-07) | ❌ no guard (PE-07) |
+
+---
+
+#### PE-05 · HIGH · Promotion: "Confirm" applies a promotion without any approval; salary still editable after approval
+
+**Where:**
+1. `PromotionController::confirmPromotion()` (`:1303`, route `POST /people/promotion/confirm-promotion`, `routes/resort_route.php:1709`) writes the new **department, position, division, rank, basic salary, increment date and benefit-grid level** onto the employee (`:1334-1341`, e.g. `$employee->basic_salary = $promotion->new_salary;` at `:1338`) **without checking `$promotion->status === 'Approved'`**. The HOD → Finance → GM chain can be skipped entirely: submit a promotion, then "confirm" it straight away.
+2. `PromotionController::inlineUpdate()` (`:1378`, route `POST /people/promotion/inline-update`, `:1714`) changes the promotion's **new salary, new position and effective date** (`:1398-1405`) **whatever its status**, including after all three approvals. "Confirm" then applies the edited figures.
+
+**How to reproduce (staging only):** *a promotion is applied with zero approvals.*
+- **Setup:** an HR login (after PE-01, HR is the only one who can start a promotion; today any portal user can); a **test** employee.
+1. As HR, open People → Promotion → Initiate, and submit a promotion for the test employee with a new salary of, say, **9999**. Don't approve anything. In DevTools → Network, note the new promotion's id (e.g. **45**) from the list or detail request.
+2. Press **F12 → Console** and run:
+   ```js
+   fetch('/resort/people/promotion/confirm-promotion', {
+     method: 'POST',
+     headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'X-Requested-With': 'XMLHttpRequest' },
+     body: new URLSearchParams({ promotionId: '45' })
+   }).then(r => r.text()).then(console.log);
+   ```
+- **Today (the problem):** success; the test employee's profile shows the **new position and basic salary 9999**, while the promotion still shows HOD / Finance / GM as *Pending*.
+- **After the fix:** `422` "Promotion is not approved yet"; the employee is unchanged.
+- *Variant (post-approval edit):* take a promotion that is fully **Approved** and call `POST /resort/people/promotion/inline-update` with its `id` and `new_salary: 12345` → today it saves; after the fix it's refused.
+
+**Fix:**
+- `confirmPromotion`: refuse unless `$promotion->status === 'Approved'` **and** every row in `$promotion->approvals` is `Approved`. Also refuse if it has already been applied (record an `applied_at` timestamp, same idea as `effective_day_applied_at` for increments).
+- `inlineUpdate`: allow only while **no** approval has been given yet (`status === 'Pending'` and all approvals `Pending`). If HR changes figures after anyone has approved, reset **all** approvals to `Pending` and re-notify (the same thing `SalaryIncrementController::update` does for stalled rows, `:490-506`).
+
+**VERIFY:** the reproduce steps above, before and after. Plus: a fully approved promotion can still be confirmed (normal path works) and shows the **approved** salary.
+
+---
+
+#### PE-06 · HIGH · Salary increment: amount still editable after GM approval
+
+**Where:** `People/SalaryIncrementController::update()` (`:448`, route `POST people/salary-increment/update/{id}`, `routes/resort_route.php:1786`) and `bulkUpdate()` (`:934`) recompute `increment_amount` and `new_salary` (`:484`) from the request for **any** status. Only "stalled" rows (Rejected / Hold / Change-Request) are sent back through approval (`:463-468`). An **Approved** increment stays "Approved" with the **new** figure. For a future-dated increment, the daily job `salary-increment:apply-effective` → `applyApprovedIncrementToEmployee()` (`:101-117`) then writes that edited `new_salary` into the employee's `basic_salary` (`:110`).
+
+**How to reproduce (staging only):**
+1. As HR, create an increment for a test employee with an **effective date next month**; approve it as Finance, then as GM (status **Approved**). Note its id (e.g. **77**) from DevTools → Network.
+2. As HR (today: any portal user), in the Console:
+   ```js
+   fetch('/resort/people/salary-increment/update/77', {
+     method: 'POST',
+     headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'X-Requested-With': 'XMLHttpRequest' },
+     body: new URLSearchParams({ effective_date: '01/11/2026', pay_increase_type: 'Fixed', value: '5000', increment_type: '<same as before>' })
+   }).then(r => r.text()).then(console.log);
+   ```
+- **Today (the problem):** success; the increment still shows **Approved**, but `new_salary` = previous + **5000**, and that's what will be paid from the effective date.
+- **After the fix:** `422` "Approved increments can't be edited", or the edit resets it to Pending and it needs Finance + GM again.
+
+**Fix:** in `update` and `bulkUpdate`, refuse edits when `status === 'Approved'` (or any approval row is Approved). The alternative is to treat an edit like the stalled case: reset every approval row to `Pending` and re-notify Finance. Also refuse once `effective_day_applied_at` is set.
+
+**VERIFY:** the reproduce steps before and after; the normal Pending → Finance → GM → applied flow still works.
+
+---
+
+#### PE-07 · MEDIUM · Approval chains let people approve their own promotion / transfer / increment
+
+| Chain | How self-approval happens today | Where |
+|---|---|---|
+| Promotion | The person being promoted is removed from the approver pools **when the chain is created** (`:273-276`), but the **approval-time** fallback `findActionableApproval()` rebuilds the pools **without** that exclusion: a promoted **HOD/EXCOM** qualifies for the HOD step of their own department (`:1573-1582`); a promoted **Finance** person qualifies for the Finance step (`:1566-1569`, `getUserPromotionRole` `:1506-1533`). | `PromotionController.php` |
+| Transfer | No exclusion at all. If the employee being transferred is in the Finance pool (`isFinanceApprover`, `:1203`) or is the GM (`isGmApprover`, `:1232`), they can approve their own step (`:866-876`). | `TransferController.php` |
+| Salary increment | No exclusion. The Finance Manager / Director of Finance can approve the Finance step of **their own** increment, and the GM the GM step of **theirs** (`:1353-1381`). | `People/SalaryIncrementController.php` |
+
+**Fix (one rule, three places):** in each approval handler, before accepting the action: `if ((int) $currentEmployee->id === (int) $<promotion|transfer|increment>->employee_id) → 403 "You cannot approve your own request."`. Also exclude that employee from any pool fallback. `HUMAN`: when the **only** person who can approve a step is the employee concerned (e.g. the GM's own increment), who approves instead? Recommended: **escalate to the resort's master admin or a named alternate**, recorded here.
+
+**How to reproduce (staging only):** create a promotion for a test employee who is the **HOD** of their department (with at least one other HOD/EXCOM in that department, so the chain is created). Log in **as that HOD** and approve the HOD step from the approval page. **Today:** it's accepted. **After the fix:** `403`.
+
+**VERIFY:** repeat for each chain (promotion as the promoted HOD; transfer of a Finance-pool employee acting as themselves; increment for the Finance Manager acting as Finance) → all `403`. A different eligible approver can still approve.
+
+---
+
+#### PE-08 · MEDIUM · Smaller approval-logic weaknesses
+
+| Where | Weakness | Fix |
+|---|---|---|
+| `People/SalaryIncrementController::updateStatus()` (`:1396`) | If the logged-in user is **neither** Finance nor GM, the step is taken from `approval_rank` **sent in the request payload**. Today the forged request only fails because `$incrementData['approver']->id` (`:1444`) crashes on a browser-sent array. That's **by accident**, and one refactor away from a real bypass. `requestChange` (`:1523`) and `holdRequest` (`:1625`) use the same pattern. | Decide the step **only** from the server-side lookups at `:1353-1366`. If neither matches → `403` before touching any row. Never read `approval_rank` / `approver` from the request. |
+| `PromotionController::handlePromotionApproval()` (`:908`) | The `{action}` URL segment is written into the approval row's status **before** it's validated. An unknown action is stored, then answered with "Invalid action." (`:1085`), leaving a junk status that blocks later steps. | Copy Transfer's allow-list (`TransferController.php:829`): only `Approved`, `Rejected`, `On Hold`, checked first. |
+| Legacy `app/Http/Controllers/Resorts/SalaryIncrementController.php` (routes `/salary-increment/save`, `/salary-increment/bulk-save`, `routes/resort_route.php:337-338`, used by the budget screens `resources/views/resorts/budget/view1.blade.php`, `view_budget_all_dp.blade.php`) | Writes employees' **`proposed_salary`** (and the manning budget line) directly, one employee or a **whole department** at a time, with **no approval** and no role check. This doesn't change pay (`basic_salary`), but it changes the salary figures in budgets and liability estimates (`LiabilityEstimationController.php:137, 922`). | Restrict to HR / Finance per W-03, and have it write only to the manning budget, not to `employees.proposed_salary`, or route it through the People increment approval flow. |
+
+**VERIFY:** `updateStatus` as a user who is neither Finance nor GM, with a payload containing `approval_rank: 'Finance'` → `403`, no status row changed. `POST /resort/people/promotion/45/Bogus` → `422` and the approval row still `Pending`. `/salary-increment/bulk-save` as a HOD → `403`.
 
 ---
 
