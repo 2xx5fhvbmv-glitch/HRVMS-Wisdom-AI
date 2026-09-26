@@ -145,7 +145,7 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | T-06 | 6 · Talent Acquisition | MEDIUM | Public forms have no rate limit / bot check; expired application links still work; submissions not tied to a valid open link | OPEN |
 | T-07 | 6 · Talent Acquisition | LOW | CV-extraction AI URL read with `env()`; public "remove video" deletes row #1; two smaller raw outputs | OPEN |
 | V-01 | 6 · Visa | HIGH | Mobile app: any employee can download **every colleague's** documents (passports) | OPEN |
-| V-02 | 6 · Visa | HIGH | Any portal user can open expat passport/visa/work-permit data and run visa payments, deposits and wallet transfers | DECISION NEEDED (who may access Visa) |
+| V-02 | 6 · Visa | HIGH | Any portal user can open expat passport/visa/work-permit data and run visa payments, deposits and wallet transfers — decided: HR full, Finance money + read, GM read-only | OPEN |
 | V-03 | 6 · Visa | MEDIUM | Payment requests accept employees of other resorts | OPEN |
 | V-04 | 6 · Visa | MEDIUM | Upload gaps: bulk documents not type-checked, SVG allowed, AI helpers forward any file | OPEN |
 | V-05 | 6 · Visa | MEDIUM | Passports and visas are sent to the AI extraction service — confirm where it runs and that it's encrypted | HUMAN CHECK |
@@ -1741,7 +1741,7 @@ It filters by **resort** and **category** only, **not by employee**, then turns 
 
 ---
 
-#### V-02 · HIGH · DECISION NEEDED · Any portal user can open expat documents and run visa payments
+#### V-02 · HIGH · Any portal user can open expat documents and run visa payments  ·  ✅ DECIDED
 
 **What it is:** only **12 of 82** Visa routes are listed in `module_pages` (X-01), mostly the menu pages. Almost none of the controllers check roles in the method: `ConfigurationController`, `DocumentController`, `ExpiryController`, `FetchDataAiController`, `FundTransferController`, `LiabilitiesController`, `PaymentDepositRequestController`, `RenewalController` (14 methods) have **no** permission checks. `PaymentRequestController`, `XpactEmployeeController` and `VisaReportController` check only a few menu pages. So **any portal user in the resort** (any HOD, manager, clinic or security user) can:
 
@@ -1755,7 +1755,7 @@ It filters by **resort** and **category** only, **not by employee**, then turns 
 | **Move money between visa wallets** | `FundTransferController::VisaWalletToWalletTransfer` |
 | Change visa configuration (fees, nationality rates, wallets) | `ConfigurationController` (20 methods, 0 checks) |
 
-**`HUMAN` decision needed (record it here before fixing) — who may access Visa?** Recommended default:
+**✅ DECIDED by the product owner (2026-09-26) — who may access Visa** (the recommended default below was accepted as-is):
 - **HR:** full access to all Visa screens and actions.
 - **Finance:** payment requests, marking fees paid, deposits, liabilities, wallets and fund transfers. Read access to the expat list and amounts. No document uploads or expiry changes.
 - **GM:** read-only dashboards and reports.
