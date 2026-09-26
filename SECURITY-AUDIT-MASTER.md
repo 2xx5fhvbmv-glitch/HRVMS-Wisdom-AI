@@ -129,6 +129,12 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | P-02 | 6 · Payroll | HIGH | Payroll figures are taken from the browser and can be changed after approval | OPEN |
 | P-03 | 6 · Payroll | MEDIUM | Mobile payslip PDFs saved with guessable names in one shared folder, never deleted | OPEN |
 | P-04 | 6 · Payroll | LOW | Payroll import files kept forever on local disk; one unscoped deductions read | OPEN |
+| W-01 | 6 · Manning & Budget | HIGH | Mobile app: any employee can read **another resort's** budget costs and org structure by changing `resort_id` | OPEN |
+| W-02 | 6 · Manning & Budget | HIGH | Anyone with a portal login can **approve** a department budget, or all budgets for the year | OPEN |
+| W-03 | 6 · Manning & Budget | HIGH | Salary-level budget data (every employee's current + proposed salary) readable and editable by any portal user | DECISION NEEDED (who may access budgets) |
+| W-04 | 6 · Manning & Budget | MEDIUM | A HOD can submit or overwrite **another department's** manning budget | OPEN |
+| W-05 | 6 · Manning & Budget | LOW | Records from other resorts accepted as references (cost items, parent division/department/section, employee) | OPEN |
+| W-06 | 6 · Manning & Budget | LOW | Budget/occupancy import files kept forever on local disk | OPEN |
 | — | 6 · next modules | — | Visa & employee documents → People/Employee → Disciplinary → … | PENDING AUDIT |
 
 ---
@@ -1236,7 +1242,156 @@ Expected: *(no output)*
 
 ---
 
-### 7.2 Next modules  ·  PENDING AUDIT
+### 7.2 Manning & Budgeting (Workforce Planning)
+
+**Scope audited:** `app/Http/Controllers/Resorts/BudgetController.php` (5,372 lines), `ManningController.php` (divisions, departments, sections, positions), `ManningResponseController.php` (department manning requests / budgets), `BudgetCostController.php`, `NonpermanentBudgetCostController.php`, `ConsolidateBudgetController.php`, `OccupancyController.php`, `PositionConfigController.php`, `WorkforcePlanningDashboardController.php`, `WorkforcePlanningReportController.php`, the "Send to Finance / GM" step in `ResortAllNotificationController::SendToFinance()` (`:323`), mobile `app/Http/Controllers/API/ManningController.php` + `API/BudgetCostController.php`, and views in `resources/views/resorts/{budget,budgetcost,manning,workforce_planning,Positions}/`. **84 web routes + 5 mobile routes.**
+
+**Why this module matters:** a manning budget holds **every employee's current basic salary and proposed salary**, per month, plus the resort's cost structure (allowances, benefits, overtime rates). It's nearly as sensitive as payroll.
+
+**Intended process (from `resources/views/resorts/budget/consolidated.blade.php:135-153` and `SendToFinance()`):** each HOD fills in their **own department's** manning request → HR reviews and sends it to Finance → Finance sends it to the GM → **the GM approves**. The "Send to Finance / Send to GM" step is **correctly** restricted on the server to HR / Finance / GM (`ResortAllNotificationController.php:332`). The steps below aren't.
+
+**Tenant isolation on the web side is clean** (68 lookups flagged by the script, all traced): every web endpoint that takes a `{resortId}` in the URL or `resort_id` in the form **replaces or verifies it** against the logged-in user (`BudgetController::viewConsolidatedBudget`, `getConfiguration`, `saveBudgetCostAssignment`; `ManningResponseController::store`, `saveDraft`, `getDraft`). The only cross-resort leak is on the **mobile** side (W-01).
+
+---
+
+#### W-01 · HIGH · Mobile app: any employee can read another resort's budget costs and org structure
+
+**Where:** all five endpoints take the resort **from the query string** and never compare it with the caller's own resort:
+
+| Route (`routes/api.php`) | Method | Returns for **any** resort id passed |
+|---|---|---|
+| `GET resort/budget-costs` (`:43`) | `API/BudgetCostController::getBudgetCosts` (`:15-31`) | **The whole budget-cost table**: every cost item's title, particulars, **amount**, cost type, frequency and details. This is the resort's confidential compensation / cost structure. |
+| `GET resort/positions` (`:40`) | `API/ManningController::getPositions` (`:153`) | Every position (title, code, rank, department, benefit-grid level, category) |
+| `GET resort/departments` (`:38`) | `API/ManningController::getDepartments` (`:52`) | Every department |
+| `GET resort/sections` (`:39`) | `API/ManningController::getSections` (`:101`) | Every section |
+| `GET resort/divisions` (`:37`) | `API/ManningController::getDivisions` (`:18`) | Every division |
+
+The routes sit inside `auth:api` (`routes/api.php:24`), so the attacker needs **any** employee login in **any** resort, and then just changes `?resort_id=`. Resort IDs are small sequential numbers. For the international client, this means **its staff could read other clients' cost structures, and other clients' staff could read its own.**
+
+**Fix:** in all five methods, ignore the query parameter and use the caller's resort: `$resortId = $this->user->resort_id;` (or `Auth::guard('api')->user()->resort_id`). Keep accepting `resort_id` in the request only so the mobile app doesn't break, but **don't use it**. If it's present and differs from the caller's resort, return `403`. Remove the `exists:resorts,id` validation, which confirms to an attacker which resort IDs exist.
+
+**VERIFY:** with a mobile token for an employee of resort A (tinker: `$t = $adminA->createToken('t')->accessToken;` inside a transaction, or a staging login), call each of the five routes with `?resort_id=<resort B's id>`:
+```bash
+curl -s -H "Authorization: Bearer $T" -H "Accept: application/json" "https://<staging>/api/resort/budget-costs?resort_id=<B>" | head -c 300
+```
+Expected for **all five**: `403`, or data belonging to **resort A only** (check that every returned row's `resort_id` is A). Paste the five results. Then `?resort_id=<A>` → still works (the app keeps working).
+
+---
+
+#### W-02 · HIGH · Anyone with a portal login can approve a department budget, or all budgets for the year
+
+**Where:**
+- `BudgetController::approveBudget()` (`:3013`, route `POST /budget/approve`, `resort.budget.approve`): marks one department's manning budget `Approved`, writes an `Approved` `BudgetStatus` row, notifies HR and the HOD.
+- `BudgetController::approveAllDepartmentBudgets()` (`:3128`, route `POST /budget/approve-all`, `resort.budget.approveAll`): marks **every department's budget for the year** `Approved` in one call.
+
+Both are resort-scoped (only the caller's resort), but **neither checks the caller's role**. The only thing stopping a HOD, supervisor or any portal user is that the **Approve button is hidden** unless the user is the GM (`consolidated.blade.php:145-153`). Anyone can send the same request from DevTools. Neither route is listed in `module_pages` (X-01).
+
+**Why it matters:** the budget approval is the GM's sign-off on next year's headcount and salary spend. It unlocks hiring against the budget, and the approval PDF (`downloadBudgetApprovalPdf`, `:3202`) is used as evidence of approval. A forged approval undermines that control.
+
+**Fix:** at the top of both methods, add the same style of check `SendToFinance()` already uses (`ResortAllNotificationController.php:326-334`, check at `:332`):
+```php
+$pos = Common::getEmployeeRankPosition($this->resort->getEmployee);
+if (($pos['position'] ?? null) !== 'GM') {
+    return response()->json(['success' => false, 'message' => 'Only the GM can approve budgets.'], 403);
+}
+```
+`HUMAN` confirms: is the GM the **only** approver, for both single-department and approve-all? The screen suggests yes. Also check the budget is actually at the GM stage (`budget_process_status === 'GM'`) before approving, so an approval can't skip the HR → Finance steps.
+
+**VERIFY:** §0.5 harness, same resort: call `approveBudget` and `approveAllDepartmentBudgets` as (a) a HOD, (b) HR, (c) Finance, (d) the GM, each on a budget that is at the GM stage. Expected: (a), (b), (c) → `403` and `budget_process_status` unchanged; (d) → success. Also as the GM on a budget still at the **HR** stage → refused. Paste the results table.
+
+---
+
+#### W-03 · HIGH · DECISION NEEDED · Salary-level budget data readable and editable by any portal user
+
+**What it is:** the budget screens themselves (`ViewBudget`, `ConsolidateBudget`, `ViewManning`, `CompareBudget`) do check rank. But the **data endpoints behind them** have **no role or department check**, only a resort check. Any portal user can call them directly:
+
+| Endpoint (route) | Method (`BudgetController.php` unless noted) | What it exposes / changes |
+|---|---|---|
+| `GET budget/hierarchy/position/employees` | `getPositionEmployees` (`:3748`) | Every employee in a position with **current basic salary and budgeted salary** |
+| `GET budget/hierarchy/employee/monthly` | `getEmployeeMonthlyData` (`:3957`) | One employee's **month-by-month salary + allowance + overtime budget** |
+| `GET budget/hierarchy/vacant/monthly`, `budget/hierarchy/department`, `budget/hierarchy/all-totals` | `getVacantMonthlyData` (`:4149`), `getDepartmentHierarchy` (`:3659`), `getAllBudgetTotals` (`:4293`, department filter only) | Budget for vacancies, whole-department and whole-resort totals |
+| `POST budget/hierarchy/employee/update`, `budget/hierarchy/vacant/update` | `updateEmployeeMonthlyBudget` (`:4599`), `updateVacantMonthlyBudget` (`:4824`) | **Change** any employee's budgeted salary figures |
+| `POST resorts/{resortId}/budget/save-cost-assignment`, `…/get-configuration` | `saveBudgetCostAssignment` (`:3255`), `getConfiguration` (`:3542`) | Change / read which cost items apply to each employee |
+| `POST budget/upload/config-files`, `budget/resort-all-department-wise` | `UploadconfigFiles` (`:2845`), `UpdateResortBudgetPositionWise` (`:2945`) | Replace budget configuration for the whole resort |
+| `GET budget/{budgetId}/approval-pdf` | `downloadBudgetApprovalPdf` (`:3202`) | The signed approval PDF |
+| `GET budget/export` | `ConsolidateBudgetController::ExportBudget` | **Excel export of the whole consolidated budget** |
+| `/budget/cost/*`, `/budget/cost/nonpermanent/*` | `BudgetCostController`, `NonpermanentBudgetCostController` (no permission checks) | Create / edit / delete the resort's cost items (allowances, benefits, rates) |
+| `/store-occupancy`, `/store-import-datas`, `/store-bulk-occupancy` | `OccupancyController` (no permission checks) | Change the occupancy forecast that drives staffing numbers |
+
+**`HUMAN` decision needed (record it here before fixing) — who may access manning & budgets?** Recommended default, matching the intended process above:
+- **HR and Finance:** full access (view all departments, edit, configure costs, export).
+- **GM:** view the consolidated budget and approve (W-02). The GM doesn't edit figures.
+- **HODs / EXCOM:** **only their own department's** manning request and budget (fill in, save draft, submit, view). No other department, no resort-wide totals, no cost configuration, no export.
+- **Everyone else, including L&D managers:** no access.
+
+**Fix (after the decision):**
+1. Add one helper, e.g. `Common::budgetAccessLevel($employee = null): string` returning `'full'` (HR, Finance), `'approve'` (GM), `'own_department'` (HOD/EXCOM of other departments) or `'none'`. Build it on `Common::getEmployeeRankPosition()`, the same source `SendToFinance()` uses. **Don't** reuse `hasFullDataAccess()` / `getScopedDepartmentIds()` for this: the first includes L&D managers, and the second gives every ordinary employee their whole department.
+2. Gate every method in the table: `'none'` → `403`; `'own_department'` → allowed only when the requested department/position/employee belongs to the caller's own `Dept_id`; `'approve'` → read-only consolidated view + W-02 approval; `'full'` → everything.
+3. `BudgetCostController`, `NonpermanentBudgetCostController`, `OccupancyController`, `UploadconfigFiles`, `UpdateResortBudgetPositionWise`, `ExportBudget`: `'full'` only.
+
+**VERIFY:** users of one resort: HR, Finance, GM, HOD of department X, HOD of department Y, an ordinary portal user. For each endpoint in the table, paste `Endpoint | HR | Finance | GM | HOD-X on X | HOD-X on Y | ordinary`. Expected: matches the decided rules. For every `403` row, the related `resort_employee_budget_cost_configurations` / `position_monthly_data` / `resort_budget_costs` rows are unchanged.
+
+---
+
+#### W-04 · MEDIUM · A HOD can submit or overwrite another department's manning budget
+
+**Where:** `ManningResponseController.php`. The department restriction exists in some methods but not in their siblings (invariant #7):
+
+| Method | Department check? |
+|---|---|
+| `saveDraft` (`:334`) | ✅ yes — `:363` |
+| `getCategoriesWithData` (`:456`), `closeManningRequestNotification` (`:491`) | ✅ yes — `:461`, `:497` |
+| **`store`** (`:151`, final **submit** of the manning request) | ❌ **no** |
+| **`updateBudgetData`** (`:836`, edit a budget line's current/proposed salary and months) | ❌ **no** |
+| **`updateParentTotal`** (`:879`, overwrite a department's total budget) | ❌ **no** |
+
+So a HOD can't *save a draft* for another department, but can **submit** one, **edit its salary lines** and **overwrite its total**. All three are resort-scoped.
+
+**Fix:** add the same check `saveDraft` uses (`:362-365`) to `store`, and to `updateBudgetData` / `updateParentTotal` (using the department of the record being changed, not a client-sent value). Once W-03's helper exists, use it here too, so HR and Finance can still edit any department.
+
+**VERIFY:** §0.5 harness, same resort, as the HOD of department X: call `store` with `dept_id` = department Y → `403`, and no new/changed `manning_responses` row for Y. Call `updateBudgetData` on a `store_manning_response_children` row belonging to Y → `403`, row unchanged. Call `updateParentTotal` for Y → `403`, `Total_Department_budget` unchanged. Repeat all three for department X → success.
+
+---
+
+#### W-05 · LOW · Records from other resorts accepted as references
+
+These don't leak another resort's data **directly**. They let a user store a link to another resort's record inside their own resort's data, which then shows up on their screens, and they're one careless query away from a real leak. Fix all of them with `Rule::exists(<table>, 'id')->where('resort_id', <caller's resort>)`, the pattern `GrievanceAppealController.php:204-207` already uses.
+
+| Where | Field accepted without a resort check |
+|---|---|
+| `BudgetController::saveBudgetCostAssignment` (`:3255+`, rule `budget_costs.*.cost_id => exists:resort_budget_costs,id`) and `ResortBudgetCost::find(...)` at `:3343, 3353, 3438, 3448, 4686, 4698, 4723, 4923, 4935, 4960` | `cost_id` — another resort's cost item (title + amount) gets pulled into this resort's budget maths and configuration |
+| `saveBudgetCostAssignment` | `employee_id`, `position_id` (only `integer`) |
+| `ManningController::store_departments` (`:415`), `store_sections` (`:693`), `store_positions` (`:982`) | parent `division_id` / `dept_id` (only `required`) |
+| `ManningController` inline updates (`:483`, `:761`, `:1053`) and the name lookups at `:557`, `:845-846`, `:1148-1150` | parent `division` / `department` / `section` from the request |
+
+**VERIFY:** for each row, a request with a **resort B** id from a resort A user → `422` validation error, nothing saved. Paste the results.
+
+---
+
+#### W-06 · LOW · Budget/occupancy import files kept forever on local disk
+
+`BudgetController::UploadconfigFiles` (`:2915`, `->store('imports')`) and `OccupancyController` (`:191`, `->store('imports', 'local')`) save uploaded spreadsheets with raw `store()` (not `StorageHelper`, against invariant #2) and don't delete them after a successful import. Same fix as P-04: delete after import, or process straight from the upload's temp path. (The file types **are** validated: `mimes:xls,xlsx` / `xls,xlsx,csv`, `max:2048`.)
+
+**VERIFY:** after a successful import on staging, `storage/app/imports/` doesn't contain the new file.
+
+---
+
+#### Manning & Budgeting — checked and found clean
+- **XSS:** no user-typed text is printed raw. The `rawColumns` in `ManningController.php:162, 399, 679, 968` render division/department/section/position names and fixed badges (HR-controlled). The AI-insights panel escapes the AI text before inserting it (`workforce_planning/dashboard.blade.php:1442`: `$('<div>').text(why).html()`). The one `{!! !!}` (`workforce_planning/hoddashboard.blade.php:22`) prints a fixed page title.
+- **Org-structure edits and deletes** (divisions, departments, sections, positions) are all resort-scoped (`ManningController.php:234, 487, 767, 1063, 311, 579, 1180`).
+- **Dashboards** use the logged-in user's own id (`WorkforcePlanningDashboardController.php:832, 887`).
+- **AI budget comparison** (`CompareBudgetRegenerateAi`, `:721`) checks both the budget and the department belong to the resort.
+- **Send to Finance / Send to GM** is correctly restricted to HR / Finance / GM on the server.
+
+#### Manning & Budgeting — non-security items (backlog)
+| File:line | Item |
+|---|---|
+| `routes/resort_route.php:257` | `GET /resort/budget/get` → `BudgetController@ajaxViewBudget`, **which doesn't exist**. Always a 500. Remove the route or restore the method. |
+| `app/Http/Controllers/Resorts/{DepartmentController,DivisionController,SectionController,PositionController}.php` | **Dead code**: no route points to them (the live versions are in `ManningController`, and the admin panel uses separate `Admin\*` controllers). Their `inlineUpdate` / `destroy` use **unscoped** `find($id)` (e.g. `DepartmentController.php:115, 129`). Harmless today, but one route line away from a cross-resort delete. **Delete these four files.** |
+
+---
+
+### 7.3 Next modules  ·  PENDING AUDIT
 Planned order (most sensitive first): Visa & employee documents → People / Employee profiles → Disciplinary → Leave & Island Pass → Time & Attendance → Performance → Incidents → Accommodation → Learning → Talent Acquisition → Survey → File Management → SOS → Wisdom AI.
 
 ---
