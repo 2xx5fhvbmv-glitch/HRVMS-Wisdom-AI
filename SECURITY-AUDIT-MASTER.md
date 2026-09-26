@@ -100,6 +100,7 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | S1-05 | 1 | LOW | Stray `public/Kernel.php` copy of the HTTP kernel | OPEN |
 | S1-06 | 1 | LOW | Guessable Pusher credential fallbacks in `config/broadcasting.php` | OPEN |
 | S1-07 | 1 | LOW | Developer's real name/email in public import template | OPEN |
+| S1-08 | 1 | CRITICAL | Public no-login URLs run database migrations, delete permission pages, clear caches, blast notifications | OPEN |
 | S2-01 | 2 | HIGH | Investigation actions (assign committee, GM decision) can change another resort's grievance | OPEN |
 | S2-02 | 2 | HIGH | "Request witness statement" works on another resort's grievance and notifies its witnesses | OPEN |
 | S2-03 | 2 | HIGH | Grievance settings: 7 deletes + 2 edits work across resorts; no permission checks at all | OPEN |
@@ -112,7 +113,13 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | S2-10 | 2 | LOW | Grievance numbers are one global sequence across all resorts | OPEN |
 | S2-11 | 2 | LOW | Mobile witness-statement lookup not scoped (safe today, defence in depth) | OPEN |
 | X-01 | cross-cutting | HIGH | Portal permission check allows every route not listed in `module_pages` (~91% of routes) | DECISION NEEDED |
-| — | 3 | — | Super-admin support view stored XSS | PENDING AUDIT |
+| S3-01 | 3 | CRITICAL | Live support chat runs on public channels — anyone can read every resort's support chats | OPEN |
+| S3-02 | 3 | CRITICAL (LIKELY) | Support reply attachments: any file type saved into the web root (possible code execution) | OPEN |
+| S3-03 | 3 | HIGH | Stored XSS in the support ticket email thread (super-admin view + resort view) | OPEN |
+| S3-04 | 3 | HIGH | Stored XSS in live support chat renderers (super-admin + resort) | OPEN |
+| S3-05 | 3 | HIGH | Chat sender identity (id, type, name, photo) is taken from the browser — messages can be faked | OPEN |
+| S3-06 | 3 | MEDIUM | Support reply sends email to any address the user types, with the user's text | OPEN |
+| S3-07 | 3 | LOW | Upload type gaps (SVG on tickets, no type check on chat) + raw name column in admin list | OPEN |
 | — | 4 | — | Passport token expiry | PENDING AUDIT |
 | — | 5 | — | CORS allows every origin | PENDING AUDIT |
 | — | 6+ | — | Module-by-module sweep (tenant isolation + frontend XSS + uploads) | PENDING AUDIT |
@@ -345,6 +352,48 @@ Expected: only `@example.com` addresses.
 
 ---
 
+### S1-08 · CRITICAL · Public no-login URLs that change the database and the system
+
+*(Found during the Stage 3 audit and placed in Stage 1 because, like S1-01/02, it's reachable by anyone on the internet with no login. **Fix this together with S1-01 and S1-02.**)*
+
+**Where:** `routes/web.php`, loaded by `RouteServiceProvider::mapWebRoutes()` (`app/Providers/RouteServiceProvider.php:121-126`) with **only** the `web` middleware: no `auth`, no IP restriction. They're all plain `GET` requests, so they can even be triggered by an `<img src="https://<domain>/qb">` tag in any email or web page someone opens.
+
+| URL | Line | What it does when anyone opens it | Impact |
+|---|---|---|---|
+| `/migrate` | 36-41 | `Artisan::call('migrate', ['--force' => true])` | Runs any pending migrations on **production** immediately, at an attacker-chosen moment (e.g. mid-deploy, before code is ready). The code comment says "Only allow from a secure IP or with auth!", but nothing enforces it. |
+| `/qb` (defined twice) | 42-50 | `ModulePages::where('module_id', 17)->delete()` | **Deletes a whole module's menu and permission pages.** Because of X-01, deleted pages become "unlisted", and unlisted routes are **allowed for everyone**. So this URL both breaks the menu and **switches off permission checks** for that module. |
+| `migrate/rollback` | 78-81 | `Artisan::call('migrate:rollback')` | **Undoes the last migration batch, which can drop tables and columns (data loss).** Without `--force`, Laravel normally refuses when `APP_ENV=production`, but it **runs on any host where `APP_ENV` isn't `production`** (staging, test boxes). Don't rely on that setting as the protection. |
+| `/clear` | 72-75 | `Artisan::call('optimize:clear')` | Wipes config, route and view caches on demand. Repeated calls = slowdown or denial of service. It also makes the app read `.env` live, which changes behaviour (see S2-07). |
+| `/survey-change-status`, `/onboarding-new-emp-hire-notification`, `/calendar-push-notification` | 83-99 | Run scheduled notification jobs on demand | Anyone can make **every employee** receive push notifications again and again (spam, and a loss of trust in the app). |
+| `/marquee` | 58-60 | `File::get('C:\Users\Spaculus\Downloads\krishika.txt')` | A developer's local Windows path. It errors on the server, and reveals a developer's machine path and name. |
+
+**Also:** `routes/front_route.php` contains `/migrate`, `/migrate/rollback`, `/passport/keys`, `/passport/install` and `/clear`. It's **not loaded today** (no `require`/`group` of it anywhere), but it's one careless line away from being live, and `/passport/keys` would **log out every mobile user**. Delete it.
+
+**Fix:**
+1. Delete every route in the table above from `routes/web.php` (lines 36-50, 58-60, 72-99), and delete `routes/front_route.php`.
+2. Keep the other routes in `web.php` (`/broadcasting/auth`, `/meeting/respond/{token}`, `/`).
+3. The scheduled jobs (`links:*`) should run from the Laravel scheduler / cron, not from URLs. `HUMAN` confirms they're in `app/Console` / `routes/console.php` scheduling, so removing the URLs doesn't stop them running.
+4. Migrations and cache clears are deploy steps: `php artisan migrate --force` and `php artisan optimize` over SSH / in the deploy script. `HUMAN` confirms the deploy process doesn't call these URLs.
+5. `HUMAN`: check web-server access logs for past hits to these paths (same command as S1-02, with `migrate|qb|rollback|clear|survey-change-status|onboarding-new-emp|calendar-push`). Hits from unknown IPs → investigate. **Check the `module_pages` rows for module 17 exist** (if `/qb` was ever called on prod, that module's permission pages are gone).
+
+**VERIFY:**
+```bash
+grep -nE "Artisan::call|ModulePages::|File::get\('C:" routes/web.php
+```
+Expected: *(no output)*
+```bash
+ls routes/front_route.php 2>&1
+```
+Expected: `No such file or directory`
+```bash
+# HUMAN, every live host, after deploy — each must be 404:
+for p in migrate qb migrate/rollback clear marquee survey-change-status onboarding-new-emp-hire-notification calendar-push-notification; do
+  printf '%s %s\n' "$(curl -s -o /dev/null -w '%{http_code}' https://<prod-domain>/$p)" "$p"; done
+```
+Expected: `404` on every line.
+
+---
+
 ### Stage 1 — checked and found clean
 
 So Claude Code doesn't spend time re-auditing these:
@@ -564,6 +613,7 @@ The key is derived as `hash('sha256', env('ENCRYPTION_KEY'), true)` and used for
 - `ENCRYPTION_KEY` is **not defined in any `config/*.php` file**, and **not present in `.env.example` or `.env.staging`**.
 - In Laravel, once `php artisan config:cache` has run (standard in production), `env()` **returns `null` everywhere outside config files**.
 - In either case (never set, or config cached), the key becomes `sha256("")`, a **publicly known constant**. The "encrypted" passports and grievance files are then encrypted with a key anyone can calculate, so the encryption protects nothing if the Wasabi bucket or its credentials ever leak.
+- **Evidence that production caches config** (found in Stage 3): the comment in `resources/views/partials/pusher-init.blade.php` says that on the live server `env()` calls outside `config/*.php` return null because `config:cache` runs on "any standard deploy", which is why that file was switched to `config()`. So on production, `env('ENCRYPTION_KEY')` is **almost certainly null today**. The `HUMAN` check in step 1 below is still needed to confirm it.
 
 **Fix — `HUMAN` first (decides the path):**
 1. On the production box: is `ENCRYPTION_KEY` set in `.env` (report length only: `grep -c '^ENCRYPTION_KEY=.\+' .env`)? Is config cached (`ls bootstrap/cache/config.php`)?
@@ -685,7 +735,217 @@ So Claude Code doesn't spend time re-auditing these:
 |---|---|
 | `routes/resort_route.php:1201` | The **delete committee** route points to `GrivanceController@GrivevanceCommitteesDestory`, but that method lives in `ConfigurationController` (`:3538`). Deleting a committee from the UI always fails with a 500. |
 | `GrivanceController.php:424-434` | `InvestigationReport()` has no "not found" guard (its sibling `Investigationinfo()` has one at `:800-802`). An unknown or foreign ID gives a 500 instead of a 404. Not a leak, since it crashes before rendering. |
-## 4. STAGE 3 — Super-admin support view XSS  ·  PENDING AUDIT
+## 4. STAGE 3 — Support module (tickets, email thread, live chat)
+
+**Scope audited:** the whole support feature, both sides, because the original "super-admin support view XSS" turned out to be one part of a bigger chain:
+- Resort side: `routes/resort_route.php:1375-1392`, `app/Http/Controllers/Resorts/Support/SupportController.php`, `.../Support/SupportChatController.php`, views `resources/views/resorts/support/*.blade.php`, and the shared chat renderer in `resources/views/resorts/layouts/js.blade.php:557-636`.
+- Super-admin side: `routes/admin_route.php:226-254` (behind `auth:admin`), `app/Http/Controllers/Admin/SupportController.php`, `.../Admin/SupportChatController.php`, views `resources/views/admin/support/*.blade.php`.
+- Real-time: `app/Events/NewChatMessage.php`, `routes/channels.php`, `routes/web.php:15-20` (`/broadcasting/auth`), `resources/views/partials/pusher-init.blade.php`.
+- Email: `app/Mail/SupportReplyEmail.php`, `resources/views/emails/commonEmail.blade.php`.
+
+**Why this matters more than it looks:** the **super-admin** is the one account that can see and manage **every resort**. Any script that runs in the super-admin's browser can do anything the super-admin can, across all tenants. Every XSS path in this stage lands either in the super-admin's browser or in another resort's browser.
+
+---
+
+### S3-01 · CRITICAL · Live support chat runs on public channels — anyone can read every resort's support chats
+
+**Where:**
+- `app/Events/NewChatMessage.php:41` — `return new Channel('chat.' . $this->receiverId);`, a **public** Pusher channel. The code comment above it admits it was made public to "sidestep multi-guard auth wiring".
+- Listeners: `resources/views/admin/support/chat.blade.php:369` (`Echo.channel('chat.' + <admin id>)`) and `resources/views/resorts/support/chat.blade.php:204` (`Echo.channel('chat.' + <employee id>)`).
+- The Pusher **app key is sent to every browser** (`partials/pusher-init.blade.php`). That's normal for Pusher, but it means anyone can connect.
+
+**What an attacker can do (no login needed):**
+1. Open any page's HTML to get the Pusher key, then subscribe to `chat.1`, `chat.2`, `chat.3`… (public channels need no authorisation).
+2. **Read every live support message, from every resort, in real time**: message text, sender name and photo URL, and attachment names/IDs.
+3. `chat.1` is especially valuable: `Resorts/Support/SupportChatController.php:96` sends every **unassigned** ticket's messages to "the first admin" (`Admin::orderBy('id')->first()`). One channel therefore carries unassigned support traffic from **all resorts**.
+
+**A second leak, even without an attacker:** admins listen on `chat.<admin id>` and resort employees on `chat.<employee id>`. Those are **two different ID sequences sharing one channel name**. When a resort user messages admin #5, the message is broadcast on `chat.5`, and **employee #5 of some other resort**, if they have the support chat open, receives it on screen. Admin replies to employee #5 likewise reach admin #5.
+
+**Fix (backend + frontend together):**
+1. Make the channel **private and per ticket**: `new PrivateChannel('support-ticket.' . $supportId)`. Pass the ticket id into the event (both `sendMessage` methods know it).
+2. In `routes/channels.php`, authorise it for both guards:
+   ```php
+   Broadcast::channel('support-ticket.{supportId}', function ($user, $supportId) {
+       if ($user instanceof \App\Models\Admin) return true; // super-admin panel
+       return \App\Models\Support::where('id', $supportId)->where('resort_id', $user->resort_id)->exists();
+   }, ['guards' => ['admin', 'resort-admin']]);
+   ```
+   Check that `/broadcasting/auth` (`routes/web.php:15-20`) resolves the **admin** guard too. Today it only switches to `resort-admin`.
+3. Frontend: the `window.Echo` shim in `partials/pusher-init.blade.php` only implements `Echo.channel()` (public). Add `Echo.private()` using Pusher's `authEndpoint: '/broadcasting/auth'` with the CSRF token header, and change both chat views to `Echo.private('support-ticket.' + supportId)`.
+4. Remove the `chat.{receiver_id}` channel definition from `routes/channels.php:6-8` once nothing uses it. Grep for other `Echo.channel('chat.` listeners first (invariant #7).
+
+**VERIFY:**
+```bash
+grep -rn "new Channel('chat\." app/ ; grep -rn "Echo.channel('chat\." resources/views/
+```
+Expected: *(no output)*
+- **Unauthenticated test (required):** in a browser console on any page, with the site logged out, run:
+  ```js
+  const p = new Pusher('<PUSHER_APP_KEY>', {cluster: '<cluster>'});
+  p.subscribe('chat.1').bind('NewChatMessage', e => console.log('LEAK', e));
+  p.subscribe('private-support-ticket.1').bind('pusher:subscription_error', e => console.log('BLOCKED', e.status));
+  ```
+  Then send a support chat message from a resort user on staging. Expected: **no `LEAK` line**, and `BLOCKED 403` (or similar auth failure) for the private channel.
+- **Cross-resort test:** logged in as a resort-A user, try `Echo.private('support-ticket.<a resort-B ticket id>')` → subscription error. Same-resort ticket → works, and messages appear live.
+- **Both panels still work:** send a message from the resort side, and it appears live in the super-admin chat; reply, and it appears live on the resort side.
+
+---
+
+### S3-02 · CRITICAL (LIKELY — confirm on server) · Support reply attachments: any file type saved into the web root
+
+**Where:** `Resorts/Support/SupportController::sendReply()` — `SupportController.php:400` (validation) and `:407-411` (storage):
+```php
+'attachments.*'  => 'nullable|file|max:25600',            // no file-type rule
+$fileName = time() . '_' . $file->getClientOriginalName();  // predictable name
+$filePath = $file->storeAs('support_attachments', $fileName, 'public');
+```
+The `public` disk is `storage/app/public` (`config/filesystems.php`), served to the web through the `public/storage` symlink (`config/filesystems.php:101-102`). The super-admin view links to it directly: `resources/views/admin/support/view.blade.php:143` (`asset('storage/' . $a)`).
+
+**Why it matters:**
+- **Code execution (if the server runs PHP under `public/storage`):** a resort user uploads `shell.php`, and it lands at `/storage/support_attachments/<unix-time>_shell.php`. The name is guessable: the upload time ±a few seconds. If the web server hands any `.php` file under `public/` to PHP (the default nginx/Apache Laravel setup does), the attacker can **run their own code on the server**, meaning every resort's data, the `.env`, everything.
+- **Stored XSS on the app's own domain (certain):** an uploaded `.html` or `.svg` opens *on the app's domain* when the super-admin clicks it, the same impact as S3-03.
+- Also breaks CLAUDE.md invariant #2: raw `storeAs(..., 'public')` instead of `StorageHelper`. In production (Wasabi) these files don't end up where the rest of the app expects.
+
+**Fix:**
+1. Add a file-type allowlist matching the ticket-create form, minus SVG: `'attachments.*' => 'nullable|file|max:25600|mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf,doc,docx,xls,xlsx,csv,txt,mp4,mov'`.
+2. Store through `StorageHelper` under a per-resort, per-ticket path with a random name (e.g. `Str::uuid() . '.' . $file->extension()`, keeping the original name only as display metadata), and change `admin/support/view.blade.php:143` to use a `StorageHelper` temporary URL instead of `asset('storage/…')`. Existing rows store `support_attachments/X` paths, so keep a fallback for them.
+3. `HUMAN` (server): make sure the web server **never executes PHP inside `public/storage`** (and ideally anywhere except `public/index.php`). nginx example:
+   ```nginx
+   location ^~ /storage/ { location ~ \.php$ { return 403; } }
+   ```
+4. `HUMAN`: list what's already in `storage/app/public/support_attachments/` on every server. Any `.php`, `.phtml`, `.phar`, `.html`, `.svg` file there must be reviewed (possible prior compromise) and removed.
+
+**VERIFY:**
+```bash
+sed -n '/function sendReply/,/^    }/p' app/Http/Controllers/Resorts/Support/SupportController.php | grep -nE "storeAs|'public'|mimes"
+```
+Expected: no `storeAs`, no `'public'`, and one `mimes:` line.
+- `HUMAN` on staging, **before** the fix (to confirm severity): upload a file `rce-test.php` containing `<?php echo "RCE-" . (7*6);` as a support reply attachment, then open `https://<staging>/storage/support_attachments/<its name>`. If the page shows `RCE-42`, it's **confirmed code execution**: escalate immediately and treat production as possibly compromised. After the fix: the upload is **rejected** (422), and a `.php` placed manually under `public/storage` returns `403`, not `RCE-42`.
+
+---
+
+### S3-03 · HIGH · Stored XSS in the support ticket email thread  ·  *Frontend fix (Blade only)*
+
+**Where:**
+- **Super-admin ticket view:** `resources/views/admin/support/view.blade.php:130` — `{!! html_entity_decode($msg->message) !!}`
+- **Resort ticket view:** `resources/views/resorts/support/email-ticket.blade.php:51` — `{!! html_entity_decode($message->message) !!}`
+
+**How the attack works:** resort replies are saved with `strip_tags($request->message)` (`SupportController.php:420`). `strip_tags` removes `<tags>` but **leaves HTML entities alone**. So a resort user types:
+`&lt;img src=x onerror=alert(document.domain)&gt;`
+`strip_tags` sees no tags and stores it unchanged. The view then calls `html_entity_decode`, which turns it back into a **real** `<img … onerror=…>`, printed raw with `{!! !!}`. The script runs:
+- in the **super-admin's** browser (view.blade.php), giving control of every tenant;
+- in the browser of **other staff in the same resort** who open the ticket (email-ticket.blade.php).
+
+(Admin replies are saved with `e($request->body)` at `Admin/SupportController.php` `replyStore`. That's why the view decodes at all: the admin text is stored already escaped.)
+
+**Fix (Blade only — both lines):** decode first, then escape, then keep line breaks:
+```blade
+{!! nl2br(e(html_entity_decode($msg->message, ENT_QUOTES | ENT_HTML5))) !!}
+```
+This shows both stored forms (escaped admin text and stripped resort text) correctly as **plain text**, and nothing can turn into live HTML. Apply the same change to `email-ticket.blade.php:51` (`$message->message`). Grep `resources/views/admin/support/` and `resources/views/resorts/support/` for any other `html_entity_decode` / `{!!` on message fields (invariant #7).
+
+**VERIFY:**
+```bash
+grep -rnE "\{!!\s*html_entity_decode" resources/views/admin/support resources/views/resorts/support
+```
+Expected: *(no output)*
+- `HUMAN` browser test on staging: from a resort user, reply to a ticket with the text `&lt;img src=x onerror=alert('XSS-S3-03')&gt;` and also `<b>bold</b>`. Open the ticket (a) as super-admin (Supports → open the ticket) and (b) as another resort user. **No alert may appear.** The text must show literally. Also confirm an existing admin reply containing an apostrophe or `&` still displays correctly (not as `&amp;#039;`).
+
+---
+
+### S3-04 · HIGH · Stored XSS in the live support chat renderers  ·  *Frontend fix (JavaScript only)*
+
+**Where:** both live-chat renderers build HTML strings from broadcast data:
+
+| File:line | Unescaped value | Who controls it |
+|---|---|---|
+| `resources/views/admin/support/chat.blade.php:402-404` | `senderImage` inside `src="${senderImage}"`; `senderInitials` (from `senderName`) | the **resort user** (sent as `senderImage` / `senderName` form fields, see S3-05) |
+| `resources/views/admin/support/chat.blade.php:424-427` | attachment `filename` | the **resort user** (original upload file name) |
+| `resources/views/resorts/layouts/js.blade.php:572-574` | `senderImage`, `senderInitials` | sender |
+| `resources/views/resorts/layouts/js.blade.php:596-599` | attachment `filename` | sender |
+| `resources/views/resorts/layouts/js.blade.php:615, 629` | **`data.message` itself** (and `senderName` at 611) | sender, **and anyone on the colliding channel** (S3-01) |
+
+Example: a resort user posts the chat form with `senderImage = x" onerror="alert(document.cookie)` → it runs in the **super-admin's** browser the moment the message arrives. On the resort side the message text isn't escaped at all, so a message `<img src=x onerror=…>` runs in the receiving browser. Because of the channel collision in S3-01, that can be a **user in another resort**.
+
+(The message **text** in the admin renderer is already escaped at line 400, and the saved-history rendering in both chat views uses `{{ }}` correctly. Only the live renderers are affected.)
+
+**Fix (JavaScript only):**
+1. Add one small escape helper in each file (or a shared one in the resort layout):
+   ```js
+   function escHtml(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
+   ```
+2. Wrap **every** interpolated value: `${escHtml(senderInitials)}`, `${escHtml(filename)}`, `${escHtml(senderName)}`, `${escHtml(data.message)}`. For the resort side, use the same `safeMessage` approach the admin side uses at line 400.
+3. For image URLs, don't interpolate into an attribute. Allow only `https:` or same-origin URLs, and set them with jQuery: `$('<img>').attr('src', url)`. For string attachments (`href="${file}"`), allow only `https:` URLs.
+4. Grep both files for any remaining `${` inside HTML template strings and check each one.
+
+**VERIFY:**
+```bash
+grep -nE '\$\{(senderImage|senderInitials|senderName|filename|data\.message)\}' resources/views/admin/support/chat.blade.php resources/views/resorts/layouts/js.blade.php
+```
+Expected: *(no output)* — every one is wrapped in `escHtml(...)` or built with `.text()` / `.attr()`.
+- `HUMAN` browser test on staging, with the super-admin chat for a ticket open in one window: from the resort side, use DevTools to send a chat message with `senderImage` set to `x" onerror="alert('XSS-img')`, `senderName` set to `<img src=x onerror=alert('XSS-name')>`, message `<img src=x onerror=alert('XSS-msg')>`, and an attachment renamed `<img src=x onerror=alert('XSS-file')>.pdf`. **No alert may appear on either side**, and the text shows literally. (After S3-05 the server ignores the sent name and image. The test must still pass.)
+
+---
+
+### S3-05 · HIGH · Chat sender identity is taken from the browser — messages can be faked
+
+**Where:** both `sendMessage` methods accept the sender's identity from the form and store/broadcast it as-is:
+- `Resorts/Support/SupportChatController.php:72-79` (validate), `:135-136` (stored as `sender_id`, `sender_type`), `:153-162` (broadcast with `senderName`, `senderImage`)
+- `Admin/SupportChatController.php:65-72`, `:119-120`, `:136-145` (same pattern)
+
+**Why it matters:** a resort user can post `senderType=admin`, `senderId=<an admin id>`, `senderName=Support Team`. The saved history then shows a message **"from Support"** telling HR to, for example, "reset your password at this link" or "send us the payroll file". That's a convincing phishing channel **inside** the product. `senderName` / `senderImage` are also what drive the XSS in S3-04.
+
+**Fix:** ignore those four fields from the request and set them on the server:
+- Resort side: `sender_id` = the logged-in user's employee id (`$this->resort->getEmployee->id`), `sender_type = 'employee'`, name = the logged-in user's first + last name, image = `Common::getResortUserPicture($this->resort->id)`.
+- Admin side: `sender_id` = `Auth::guard('admin')->id()`, `sender_type = 'admin'`, name and image from the admin record.
+- Remove `senderId`, `senderType`, `senderName`, `senderImage` from the `validate()` rules. Leave the frontend sending them for now (they'll simply be ignored), or remove them from the `formData.append` calls in both chat views (`admin/support/chat.blade.php:462-469`, `resorts/support/chat.blade.php:256-263`).
+
+**VERIFY:** in tinker (transaction, rolled back), log in as a resort user, call `SupportChatController@sendMessage` with `senderType=admin`, `senderId=1`, `senderName=Support Team`, `senderImage=x` on a ticket of their own resort, then read the created `SupportChatMessage`. `sender_type` must be `employee`, and `sender_id` the caller's employee id. Paste the row. The broadcast payload's `senderName` must be the caller's real name (check via `Event::fake()` + `Event::assertDispatched(NewChatMessage::class, fn($e) => $e->senderName === '<real name>')`).
+
+---
+
+### S3-06 · MEDIUM · Support reply emails any address the user types
+
+**Where:** `Resorts/Support/SupportController::sendReply()`:
+- `:394` — `'to_email' => 'required|email'`, taken from the form
+- `:431` — `Mail::to($request->to_email)->send(new SupportReplyEmail($ticket, $resort, $request->message, $replyBy))`, which passes the **raw** message (not the stripped one saved at `:420`)
+- `app/Mail/SupportReplyEmail.php:75` puts that raw message into the HTML body, printed unescaped by `resources/views/emails/commonEmail.blade.php:5` (`{!! $mainbody !!}`)
+
+**Why it matters:** any portal user can make the company's mail server send an email **to any address in the world**, with their own text, under the product's support branding: a ready-made phishing/spam relay that will hurt the domain's email reputation. (HTML in the message currently breaks the send by accident: `SupportReplyEmail.php:46` looks up the saved message by the raw text, which no longer matches after `strip_tags`, so it crashes on null and the error is swallowed. **Plain-text** phishing with a link goes through today.)
+
+**Fix:**
+1. Don't read `to_email` from the request. Send to the configured support address (`Settings::first()->support_email`, which `replyEMail()` already loads at `SupportController.php:385-386`) and/or the assigned admin's email. Remove the field from the form (`resources/views/resorts/support/email-reply.blade.php`) or make it display-only.
+2. Pass the **stored** (stripped) message to `SupportReplyEmail`, and in `SupportReplyEmail.php:75` escape it: `nl2br(e($this->replyMessage))`. Fix the lookup at `:46` to use the message id instead of matching text.
+
+**VERIFY:**
+```bash
+grep -nE "to_email" app/Http/Controllers/Resorts/Support/SupportController.php
+```
+Expected: *(no output)*, or only a line that is **not** used as the `Mail::to()` target.
+- In tinker with `Mail::fake()` (transaction, rolled back): call `sendReply` with `to_email=attacker@example.com` → `Mail::assertNotSent(SupportReplyEmail::class, fn($m) => $m->hasTo('attacker@example.com'))`, and `assertSent` to the configured support address. Paste the output.
+
+---
+
+### S3-07 · LOW · Upload type gaps + a raw name column
+
+| Where | Issue | Fix |
+|---|---|---|
+| `Resorts/Support/SupportController.php:235` (ticket create) | Allows **`svg`**, which can contain script. | Remove `svg` from the list. |
+| `Resorts/Support/SupportChatController.php:81`, `Admin/SupportChatController.php:74` (chat) | No file-type rule at all (`nullable|file|max:51200`). | Add the same `mimes:` allowlist as S3-02 step 1. |
+| `Resorts/Support/SupportChatController.php:115` | Chat attachments are stored in the **sender's personal employee folder** (`AWSEmployeeFileUpload(..., $employee->Emp_id, null, true)`), mixed with their personal documents. | Store under a support-ticket folder instead. Coordinate with S2-05c (same pattern) and S2-07 (same "secure" encryption). |
+| `Admin/SupportController.php:93, 221` | `employee_name` column built from names and listed in `rawColumns`. Low risk while names are HR-controlled. | Wrap the name parts in `e()`. |
+
+**VERIFY:** `grep -nE "svg" app/Http/Controllers/Resorts/Support/SupportController.php` → no output. Both chat `attachments.*` rules contain `mimes:`. Uploading `test.svg` to a ticket and `test.html` to chat → both rejected (422).
+
+---
+
+### Stage 3 — checked and found clean
+
+- Ticket **list, view, email page, reply** and chat **page / fetch / send** on the resort side are all scoped to the user's resort (`SupportController.php:41-200, 360-400`; `SupportChatController.php:33, 49, 71`). No cross-resort access **through the controllers**; the cross-resort leak is only through the broadcast channel (S3-01).
+- **Saved chat history** on both sides is escaped (`{{ $msg->message }}`, `{{ $attachment['Filename'] }}`).
+- Ticket **subject and description** are escaped in the super-admin view (`view.blade.php:36, 71`).
+- The super-admin routes are all behind `auth:admin` (`routes/admin_route.php:15`).
+- In the super-admin live chat, the **message text** itself is escaped (`admin/support/chat.blade.php:400`). Only the name, photo and file-name fields aren't (S3-04).
 ## 5. STAGE 4 — Passport token expiry  ·  PENDING AUDIT
 ## 6. STAGE 5 — CORS  ·  PENDING AUDIT
 ## 7. STAGE 6+ — Module-by-module sweep  ·  PENDING AUDIT
