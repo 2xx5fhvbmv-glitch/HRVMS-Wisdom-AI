@@ -114,7 +114,7 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | S2-11 | 2 | LOW | Mobile witness-statement lookup not scoped (safe today, defence in depth) | OPEN |
 | X-01 | cross-cutting | HIGH | Portal permission check allows every route not listed in `module_pages` (~91% of routes) — decided: extend the Permission module | OPEN |
 | X-02 | cross-cutting | HIGH | Mobile app: 5 endpoints let a user act on / view **any** employee (other resorts or colleagues) by changing an ID | OPEN |
-| X-03 | cross-cutting | MEDIUM | Super-admin "log in as resort user": any admin-panel account can use it, no audit trail, ends in a broken route | OPEN |
+| X-03 | cross-cutting | MEDIUM | Super-admin "log in as resort user": any admin-panel account can use it, no audit trail, ends in a broken route | DEFERRED — owner to address before production go-live |
 | S3-01 | 3 | CRITICAL | Live support chat runs on public channels — anyone can read every resort's support chats | OPEN |
 | S3-02 | 3 | CRITICAL (LIKELY) | Support reply attachments: any file type saved into the web root (possible code execution) | OPEN |
 | S3-03 | 3 | HIGH | Stored XSS in the support ticket email thread (super-admin view + resort view) | OPEN |
@@ -1051,7 +1051,9 @@ Paste all results.
 
 ---
 
-### X-03 · MEDIUM · Super-admin "log in as resort user" (impersonation)
+### X-03 · MEDIUM · Super-admin "log in as resort user" (impersonation)  ·  ⏸ DEFERRED
+
+> **⏸ DEFERRED by the product owner (2026-09-26):** the super-admin panel is still being tested. **Claude Code: do NOT work on X-03 now.** It stays on the list and **must be resolved before production go-live**. Re-check it in the final pre-production gate (§0.4).
 
 **Where:** `app/Http/Controllers/Admin/LoginController::AdminToResort()` (`:110-168`), route `POST /admin/admin-to-resort` (`routes/admin_route.php:22`).
 
