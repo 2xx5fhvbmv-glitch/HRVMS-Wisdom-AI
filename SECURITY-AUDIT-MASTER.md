@@ -109,7 +109,7 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | S2-06 | 2 | HIGH | No role checks — any portal user can run committee / GM / HR / appeal-decision actions | OPEN |
 | S2-07 | 2 | HIGH | "Secure" file encryption key read with `env()` — likely empty in production (all modules) | OPEN |
 | S2-08 | 2 | MEDIUM | Investigation files of different grievances overwrite each other; web uploads have no file-type check | OPEN |
-| S2-09 | 2 | MEDIUM | DECISION NEEDED — grievant's app shows witness statements and internal committee notes | OPEN |
+| S2-09 | 2 | MEDIUM | Grievant's app shows witness statements — decided: hide statements, keep committee notes for now | OPEN |
 | S2-10 | 2 | LOW | Grievance numbers are one global sequence across all resorts | OPEN |
 | S2-11 | 2 | LOW | Mobile witness-statement lookup not scoped (safe today, defence in depth) | OPEN |
 | X-01 | cross-cutting | HIGH | Portal permission check allows every route not listed in `module_pages` (~91% of routes) | DECISION NEEDED |
@@ -672,7 +672,7 @@ Expected: `KEY LOADED WITH CONFIG CACHED` (on a box whose `.env` has the key).
 
 ---
 
-### S2-09 · MEDIUM · DECISION NEEDED — grievant's app shows witness statements and internal committee notes
+### S2-09 · MEDIUM · Grievant's app shows witness statements and internal committee notes  ·  ✅ DECIDED
 
 **Where:** `API/GrievanceController::grievanceDetail()` — `API/GrievanceController.php:510-642`. It's correctly scoped (only the grievant's own grievance), but it returns to the **grievant**:
 - every witness's **name, photo, written statement and attachments** (`:529-547`)
@@ -680,9 +680,13 @@ Expected: `KEY LOADED WITH CONFIG CACHED` (on a box whose `.env` has the key).
 
 **Why it's flagged:** in most HR grievance procedures, witness statements and internal committee deliberations are **not** shown to the complainant, because it exposes witnesses to pressure or retaliation. This may be a deliberate product choice, which is why it's a decision item, not a bug.
 
-**Action:** `HUMAN` (product owner or HR lead) decides and records the answer here: "Grievant may see: witness names yes/no, statements yes/no, committee notes yes/no". Claude Code then removes the disallowed fields from the response. The mobile app must handle their absence, so check with the app developer.
+**✅ DECIDED by the product owner (2026-09-26):**
+- **Witness statements: NOT shown to the grievant.** In each `witnesses[]` entry of the `grievanceDetail` response, **remove `statement` and `attachments`** (`API/GrievanceController.php:543-545`). Keep `employee_id`, `name`, `photo` (the grievant chose these witnesses when filing, so hiding names protects nothing), and `status`, so the grievant can see whether a statement has been given, but not what it says.
+- **Committee internal notes: STILL shown to the grievant, for now.** Leave the `investigation` block (`:555-581`: recommendations, follow-up actions, resolution notes, committee member names) as it is. This is a deliberate, temporary product choice. Revisit it before the international client's HR team goes live, and record any change here.
 
-**VERIFY:** after the decision, call `grievanceDetail` for a grievance with witnesses and investigation entries and paste the JSON keys. The removed fields must be absent.
+**Fix:** delete the two keys from the witness map in `grievanceDetail()`. Don't touch `witnessStatementRequest()` (`:721+`): that's the **witness** viewing their **own** statement, which is correct. **Invariant #7:** check that no other mobile or web endpoint returns `GrivanceSubmissionWitness.Statement` / `.Attachement` to the grievant (`grep -rn "Statement\|Attachement" app/Http/Controllers/API/GrievanceController.php`). `myGrievances()` returns only `witness_count`, which is fine. The mobile app must cope with the missing keys, so tell the app developer before deploying.
+
+**VERIFY:** call `grievanceDetail` (as the grievant, via the mobile API or tinker) for a grievance where at least one witness has **submitted** a statement with an attachment, and paste the JSON of `data.witnesses[0]` and the key list of `data.investigation`. Expected: `witnesses[0]` has `employee_id`, `name`, `photo`, `status` and **no** `statement` / `attachments`; `investigation` still contains `timeline` with the committee entries. Then call `witnessStatementRequest` **as that witness**: they still see their own `existing_statement`.
 
 ---
 
