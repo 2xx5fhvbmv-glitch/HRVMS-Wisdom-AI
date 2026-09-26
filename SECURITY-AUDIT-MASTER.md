@@ -150,7 +150,11 @@ Severity scale: **CRITICAL** = exploitable now from the internet, or exposes all
 | V-04 | 6 · Visa | MEDIUM | Upload gaps: bulk documents not type-checked, SVG allowed, AI helpers forward any file | OPEN |
 | V-05 | 6 · Visa | MEDIUM | Passports and visas are sent to the AI extraction service — confirm where it runs and that it's encrypted | HUMAN CHECK |
 | V-06 | 6 · Visa | LOW | Small items: unused unscoped lookup, leftover debug function, raw receipt number, import file kept | OPEN |
-| — | 6 · next modules | — | People/Employee → Disciplinary → Leave & Island Pass → … | PENDING AUDIT |
+| PE-01 | 6 · People | HIGH | Employee **edits** aren't limited by role/department: any portal user can change status, salary, **bank account**, employment data, reset logins, delete or export any employee in the resort | DECISION NEEDED (who may edit employee records) |
+| PE-02 | 6 · People | HIGH | Onboarding: another resort's new-hire meeting (date, link, participants) can be overwritten | OPEN |
+| PE-03 | 6 · People | MEDIUM | Announcements can be created about another resort's employee (and push-notify them) | OPEN |
+| PE-04 | cross-cutting | MEDIUM | Employee names are printed raw in ~50 tables; employees can change their own name (via info-update) | OPEN |
+| — | 6 · next modules | — | Disciplinary → Leave & Island Pass → Time & Attendance → … | PENDING AUDIT |
 
 ---
 
@@ -1826,8 +1830,98 @@ It filters by **resort** and **category** only, **not by employee**, then turns 
 
 ---
 
-### 7.5 Next modules  ·  PENDING AUDIT
-Done so far: Payroll (7.1), Manning & Budgeting (7.2), Talent Acquisition (7.3), Visa & employee documents (7.4). Remaining (most sensitive first): People / Employee profiles → Disciplinary → Leave & Island Pass → Time & Attendance → Performance → Incidents → Accommodation → Learning → Survey → File Management → SOS → Wisdom AI.
+### 7.5 People (employee records, onboarding, transfers, promotions, increments, probation, exit)
+
+**Scope audited:** all of `app/Http/Controllers/Resorts/People/` except salary advances (covered in Payroll): `Employee/EmployeeController`, `EmployeeResignationController`, `InfoUpdateController`, `Onboarding/OnboardingController`, `FacilityTourCategoryController`, `Transfer/TransferController`, `Promotion/*`, `SalaryIncrementController`, `Probation/ProbationController`, `ExitClearance/ExitClearanceController`, `Compliances/ComplianceController`, `Liability/LiabilityEstimationController`, `OrgChart/OrganizationChartController`, `AnnouncementController`, `ApprovalController`, `BenefitGradeLevelController`, `ConfigController`, `DashboardController`, `configuration/*` (~24,000 lines, **254 web routes**). Mobile: `API/EmployeeController`, `EmployeeManagementController`, `ProfileController`, `OnBoardingController`, `ResignationController`, `RequestController`. All five sweep criteria applied.
+
+**Good news first:**
+- **Tenant isolation is clean apart from PE-02 and PE-03.** 121 lookups were flagged by the script and traced. Every employee edit loads the employee **scoped to the resort** (`EmployeeController::changeStatus` `:1641`, `updateSalary` `:2277`, `updateEmploymentData` `:2062`, `delete` `:2906`, `sendCredentials` `:1681`; bank / education / experience through `whereHas('employee', resort_id)` `:2352`, `:2457`, `:2577`). The export (`SelectedEmployeesExport`, `app/Exports/SelectedEmployeesExport.php:35-36`), salary-increment bulk create (`SalaryIncrementController.php:858`), bulk status (`:1003`), info-update approval (`InfoUpdateController.php:122-123`), exit-clearance forms and reminders, facility tours, transfers and promotions are all resort-scoped.
+- **Mobile People self-service is correct (criterion 5):** profile, password, signature and picture always act on the logged-in user (`ProfileController.php:312, 451, 512, 577`). Resignation withdraw, exit-form submit and meeting confirmation check **both** resort and "this is my own record" (`ResignationController.php:345-347, 409-412, 511-514`). Onboarding tasks check "this task is assigned to you" (`OnBoardingController.php:560-572`), and adding a meeting link checks resort and participation (`:1511-1525`).
+- **Employee list and profile view are department-scoped** (CLAUDE.md invariant #5): `index`, `fetchEmployeesGrid`, `fetchEmployeesList`, `getAllEmployeeIds`, `create`, `details` use `getScopedDepartmentIds()`. The gap is the **edit** actions (PE-01).
+- **XSS:** information-change requests are shown escaped (`resources/views/resorts/people/info_update/show_details.blade.php:64, 70`), and resignation / exit / promotion comments are escaped (`{{ }}`). The one pattern that isn't is employee **names** in tables (PE-04).
+
+**Not deep-audited here (say so, don't assume):** the *correctness* of the multi-step approval chains inside Transfer, Promotion and Salary Increment. They contain substantial rank logic (Promotion 25, Transfer 23 rank references; Salary Increment gates on HR / Finance / GM steps), and every record they touch is resort-scoped, but whether each step can only be approved by the right person wasn't traced line by line in this pass. Treat them like payroll/budget approvals: include them in the PE-01 test matrix.
+
+---
+
+#### PE-01 · HIGH · DECISION NEEDED · Employee edits aren't limited by role or department
+
+**What it is:** a HOD only **sees** their own department's employees (list and profile are scoped), but **every action that changes an employee** takes an employee id and only checks it's in the same **resort**. None of the ~30 edit methods in `app/Http/Controllers/Resorts/People/Employee/EmployeeController.php` check the caller's role or department, and only a handful of the 254 People routes are listed in `module_pages` (X-01). So any portal user (e.g. the F&B manager) can, for **any employee in the resort**:
+
+| Action | Method (`EmployeeController.php`) | Why it's serious |
+|---|---|---|
+| **Change bank account** (account number, IBAN/IFSC, holder name) | `updateBankDetails` (`:2349`), `addBankDetails` (`:2402`) | **Payroll diversion fraud:** point a colleague's salary at your own account. |
+| **Change salary / allowances** | `updateSalary` (`:2247`) | Pay changes outside the increment approval flow. |
+| **Deactivate / reactivate / terminate** | `changeStatus` (`:1633`), `activate` (`:1826`) | Cuts someone's access, or restores a leaver's (see S4-01/S4-02). |
+| **Reset and email login credentials** | `sendCredentials` (`:1677`) | Resets the person's password (lock-out / disruption). |
+| **Change position, rank, department, dates, TIN** | `updateEmploymentData` (`:2029`) | Changes rank, and therefore every rank-based permission. |
+| Edit personal, contact, emergency, education, experience, documents, travel quota, location, photo | `updatePersonal` `:1889`, `updateContacts` `:1917`, `updateEmergencyContacts` `:1958`, `updateAdditionalInfo` `:1973`, education/experience `:2454-2607`, `updateExpiryDocuments` `:2639`, `updateTravelQuota` `:2660`, `updateLocation` `:1737`, `updateProfilePicture` `:1760` | Personal data changed by people who shouldn't even see it. |
+| **Delete / bulk-delete** employees | `delete` (`:2904`), `bulkDelete` (`:2920`) | |
+| **Export** employees to Excel (with allowances, education, experience, documents) | `exportSelected` (`:310`) | Bulk personal-data export of any department. |
+| Create employees, employment verification letter, assign team | `store` (`:472`), `sendEmploymentVerificationLetter` (`:1406`), `assignToTeam` (`:1599`) | |
+
+The rest of People follows the same pattern: `AnnouncementController`, `BenefitGradeLevelController`, `ConfigController`, `FacilityTourCategoryController` and all `configuration/*` controllers have **no** permission checks. `ComplianceController`, `ExitClearanceController`, `ProbationController`, `OnboardingController` and `SalaryIncrementController` check only a few pages.
+
+**`HUMAN` decision needed (record it here before fixing) — who may create/edit/delete employee records?** Recommended default:
+- **HR:** full create / edit / delete / export / credentials for all employees.
+- **Finance:** **read-only** salary, allowance and bank details (for payroll). No edits.
+- **GM:** read-only view of all employees (as today via `hasFullDataAccess`). No edits.
+- **HOD / EXCOM:** read-only view of **their own department** (as today). No edits, no export, no credentials, no bank or salary view.
+- **Everyone else:** no access to other people's records.
+- **Bank account changes** additionally need a second step: notify the employee (push + email) whenever their bank details change, so fraud is noticed immediately.
+
+**Fix (after the decision):** gate every method in the table through the extended Permission module (X-01) with the decided default ticks, plus an in-method check on the most dangerous actions (`updateBankDetails`, `addBankDetails`, `updateSalary`, `changeStatus`, `activate`, `sendCredentials`, `updateEmploymentData`, `delete`, `bulkDelete`, `exportSelected`) so they require HR even if a tick is set by mistake. Add the bank-change notification. For HOD read access, keep using `getScopedDepartmentIds()` as the list/profile already do.
+
+**VERIFY:** users of one resort: HR, Finance, GM, the HOD of department X, an ordinary portal user. Target: an employee in department **Y**. For each row of the table, call the method (§0.5 harness, same resort) and paste `Action | HR | Finance | GM | HOD-X | ordinary`. Expected: only HR succeeds on writes. For every `403`, the employee row / bank row / allowance rows are unchanged (`updated_at` the same). Then, as HR, change a test employee's bank account → that employee receives the notification.
+
+---
+
+#### PE-02 · HIGH · Onboarding: another resort's new-hire meeting can be overwritten
+
+**Where:** `People/Onboarding/OnboardingController::updateItinerary()` (`:1828`, route `POST /people/onboarding/itinerary/update/{id}` at `routes/resort_route.php:1975`) scopes the itinerary to the resort (`:2002`), then calls `handleMeetings()` (`:2066` → `:2129-2160`):
+```php
+// :2149-2152
+$meeting = EmployeeItinerariesMeeting::find($request->meeting_id[$index]);   // no resort / itinerary check
+if ($meeting) { $meeting->update($meetingData); }                            // title, date, time, meeting_link, participants
+```
+A user of resort A can send any `meeting_id` and overwrite **another resort's** onboarding meeting for a new hire: date, time, **meeting link** (so the new hire joins the attacker's call / phishing page), and participants.
+
+**Also (bug, not security):** the delete branch at `:2133` calls `Meeting::whereIn(...)`, but **no `Meeting` class is imported or exists**, so removing a meeting from an itinerary always crashes.
+
+**Fix:** only allow meetings that belong to **this** itinerary: `$itinerary->meetings()->whereKey($request->meeting_id[$index])->first()`, and for deletes `$itinerary->meetings()->whereIn('id', $request->deleted_meetings)->delete()` (which also fixes the missing-class crash). The mobile `addMeetingLink` already does the right check (`API/OnBoardingController.php:1511-1525`); follow it.
+
+**VERIFY:** §0.5 harness: `updateItinerary` for one of **A's** itineraries with `meeting_id[0]` = a **resort B** meeting id and `meeting_link[0] = 'https://evil.example'` → B's meeting row unchanged (`meeting_link`, `meeting_date` the same). Deleting one of A's own meetings through the form → works (no 500).
+
+---
+
+#### PE-03 · MEDIUM · Announcements can be created about another resort's employee
+
+**Where:** `People/AnnouncementController::store()` validates with a **plain** `exists:` (`:186-187`): `'announcement_title' => 'required|exists:announcement_category,id'`, `'employee_name' => 'required|exists:employees,id'`, which accepts **any resort's** category and employee. It then loads that employee (`:212`) and **push-notifies their phone** and creates an in-app notification (`:212-230`). The sibling `update()` already validates correctly with `Rule::exists(...)->where('resort_id', …)` (`:289-290`).
+
+**Fix:** copy the `update()` rules into `store()`.
+
+**VERIFY:** §0.5 harness: `store` with `employee_name` = a resort-B employee id → `422`, no `announcements` row, no notification sent.
+
+---
+
+#### PE-04 · MEDIUM · cross-cutting · Employee names printed raw in ~50 tables
+
+**What it is:** about **50** DataTables across the portal list a name column in `rawColumns` (`grep -rnE "rawColumns\(\[[^]]*'(employee_name|Employee_Name|EmployeeName|name|Name|employee|Employee|Employeee|applicant_name|Submitter)'" app/Http/Controllers`), and most build it by gluing `first_name` / `last_name` / `full_name` into HTML **without escaping** (e.g. `EmployeeResignationController.php:~172`, `ExitClearanceController.php:~245`, `GrivanceController.php:1003`). Earlier stages treated names as "HR-controlled", but **employees can change their own name**: the mobile "update personal information" request (`API/ProfileController.php:253`, fields include `first_name`, `middle_name`, `last_name`) becomes their real name once HR approves it (`InfoUpdateController::statusChange`). HR sees the requested value **escaped** on the review screen (so `<img src=x onerror=…>` looks like odd text), and after one approval that name runs as script in every raw table that shows it.
+
+**Fix (one pattern, applied everywhere):**
+1. Escape the name wherever it's glued into HTML: `e($first . ' ' . $last)` or `e($admin->full_name)`. Payroll (`PayrollController.php:371`), Talent Acquisition (`InterviewAssessmentController.php:117`) and Vacancy (`VacancyController.php:2314`) already do this; copy them.
+2. Defence in depth: in `InfoUpdateController::statusChange`, reject name values containing `<`, `>` or quotes (a name never needs them), and validate the same on the mobile request (`ProfileController.php:~240`): `'first_name' => 'regex:/^[\pL\pM\s\.\'-]+$/u'`.
+
+**VERIFY:**
+```bash
+grep -rnE "rawColumns\(\[[^]]*'(employee_name|Employee_Name|EmployeeName|name|Name|employee|Employee|Employeee)'" app/Http/Controllers | cut -d: -f1 | sort -u
+```
+For each file listed, show the matching `addColumn` builder uses `e(...)` / `htmlspecialchars(...)` on the name. `HUMAN` staging test: submit an info-update request with first name `<img src=x onerror=alert('XSS-name')>` → it's rejected (422). As a second check, set a test employee's name to `<b>Bold</b>` directly through HR's edit screen, then open the resignation list, exit-clearance list and grievance history: the name shows literally as `<b>Bold</b>`, not bold.
+
+---
+
+### 7.6 Next modules  ·  PENDING AUDIT
+Done so far: Payroll (7.1), Manning & Budgeting (7.2), Talent Acquisition (7.3), Visa & employee documents (7.4), People (7.5). Remaining (most sensitive first): Disciplinary → Leave & Island Pass → Time & Attendance → Performance → Incidents → Accommodation → Learning → Survey → File Management → SOS → Wisdom AI.
 
 ---
 
