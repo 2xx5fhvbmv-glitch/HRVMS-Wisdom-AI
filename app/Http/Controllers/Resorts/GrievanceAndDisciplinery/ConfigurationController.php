@@ -2131,7 +2131,7 @@ class ConfigurationController extends Controller
         try
         {
 
-            GrievanceCategory::where("id",$id)->delete();
+            GrievanceCategory::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
 
             DB::commit();
             return response()->json([
@@ -2301,7 +2301,7 @@ class ConfigurationController extends Controller
         try
         {
 
-            GrievanceSubcategory::where("id",$id)->delete();
+            GrievanceSubcategory::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
 
             DB::commit();
             return response()->json([
@@ -2563,7 +2563,7 @@ class ConfigurationController extends Controller
         try
         {
 
-            GrievanceCategoryAndSubcatModel::where("id",$id)->delete();
+            GrievanceCategoryAndSubcatModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
 
             DB::commit();
             return response()->json([
@@ -2744,9 +2744,12 @@ class ConfigurationController extends Controller
         try
         {
 
-                GrievanceDelegationRuleModel::where("id",$Main_id)->update(
+                // Was unscoped ("id"=$Main_id only) and, worse, blindly wrote
+                // 'resort_id'=>$resort_id into the SET clause — a foreign
+                // row's own resort_id would be silently reassigned to the
+                // caller's resort even without the where-clause gap.
+                GrievanceDelegationRuleModel::where("id",$Main_id)->where('resort_id', $resort_id)->update(
                     [
-                        'resort_id'=>$resort_id,
                         'Grievance_Cat_id'=>$request->Grievance_Cat_id,
                         'delegation_rule'=>$request->delegation_rule
                     ]
@@ -2774,7 +2777,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            GrievanceDelegationRuleModel::where("id",$id)->delete();
+            GrievanceDelegationRuleModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -3061,7 +3064,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            GrievanceTempleteModel::where("id",$id)->delete();
+            GrievanceTempleteModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -3267,6 +3270,7 @@ class ConfigurationController extends Controller
             // Proceed with update
 
                 $update = GrivanceEscaltionModel::where('id', $mainId)
+                ->where('resort_id', auth()->guard('resort-admin')->user()->resort_id)
                 ->update([
                     'Grievance_Cat_id'  => $request->Grievance_Cat_id,
                     'resolved_duration' => $request->resolved_duration,
@@ -3295,7 +3299,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            GrivanceEscaltionModel::where("id",$id)->delete();
+            GrivanceEscaltionModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
