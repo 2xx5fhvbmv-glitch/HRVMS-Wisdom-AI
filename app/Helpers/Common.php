@@ -9279,6 +9279,26 @@ class Common
      * files at once, so this returns a list of [filename, url] pairs
      * instead of a single url.
      */
+    /**
+     * Investigation-report evidence files (GrivanceInvestigationModel::
+     * investigation_files) used to be written to one flat per-resort
+     * folder shared by every grievance, so two grievances uploading a
+     * same-named file overwrote each other. New uploads now go to a
+     * per-grievance folder ($newBasePath); this resolves each stored
+     * filename against the new path first, falling back to the old flat
+     * path for files that were uploaded before that change — no data
+     * migration needed, and no broken links for files already on disk.
+     */
+    public static function resolveInvestigationFiles($investigationFilesCsv, $newBasePath, $oldBasePath)
+    {
+        if (empty($investigationFilesCsv)) return [];
+
+        return collect(explode(',', $investigationFilesCsv))->filter()->map(function ($filename) use ($newBasePath, $oldBasePath) {
+            $path = StorageHelper::exists($newBasePath . '/' . $filename) ? $newBasePath : $oldBasePath;
+            return ['filename' => $filename, 'url' => StorageHelper::temporaryUrl($path . '/' . $filename)];
+        })->values()->all();
+    }
+
     public static function resolveGrievanceAttachments($value, $basePath, $resortId)
     {
         if (empty($value)) return [];

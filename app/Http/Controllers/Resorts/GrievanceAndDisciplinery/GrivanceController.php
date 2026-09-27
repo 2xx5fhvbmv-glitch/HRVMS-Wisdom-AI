@@ -445,7 +445,16 @@ class GrivanceController extends Controller
         $GrievanceCommitteeMemberParent = GrievanceCommitteeMemberParent::where('resort_id',$this->resort->resort_id)->get();
         $ActionStore = ActionStore::where('resort_id',$this->resort->resort_id)->get();
 
+        // investigation_files: new uploads (InvestigationReportStore) go to a
+        // per-grievance folder now — resolve each stored filename against
+        // that path, falling back to the old flat one for files uploaded
+        // before that fix. See Common::resolveInvestigationFiles().
         $EveidanceFilePath = config('settings.GrievanceSubmission').'/'.$this->resort->resort->resort_id;
+        $investigationFileLinks = Common::resolveInvestigationFiles(
+            $GrivanceInvestigationModel->investigation_files ?? null,
+            $EveidanceFilePath.'/'.$Grivance_Parent->Grivance_id,
+            $EveidanceFilePath
+        );
         $path = config('settings.GrivanceAttachments').'/'.$this->resort->resort->resort_id;
         $GrivanceKeys = GrivanceKeyPerson::where('resort_id',$this->resort->resort_id)->get()->pluck('emp_ids')->toArray();
         // GrivanceKeys holds Employee ids (see KeyPersonnel()), so the
@@ -465,7 +474,7 @@ class GrivanceController extends Controller
         if ($Grivance_Parent->Assigned !== 'No' && !empty($GrivanceInvestigationModel->Committee_id)) {
             $isCommitteeMember = in_array($GrivanceInvestigationModel->Committee_id, Common::PartOfCommitteeMember($assinged_id, $this->resort->resort_id));
         }
-        return view('resorts.GrievanceAndDisciplinery.grivance.investigationreport',compact('auth_id','GrivanceKeys','canViewIdentity','EveidanceFilePath','GrivanceInvestigationModel','flag','GrivanceSubmissionHistory','ActionStore','FilePath','page_title','Grivance_Parent','GrievanceCommitteeMemberParent','path','isCommitteeMember'));
+        return view('resorts.GrievanceAndDisciplinery.grivance.investigationreport',compact('auth_id','GrivanceKeys','canViewIdentity','EveidanceFilePath','investigationFileLinks','GrivanceInvestigationModel','flag','GrivanceSubmissionHistory','ActionStore','FilePath','page_title','Grivance_Parent','GrievanceCommitteeMemberParent','path','isCommitteeMember'));
     }
 
     public function InvestigationReportStore(Request $request)
@@ -560,6 +569,19 @@ class GrivanceController extends Controller
             // $gr_investigation->investigation_files on a null object.
             if (!$investigation) {
                 return response()->json(['success' => false, 'message' => 'No investigation record found for this grievance yet.'], 422);
+            }
+
+            // The form's own accept/data-parsley-fileextension attributes
+            // already declare "pdf,png,jpg,jpeg,gif,svg,webp,heic,heif" —
+            // that was never enforced server-side, so any file type could
+            // be uploaded and stored under the resort's public file tree.
+            if ($request->hasFile('investigation_file')) {
+                $fileValidator = Validator::make($request->all(), [
+                    'investigation_file.*' => ['file', 'mimes:pdf,png,jpg,jpeg,gif,svg,webp,heic,heif', 'max:5120'],
+                ]);
+                if ($fileValidator->fails()) {
+                    return response()->json(['success' => false, 'errors' => $fileValidator->errors()], 422);
+                }
             }
 
             DB::beginTransaction();
@@ -677,8 +699,13 @@ class GrivanceController extends Controller
             $file = $request->investigation_file;
             $Files = array();
             if(isset($file)) {
+                // Was missing the grievance id that the sibling upload path
+                // (store(), for the initial submission's own Attachments)
+                // already includes — every investigation in this resort
+                // shared one folder, so two grievances' evidence files with
+                // the same original filename silently overwrote each other.
+                $FilePath = config('settings.GrievanceSubmission').'/'.$this->resort->resort->resort_id.'/'.$grievance->Grivance_id;
                 foreach($file as $f) {
-                    $FilePath = config('settings.GrievanceSubmission').'/'.$this->resort->resort->resort_id;
                     StorageHelper::put($FilePath.'/'.$f->getClientOriginalName(), file_get_contents($f->getRealPath()));
                     $Files[] = $f->getClientOriginalName();
                 }
@@ -840,7 +867,13 @@ class GrivanceController extends Controller
         $GrievanceCommitteeMemberParent = GrievanceCommitteeMemberParent::where('resort_id',$this->resort->resort_id)->get();
         $ActionStore = ActionStore::where('resort_id',$this->resort->resort_id)->get();
         
+        // investigation_files: see the identical comment in InvestigationReport().
         $EveidanceFilePath = config('settings.GrievanceSubmission').'/'.$this->resort->resort->resort_id;
+        $investigationFileLinks = Common::resolveInvestigationFiles(
+            $GrivanceInvestigationModel->investigation_files ?? null,
+            $EveidanceFilePath.'/'.$Grivance_Parent->Grivance_id,
+            $EveidanceFilePath
+        );
         $path = config('settings.GrivanceAttachments').'/'.$this->resort->resort->resort_id; 
 
         $GrivanceKeys = GrivanceKeyPerson::where('resort_id',$this->resort->resort_id)->get()->pluck('emp_ids')->toArray();
@@ -851,7 +884,7 @@ class GrivanceController extends Controller
             ? $Grivance_Parent->Identity_Disclosed_To
             : (json_decode($Grivance_Parent->Identity_Disclosed_To ?? '[]', true) ?: []);
         $canViewIdentity = $Grivance_Parent->Grivance_Submission_Type != "Yes" || in_array($auth_id, $identityDisclosedTo);
-        return view('resorts.GrievanceAndDisciplinery.grivance.Investigationinfo',compact('GrivanceKeys','auth_id','canViewIdentity','rankKey','path','EveidanceFilePath','GrivanceInvestigationModel','flag','GrivanceSubmissionHistory','ActionStore','FilePath','page_title','Grivance_Parent','GrievanceCommitteeMemberParent'));
+        return view('resorts.GrievanceAndDisciplinery.grivance.Investigationinfo',compact('GrivanceKeys','auth_id','canViewIdentity','rankKey','path','EveidanceFilePath','investigationFileLinks','GrivanceInvestigationModel','flag','GrivanceSubmissionHistory','ActionStore','FilePath','page_title','Grivance_Parent','GrievanceCommitteeMemberParent'));
 
     }
     public function RequestIdentity(Request $request)

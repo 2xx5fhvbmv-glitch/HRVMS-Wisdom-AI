@@ -217,10 +217,10 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (explode(',', $GrivanceInvestigationModel->investigation_files) as $f)
+                                @foreach ($investigationFileLinks as $ef)
                                     <tr>
-                                        <td>{{ $f }}</td>
-                                        <td><a target="_blank" href="{{ \App\Helpers\StorageHelper::temporaryUrl($EveidanceFilePath.'/'. $f) }}">View</a></td>
+                                        <td>{{ $ef['filename'] }}</td>
+                                        <td><a target="_blank" href="{{ $ef['url'] }}">View</a></td>
                                     </tr>
                                 @endforeach
                             </tbody>
