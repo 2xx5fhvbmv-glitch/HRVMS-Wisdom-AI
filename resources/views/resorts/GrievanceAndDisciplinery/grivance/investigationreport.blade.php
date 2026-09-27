@@ -121,7 +121,7 @@
                     </div>
                     <div class="gvi-desc">
                         <div class="dk">Description</div>
-                        <div class="dv">{!! $Grivance_Parent->Grivance_description !!}</div>
+                        <div class="dv">{{ $Grivance_Parent->Grivance_description }}</div>
                     </div>
                     <div class="gvi-facts">
                         <div class="gvi-fact"><span class="k">Grievance ID</span><span class="pill ref-pill">{{ $Grivance_Parent->Grivance_id }}</span></div>
@@ -212,7 +212,7 @@
                                 </div>
                                 <div class="gvi-hbody">
                                     @if(!empty($value->follow_up_description))
-                                        <div class="gvi-hrow"><div class="hk">Follow-up description</div><div class="hv">{!! $value->follow_up_description !!}</div></div>
+                                        <div class="gvi-hrow"><div class="hk">Follow-up description</div><div class="hv">{{ $value->follow_up_description }}</div></div>
                                     @endif
                                     @if(!empty($value->inves_find_recommendations))
                                         <div class="gvi-hrow">
@@ -273,7 +273,7 @@
                         <tbody>
                             <tr>
                                 <td>{{ $Grivance_Parent->Gm_Decision }}</td>
-                                <td>{!!  $Grivance_Parent->Gm_Resoan  !!}</td>
+                                <td>{{ $Grivance_Parent->Gm_Resoan }}</td>
                             </tr>
                         </tbody>
                     </table>

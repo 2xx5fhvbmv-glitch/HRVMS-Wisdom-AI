@@ -88,7 +88,7 @@
                     </div>
                     <div class="gvi-desc">
                         <div class="dk">Description</div>
-                        <div class="dv">{!! $Grivance_Parent->Grivance_description !!}</div>
+                        <div class="dv">{{ $Grivance_Parent->Grivance_description }}</div>
                     </div>
                     <div class="gvi-facts">
                         <div class="gvi-fact"><span class="k">Grievance ID</span><span class="pill ref-pill">{{ $Grivance_Parent->Grivance_id }}</span></div>
@@ -177,13 +177,13 @@
                                 </div>
                                 <div class="gvi-hbody">
                                     @if(!empty($value->follow_up_description))
-                                        {{-- Fixed: this page previously escaped these two fields
-                                             ({{ }}) even though both can hold CKEditor-authored
-                                             HTML (confirmed on the sibling Investigation Report
-                                             page's identical data) — showing literal <p>/<ul> tags
-                                             instead of the formatted text. Rendered raw here, same
-                                             as the sibling page already does correctly. --}}
-                                        <div class="gvi-hrow"><div class="hk">Follow-up description</div><div class="hv">{!! $value->follow_up_description !!}</div></div>
+                                        {{-- follow_up_description is a plain <input type="text">
+                                             everywhere it's submitted (this module and the
+                                             Disciplinary sibling), never CKEditor — the disciplinary
+                                             sibling page already escapes it with {{ }}. Escaped here
+                                             too: unescaped, it was stored XSS (employee/committee
+                                             text rendered as HTML in HR's browser). --}}
+                                        <div class="gvi-hrow"><div class="hk">Follow-up description</div><div class="hv">{{ $value->follow_up_description }}</div></div>
                                     @endif
                                     @if(!empty($value->inves_find_recommendations))
                                         <div class="gvi-hrow">
