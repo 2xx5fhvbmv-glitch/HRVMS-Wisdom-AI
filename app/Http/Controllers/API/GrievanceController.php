@@ -800,6 +800,18 @@ class GrievanceController extends Controller
         $emp_id = $this->user->GetEmployee->id;
 
         try {
+            // Not exploitable today — Witness_id is an employees.id, and an
+            // attacker's own employee id can only ever match a witness row
+            // that a same-resort form actually created — but the 'exists'
+            // validation rule above doesn't check resort_id, so add the
+            // check explicitly rather than rely on that always holding.
+            $grievanceInResort = GrivanceSubmissionModel::where('id', $request->grievance_id)
+                ->where('resort_id', $this->resort_id)
+                ->exists();
+            if (!$grievanceInResort) {
+                return response()->json(['success' => false, 'message' => 'Grievance not found.'], 404);
+            }
+
             $witness = GrivanceSubmissionWitness::where('G_S_Parent_id', $request->grievance_id)
                 ->where('Witness_id', $emp_id)
                 ->first();
