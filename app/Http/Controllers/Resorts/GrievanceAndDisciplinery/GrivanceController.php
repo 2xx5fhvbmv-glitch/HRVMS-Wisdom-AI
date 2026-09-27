@@ -910,7 +910,14 @@ class GrivanceController extends Controller
     public function RequestForStatement(Request $request)
     {
         $id = $request->id;
-        $parent_id = GrivanceSubmissionModel::where('Grivance_id',$id)->first();
+        // Grivance_id (e.g. "GR-0001") is one global sequence across every
+        // resort (see S2-10), and this lookup had no resort_id filter at
+        // all — any resort's admin could request a statement on another
+        // resort's grievance and its real witnesses would be notified.
+        $parent_id = GrivanceSubmissionModel::where('Grivance_id',$id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$parent_id) {
+            return response()->json(['success' => false, 'message' => 'Grievance not found.'], 404);
+        }
         $parent_id->RequestforStatment = 'Yes';
         $parent_id ->save();
         $witness = GrivanceSubmissionWitness::where("G_S_Parent_id",$parent_id->id)->update(['status'=>"Requested"]);
