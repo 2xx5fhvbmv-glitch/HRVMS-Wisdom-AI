@@ -470,20 +470,33 @@ class GrivanceController extends Controller
 
     public function InvestigationReportStore(Request $request)
     {
+        // Every branch below (assign, committee edit, GM decision) acted on
+        // a raw Grievant_form_id with no resort_id check, so a POST built
+        // with another resort's grievance id would read/write that
+        // resort's record. Load it once, scoped, and use its own id
+        // everywhere below instead of the raw request value.
+        $grievance = GrivanceSubmissionModel::where('id', $request->Grievant_form_id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if (!$grievance) {
+            return response()->json(['success' => false, 'message' => 'Grievance not found.'], 404);
+        }
+        $id = $grievance->id;
 
         if($request->flag =="AssignToComittee")
         {
+            // A plain <select name="assign_to"> (no []) — a single value,
+            // not an array; assign_to.* is silently skipped by the
+            // validator when the field isn't an array, so this never
+            // actually validated the committee id's shape.
             $committee_ids =  $request->assign_to;
-            $id =  $request->Grievant_form_id;
 
-            $validator = Validator::make($request->all(), 
+            $validator = Validator::make($request->all(),
             [
-                'assign_to'   => ['required',  'min:1'],
-                'assign_to.*' => ['required', 'integer'], 
+                'assign_to'   => ['required', 'integer'],
             ], [
                 'assign_to.required' => 'At least one Committee  is required.',
-                'assign_to.*.required' => 'Each Committee  must be provided.',
-                'assign_to.*.integer'  => 'Each Committee  must be a valid integer ID.',
+                'assign_to.integer'  => 'Committee must be a valid integer ID.',
             ]);
             if($validator->fails())
             {
@@ -491,6 +504,12 @@ class GrivanceController extends Controller
                     'success' => false,
                     'errors' => $validator->errors()
                 ], 422);
+            }
+
+            // The committee id itself was never checked to belong to this
+            // resort — a foreign committee id would silently attach.
+            if (!GrievanceCommitteeMemberParent::where('id', $committee_ids)->where('resort_id', $this->resort->resort_id)->exists()) {
+                return response()->json(['success' => false, 'message' => 'Committee not found.'], 404);
             }
 
             DB::beginTransaction();
@@ -529,13 +548,18 @@ class GrivanceController extends Controller
             // direct POST would otherwise bypass that — same membership
             // check as InvestigationReport() gates the view with.
             $callerEmployeeId = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id : 0;
-            $gr = GrivanceSubmissionModel::find($request->Grievant_form_id);
-            $investigation = GrivanceInvestigationModel::where('Grievance_s_id', $request->Grievant_form_id)->first();
-            if ($gr && $gr->Assigned !== 'No' && !empty($investigation->Committee_id)) {
+            $investigation = GrivanceInvestigationModel::where('Grievance_s_id', $id)->where('resort_id', $this->resort->resort_id)->first();
+            if ($grievance->Assigned !== 'No' && !empty($investigation->Committee_id)) {
                 $memberOfCommittees = Common::PartOfCommitteeMember($callerEmployeeId, $this->resort->resort_id);
                 if (!in_array($investigation->Committee_id, $memberOfCommittees)) {
                     return response()->json(['success' => false, 'message' => 'You are not part of the assigned investigation committee for this grievance.'], 403);
                 }
+            }
+            // No investigation row yet (never assigned to a committee) —
+            // return a clean error instead of crashing further down at
+            // $gr_investigation->investigation_files on a null object.
+            if (!$investigation) {
+                return response()->json(['success' => false, 'message' => 'No investigation record found for this grievance yet.'], 422);
             }
 
             DB::beginTransaction();
@@ -604,13 +628,13 @@ class GrivanceController extends Controller
             //     }
             
             if($request->outcome_type == "DeliverToHr") {
-                GrivanceSubmissionModel::where('id', $request->Grievant_form_id)->update(['Assigned' => "DeliverToHr"]);
+                GrivanceSubmissionModel::where('id', $id)->update(['Assigned' => "DeliverToHr"]);
             } elseif($request->outcome_type == "Resolved") {
                 // Frozen HERE, at the moment the case is marked resolved —
                 // never re-derived later from the live ResortAdmin.signature_img.
-                $resolutionSignature = Common::snapshotSignature($this->resort->id, 'grievance-resolution', $request->Grievant_form_id);
+                $resolutionSignature = Common::snapshotSignature($this->resort->id, 'grievance-resolution', $id);
 
-                GrivanceSubmissionModel::where('id', $request->Grievant_form_id)->update([
+                GrivanceSubmissionModel::where('id', $id)->update([
                     'status' => "resolved",
                     'action_taken' => base64_decode($request->action_taken),
                     'outcome_type' => $request->outcome_type,
@@ -620,15 +644,14 @@ class GrivanceController extends Controller
                 ]);
 
                 try {
-                    $complainantId = GrivanceSubmissionModel::where('id', $request->Grievant_form_id)->value('Employee_id');
-                    if ($complainantId) {
+                    if ($grievance->Employee_id) {
                         Common::notifyEmployees(
                             $this->resort->resort_id,
-                            [$complainantId],
+                            [$grievance->Employee_id],
                             'Grievance Resolved',
                             'Your grievance has been resolved.',
                             'Grievance And Disciplinery ',
-                            $request->Grievant_form_id
+                            $id
                         );
                     }
                 } catch (\Exception $e) {
@@ -636,21 +659,21 @@ class GrivanceController extends Controller
                 }
             } else {
                 $SentToGm = ($request->approval_request == "on") ? "Yes" : "No";
-                GrivanceSubmissionModel::where('id', $request->Grievant_form_id)->update([
+                GrivanceSubmissionModel::where('id', $id)->update([
                     'status' => $request->STATUS,
                     'action_taken' => base64_decode($request->action_taken),
                     'SentToGM' => $SentToGm,
                     'outcome_type' => $request->outcome_type
                 ]);
             }
-            
+
             // Process investigation files
             $file = $request->investigation_file;
             $assinged_id = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id : 0;
             $current_rank = isset($this->resort->GetEmployee->rank) ? $this->resort->GetEmployee->rank : 3;
-            $grievance_id = $request->Grievant_form_id;
+            $grievance_id = $id;
             $committee_id = Common::PartOfCommitteeMember($assinged_id, $this->resort->resort_id);
-            
+
             $file = $request->investigation_file;
             $Files = array();
             if(isset($file)) {
@@ -660,8 +683,9 @@ class GrivanceController extends Controller
                     $Files[] = $f->getClientOriginalName();
                 }
             }
-            // Get the investigation record and update it
-            $gr_investigation = GrivanceInvestigationModel::where("Grievance_s_id", $request->Grievant_form_id)->first();
+            // Re-fetch inside the transaction (the earlier $investigation
+            // read happened before DB::beginTransaction()).
+            $gr_investigation = GrivanceInvestigationModel::where("Grievance_s_id", $id)->where('resort_id', $this->resort->resort_id)->first();
             if(isset($gr_investigation->investigation_files)) {
                 foreach(explode(",", $gr_investigation->investigation_files) as $f) {
                     if(!in_array($f, $Files)) {
@@ -713,7 +737,7 @@ class GrivanceController extends Controller
             DB::beginTransaction();
             try
             {
-                $GrivanceSubmissionModel = GrivanceSubmissionModel::where("id",$request->Grievant_form_id)->first();
+                $GrivanceSubmissionModel = GrivanceSubmissionModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->first();
                 $GrivanceSubmissionModel->Gm_Decision = $request->Gm_Decision;
                 $GrivanceSubmissionModel->Rejection_reason = $request->Rejection_reason;
                 $GrivanceSubmissionModel->SentToGM ='No';
