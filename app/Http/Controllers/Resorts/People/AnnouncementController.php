@@ -182,9 +182,15 @@ class AnnouncementController extends Controller
 
     public function store(Request $request)
     {
+        // PE-03: both rules were unscoped ('exists:table,id' with no
+        // resort_id filter) — unlike update(), which already scopes both
+        // fields correctly. A resort's HR could submit another resort's
+        // employee id here, creating an announcement that both stores a
+        // cross-tenant employee_id and, once Published, pushes a real
+        // notification to that foreign employee's device.
         $request->validate([
-            'announcement_title' => 'required|exists:announcement_category,id',
-            'employee_name' => 'required|exists:employees,id',
+            'announcement_title' => ['required', \Illuminate\Validation\Rule::exists('announcement_category', 'id')->where('resort_id', $this->resort->resort_id)],
+            'employee_name' => ['required', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             'congratulatory_message' => 'required|string',
             'action_type' => 'required|in:Draft,Scheduled,Published',
             'published_date' => 'nullable|date',
