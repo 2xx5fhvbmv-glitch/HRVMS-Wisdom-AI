@@ -58,6 +58,24 @@ class EmployeeController extends Controller
         if(!$this->resort) return;
     }
 
+    /**
+     * PE-01: none of the mutating endpoints below (status change,
+     * activation, credential reset, salary, bank details, employment
+     * data, delete, bulk-delete, export) had any role check — only the
+     * resort_id scoping that stops cross-tenant access, not a same-resort
+     * HOD/EXCOM/ordinary employee from acting on any employee in their
+     * own resort. Decided: HR only (same rule this codebase already uses
+     * everywhere else for "everyone vs HR/GM" — Common::hasFullDataAccess,
+     * which also covers GM and an HR-department HOD/EXCOM).
+     */
+    private function requireHrAccess()
+    {
+        if (!Common::hasFullDataAccess(optional($this->resort)->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+        return null;
+    }
+
     public function index()
     {
         $page_title ='Employees';
@@ -309,6 +327,7 @@ class EmployeeController extends Controller
 
     public function exportSelected(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $ids = $request->employee_ids;
 
         if (empty($ids)) {
@@ -1632,6 +1651,7 @@ class EmployeeController extends Controller
 
     public function changeStatus(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $request->validate([
             'emp_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             'status' => 'required|in:Active,Onboarding,Probationary,Inactive,Terminated,Resigned,On Leave,Suspended'
@@ -1676,6 +1696,7 @@ class EmployeeController extends Controller
 
     public function sendCredentials(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         try {
 
             $employee = Employee::with('resortAdmin')->where('resort_id', $this->resort->resort_id)->find($request->employee_id);
@@ -1825,6 +1846,7 @@ class EmployeeController extends Controller
      */
     public function activate(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $validator = \Validator::make($request->all(), [
             'emp_id'       => 'required|exists:employees,id',
             'joining_date' => ['required', 'date_format:d/m/Y'],
@@ -2028,6 +2050,7 @@ class EmployeeController extends Controller
 
     public function updateEmploymentData(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         // TIN format validation. Maldives MIRA TINs are 10 digits, with a
         // 1-letter prefix (commonly "A" or "B") in some encodings. We
         // accept either 10 digits, or a single letter followed by 10
@@ -2246,6 +2269,7 @@ class EmployeeController extends Controller
 
     public function updateSalary(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         DB::beginTransaction();
 
         try {
@@ -2348,6 +2372,7 @@ class EmployeeController extends Controller
 
     public function updateBankDetails(Request $request, $id)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         // Find the education record by ID
         $bank_details = EmployeeBankDetails::whereHas('employee', function ($q) {
                 $q->where('resort_id', $this->resort->resort_id);
@@ -2401,6 +2426,7 @@ class EmployeeController extends Controller
 
     public function addBankDetails(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $request->validate([
             'employee_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             'bank_name' => 'required|string|max:255',
@@ -2903,6 +2929,7 @@ class EmployeeController extends Controller
 
     public function delete(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $employee = Employee::where('resort_id', $this->resort->resort_id)->find($request->id);
 
         if (!$employee) {
@@ -2919,6 +2946,7 @@ class EmployeeController extends Controller
 
     public function bulkDelete(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $ids = $request->input('ids', []);
 
         if (empty($ids)) {
