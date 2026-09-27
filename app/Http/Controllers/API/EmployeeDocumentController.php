@@ -128,10 +128,19 @@ class EmployeeDocumentController extends Controller
         try {
             $user = Auth::guard('api')->user();
             $resortId = $user->resort_id;
+            $employee = $user->GetEmployee;
 
-            // Fetch employee documents based on filters
+            // Had no per-employee scoping at all — any authenticated mobile
+            // user could pull every employee's documents in a category
+            // (passports, contracts, medical certs) resort-wide, with no id
+            // even needed. Only HR/GM see everyone; anyone else sees their
+            // own documents only, same rule this codebase already uses
+            // everywhere else for "everyone vs just me" (Common::hasFullDataAccess).
             $employeesDoc = EmployeesDocument::where('resort_id', $resortId)
                 ->where('document_category', $request->document_category)
+                ->when(!Common::hasFullDataAccess($employee), function ($query) use ($employee) {
+                    return $query->where('employee_id', $employee->id ?? 0);
+                })
                 ->get();
 
             // Check if no documents were found
