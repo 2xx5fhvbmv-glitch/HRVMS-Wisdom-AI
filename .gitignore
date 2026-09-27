@@ -14,8 +14,8 @@
 /storage/logs
 /vendor
 .env
-.env.backup
-.env.production
+.env.*
+!.env.example
 backup.sql
 .htaccess
 .phpunit.result.cache
