@@ -1020,34 +1020,49 @@ class GrivanceController extends Controller
             ->map(function($ak) {
                 $ak->profileImg = Common::getResortUserPicture($ak->Admin_id);
                 return $ak;
-            });          
-                                  
+            });
+
+            // Same identity gate as the investigation-detail views
+            // (InvestigationReport()/Investigationinfo()) — this listing
+            // showed every grievant's real name and photo unconditionally,
+            // including confidential submissions whose identity had never
+            // been disclosed to this viewer.
+            $viewerId = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id : 0;
+            $canViewIdentityFor = function ($row) use ($viewerId) {
+                $disclosedTo = is_array($row->Identity_Disclosed_To ?? null)
+                    ? $row->Identity_Disclosed_To
+                    : (json_decode($row->Identity_Disclosed_To ?? '[]', true) ?: []);
+                return $row->Grivance_Submission_Type != "Yes" || in_array($viewerId, $disclosedTo);
+            };
+
             return datatables()->of($GrivanceSubmissionModel)
             ->addColumn('ID', function ($row) {
                 return $row->Grivance_id;
             })
-            ->addColumn('Employee_Name', function ($row) {
+            ->addColumn('Employee_Name', function ($row) use ($canViewIdentityFor) {
+                if (!$canViewIdentityFor($row)) {
+                    return '<div class="tableUser-block"><span>Confidential</span></div>';
+                }
                 $string = '<div class="tableUser-block">
                                 <div class="img-circle">
                                     <img src="' . asset($row->profileImg) . '" alt="user">
                                 </div>
-                                <span>' . $row->first_name . ' ' . $row->last_name . '</span>
+                                <span>' . e($row->first_name . ' ' . $row->last_name) . '</span>
                             </div>';
                 return $string;
             })
-            ->addColumn('Department', function ($row) 
+            ->addColumn('Department', function ($row) use ($canViewIdentityFor)
             {
-                return $row->DepartmentName;
+                return $canViewIdentityFor($row) ? $row->DepartmentName : '-';
             })
-            ->addColumn('Section', function ($row) {
-            
+            ->addColumn('Section', function ($row) use ($canViewIdentityFor) {
+                if (!$canViewIdentityFor($row)) return '-';
                 return isset($row->SectionName) ? $row->SectionName : '-';
             })
-            ->addColumn('Position', function ($row) {
-            
-                return $row->PositionName;
+            ->addColumn('Position', function ($row) use ($canViewIdentityFor) {
+                return $canViewIdentityFor($row) ? $row->PositionName : '-';
             })
-            ->addColumn('GrivanceName', function ($row) 
+            ->addColumn('GrivanceName', function ($row)
             {
                 return $row->Category_Name;
             })
@@ -1060,10 +1075,14 @@ class GrivanceController extends Controller
             })
             ->addColumn('Action', function ($row)
             {
-                
+
                 return $string='<a href="javascript:void(0)" class="btn btn-themeSuccess btn-xs">Resolved</a>';
             })
-            ->rawColumns(['ID','GrivanceName','Employee_Name','Department','Section','Note','Status','Action'])
+            // 'Note' is plain employee-written text (Grivance_Eexplination_description),
+            // not markup — it was in rawColumns, so DataTables sent it to the
+            // browser unescaped (stored XSS). Dropped from rawColumns; the
+            // datatables package HTML-escapes any column not listed here.
+            ->rawColumns(['ID','GrivanceName','Employee_Name','Department','Section','Status','Action'])
             ->make(true);
         }
         $page_title="History And Logs";
