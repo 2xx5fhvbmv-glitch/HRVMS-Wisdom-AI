@@ -123,6 +123,14 @@ return [
     'key' => env('APP_KEY'),
     'cipher' => 'AES-256-CBC',
 
+    // Symmetric key for the raw openssl_encrypt/decrypt file-encryption calls
+    // in Common.php (secure file uploads, signature snapshots). Read here at
+    // boot, not via env('ENCRYPTION_KEY') at each call site — env() returns
+    // null once `config:cache` runs in production, which would have made
+    // every one of those calls silently hash(null) into the same fixed,
+    // publicly-derivable key instead of failing loudly.
+    'file_encryption_key' => env('ENCRYPTION_KEY'),
+
     /*
     |--------------------------------------------------------------------------
     | Autoloaded Service Providers
