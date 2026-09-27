@@ -41,10 +41,6 @@ return [
                 'useTLS'  => env('PUSHER_SCHEME', 'https') === 'https',
                 'host'    => env('PUSHER_HOST', '127.0.0.1'),
                 'port'    => env('PUSHER_PORT', 6001),
-                'curl_options' => [
-                    CURLOPT_SSL_VERIFYHOST => 0,
-                    CURLOPT_SSL_VERIFYPEER => 0,
-                ],
             ]
         ],
         'ably' => [

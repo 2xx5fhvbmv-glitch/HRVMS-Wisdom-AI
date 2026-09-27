@@ -65,10 +65,6 @@ return [
                 'region'   => env('AWS_DEFAULT_REGION', 'ap-south-1'),
                 'bucket'   => env('AWS_BUCKET'),
                 'url'      => env('AWS_URL'),
-                // Tell the AWS SDK exactly which CA root certificates to use:
-                'http' => [
-                    'verify' => false,
-                ],
             ],
 
         'wasabi' => [
@@ -80,9 +76,6 @@ return [
             'endpoint' => env('WASABI_ENDPOINT'),
             'url' => env('WASABI_URL'),
             'use_path_style_endpoint' => env('WASABI_USE_PATH_STYLE_ENDPOINT', false),
-            'http' => [
-                'verify' => false,
-            ],
         ],
 
     ],
