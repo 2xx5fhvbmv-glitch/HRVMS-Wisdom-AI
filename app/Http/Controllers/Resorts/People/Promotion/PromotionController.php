@@ -830,6 +830,15 @@ class PromotionController extends Controller
         if (!$promotion) {
             return response()->json(['status' => 'error', 'message' => 'Promotion not found.'], 404);
         }
+        // PE-08: {action} is a raw route segment with no allow-list. Before
+        // this check, any other value fell through to $currentApproval->update
+        // (status column written regardless) and only THEN hit the final
+        // "Invalid action" response — corrupting the approval row's status
+        // with an arbitrary string after the fact.
+        if (!in_array($action, ['Approved', 'Rejected', 'On Hold'], true)) {
+            return response()->json(['status' => 'error', 'message' => 'Invalid action.'], 422);
+        }
+
         $comments = $request->input('comments', null);
         $currentEmployee = $this->resort->GetEmployee; // Assuming current logged-in employee
         // Eager-load relations the actor descriptor needs ($actorLabel below
@@ -837,6 +846,17 @@ class PromotionController extends Controller
         if ($currentEmployee) {
             $currentEmployee->loadMissing(['resortAdmin', 'position', 'department']);
         }
+
+        // PE-07 ("decided: never allowed"): the person BEING promoted must
+        // never be able to approve/reject/hold their own promotion, even if
+        // they happen to hold a matching approval slot (e.g. they're the
+        // Finance/GM pool's only member). approval()'s $canAct only ever
+        // hid this in the UI for the submitter — the promotee case was
+        // never blocked anywhere, UI or server.
+        if ($currentEmployee && (int) $promotion->employee_id === (int) $currentEmployee->id) {
+            return response()->json(['status' => 'error', 'message' => 'You cannot act on your own promotion.'], 403);
+        }
+
         $actionName = $action;
         $hr = Employee::where('resort_id',$this->resort->resort_id)->where('Admin_Parent_id',$promotion->created_by)->first();
 
@@ -1331,6 +1351,16 @@ class PromotionController extends Controller
         if (!$employee) {
             return response()->json(['message' => 'Employee not found.'], 404);
         }
+
+        // PE-05: this had no check that the promotion actually finished the
+        // approval chain — a Pending, On Hold, or even Rejected promotion
+        // row could be "confirmed" here, directly overwriting the
+        // employee's real rank/department/position/salary with no
+        // approval at all.
+        if ($promotion->status !== 'Approved') {
+            return response()->json(['message' => 'This promotion has not been approved yet and cannot be confirmed.'], 422);
+        }
+
         $employee->Dept_id = $promotion->newPosition->department->id;
         $employee->Position_id = $promotion->newPosition->id;
         $employee->division_id = $promotion->newPosition->department->division_id;

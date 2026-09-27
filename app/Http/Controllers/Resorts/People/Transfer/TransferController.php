@@ -844,6 +844,14 @@ class TransferController extends Controller
         $comments = $request->input('reason', null);
         $currentEmployee = $this->resort->GetEmployee;
 
+        // PE-07 ("decided: never allowed"): the employee being transferred
+        // must never approve/reject/hold their own transfer, even if they
+        // happen to hold a matching Finance/GM approval slot. Same rule as
+        // PromotionController::handlePromotionApproval().
+        if ($currentEmployee && (int) $transfer->employee_id === (int) $currentEmployee->id) {
+            return response()->json(['status' => 'error', 'message' => 'You cannot act on your own transfer.'], 403);
+        }
+
         $currentApproval = $transfer->approvals()
             ->where('approved_by', $currentEmployee->id)
             ->whereIn('status', ['Pending', 'On Hold'])
