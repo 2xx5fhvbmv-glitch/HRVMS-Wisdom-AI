@@ -455,6 +455,16 @@ class SalaryIncrementController extends Controller
             return response()->json(['success' => false, 'status' => 'error', 'message' => 'Not found.'], 404);
         }
 
+        // PE-06: once GM has approved, this had no gate at all — the salary
+        // figures could still be silently edited after the fact, and it's
+        // the edited new_salary that gets paid (applyApprovedIncrementToEmployee
+        // reads it straight off this row). An Approved increment is final;
+        // Rejected/Hold/Change-Request stay editable (that's what the
+        // $wasStalled re-open flow below is for), Pending obviously is too.
+        if ($peopleSalaryIncrement->status === 'Approved') {
+            return response()->json(['success' => false, 'status' => 'error', 'message' => 'This increment has already been approved and can no longer be edited.'], 422);
+        }
+
         $effectiveDate = Carbon::createFromFormat('d/m/Y', $request->effective_date)->format('Y-m-d');
 
         if ($peopleSalaryIncrement) {
@@ -949,6 +959,11 @@ class SalaryIncrementController extends Controller
             if (!$peopleSalaryIncrement) {
                 continue;
             }
+            // PE-06: same lock as the single-item update() — an Approved
+            // increment is final and must not be silently re-editable.
+            if ($peopleSalaryIncrement->status === 'Approved') {
+                continue;
+            }
             if($payIncreaseType == PeopleSalaryIncrement::PAY_INCREASE_TYPE_PERCENTAGE){
                $value = $peopleSalaryIncrement->previous_salary * $request->value / 100;
             } else {
@@ -1365,21 +1380,43 @@ class SalaryIncrementController extends Controller
             ->select('id')
             ->first();
         
-        // Add approvers to each incrementData array
-        if (is_array($paylaod)) {
-            foreach ($paylaod as &$incrementData) {
-            if ($financeApprover) {
-                $incrementData['approver'] = $financeApprover;
-                $incrementData['approval_rank'] = 'Finance';
-            }
-            if ($gmApprover) {
-                $incrementData['approver'] = $gmApprover;
-                $incrementData['approval_rank'] = 'GM';
-            }
-            }
-            unset($incrementData);
+        // PE-08: this used to trust $incrementData['approval_rank']/['approver']
+        // straight from the request payload. The block below only ever
+        // OVERWROTE those fields when the caller was genuinely verified as
+        // Finance or GM (the $financeApprover/$gmApprover lookups, correctly
+        // scoped to $this->resort->id — the logged-in admin — above); when
+        // the caller was neither, the client-supplied values passed through
+        // untouched, and the update logic further down branched purely on
+        // the STRING value of approval_rank, never on whether a real
+        // $financeApprover/$gmApprover had actually been found. Any
+        // authenticated portal user — any rank, any department — could POST
+        // payload:[{"id":<id>,"approval_rank":"Finance",...}] (or "GM", once
+        // Finance had genuinely been approved) and have it accepted as a
+        // real Finance/GM approval, eventually applying a real salary
+        // change via applyApprovedIncrementToEmployee() with no Finance/GM
+        // sign-off at all.
+        //
+        // Fixed by resolving the caller's role ONCE, server-side, and using
+        // that everywhere below instead of anything from $incrementData.
+        $callerApprover = null;
+        $callerRank = null;
+        if ($financeApprover) {
+            $callerApprover = $financeApprover;
+            $callerRank = 'Finance';
         }
-        
+        if ($gmApprover) {
+            $callerApprover = $gmApprover;
+            $callerRank = 'GM';
+        }
+
+        if (!$callerRank) {
+            return response()->json([
+                'success' => false,
+                'status' => 'Error',
+                'message' => 'Unauthorized action.'
+            ]);
+        }
+
         if (is_array($paylaod)) {
             foreach ($paylaod as $incrementData) {
                 // Approver identity above is correctly scoped to this
@@ -1391,12 +1428,24 @@ class SalaryIncrementController extends Controller
                 // approver-identity/status logic runs.
                 $increment = PeopleSalaryIncrement::where('resort_id', $this->resort->resort_id)->find($incrementData['id']);
 
+                // PE-07 ("decided: never allowed"): the employee receiving
+                // the raise must never approve their own increment, even
+                // when they're the resort's Finance Manager or GM. Same
+                // rule as the promotion/transfer approval flows.
+                if ($increment && (int) $increment->employee_id === (int) ($callerApprover->id ?? 0)) {
+                    return response()->json([
+                        'success' => false,
+                        'status' => 'Error',
+                        'message' => 'You cannot act on your own salary increment.'
+                    ]);
+                }
+
                 if ($increment) {
                     $peopleSalaryIncrementStatus = PeopleSalaryIncrementStatus::where('people_salary_increment_id', $increment->id);
-                    if($incrementData['approval_rank']){
+                    {
                                 $update_key = false;
 
-                        if($incrementData['approval_rank'] == 'Finance') {
+                        if($callerRank == 'Finance') {
                                 $update_key = true;
 
                             // Hold is a pause, not a lock — approver can still
@@ -1405,15 +1454,15 @@ class SalaryIncrementController extends Controller
                             // must accept BOTH 'Pending' and 'Hold', otherwise
                             // the chained where() narrows the update target to
                             // zero rows and the action silently fails.
-                            $peopleSalaryIncrementStatus->where('approval_rank', $incrementData['approval_rank'])
+                            $peopleSalaryIncrementStatus->where('approval_rank', $callerRank)
                             ->whereIn('status', ['Pending','Hold'])->first();
 
-                        }elseif($incrementData['approval_rank'] == 'GM') {
+                        }elseif($callerRank == 'GM') {
                             $peopleSalaryIncrementStatusFinance =  PeopleSalaryIncrementStatus::where('people_salary_increment_id', $increment->id)->where('approval_rank', 'Finance')->where('status', 'Approved')->first();
 
                             if($peopleSalaryIncrementStatusFinance){
                                 $update_key = true;
-                                $peopleSalaryIncrementStatus->where('approval_rank', $incrementData['approval_rank'])
+                                $peopleSalaryIncrementStatus->where('approval_rank', $callerRank)
                                 ->whereIn('status', ['Pending','Hold'])->first();
                             }else{
                                 return response()->json([
@@ -1423,7 +1472,7 @@ class SalaryIncrementController extends Controller
                                     ]);
                             }
                         }
-                        
+
                         if ($update_key == true) {
                             // Signature snapshot — only an Approve represents
                             // this person actually signing off. Frozen HERE,
@@ -1436,12 +1485,12 @@ class SalaryIncrementController extends Controller
                             // as Transfer/Promotion.
                             $signatureFields = [];
                             if ($status === 'Approved') {
-                                $signatureFields = Common::snapshotSignature($this->resort->id, 'salary-increment', $increment->id . '-' . $incrementData['approval_rank']);
+                                $signatureFields = Common::snapshotSignature($this->resort->id, 'salary-increment', $increment->id . '-' . $callerRank);
                             }
 
                             $peopleSalaryIncrementStatus->update([
                                 'status' => $status,
-                                'approved_by' => $incrementData['approver']->id,
+                                'approved_by' => $callerApprover->id,
                                 'action_date' => now(),
                                 'remarks' => $request->remarks,
                                 'reject_reason' => $request->rejected_reason,
@@ -1463,7 +1512,7 @@ class SalaryIncrementController extends Controller
                             $this->dispatchActionNotifications(
                                 $increment->fresh(),
                                 $status,
-                                $incrementData['approval_rank'],
+                                $callerRank,
                                 $request->rejected_reason ?: $request->remarks
                             );
                         }
@@ -1501,12 +1550,6 @@ class SalaryIncrementController extends Controller
                             // idempotency timestamp.
                             self::applyApprovedIncrementToEmployee($increment->fresh());
                         }
-                    }else{
-                        return response()->json([
-                                'success' => false,
-                                'status' => 'Error',
-                                'message' => 'Unauthorized action.'
-                            ]);
                     }
                 }
             }
@@ -1543,19 +1586,29 @@ class SalaryIncrementController extends Controller
             ->select('id')
             ->first();
         
-        // Add approvers to each incrementData array
-        if (is_array($paylaod)) {
-            foreach ($paylaod as &$incrementData) {
-            if ($financeApprover) {
-                $incrementData['approver'] = $financeApprover;
-                $incrementData['approval_rank'] = 'Finance';
-            }
-            if ($gmApprover) {
-                $incrementData['approver'] = $gmApprover;
-                $incrementData['approval_rank'] = 'GM';
-            }
-            }
-            unset($incrementData);
+        // PE-08: same fix as updateStatus() — resolve the caller's role
+        // server-side, once, and reject outright if they're neither Finance
+        // nor GM. Previously this trusted approval_rank/approver from the
+        // client payload whenever the caller wasn't verified as either,
+        // letting any authenticated portal user push any already-Finance-
+        // approved increment to Change-Request.
+        $callerApprover = null;
+        $callerRank = null;
+        if ($financeApprover) {
+            $callerApprover = $financeApprover;
+            $callerRank = 'Finance';
+        }
+        if ($gmApprover) {
+            $callerApprover = $gmApprover;
+            $callerRank = 'GM';
+        }
+
+        if (!$callerRank) {
+            return response()->json([
+                'success' => false,
+                'status' => 'Error',
+                'message' => 'Unauthorized action.'
+            ]);
         }
 
         if (is_array($paylaod)) {
@@ -1568,32 +1621,32 @@ class SalaryIncrementController extends Controller
 
                 if ($increment) {
                    $peopleSalaryIncrementStatus = PeopleSalaryIncrementStatus::where('people_salary_increment_id', $increment->id);
-                    if($incrementData['approval_rank']){
+                    {
                                 $update_key = false;
 
-                        if($incrementData['approval_rank'] == 'Finance') {
+                        if($callerRank == 'Finance') {
                                 $update_key = true;
 
-                            $peopleSalaryIncrementStatus->where('approval_rank', $incrementData['approval_rank'])
+                            $peopleSalaryIncrementStatus->where('approval_rank', $callerRank)
                             ->where('status', 'Pending')->first();
-    
-                        }elseif($incrementData['approval_rank'] == 'GM') {
+
+                        }elseif($callerRank == 'GM') {
                             $peopleSalaryIncrementStatusFinance =  PeopleSalaryIncrementStatus::where('people_salary_increment_id', $increment->id)->where('approval_rank', 'Finance')->where('status', 'Approved')->first();
-    
+
                             if($peopleSalaryIncrementStatusFinance){
                                 $update_key = true;
-                                $peopleSalaryIncrementStatus->where('approval_rank', $incrementData['approval_rank'])
+                                $peopleSalaryIncrementStatus->where('approval_rank', $callerRank)
                                 ->where('status', 'Pending')->first();
                             }
                         }
-                        
+
                         if ($update_key == true) {
                             $peopleSalaryIncrementStatus->update([
                                 'status' => 'Change-Request',
                                 // Track who raised the change request so
                                 // the summary-list can show
                                 // "Change Requested By: <name>".
-                                'approved_by' => optional($incrementData['approver'] ?? null)->id,
+                                'approved_by' => optional($callerApprover)->id,
                                 'action_date' => now(),
                                 'remarks' => $request->remarks,
                             ]);
@@ -1606,7 +1659,7 @@ class SalaryIncrementController extends Controller
                             $this->dispatchActionNotifications(
                                 $increment->fresh(),
                                 'Change-Request',
-                                $incrementData['approval_rank'],
+                                $callerRank,
                                 $request->remarks
                             );
                         }
@@ -1655,15 +1708,27 @@ class SalaryIncrementController extends Controller
             ->select('id')
             ->first();
 
+            // PE-08: the else branch here set approval_rank = 'GM'
+            // unconditionally even when $gmApprover was null — i.e. the
+            // caller was neither Finance nor GM — which then let the
+            // Hold branch below run with approved_by=null. Any
+            // authenticated portal user could put an already-Finance-
+            // approved increment on Hold.
             if ($financeApprover) {
                 $approver = $financeApprover;
                 $approval_rank = 'Finance';
-            }else{
+            }elseif ($gmApprover){
 
                 $approver = $gmApprover;
                 $approval_rank = 'GM';
+            }else{
+                return response()->json([
+                    'success' => false,
+                    'status' => 'Error',
+                    'message' => 'Unauthorized action.'
+                ]);
             }
-        
+
             // Accept either the "d/m/Y" format the date-picker emits or a
             // raw "Y-m-d" string (some browsers/extensions submit the
             // native format). Either way we end up with a clean Y-m-d.
