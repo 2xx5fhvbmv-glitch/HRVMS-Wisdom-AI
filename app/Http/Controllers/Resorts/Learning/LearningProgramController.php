@@ -251,10 +251,9 @@ class LearningProgramController extends Controller
         $trainerImagePath = null;
         if ($request->hasFile('trainer_image')) {
             $img = $request->file('trainer_image');
-            $trainerImagePath = $img->storeAs(
-                'learning_trainer_images/' . $this->resort->resort_id,
-                time() . '_' . $img->getClientOriginalName()
-            );
+            $trainerImagePath = 'learning_trainer_images/' . $this->resort->resort_id . '/'
+                . time() . '_' . $img->getClientOriginalName();
+            \App\Helpers\StorageHelper::put($trainerImagePath, file_get_contents($img->getRealPath()));
         }
 
         // Store the learning program details
@@ -290,7 +289,8 @@ class LearningProgramController extends Controller
                 foreach ($request->file('learning_material') as $file) {
                     // Generate unique file name
                     $fileName = time() . '_' . $file->getClientOriginalName();
-                    $path = $file->storeAs($storagePath, $fileName); // Store file in dynamic path
+                    $path = rtrim($storagePath, '/') . '/' . $fileName;
+                    \App\Helpers\StorageHelper::put($path, file_get_contents($file->getRealPath()));
                     $filePaths[] = $path; // Save the path in array
 
                     LearningMaterials::create([
@@ -326,23 +326,28 @@ class LearningProgramController extends Controller
     }
 
     /**
-     * Stream the trainer image for a Learning Program. Stored on the local disk
-     * (private) so it needs a controller route rather than asset(...) URL.
+     * Stream the trainer image for a Learning Program via StorageHelper so this
+     * works the same on wasabi/S3 as it does locally (prod runs STORAGE_DRIVER=
+     * wasabi; the previous Storage::disk('local') read couldn't see a file the
+     * default-disk upload had actually written to the cloud disk).
      */
     public function trainerImage($id)
     {
         $program = LearningProgram::where('resort_id', $this->resort->resort_id)->find(base64_decode($id));
         if (!$program || !$program->trainer_image) abort(404, 'Trainer image not found.');
 
-        if (!\Illuminate\Support\Facades\Storage::disk('local')->exists($program->trainer_image)) {
+        if (!\App\Helpers\StorageHelper::exists($program->trainer_image)) {
             abort(404, 'Image missing from storage.');
         }
-        return \Illuminate\Support\Facades\Storage::disk('local')->response($program->trainer_image);
+        return response(\App\Helpers\StorageHelper::get($program->trainer_image), 200)
+            ->header('Content-Type', \App\Helpers\StorageHelper::mimeType($program->trainer_image) ?: 'application/octet-stream')
+            ->header('Content-Disposition', 'inline; filename="' . basename($program->trainer_image) . '"');
     }
 
     /**
-     * Stream a Learning Program material file (stored on the local disk under storage/app/).
-     * Access is gated to users who can view the parent program.
+     * Stream a Learning Program material file via StorageHelper (see trainerImage()
+     * above for why — same driver-mismatch bug). Access is gated to users who can
+     * view the parent program.
      */
     public function downloadMaterial($id)
     {
@@ -352,14 +357,13 @@ class LearningProgramController extends Controller
         $program = LearningProgram::where('resort_id', $this->resort->resort_id)->find($material->learning_program_id);
         if (!$program) abort(403, 'You do not have access to this material.');
 
-        if (!\Illuminate\Support\Facades\Storage::disk('local')->exists($material->file_path)) {
+        if (!\App\Helpers\StorageHelper::exists($material->file_path)) {
             abort(404, 'File missing from storage.');
         }
 
-        return \Illuminate\Support\Facades\Storage::disk('local')->download(
-            $material->file_path,
-            basename($material->file_path)
-        );
+        return response(\App\Helpers\StorageHelper::get($material->file_path), 200)
+            ->header('Content-Type', \App\Helpers\StorageHelper::mimeType($material->file_path) ?: 'application/octet-stream')
+            ->header('Content-Disposition', 'attachment; filename="' . basename($material->file_path) . '"');
     }
 
     public function getProgramDetails(Request $request)
