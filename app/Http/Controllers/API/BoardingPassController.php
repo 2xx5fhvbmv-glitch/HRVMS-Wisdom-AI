@@ -1464,6 +1464,24 @@ class BoardingPassController extends Controller
 
             if($action == 'Cancel') {
 
+                // L-03: nothing gated who could call this — the status-row
+                // update above only touched rows where approver_id matched
+                // the caller (silently a no-op for anyone else), but the
+                // pass's own status was set to Cancel UNCONDITIONALLY right
+                // after, regardless of whether that update actually
+                // matched anything. Any employee in the resort could
+                // emergency-cancel any other employee's approved pass by
+                // guessing/incrementing pass_id.
+                $isOwnPass = (int) $employeeTravelPasses->employee_id === (int) $employee->id;
+                $isChainApprover = EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)
+                    ->where('approver_id', $employee->id)->exists();
+                if (!$isOwnPass && !$isChainApprover && !Common::hasFullDataAccess($employee)) {
+                    return response()->json([
+                        'success'                       =>  false,
+                        'message'                       =>  'You are not authorized to cancel this boarding pass.',
+                    ], 403);
+                }
+
                 EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)->where('approver_id', $employee->id)->update([
                     'emergency_cancel_status'           =>  $action,
                     'comments'                          =>  $comments, // Save comments if provided
