@@ -46,7 +46,7 @@ class EvaluationFormController extends Controller
         // Do NOT call get() here; pass the query builder to DataTables
         return datatables()->of($forms)
             ->addColumn('form_name', function ($row) {
-                return $row->form_name;
+                return e($row->form_name);
             })
             ->addColumn('action', function ($row) {
                 $view_url = route('evaluation-form.preview', $row->id);

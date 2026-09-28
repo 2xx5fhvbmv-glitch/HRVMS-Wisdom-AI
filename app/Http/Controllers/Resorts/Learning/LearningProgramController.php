@@ -138,8 +138,11 @@ class LearningProgramController extends Controller
             return datatables()->of($programs)
                 ->editColumn('description', fn($row) => $row->description ? e(\Illuminate\Support\Str::limit(strip_tags($row->description), 100)) : '-')
                 ->editColumn('objectives', fn($row) => $row->objectives ? e(\Illuminate\Support\Str::limit(strip_tags($row->objectives), 100)) : '-')
+                ->addColumn('name', function ($row) {
+                    return e($row->name);
+                })
                 ->addColumn('category', function ($row) {
-                    return optional($row->category)->category ?? 'N/A';
+                    return e(optional($row->category)->category ?? 'N/A');
                 })
                 ->addColumn('duration', function ($row) {
                     // Hours / Days are now mutually optional — render only the parts present.
@@ -231,7 +234,9 @@ class LearningProgramController extends Controller
             'trainer' => 'nullable|required_without:external_trainer_company|exists:employees,id',
             'external_training' => 'nullable|string|max:255',
             'external_trainer_company' => 'nullable|required_without:trainer|string|max:255',
-            'trainer_image' => 'nullable|mimes:jpg,jpeg,png,gif,svg,webp,heic,heif|max:4096',
+            // SVG excluded — served inline via Storage::response(), so an SVG with an
+            // embedded <script>/onload payload would execute as stored XSS when opened.
+            'trainer_image' => 'nullable|mimes:jpg,jpeg,png,gif,webp,heic,heif|max:4096',
             'prior_qualification' => 'nullable|string',
             'learning_material.*' => 'nullable|mimes:pdf,ppt,pptx|max:2048',
         ]);

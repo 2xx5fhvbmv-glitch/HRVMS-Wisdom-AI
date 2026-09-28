@@ -651,10 +651,10 @@ class TrainingScheduleController extends Controller
 
         if ($request->ajax()) {
             return datatables()->of($trainings)
-                ->addColumn('title', fn($row) => $row->learningProgram->name ?? 'N/A')
+                ->addColumn('title', fn($row) => e(optional($row->learningProgram)->name ?? 'N/A'))
                 ->addColumn('dates', fn($row) => date('d M Y', strtotime($row->start_date)) . ' - ' . date('d M Y', strtotime($row->end_date)))
                 ->addColumn('time', fn($row) => date('h:i A', strtotime($row->start_time)) . ' - ' . date('h:i A', strtotime($row->end_time)))
-                ->addColumn('venue', fn($row) => $row->venue ?? 'N/A')
+                ->addColumn('venue', fn($row) => e($row->venue ?? 'N/A'))
                 ->addColumn('status', function ($row) {
                     // Derive effective status from dates so this column agrees with
                     // the dashboard tile counts (which also derive from dates).
