@@ -1331,6 +1331,15 @@ class ApplicantsController extends Controller
                 return response()->json(['error' => 'Resort not found'], 404);
             }
 
+            // Every Applicant_form_data::find($ApplicantID) below is otherwise
+            // unscoped — a client on resort A could pass resort B's applicant
+            // id and this method would create an interview row (resort_id=A)
+            // pointing at resort B's applicant, and email them. Gate once here
+            // instead of scoping each of the 3 lookups separately.
+            if (!Applicant_form_data::where('id', $ApplicantID)->where('resort_id', $Resort_id)->exists()) {
+                return response()->json(['error' => 'Applicant not found'], 404);
+            }
+
             $interviewerId = $this->resort->id;
             // interviewer_id column stores a resort_admins id (compared against
             // ResortAdmin elsewhere in this method) — track the matching
