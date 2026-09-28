@@ -199,26 +199,32 @@ class EvaluationFormController extends Controller
             $page_title = 'View Evaluation Response';
             $formId = base64_decode($formId);
             $responseId = base64_decode($responseId);
-            // Fetch the response along with the form structure for rendering
-            $response = EvaluationFormResponse::with(['interviewer', 'interviewee', 'form'])
+            // LR-01: 'interviewer'/'interviewee' aren't real relations on
+            // EvaluationFormResponse (it has training()/participant()) and
+            // InterviewAssessmentForm is a TalentAcquisition model with no
+            // resort check — this had no tenant scoping at all. Use the
+            // model's own real relations, scoped via the form's resort_id.
+            $response = EvaluationFormResponse::with(['training', 'participant', 'form'])
                 ->where('id', $responseId)
                 ->where('form_id', $formId)
+                ->whereHas('form', function ($q) {
+                    $q->where('resort_id', $this->resort->resort_id);
+                })
                 ->firstOrFail();
 
-            // dd($response);
+            $responses = $response->responses;
 
-            // Decode the stored JSON responses
-            $responses = json_decode($response->responses, true);
-
-            // Fetch the form structure
-            $form = InterviewAssessmentForm::findOrFail($formId);
+            $form = $response->form;
             $formStructure = json_decode($form->form_structure, true);
 
-            return view('resorts.talentacquisition.interview-assessment.viewResponse', compact('response', 'responses', 'formStructure', 'page_title'));
+            // No blade view was ever built for this (the prior code used
+            // the wrong model classes and would have fataled on every
+            // call) — return the data rather than inventing a new view
+            // template, which is feature work beyond this security fix.
+            return response()->json(compact('response', 'responses', 'formStructure', 'page_title'));
         } catch (\Exception $e) {
-            \Log::error('Error saving interview response: ' . $e->getMessage());
-
-            // return redirect()->back()->withErrors(['error' => 'Failed to load the response. ' . $e->getMessage()]);
+            \Log::error('Error loading evaluation response: ' . $e->getMessage());
+            return redirect()->back()->withErrors(['error' => 'Failed to load the response.']);
         }
     }
 

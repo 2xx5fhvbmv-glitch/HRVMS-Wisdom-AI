@@ -213,26 +213,36 @@ class FeedbackFormController extends Controller
             $page_title = "View Feedback Response";
             $formId = base64_decode($formId);
             $responseId = base64_decode($responseId);
-            // Fetch the response along with the form structure for rendering
-            $response = InterviewAssessmentResponseForm::with(['interviewer', 'interviewee', 'form'])
+            // LR-01: this referenced InterviewAssessmentResponseForm/
+            // InterviewAssessmentForm — TalentAcquisition models, not even
+            // imported in this file (namespace App\Http\Controllers\
+            // resorts\Learning has no such class), so every call fatals
+            // with a class-not-found error. Never functional. The correct
+            // model for this feature was already imported and unused —
+            // TrainingFeedbackResponse/TrainingFeedbackForm — and, unlike
+            // the TA models, resort-scoped via the form relation below.
+            $response = TrainingFeedbackResponse::with(['training', 'participant', 'form'])
                 ->where('id', $responseId)
                 ->where('form_id', $formId)
+                ->whereHas('form', function ($q) {
+                    $q->where('resort_id', $this->resort->resort_id);
+                })
                 ->firstOrFail();
 
-            // dd($response);
-
             // Decode the stored JSON responses
-            $responses = json_decode($response->responses, true);
+            $responses = $response->responses;
 
-            // Fetch the form structure
-            $form = InterviewAssessmentForm::findOrFail($formId);
+            $form = $response->form;
             $formStructure = json_decode($form->form_structure, true);
 
-            return view('resorts.talentacquisition.interview-assessment.viewResponse', compact('response', 'responses', 'formStructure', 'page_title'));
+            // No blade view was ever built for this (the method fataled on
+            // every call before, so nothing could have rendered one
+            // either) — return the data rather than inventing a new view
+            // template, which is feature work beyond this security fix.
+            return response()->json(compact('response', 'responses', 'formStructure', 'page_title'));
         } catch (\Exception $e) {
-            \Log::error('Error saving interview response: ' . $e->getMessage());
-
-            // return redirect()->back()->withErrors(['error' => 'Failed to load the response. ' . $e->getMessage()]);
+            \Log::error('Error loading feedback response: ' . $e->getMessage());
+            return redirect()->back()->withErrors(['error' => 'Failed to load the response.']);
         }
     }
 
