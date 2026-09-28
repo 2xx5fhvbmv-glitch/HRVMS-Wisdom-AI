@@ -408,10 +408,17 @@ class LearningController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
+        $resort_id                                   =   $this->resort_id;
+
+        // LR-02: neither the schedule lookup nor the employee ids were
+        // resort-scoped — an EXCOM (route-gated to check.rank:EXCOM, any
+        // resort) could mark attendance, including Absent, on another
+        // resort's training schedule for that resort's own employees
+        // (also triggering the absence notification cross-tenant).
         $validator = Validator::make($request->all(), [
-            'training_schedule_id'      => 'required',
+            'training_schedule_id'      => ['required', \Illuminate\Validation\Rule::exists('training_schedules', 'id')->where('resort_id', $resort_id)],
             'employees'                 => 'required|array|min:1',
-            'employees.*.employee_id'   => 'required|exists:employees,id',
+            'employees.*.employee_id'   => ['required', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $resort_id)],
             'employees.*.status'        => 'required|in:Present,Absent,Late',
         ]);
 
@@ -420,10 +427,8 @@ class LearningController extends Controller
         }
 
         try {
-            $resort_id                              =   $this->resort_id;
-            
-            $trainingSchedule = TrainingSchedule::find($request->training_schedule_id);
-           
+            $trainingSchedule = TrainingSchedule::where('resort_id', $resort_id)->find($request->training_schedule_id);
+
             // Check if the training schedule exists
             if (!$trainingSchedule) {
                 return response()->json([
