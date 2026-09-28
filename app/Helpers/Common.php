@@ -11073,7 +11073,12 @@ class Common
             $pagesList = ModulePages::where('internal_route',$routeName)
                     ->where('TypeOfPage','InsideOfPage')->where('type','normal')->first();
             if(!$pagesList){
-                return true; // No page found for this route
+                // X-01: this used to be a bare `return true` — any route not
+                // seeded as a module_pages row (≈91% of portal routes) was
+                // open to any logged-in portal user of any rank. Extend
+                // coverage via config/route_permissions.php before falling
+                // back to the old permissive default.
+                return self::checkRoutePermissionsMap($routeName, $Resort_id, $employee);
             }
             $hasViewPermission = Common::resortHasPermission($pagesList->Module_Id, $pagesList->id, $permission_id);;
         }
@@ -11083,6 +11088,64 @@ class Common
         }else{
             return false;
         }
+    }
+
+    /**
+     * X-01: second layer of route coverage, checked only when a route has
+     * no module_pages row at all. config/route_permissions.php maps a route
+     * to the page whose permission tick should gate it (and which tick —
+     * view/create/edit/delete, not always "view" the way the middleware's
+     * default check is). A route in neither place is report-only: logged
+     * and still allowed, so adding the map/this method changes nothing on
+     * its own — see config/route_permissions.php's own doc comment for the
+     * rollout plan before 'enforce_unmapped' is ever flipped to true.
+     */
+    private static function checkRoutePermissionsMap($routeName, $resortId, $employee)
+    {
+        $config = config('route_permissions', []);
+        $enforceUnmapped = $config['enforce_unmapped'] ?? false;
+        $entry = $config['map'][$routeName] ?? null;
+
+        if ($entry === null) {
+            \Log::warning('UNMAPPED_ROUTE', ['route' => $routeName, 'resort_id' => $resortId, 'employee_id' => $employee->id ?? null]);
+            return $enforceUnmapped ? false : true;
+        }
+
+        [$ownerPage, $required] = $entry;
+
+        if ($ownerPage === '*' && $required === 'any_authenticated') {
+            return true;
+        }
+
+        $pagesList = ModulePages::where('internal_route', $ownerPage)->first();
+        if (!$pagesList) {
+            // The map points at a page that doesn't exist — fail toward the
+            // existing default rather than silently trusting a typo.
+            \Log::warning('ROUTE_PERMISSIONS_BAD_OWNER_PAGE', ['route' => $routeName, 'owner_page' => $ownerPage]);
+            return $enforceUnmapped ? false : true;
+        }
+
+        $permissionId = match ($required) {
+            'create' => config('settings.resort_permissions.create'),
+            'edit'   => config('settings.resort_permissions.edit'),
+            'delete' => config('settings.resort_permissions.delete'),
+            default  => config('settings.resort_permissions.view'),
+        };
+
+        $allowed = (bool) Common::resortHasPermission($pagesList->Module_Id, $pagesList->id, $permissionId);
+        if (!$allowed && !$enforceUnmapped) {
+            // Report-only applies here too: almost no resort has explicit
+            // ticks configured for these newly-mapped pages yet (this audit
+            // found ~9% coverage overall), so enforcing a real "deny" the
+            // moment a route is added to the map would 403 legitimate
+            // HR/GM users the in-method check already allows — a functional
+            // regression, not a security fix. Log so HR can review/
+            // configure ticks before 'enforce_unmapped' ever flips to true.
+            \Log::warning('ROUTE_PERMISSIONS_WOULD_DENY', ['route' => $routeName, 'resort_id' => $resortId, 'employee_id' => $employee->id ?? null]);
+            return true;
+        }
+
+        return $allowed;
     }
 
     public static function getCurrentCutoffPeriod($cutoff_day)
