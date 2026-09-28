@@ -50,6 +50,22 @@ class ApplicantsController extends Controller
         if(!$this->resort) return;
     }
 
+    /**
+     * T-05: document downloads, applicant delete, offer/contract send and
+     * salary allocation had no role check at all — any authenticated
+     * portal user of any rank/department could call them directly (the
+     * UI's $isHrUser button-hiding is cosmetic only). Same
+     * Common::hasFullDataAccess() gate used codebase-wide for this
+     * "everyone vs HR/GM" decision.
+     */
+    private function requireHrAccess()
+    {
+        if (!Common::hasFullDataAccess(optional($this->resort)->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+        return null;
+    }
+
     public function VacnacyWiseApplicants(Request $request, $id)
     {
         $page_title="Applicants";
@@ -1928,6 +1944,7 @@ class ApplicantsController extends Controller
 
     public function destoryApplicant(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $id = base64_decode($request->base64_id);
 
         DB::beginTransaction();
@@ -2679,8 +2696,9 @@ class ApplicantsController extends Controller
 
     public function GetAwsFiles(Request $request)
     {
-       
-       
+        if ($guard = $this->requireHrAccess()) return $guard;
+
+
         $ApplicantID = base64_decode($request->id);
         $flag        = $request->flag;
 
@@ -2750,6 +2768,7 @@ class ApplicantsController extends Controller
 
     public function GetAllAwsFiles(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $ApplicantID = base64_decode($request->id);
         $fields = ['curriculum_vitae', 'passport_img', 'passport_photo', 'full_length_photo', 'other_document'];
         $applicant = Applicant_form_data::where('id', $ApplicantID)
@@ -2810,6 +2829,7 @@ class ApplicantsController extends Controller
      */
     public function DownloadAllFilesZip(Request $request, $id)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $ApplicantID = base64_decode($id);
 
         $applicant = Applicant_form_data::leftJoin('vacancies as v', 'v.id', '=', 'applicant_form_data.Parent_v_id')
@@ -3072,6 +3092,7 @@ class ApplicantsController extends Controller
 
     public function sendOfferLetter(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
         ]);
@@ -3215,6 +3236,7 @@ class ApplicantsController extends Controller
 
     public function sendContract(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
         ]);
@@ -3483,6 +3505,7 @@ class ApplicantsController extends Controller
 
     public function deleteTalentPoolApplicant(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $applicant_id = base64_decode($request->applicant_id);
         $applicant = Applicant_form_data::find($applicant_id);
         if (!$applicant) {
@@ -3511,6 +3534,7 @@ class ApplicantsController extends Controller
 
     public function saveSalaryAllocation(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $applicantId = base64_decode($request->applicant_id);
         $resortId = $this->resort->resort_id;
 
