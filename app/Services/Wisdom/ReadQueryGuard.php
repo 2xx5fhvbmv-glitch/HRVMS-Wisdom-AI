@@ -67,12 +67,18 @@ class ReadQueryGuard
         }
 
         // Forbidden keywords / dangerous constructs (word-boundary matched).
+        // WA-01: `union` was missing here — `SELECT ... WHERE resort_id = :resort_id
+        // UNION SELECT ... WHERE resort_id != :resort_id` passed every other check
+        // (single statement, starts with SELECT, no other forbidden keyword, the
+        // literal substring `:resort_id` present) and returned every other resort's
+        // rows. A single-statement read tool has no legitimate need for UNION.
         $forbidden = [
             'insert', 'update', 'delete', 'drop', 'alter', 'create', 'truncate',
             'replace', 'rename', 'grant', 'revoke', 'merge', 'call', 'do',
             'handler', 'set', 'into', 'load_file', 'outfile', 'dumpfile',
             'sleep', 'benchmark', 'get_lock', 'release_lock', 'lock', 'unlock',
             'information_schema', 'performance_schema', 'mysql', 'sys',
+            'union',
         ];
         foreach ($forbidden as $kw) {
             if (preg_match('/\b' . preg_quote($kw, '/') . '\b/i', $sql)) {
@@ -98,6 +104,27 @@ class ReadQueryGuard
             if (self::isDeniedTable($table)) {
                 return self::fail("Table \"{$table}\" is restricted and cannot be queried.");
             }
+        }
+
+        // WA-01: the check above only requires `:resort_id` to appear ONCE,
+        // anywhere — `SELECT e1.name FROM employees e1 JOIN employees e2 ON 1=1
+        // WHERE e1.resort_id = :resort_id` passed it while e2 (and any other
+        // joined table) was never scoped, cartesian-joining every resort's rows
+        // in. This can't be verified precisely without a real SQL parser, but a
+        // query that touches N tables (one FROM + each JOIN) and mentions
+        // `resort_id` fewer than N times is almost certainly missing a
+        // per-table scope, so reject it. A determined bypass (repeating the
+        // same table's resort_id N times instead of scoping each one) is still
+        // possible — this raises the bar, it isn't a full fix.
+        $tableRefs = count($m[1]);
+        // Count only column-level resort_id references (e.g. `e.resort_id`),
+        // not the bound `:resort_id` placeholder itself — a lookbehind
+        // excluding `:`-preceded matches, since otherwise a single
+        // `e.resort_id = :resort_id` predicate counts as 2 mentions for what
+        // scopes only one table, undercounting how many tables are unscoped.
+        $resortIdMentions = preg_match_all('/(?<!:)\bresort_id\b/i', $sql);
+        if ($resortIdMentions < $tableRefs) {
+            return self::fail('Every joined table must be scoped by its own resort_id — add resort_id = :resort_id for each table/alias referenced.');
         }
 
         // Force a row limit if the model didn't add one.
