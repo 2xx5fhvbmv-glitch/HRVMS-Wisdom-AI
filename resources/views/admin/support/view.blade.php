@@ -127,7 +127,7 @@
                         <span class="sender">{{ $isAdmin ? $adminFullName : $customerFullName }}</span>
                         <span class="time">{{ $timeLabel }}</span>
                       </div>
-                      <div class="body">{!! html_entity_decode($msg->message) !!}</div>
+                      <div class="body">{!! nl2br(e(html_entity_decode($msg->message, ENT_QUOTES | ENT_HTML5))) !!}</div>
                       @if(!empty($atts))
                         <div class="attachments">
                           @foreach($atts as $a)
@@ -137,10 +137,12 @@
                                 <i class="fas fa-paperclip"></i> {{ $a['Filename'] }}
                               </a>
                             @elseif(is_string($a) && $a !== '')
-                              {{-- Resort-side sendReply stores plain
-                                   filepaths via Storage::disk('public').
-                                   Render them as a direct download link. --}}
-                              <a href="{{ asset('storage/' . ltrim($a, '/')) }}" target="_blank" class="d-inline-block me-2">
+                              {{-- Resort-side sendReply stores a filepath.
+                                   Pre-fix rows are 2-segment paths written to
+                                   the local 'public' disk directly; post-fix
+                                   rows are 4-segment paths (ticket/uuid/file)
+                                   written through StorageHelper. --}}
+                              <a href="{{ substr_count($a, '/') > 1 ? \App\Helpers\StorageHelper::temporaryUrl($a) : asset('storage/' . ltrim($a, '/')) }}" target="_blank" class="d-inline-block me-2">
                                 <i class="fas fa-paperclip"></i> {{ basename($a) }}
                               </a>
                             @endif

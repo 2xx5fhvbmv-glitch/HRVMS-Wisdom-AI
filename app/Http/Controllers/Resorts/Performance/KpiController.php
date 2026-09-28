@@ -430,9 +430,20 @@ class KpiController extends Controller
      */
     public function approve(Request $request, $id)
     {
+        // PF-02: unlike create/edit/PerformanceKpiStore/updateKpi/destroyKpi
+        // in this same controller, approve/reject had no rank check at all —
+        // any authenticated portal user could GM-approve/reject a KPI, and
+        // the HOD/XCOM who submitted the response (storeResponse() above)
+        // could approve/reject their own submission.
+        if ((int) $this->getUserRank() !== 8) {
+            return response()->json(['success' => false, 'message' => 'Only GM can approve a KPI.'], 403);
+        }
         $kpi = PerformanceKpiParent::where('resort_id', $this->resort->resort_id)->findOrFail($id);
         if ($kpi->status !== 'responded') {
             return response()->json(['success' => false, 'message' => 'KPI must be in responded state'], 422);
+        }
+        if ($kpi->responded_by && $kpi->responded_by == optional($this->resort->GetEmployee)->id) {
+            return response()->json(['success' => false, 'message' => 'You cannot approve your own KPI response.'], 403);
         }
 
         $kpi->update([
@@ -471,9 +482,15 @@ class KpiController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
+        if ((int) $this->getUserRank() !== 8) {
+            return response()->json(['success' => false, 'message' => 'Only GM can reject a KPI.'], 403);
+        }
         $kpi = PerformanceKpiParent::where('resort_id', $this->resort->resort_id)->findOrFail($id);
         if ($kpi->status !== 'responded') {
             return response()->json(['success' => false, 'message' => 'KPI must be in responded state'], 422);
+        }
+        if ($kpi->responded_by && $kpi->responded_by == optional($this->resort->GetEmployee)->id) {
+            return response()->json(['success' => false, 'message' => 'You cannot reject your own KPI response.'], 403);
         }
 
         $kpi->update([

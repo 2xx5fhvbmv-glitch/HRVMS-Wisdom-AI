@@ -4853,6 +4853,21 @@ class Common
     }
 
     /**
+     * Revoke every live mobile/web API token for a resort-admin account (S4-01).
+     * Called right after an employee/admin is deactivated so access is cut off
+     * immediately instead of surviving up to the token's remaining lifetime.
+     * Wrapped by the caller in try/catch — a revoke failure must never roll
+     * back the status-change transaction it's attached to.
+     */
+    public static function revokeAllApiTokens(?ResortAdmin $admin): void
+    {
+        if (!$admin) {
+            return;
+        }
+        $admin->tokens()->where('revoked', false)->update(['revoked' => true]);
+    }
+
+    /**
      * Resolve an Emp_main_id value (stored as numeric id, base64 id, or Emp_id
      * string like "DR-22") to a numeric employee primary key, or null if not found.
      * Legacy cycle rows stored the Emp_id string instead of the numeric key, so all
@@ -5601,6 +5616,174 @@ class Common
         }
 
         return false;
+    }
+
+    /**
+     * Payroll access gate (security audit P-01, product decision 2026-09-26):
+     * HR department, Finance department, or master admin only. Deliberately
+     * narrower than hasFullDataAccess() — that one also admits the GM and
+     * L&D managers, both explicitly excluded from payroll. The GM keeps
+     * approval-only access through the existing per-step checks in
+     * PayrollController::approvePayroll / PayslipController::approveFinalSettlement /
+     * AdvanceSalaryController::updateStatus — this gate does not sit in front
+     * of those, only in front of browsing/editing payroll data.
+     */
+    public static function canAccessPayroll($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+
+            $employee = $user->GetEmployee ?? null;
+        }
+
+        if (!$employee) return false;
+
+        if ((int) $employee->rank === 3) return true;
+
+        return self::isHRDepartment($employee->Dept_id ?? null)
+            || self::isFinanceDepartment($employee->Dept_id ?? null);
+    }
+
+    /**
+     * Visa module access gate (security audit V-02, product decision
+     * 2026-09-26): HR full, Finance money+read, GM read-only. Was
+     * completely ungated — any portal user could open expat passport/
+     * visa/work-permit data and run visa payments/deposits/wallet transfers.
+     */
+    public static function canAccessVisa($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        if ((int) $employee->rank === 3) return true; // HR
+        if ((int) $employee->rank === 8) return true; // GM (read-only, enforced by canWriteVisa)
+        if (in_array((int) $employee->rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null)) {
+            return true; // HR HOD/EXCOM
+        }
+
+        return self::isFinanceDepartment($employee->Dept_id ?? null); // Finance
+    }
+
+    /**
+     * Visa write gate — HR or Finance only. GM has canAccessVisa() (read)
+     * but never this, per the decided "GM read-only" split.
+     */
+    public static function canWriteVisa($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        if ((int) $employee->rank === 3) return true; // HR
+        if (in_array((int) $employee->rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null)) {
+            return true; // HR HOD/EXCOM
+        }
+
+        return self::isFinanceDepartment($employee->Dept_id ?? null); // Finance
+    }
+
+    /**
+     * Manning & Budgeting access tiers (security audit W-03, product
+     * decision 2026-09-26):
+     *   - 'full'           HR / Finance / master admin — view all
+     *                       departments, edit, configure costs, export.
+     *   - 'approve'        GM — read-only consolidated view + approval
+     *                       (see W-02's approveBudget/approveAllDepartmentBudgets).
+     *   - 'own_department' HOD/EXCOM of any other department — their own
+     *                       department's manning request/budget only.
+     *   - 'none'           everyone else, including L&D managers.
+     *
+     * Deliberately not hasFullDataAccess()/getScopedDepartmentIds(): those
+     * admit L&D managers into "full", which this decision excludes, and
+     * give every ordinary employee their whole department rather than
+     * "none". GM detection uses 'rank' (config('settings.eligibilty')'s
+     * 8 => 'GM' label) — 'position' only matches when the department is
+     * literally named "General Manager"/"GM", which real GM records aren't.
+     */
+    public static function budgetAccessLevel($employee = null): string
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return 'none';
+
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return 'full';
+            }
+
+            $employee = $user->GetEmployee ?? null;
+        }
+
+        if (!$employee) return 'none';
+
+        if (self::canAccessPayroll($employee)) {
+            return 'full';
+        }
+
+        $rankPosition = self::getEmployeeRankPosition($employee);
+
+        if (($rankPosition['rank'] ?? null) === 'GM') {
+            return 'approve';
+        }
+
+        if (in_array($rankPosition['rank'] ?? null, ['HOD', 'EXCOM'], true)) {
+            return 'own_department';
+        }
+
+        return 'none';
+    }
+
+    /**
+     * A-01/A-02 (Time & Attendance audit): who may approve/edit another
+     * employee's attendance record (check-in/out, overtime approval).
+     * HR/GM/master admin (hasFullDataAccess) may act on anyone. Otherwise
+     * the caller must be a HOD/EXCOM of the TARGET employee's own
+     * department — and never the target themselves, even if they hold
+     * that rank in that department ("decided: never allowed", same rule
+     * already applied for PE-07/L-06 self-approval).
+     */
+    public static function canManageAttendanceFor($targetEmployeeId, $callerEmployee = null): bool
+    {
+        if ($callerEmployee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+
+            $callerEmployee = $user->GetEmployee ?? null;
+        }
+
+        if (!$callerEmployee) return false;
+
+        // Never self, regardless of rank.
+        if ((int) $targetEmployeeId === (int) $callerEmployee->id) return false;
+
+        if (self::hasFullDataAccess($callerEmployee)) return true;
+
+        $rankPosition = self::getEmployeeRankPosition($callerEmployee);
+        if (!in_array($rankPosition['rank'] ?? null, ['HOD', 'EXCOM'], true)) return false;
+
+        $targetDeptId = \App\Models\Employee::where('id', $targetEmployeeId)->value('Dept_id');
+        return $targetDeptId !== null && (int) $targetDeptId === (int) ($callerEmployee->Dept_id ?? 0);
     }
 
     /**

@@ -14,18 +14,25 @@ class BudgetCostController extends Controller
     }
     public function getBudgetCosts(Request $request)
     {
-        
-        if (!Auth::guard('api')->check()) {
+        $user = Auth::guard('api')->user();
+        if (!$user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        // Validate the input
-        $request->validate([
-            'resort_id' => 'required|integer|exists:resorts,id',
-        ]);
-
         try {
-            $resortId = $request->query('resort_id');
+            // W-01: resort_id used to come straight from the query string
+            // with only an exists:resorts,id check — any authenticated
+            // mobile employee of any resort could read another resort's
+            // whole cost structure (amounts, allowances, benefits) by
+            // changing the id. Always use the caller's own resort instead;
+            // a mismatched resort_id in the request is refused outright
+            // rather than silently ignored, so the app finds out instead
+            // of quietly seeing someone else's data.
+            if ($request->filled('resort_id') && (int) $request->query('resort_id') !== (int) $user->resort_id) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+            }
+
+            $resortId = $user->resort_id;
 
             // Fetch the budget costs for the specified resort
             $budgetCosts = ResortBudgetCost::where('resort_id', $resortId)->get();

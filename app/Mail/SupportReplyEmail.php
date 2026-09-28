@@ -21,14 +21,16 @@ class SupportReplyEmail extends Mailable
     public $resort;
     public $replyMessage;
     public $replyBy;
+    public $messageId;
 
-    public function __construct(Support $ticket, Resort $resort, $replyMessage, $replyBy)
+    public function __construct(Support $ticket, Resort $resort, $replyMessage, $replyBy, $messageId = null)
     {
-       
+
         $this->ticket = $ticket;
         $this->resort = $resort;
         $this->replyMessage = $replyMessage;
         $this->replyBy = $replyBy; // Can be Admin or Employee who replied
+        $this->messageId = $messageId;
         //  dd($this->ticket->id);
     }
 
@@ -42,11 +44,18 @@ class SupportReplyEmail extends Mailable
         $cleanMessage = strip_tags($this->replyMessage);
         // dd($this->replyMessage,$this->ticket->id);
 
-        $support_message = SupportMessages::where('ticket_id', $this->ticket->id)
-                            ->where('message', $this->replyMessage)
-                            ->first();
+        // Looked up by id, not by matching the message text — a text match
+        // silently broke (and null-derefed $support_message->sender below)
+        // whenever the stored message differed from what's passed in here
+        // (e.g. once the resort side started passing the already-stripped
+        // message instead of the raw request body).
+        $support_message = $this->messageId
+            ? SupportMessages::find($this->messageId)
+            : SupportMessages::where('ticket_id', $this->ticket->id)
+                ->where('message', $this->replyMessage)
+                ->first();
         // dd($support_message);
-        if($support_message->sender == "admin"){
+        if(optional($support_message)->sender == "admin"){
             $employeeName = $support->createdBy->first_name . " " . $support->createdBy->last_name;
             $replyByName = $this->replyBy;
         }
@@ -70,9 +79,13 @@ class SupportReplyEmail extends Mailable
         $data['body'] = isset($emailTemplate) && $emailTemplate->body != '' ? 
                         $emailTemplate->body : $defaultBody;
 
-        // Replace placeholders with actual values
+        // Replace placeholders with actual values. Reply message is escaped
+        // here — it's printed raw ({!! !!}) by emails.commonEmail below, and
+        // is either an admin's e()-escaped text or an employee's stripped
+        // (but entity-encoded) text; without re-escaping, an entity-encoded
+        // payload decodes right back into live HTML in the recipient's inbox.
         $placeholders = ["[Subject]","[Employee Name]", "[Reply Message]", "[Reply By]"];
-        $values = [ $this->ticket->subject,$employeeName, $this->replyMessage, $replyByName];
+        $values = [ $this->ticket->subject,$employeeName, nl2br(e($this->replyMessage)), $replyByName];
 
         $subject = str_replace($placeholders, $values, $subjectLine);
         $data['mainbody'] = str_replace($placeholders, $values, $data['body']);

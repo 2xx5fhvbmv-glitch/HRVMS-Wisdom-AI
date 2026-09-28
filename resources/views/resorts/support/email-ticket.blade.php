@@ -48,7 +48,7 @@
                                     <div class="msg">
                                         <div class="time">{{ \Carbon\Carbon::flexible($message->created_at)->format('d-M-Y h:i A') }}</div>
                                         <div class="content">
-                                            <p>{!! html_entity_decode($message->message) !!}</p>
+                                            <p>{!! nl2br(e(html_entity_decode($message->message, ENT_QUOTES | ENT_HTML5))) !!}</p>
                                             
                                             @if(!empty($message->attachments))
                                                 <ul>

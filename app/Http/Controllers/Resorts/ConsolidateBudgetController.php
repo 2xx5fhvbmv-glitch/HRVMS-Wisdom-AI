@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Resorts;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Exports\ConsolidateBudgetData;
+use App\Helpers\Common;
 use Maatwebsite\Excel\Facades\Excel;
 use Auth;
 
@@ -12,6 +13,11 @@ class ConsolidateBudgetController extends Controller
 {
     public function ExportBudget()
     {
+        // W-03: whole-resort consolidated budget export — HR/Finance only.
+        if (Common::budgetAccessLevel() !== 'full') {
+            abort(403, 'Unauthorized access');
+        }
+
         try {
             $resortId = Auth::guard('resort-admin')->user()->resort_id;
 

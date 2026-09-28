@@ -68,7 +68,10 @@ class Logincontroller extends Controller
                 ],200);
             }
 
-            if ($employee->status == "Inactive") {
+            // Allow-list, not a block-list (S4-02): Terminated/Resigned/
+            // Suspended must also be blocked, and any future status is
+            // blocked by default until added to Employee::LOGIN_ALLOWED_STATUSES.
+            if (!in_array($employee->status, Employee::LOGIN_ALLOWED_STATUSES, true)) {
                 return response()->json([
                     'success'                       =>  false,
                     'message'                       =>  'Account is deactivated'
@@ -87,7 +90,21 @@ class Logincontroller extends Controller
                 ],200);
             }
 
-            if ($resortAdmin->status == "Inactive") {
+            // Case-sensitive `== "Inactive"` never matched — the super-admin
+            // form saves resort_admins.status as lowercase 'active'/'inactive'
+            // (S4-02). Compare case-insensitively and allow only 'active'.
+            if (strtolower($resortAdmin->status) !== 'active') {
+                return response()->json([
+                    'success'                       =>  false,
+                    'message'                       =>  'Account is deactivated'
+                ],200);
+            }
+
+            // Mobile login had no resort-status check at all (S4-02) — a
+            // client resort switched off (contract ended) could still use
+            // the app. Mirror the web login's check.
+            $resort = \App\Models\Resort::find($employee->resort_id);
+            if (!$resort || strtolower($resort->status) !== 'active') {
                 return response()->json([
                     'success'                       =>  false,
                     'message'                       =>  'Account is deactivated'

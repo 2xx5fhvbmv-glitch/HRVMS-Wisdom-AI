@@ -2024,7 +2024,7 @@ class AccommodationController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'emp_id'                                            =>    'required',
+            'emp_id'                                            =>    ['required', \Illuminate\Validation\Rule::in($this->underEmp_id)],
             'housekeeping_id'                                   =>    'required',
         ]);
 
@@ -2035,6 +2035,15 @@ class AccommodationController extends Controller
         try {
 
             DB::beginTransaction();
+            // Scoped to this resort — was an unscoped id lookup, letting a
+            // HOD of resort A write into a housekeeping schedule that
+            // belongs to resort B (X-02b). emp_id is scoped above to
+            // $this->underEmp_id (this HOD's own subordinates).
+            $housekeepingScheduleExists                     =   HousekeepingSchedules::where('resort_id', $this->resort_id)->where('id', $request->housekeeping_id)->exists();
+            if (!$housekeepingScheduleExists) {
+                return response()->json(['success' => false, 'message' => 'Housekeeping schedule not found.'], 404);
+            }
+
             $assignToHODExists                              =   ChildHouseKeepingSchedules::where("housekeeping_id", $request->housekeeping_id)->where('ApprovedBy', $request->emp_id)->exists();
 
             if ($assignToHODExists) {
@@ -2044,7 +2053,7 @@ class AccommodationController extends Controller
                 ], 200);
             }
 
-            $housekeepingSchedules                      =   HousekeepingSchedules::where("id", $request->housekeeping_id)->update(['Assigned_To' =>  $request->emp_id, 'Status' => 'Assigned']);
+            $housekeepingSchedules                      =   HousekeepingSchedules::where('resort_id', $this->resort_id)->where("id", $request->housekeeping_id)->update(['Assigned_To' =>  $request->emp_id, 'Status' => 'Assigned']);
             $assignToHOD                                =   ChildHouseKeepingSchedules::where("housekeeping_id", $request->housekeeping_id)->where('Status', '=', 'Pending')->update(['ApprovedBy' => $this->user->GetEmployee->id, 'Status' => 'Assigned']);
 
             if (!$assignToHOD) {

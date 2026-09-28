@@ -361,17 +361,14 @@
         })();
 
         // === Real-time incoming messages via Laravel Echo / Pusher ===
-        // Server fires NewChatMessage on the public 'chat.{receiver_id}'
-        // channel. The admin subscribes on its own admin id; messages from the
-        // resort employee will surface here without page reload. Guarded so it
+        // Server fires NewChatMessage on the private 'support-ticket.{supportId}'
+        // channel, authorized per-ticket in routes/channels.php. Guarded so it
         // silently no-ops when Echo isn't bundled (BROADCAST_DRIVER=log).
-        if (typeof window.Echo !== 'undefined' && userId) {
-            window.Echo.channel('chat.' + userId)
+        if (typeof window.Echo !== 'undefined' && supportId) {
+            window.Echo.private('support-ticket.' + supportId)
                 .listen('NewChatMessage', function (e) {
                     console.log('[chat] incoming', { senderId: e.senderId, receiverId: e.receiverId, message: e.message });
-                    // Channel `chat.{userId}` is scoped to this admin, so
-                    // any event here is meant for us. Just skip our own
-                    // echoes — don't filter by senderId/receiverId match.
+                    // Channel is scoped to this ticket; skip our own echoes.
                     if (String(e.senderId) === String(userId)) return;
                     appendMessage({
                         senderName:  e.senderName,
@@ -385,6 +382,8 @@
                 });
         }
 
+        function escHtml(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
+
         // Render a chat bubble in the new resort-style markup. Both incoming
         // and outgoing messages use this — `isSender=true` flips the bubble
         // to the right-hand side via the `.right` class.
@@ -396,11 +395,14 @@
             // own created_at and prepends a date when it's older than today.
             const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
             const senderImage = data.senderImage || null;
-            const senderInitials = senderName.split(" ").map(n => n.charAt(0)).join("").toUpperCase();
+            const senderInitials = escHtml(senderName.split(" ").map(n => n.charAt(0)).join("").toUpperCase());
             const safeMessage = $('<div>').text(data.message || '').html();
 
-            const imageHtml = senderImage
-                ? `<img src="${senderImage}" alt="user"/>`
+            // Build with jQuery instead of interpolating into an attribute —
+            // an onerror= payload in senderImage would otherwise execute.
+            // Only https:/relative URLs are allowed as an image src.
+            const imageHtml = (senderImage && /^(https:\/\/|\/)/i.test(senderImage))
+                ? $('<img>').attr({ src: senderImage, alt: 'user' })[0].outerHTML
                 : `<div class="profile-initials">${senderInitials}</div>`;
 
             // Attachments — server returns { Filename, Child_id }; render as
@@ -411,9 +413,10 @@
                 data.attachments.forEach(file => {
                     if (!file) return;
                     if (typeof file === "string") {
+                        if (!/^https:\/\//i.test(file)) return;
                         attachmentsHtml += `
-                            <a href="${file}" target="_blank" class="attachment-link">
-                                <i class="fa fa-file"></i> ${file.split('/').pop()}
+                            <a href="${escHtml(file)}" target="_blank" class="attachment-link">
+                                <i class="fa fa-file"></i> ${escHtml(file.split('/').pop())}
                             </a>`;
                         return;
                     }
@@ -422,8 +425,8 @@
                     if (!childId) return;
                     const encodedId = btoa(String(childId));
                     attachmentsHtml += `
-                        <a href="javascript:void(0)" class="download-link" data-id="${encodedId}">
-                            <i class="fa fa-file"></i> ${filename}
+                        <a href="javascript:void(0)" class="download-link" data-id="${escHtml(encodedId)}">
+                            <i class="fa fa-file"></i> ${escHtml(filename)}
                         </a>`;
                 });
                 attachmentsHtml += `</div>`;

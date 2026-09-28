@@ -412,7 +412,12 @@ class ManningController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'division_id' => 'required',
+            // W-05: was 'required' only — proved a division_id was sent,
+            // never that it belongs to this resort.
+            'division_id' => [
+                'required',
+                Rule::exists('resort_divisions', 'id')->where('resort_id', $this->resort_id),
+            ],
             'name' => [
                 'required',
                 'string',
@@ -494,6 +499,12 @@ class ManningController extends Controller
         }
 
             $validator = Validator::make($request->all(), [
+            // W-05: 'division' becomes this department's new parent — was
+            // accepted with no check at all that it belongs to this resort.
+            'division' => [
+                'required',
+                Rule::exists('resort_divisions', 'id')->where('resort_id', $this->resort_id),
+            ],
             'name' => [
                 'required',
                 'string',
@@ -554,7 +565,8 @@ class ManningController extends Controller
             }
 
             // Get the updated division name
-            $divisionName = ResortDivision::find($request->input('division'))->name;
+            // W-05: resort-scoped — input is validated above, but scope defensively too.
+            $divisionName = ResortDivision::where('resort_id', $this->resort_id)->find($request->input('division'))->name;
 
             // Return success response with division name
             return response()->json([
@@ -690,7 +702,11 @@ class ManningController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'dept_id' => 'required',
+            // W-05: was 'required' only — see store_departments() above.
+            'dept_id' => [
+                'required',
+                Rule::exists('resort_departments', 'id')->where('resort_id', $this->resort_id),
+            ],
             'name' => [
                 'required',
                 'string',
@@ -786,6 +802,17 @@ class ManningController extends Controller
                 }
 
                 $validator = Validator::make($request->all(), [
+                    // W-05: 'department' becomes this section's new parent,
+                    // 'division' is only echoed back in the response below —
+                    // neither was ever checked against this resort.
+                    'department' => [
+                        'required',
+                        Rule::exists('resort_departments', 'id')->where('resort_id', $this->resort_id),
+                    ],
+                    'division' => [
+                        'nullable',
+                        Rule::exists('resort_divisions', 'id')->where('resort_id', $this->resort_id),
+                    ],
                     'name' => [
                         'required',
                         'string',
@@ -842,8 +869,10 @@ class ManningController extends Controller
                 }
 
                 // Get the updated division name
-                $divisionName = ResortDivision::find($request->input('division'))->name;
-                $deptName = ResortDepartment::find($request->input('department'))->name;
+                // W-05: resort-scoped — input is validated above, but scope defensively too.
+            $divisionName = ResortDivision::where('resort_id', $this->resort_id)->find($request->input('division'))->name;
+                // W-05: resort-scoped — see the divisionName lookup above.
+                $deptName = ResortDepartment::where('resort_id', $this->resort_id)->find($request->input('department'))->name;
                 return response()->json([
                     'success' => true,
                     'message' => 'Section updated successfully.',
@@ -979,7 +1008,15 @@ class ManningController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'dept_id' => 'required',
+            // W-05: was 'required' only — see store_departments() above.
+            'dept_id' => [
+                'required',
+                Rule::exists('resort_departments', 'id')->where('resort_id', $this->resort_id),
+            ],
+            'section_id' => [
+                'nullable',
+                Rule::exists('resort_sections', 'id')->where('resort_id', $this->resort_id),
+            ],
             'position_title' => [
                 'required',
                 'string',
@@ -1085,6 +1122,21 @@ class ManningController extends Controller
             }
 
             $validator = Validator::make($request->all(), [
+                // W-05: 'department'/'section' become this position's new
+                // parent, 'division' is only echoed back below — none of
+                // the three was ever checked against this resort.
+                'department' => [
+                    'required',
+                    Rule::exists('resort_departments', 'id')->where('resort_id', $this->resort_id),
+                ],
+                'section' => [
+                    'nullable',
+                    Rule::exists('resort_sections', 'id')->where('resort_id', $this->resort_id),
+                ],
+                'division' => [
+                    'nullable',
+                    Rule::exists('resort_divisions', 'id')->where('resort_id', $this->resort_id),
+                ],
                 'position_title' => [
                     'required',
                     'string',
@@ -1145,9 +1197,12 @@ class ManningController extends Controller
                 }
 
                 // Get the updated division name
-                $divisionName = ResortDivision::find($request->input('division'))->name;
-                $deptName = ResortDepartment::find($request->input('department'))->name;
-                $sectionName = $request->input('section') ? ResortSection::find($request->input('section'))->name : '';
+                // W-05: resort-scoped — input is validated above, but scope defensively too.
+            $divisionName = ResortDivision::where('resort_id', $this->resort_id)->find($request->input('division'))->name;
+                // W-05: resort-scoped — see the divisionName lookup above.
+                $deptName = ResortDepartment::where('resort_id', $this->resort_id)->find($request->input('department'))->name;
+                // W-05: resort-scoped — see the divisionName lookup above.
+                $sectionName = $request->input('section') ? ResortSection::where('resort_id', $this->resort_id)->find($request->input('section'))->name : '';
                 $Rank = config('settings.Position_Rank');
 
                 // Return success response with division name

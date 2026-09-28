@@ -177,7 +177,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            PerformanceReviewType::where('id',$id)->update([
+            PerformanceReviewType::where('id',$id)->where('resort_id', $this->resort->resort_id)->update([
                 'category_title'=>$request->category_title,
                 'category_weightage'=>$request->category_weightage
             ]);

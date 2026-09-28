@@ -94,10 +94,10 @@ class SupportController extends Controller
                 $image = Common::getResortUserPicture($support->createdBy);
                 $name = optional($support->createdBy)->first_name ?
                     ucwords($support->createdBy->first_name . ' ' . $support->createdBy->last_name) : 'N/A';
-    
+
                 return '<div class="tableUser-block">
-                            <div class="img-circle"><img src="' . $image . '" alt="user"></div>
-                            <span class="userApplicants-btn">' . $name . '</span>
+                            <div class="img-circle"><img src="' . e($image) . '" alt="user"></div>
+                            <span class="userApplicants-btn">' . e($name) . '</span>
                         </div>';
             })
             ->addColumn('position', function ($support) {

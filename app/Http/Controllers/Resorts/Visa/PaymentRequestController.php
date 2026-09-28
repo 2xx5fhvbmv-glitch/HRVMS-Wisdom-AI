@@ -612,13 +612,32 @@ class PaymentRequestController extends Controller
             return response()->json($validator->errors(), 400);
         }
 
-        if (empty($employee_ids)) 
+        if (empty($employee_ids))
         {
             return response()->json(['error' => 'No employees selected'], 400);
         }
         else
         {
-
+                // PaymentRequestChild.Employee_id was never checked against
+                // this resort — a payment request could be created against
+                // another resort's employee (V-03). Decode every id up front
+                // and reject the whole submission if any doesn't belong here.
+                $decodedEmpIds = [];
+                foreach ($employee_ids as $data) {
+                    $decoded = json_decode($data, true);
+                    foreach ((array) $decoded as $key => $value) {
+                        $decodedEmpIds[] = (int) base64_decode($key);
+                    }
+                }
+                $decodedEmpIds = array_unique(array_filter($decodedEmpIds));
+                if (!empty($decodedEmpIds)) {
+                    $validEmpCount = Employee::where('resort_id', $this->resort->resort_id)
+                        ->whereIn('id', $decodedEmpIds)
+                        ->count();
+                    if ($validEmpCount !== count($decodedEmpIds)) {
+                        return response()->json(['success' => false, 'message' => 'One or more employees do not belong to this resort.'], 403);
+                    }
+                }
 
                 $parts = explode(' ', $this->resort->resort->resort_name);
                 $initials = '';

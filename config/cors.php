@@ -15,11 +15,17 @@ return [
     |
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    // Mobile app doesn't need CORS (Passport bearer tokens, not a browser
+    // caller). Only add explicit https origins here, never '*', never with
+    // supports_credentials=true (S5-01) — this was previously live with a
+    // wildcard origin on api/* and the unused sanctum/csrf-cookie path
+    // (Sanctum's frontend-stateful middleware is commented out in Kernel.php,
+    // so nothing legitimately depends on it).
+    'paths' => [],
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    'allowed_origins' => [],
 
     'allowed_origins_patterns' => [],
 

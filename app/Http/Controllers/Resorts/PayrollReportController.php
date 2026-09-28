@@ -32,6 +32,9 @@ class PayrollReportController extends Controller
 
     public function __construct()
     {
+        // P-01: payroll reports are HR/Finance only.
+        $this->middleware('payroll.access');
+
         $this->resort = auth()->guard('resort-admin')->user();
     }
 
@@ -83,7 +86,12 @@ class PayrollReportController extends Controller
 
         $page_title = 'Payroll Reports';
         $resortId   = $this->resort->resort_id;
-        $scoped     = Common::getScopedDepartmentIds();
+        // P-01: this controller is HR/Finance only now (payroll.access
+        // middleware); getScopedDepartmentIds() would incorrectly narrow
+        // Finance (not in hasFullDataAccess()'s set) to its own department,
+        // but the 2026-09-26 decision gives Finance full, all-department
+        // payroll-report access same as HR.
+        $scoped     = null;
 
         $reports = collect($this->registry())->map(function ($r, $key) {
             $filters = $r['filters'];
@@ -359,7 +367,8 @@ class PayrollReportController extends Controller
     /** Base per-employee payslip query for a payroll run, dept-scoped. */
     private function basePayslip($payrollId, array $filters)
     {
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: full access — see the note in index() above.
+        $scoped = null;
         return DB::table('payroll_reviews as pr')
             ->join('payroll as pay', 'pay.id', '=', 'pr.payroll_id')
             ->join('employees as e', 'e.id', '=', 'pr.employee_id')
@@ -635,7 +644,8 @@ class PayrollReportController extends Controller
     public function allowanceReport(array $filters): array
     {
         $pid = $this->resolvePayrollId($filters);
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: full access — see the note in index() above.
+        $scoped = null;
         $records = DB::table('payroll_review_allowances as a')
             ->join('payroll_reviews as pr', 'pr.id', '=', 'a.payroll_review_id')
             ->join('payroll as pay', 'pay.id', '=', 'pr.payroll_id')
@@ -753,7 +763,8 @@ class PayrollReportController extends Controller
     public function averageServiceCharge(array $filters): array
     {
         $year = $filters['year'] ?: Carbon::now()->year;
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: full access — see the note in index() above.
+        $scoped = null;
         $rows = DB::table('payroll_reviews as pr')
             ->join('payroll as pay', 'pay.id', '=', 'pr.payroll_id')
             ->join('employees as e', 'e.id', '=', 'pr.employee_id')
@@ -838,7 +849,8 @@ class PayrollReportController extends Controller
     public function annualTaxSummary(array $filters): array
     {
         $year = $filters['year'] ?: Carbon::now()->year;
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: full access — see the note in index() above.
+        $scoped = null;
         $rows = DB::table('payroll_deductions as pd')
             ->join('payroll as pay', 'pay.id', '=', 'pd.payroll_id')
             ->join('payroll_reviews as pr', function ($j) {
@@ -915,7 +927,8 @@ class PayrollReportController extends Controller
 
     private function settlementQuery(array $filters)
     {
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: full access — see the note in index() above.
+        $scoped = null;
         return DB::table('final_settlements as fs')
             ->join('employees as e', 'e.id', '=', 'fs.employee_id')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
@@ -953,7 +966,8 @@ class PayrollReportController extends Controller
     {
         $pid = $this->resolvePayrollId($filters);
         $runs = $this->payrollRuns($pid);
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: full access — see the note in index() above.
+        $scoped = null;
 
         $q = DB::table('payments as pmt')
             ->join('employees as e', 'e.id', '=', 'pmt.emp_id')
@@ -988,7 +1002,8 @@ class PayrollReportController extends Controller
     /** #30 Salary Advance Report. */
     public function salaryAdvance(array $filters): array
     {
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: full access — see the note in index() above.
+        $scoped = null;
         $rows = DB::table('payroll_advance as a')
             ->join('employees as e', 'e.id', '=', 'a.employee_id')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
@@ -1164,7 +1179,8 @@ class PayrollReportController extends Controller
              SUM(pr.regularOTPay + pr.holidayOTPay) ot, SUM(pr.service_charge) sc, SUM(pr.total_deductions) ded'
         )->first();
 
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: full access — see the note in index() above.
+        $scoped = null;
         $d = DB::table('payroll_deductions as pd')
             ->join('payroll as pay', 'pay.id', '=', 'pd.payroll_id')
             ->join('employees as e', 'e.id', '=', 'pd.employee_id')
@@ -1353,7 +1369,8 @@ class PayrollReportController extends Controller
     public function annualPension(array $filters): array
     {
         $year   = $filters['year'] ?: Carbon::now()->year;
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: full access — see the note in index() above.
+        $scoped = null;
         $rows = DB::table('payroll_deductions as pd')
             ->join('payroll as pay', 'pay.id', '=', 'pd.payroll_id')
             ->join('employees as e', 'e.id', '=', 'pd.employee_id')
@@ -1385,7 +1402,8 @@ class PayrollReportController extends Controller
     {
         $pid = $this->resolvePayrollId($filters);
         $runs = $this->payrollRuns($pid);
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: full access — see the note in index() above.
+        $scoped = null;
 
         $q = DB::table('payments as pmt')
             ->join('employees as e', 'e.id', '=', 'pmt.emp_id')

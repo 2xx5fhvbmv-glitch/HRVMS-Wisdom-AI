@@ -1733,12 +1733,28 @@ class TimeAndAttendanceController extends Controller
 
         $user                                               =   Auth::guard('api')->user();
         $employee                                           =   $user->GetEmployee;
-        $emp_id                                             =   $employee->id;
         $attendaceId                                        =   $request->attendace_id;
         $breakOutTime                                       =   $request->break_out_time;
         $breakInTime                                        =   $request->break_in_time;
         $flag                                               =   $request->flag;
         $break_id                                           =   $request->break_id;
+
+        // A-03: attendace_id was never checked against the caller at all —
+        // any authenticated employee could add/close a break on ANY other
+        // employee's attendance record (any resort) by guessing the id.
+        // Same self-or-permitted-target resolution manualCheckIn/
+        // manualCheckOut already use.
+        [$targetEmployee, $permissionError]                 =   $this->resolveTargetEmployeeForManualAction($request, $user, $employee);
+        if ($permissionError) {
+            return $permissionError;
+        }
+        $parentAttendanceForBreak = ParentAttendace::where('id', $attendaceId)
+            ->where('resort_id', $user->resort_id)
+            ->where('Emp_id', $targetEmployee->id)
+            ->first();
+        if (!$parentAttendanceForBreak) {
+            return response()->json(['success' => false, 'message' => 'Attendance record not found'], 404);
+        }
 
         try {
             DB::beginTransaction();
@@ -3710,6 +3726,15 @@ class TimeAndAttendanceController extends Controller
             DB::beginTransaction(); // Start transaction
 
             $parentAttendance                               =   ParentAttendace::where('resort_id', $resort_id)->whereNotNull('OverTime')->whereNotNull('CheckingTime')->whereNotNull('CheckingOutTime')->where('id', $attendaceId)->where('Status', 'present')->first();
+
+            // A-01: zero role check previously — any authenticated employee
+            // could approve/reject any other employee's overtime, including
+            // their own. HR/GM or the employee's own HOD/EXCOM only.
+            if ($parentAttendance && !Common::canManageAttendanceFor($parentAttendance->Emp_id, $employee)) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'You are not authorized to approve this overtime.'], 403);
+            }
+
             if ($parentAttendance) {
                 $shiftData                              =   ShiftSettings::where('resort_id', $resort_id)->where('id', $parentAttendance->Shift_id)->first();
 
@@ -4156,6 +4181,19 @@ class TimeAndAttendanceController extends Controller
 
             if (!$employee) {
                 return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
+            }
+
+            // Was readable by any logged-in employee for any colleague's id
+            // (X-02e) — attendance/overtime/leave includes sensitive leave
+            // types (e.g. sick leave). Allow only the employee themselves,
+            // HR/GM-level access, or their department's HOD/EXCOM.
+            $actorEmployee = $user->getEmployee;
+            $isSelf        = $actorEmployee && (int) $actorEmployee->id === (int) $employee_id;
+            $isHod         = $actorEmployee && (int) $employee->emp_id !== (int) $actorEmployee->id
+                                && Employee::where('id', $employee_id)->where('Dept_id', $actorEmployee->Dept_id)->exists()
+                                && in_array((int) $actorEmployee->rank, [1, 2], true);
+            if (!$isSelf && !$isHod && !Common::hasFullDataAccess($actorEmployee)) {
+                return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
             }
 
             // Was always the 1st-to-last-day calendar month, ignoring the

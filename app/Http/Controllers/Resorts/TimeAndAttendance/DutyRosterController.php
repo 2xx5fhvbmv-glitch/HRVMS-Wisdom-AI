@@ -1556,17 +1556,21 @@ class DutyRosterController extends Controller
             return response()->json(['success' => false, 'message' => 'Please provide at least one overtime entry.']);
         }
 
-        // Department validation: everyone can only approve OT for their own department.
-        // Dept_id is not resort-namespaced, so this alone doesn't prove
-        // Emp_id belongs to this resort (see audit "LIKELY" finding) — verify
-        // the employee is actually in this resort before trusting Dept_id.
-        $loggedInDeptId = $this->resort->GetEmployee->Dept_id ?? '';
+        // Employee must exist in this resort — Dept_id is not
+        // resort-namespaced, so the role check below doesn't by itself
+        // prove Emp_id belongs to this resort.
         $targetEmployee = Employee::where('id', $Emp_id)->where('resort_id', $resort_id)->first();
         if (!$targetEmployee) {
             return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
         }
-        if ($loggedInDeptId != $targetEmployee->Dept_id) {
-            return response()->json(['success' => false, 'message' => 'You can only manage overtime for employees in your own department.']);
+
+        // A-01: the previous "same department" check let ANY employee in
+        // the department approve OT, including their own (same department
+        // as themselves is always true) — not just that department's
+        // HOD/EXCOM. HR/GM or the employee's own HOD/EXCOM only, never the
+        // employee themselves.
+        if (!Common::canManageAttendanceFor($Emp_id, $this->resort->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage overtime for this employee.'], 403);
         }
 
         $dateCarbon = Carbon::parse($date);

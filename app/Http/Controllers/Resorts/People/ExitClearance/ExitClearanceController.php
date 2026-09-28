@@ -1183,6 +1183,12 @@ class ExitClearanceController extends Controller
             $employee = Employee::find($employeeResignation->employee_id);
             if ($employee && $employee->status === 'Offboarding') {
                 $employee->update(['status' => 'Terminated']);
+                // Cut off mobile/web API access immediately (S4-01).
+                try {
+                    Common::revokeAllApiTokens($employee->resortAdmin);
+                } catch (\Exception $e) {
+                    \Log::warning('revokeAllApiTokens failed on exit clearance: ' . $e->getMessage());
+                }
             }
 
             // Auto-generate the Experience Certificate so HR doesn't

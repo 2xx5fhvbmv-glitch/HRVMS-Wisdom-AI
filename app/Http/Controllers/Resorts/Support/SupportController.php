@@ -13,6 +13,7 @@ use App\Models\SupportMessages;
 use App\Models\Resort;
 use App\Models\Settings;
 use App\Helpers\Common;
+use App\Helpers\StorageHelper;
 use Config;
 use Auth;
 use DB;
@@ -232,14 +233,14 @@ class SupportController extends Controller
             'attachments.*' => [
                 'nullable',
                 'file',
-                'mimes:jpg,jpeg,png,gif,svg,webp,heic,heif,pdf',
+                'mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf',
                 'max:51200', // 50MB max size
             ],
         ], [
             'category.required' => 'Please  Select Category.',
             'subject.required' => 'Please Enter subject.',
             'description.max' => 'The description  must not exceed 255 characters.',
-            'attachments.in' => 'Please select file as jpg,jpeg,png,gif,svg,webp,heic,heif,pdf".',
+            'attachments.in' => 'Please select file as jpg,jpeg,png,gif,webp,heic,heif,pdf".',
         ]);
 
         
@@ -391,13 +392,14 @@ class SupportController extends Controller
     {
         $request->validate([
             'ticket_id'      => ['required', Rule::exists('support', 'id')->where('resort_id', $this->resort->resort_id)],
-            'to_email'       => 'required|email',
             'subject'        => 'required|string|max:255',
             'message'        => 'required|string',
             // Loosened from `mimes:pdf,xlsx|max:2048` — users routinely
             // attach screenshots / docs / spreadsheets / videos when
             // explaining a problem, so allow common file types up to 25 MB.
-            'attachments.*'  => 'nullable|file|max:25600',
+            // Type-restricted (no .php/.html/.svg/etc) to close an upload ->
+            // web-root code-execution / stored-XSS path (S3-02).
+            'attachments.*'  => 'nullable|file|max:25600|mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf,doc,docx,xls,xlsx,csv,txt,mp4,mov',
         ]);
 
         $ticket = Support::where('id', $request->ticket_id)->where('resort_id', $this->resort->resort_id)->firstOrFail();
@@ -406,9 +408,13 @@ class SupportController extends Controller
         $uploadedFiles = [];
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
-                $fileName = time() . '_' . $file->getClientOriginalName();
-                $filePath = $file->storeAs('support_attachments', $fileName, 'public');
-                $uploadedFiles[] = $filePath;
+                // Random per-file path (not the guessable time()+original-name
+                // scheme) through StorageHelper, not a raw storeAs('public').
+                $basePath = 'support_attachments/' . $ticket->id . '/' . Str::uuid();
+                $result = StorageHelper::uploadFile($basePath, $file);
+                if ($result['status']) {
+                    $uploadedFiles[] = $result['path'];
+                }
             }
         }
 
@@ -427,8 +433,15 @@ class SupportController extends Controller
         ]);
 
         $replyBy = Auth::guard('resort-admin')->user()->first_name . ' ' . Auth::guard('resort-admin')->user()->last_name;
+        // Send to the configured support address / assigned admin, never to
+        // an address the requester typed in — otherwise any portal user
+        // could turn this into an open mail relay (S3-06).
+        $settings = Settings::first();
+        $toEmail = optional($ticket->assignedAdmin)->email ?: optional($settings)->support_email;
         try {
-            Mail::to($request->to_email)->send(new SupportReplyEmail($ticket, $resort, $request->message, $replyBy));
+            if ($toEmail) {
+                Mail::to($toEmail)->send(new SupportReplyEmail($ticket, $resort, $message->message, $replyBy, $message->id));
+            }
         } catch (\Exception $mailErr) {
             \Log::warning('Support reply email failed: ' . $mailErr->getMessage());
             // Don't fail the request — the message is already stored in DB.

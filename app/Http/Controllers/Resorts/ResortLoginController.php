@@ -87,8 +87,10 @@ class ResortLoginController extends Controller
                     }
                 }
             }
-            // 3. Employee account is inactive
-            if ($resort_admin->GetEmployee && $resort_admin->GetEmployee->status === 'Inactive') {
+            // 3. Employee account is not in an allowed status (allow-list,
+            // not a block-list — also blocks Terminated/Resigned/Suspended
+            // and any future status not explicitly allowed, S4-02).
+            if ($resort_admin->GetEmployee && !in_array($resort_admin->GetEmployee->status, \App\Models\Employee::LOGIN_ALLOWED_STATUSES, true)) {
                 return response()->json([
                     'success' => false,
                     'msg' => 'Your account is inactive. Please contact your administrator.'
@@ -603,6 +605,14 @@ class ResortLoginController extends Controller
         $user->password = Hash::make($request->password);
         $user->must_change_password = false;
         $user->save();
+
+        // Revoke every live mobile token — the old password shouldn't keep
+        // working on the phone after it's changed here (S4-03).
+        try {
+            Common::revokeAllApiTokens($user);
+        } catch (\Exception $e) {
+            \Log::warning('revokeAllApiTokens failed on self-service password change: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,

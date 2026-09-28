@@ -25,6 +25,9 @@ class ConfigController extends Controller
     public $resort;
     public function __construct()
     {
+        // P-01: pay configuration (earnings/deductions/imports/cutoff day) is HR/Finance only.
+        $this->middleware('payroll.access');
+
         $this->resort = Auth::guard('resort-admin')->user();
         if(!$this->resort) return;
     }
@@ -71,6 +74,10 @@ class ConfigController extends Controller
             \Storage::delete($filePath);
             return response()->json(['success' => false, 'message' => 'Failed to read the file. Please make sure it is a valid Excel file and not corrupted.'], 422);
         }
+        // P-04: a successful import was never cleaned up — only a failed
+        // one deleted the uploaded spreadsheet, so every good import left
+        // another copy on disk forever.
+        \Storage::delete($filePath);
         $this->notifyHrOfConfigChange('Service charges were bulk-imported from a file.');
         return response()->json(['success' => true, 'message' => 'Service Charges Imported successfully']);
     }
@@ -103,6 +110,8 @@ class ConfigController extends Controller
             \Storage::delete($filePath);
             return response()->json(['success' => false, 'message' => 'Failed to read the file. Please make sure it is a valid Excel file and not corrupted.'], 422);
         }
+        // P-04: delete on success too — see importServiceCharge() above.
+        \Storage::delete($filePath);
         $this->notifyHrOfConfigChange('Earnings were bulk-imported from a file.');
         return response()->json(['success' => true, 'message' => 'Earnings Imported successfully']);
     }
@@ -135,6 +144,8 @@ class ConfigController extends Controller
             \Storage::delete($filePath);
             return response()->json(['success' => false, 'message' => 'Failed to read the file. Please make sure it is a valid Excel file and not corrupted.'], 422);
         }
+        // P-04: delete on success too — see importServiceCharge() above.
+        \Storage::delete($filePath);
         $this->notifyHrOfConfigChange('Deduction rules were bulk-imported from a file.');
         return response()->json(['success' => true, 'message' => 'Deductions Imported successfully']);
     }

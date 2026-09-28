@@ -714,6 +714,18 @@ class EmployeeController extends Controller
                 abort(404, 'Employee not found.');
             }
 
+            // A-05: $Dept_id/$Rank above were fetched but never used to
+            // restrict which employee's detail page could be opened — any
+            // portal user could view any other department's employee by
+            // id. Same HR/EXCOM-see-all, everyone-else-own-department rule
+            // AttandanceRegisterController::ResigterRosterSearch already
+            // applies to the register list.
+            $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->GetEmployee ?? null);
+            if (!in_array($employeeRankPosition['position'] ?? null, ['HR', 'EXCOM'], true)
+                && (int) $employee->Dept_id !== (int) $Dept_id) {
+                abort(403, 'You do not have access to this employee.');
+            }
+
             $department  = ResortDepartment::where('id', $employee->Dept_id)->value('name');
 
             if ($employee)
@@ -1047,6 +1059,14 @@ class EmployeeController extends Controller
                 return response()->json(['success'=>false,'message' => 'Record not found.'], 404);
             }
 
+            // A-02: rewrites check-in/out/overtime for this attendance
+            // record — previously with zero role check. HR/GM or the
+            // employee's own HOD/EXCOM only, never the employee themselves.
+            if (!Common::canManageAttendanceFor($ParentAttendace->Emp_id, $this->resort->GetEmployee)) {
+                DB::rollback();
+                return response()->json(['success' => false, 'message' => 'You are not authorized to edit this attendance record.'], 403);
+            }
+
             // ChildAttendace has no resort_id column of its own — it's scoped
             // by belonging to the already resort-verified ParentAttendace row.
             $ChildAttendace = ChildAttendace::where('id', $child_id)
@@ -1104,6 +1124,12 @@ class EmployeeController extends Controller
             if (!$ParentAttendace) {
                 DB::rollback();
                 return response()->json(['success'=>false,'message' => 'Record not found.'], 404);
+            }
+
+            // A-01: same gate as AttandanceRegisterController::CheckoutTimeMissing.
+            if (!Common::canManageAttendanceFor($ParentAttendace->Emp_id, $this->resort->GetEmployee)) {
+                DB::rollback();
+                return response()->json(['success' => false, 'message' => 'You are not authorized to approve this overtime.'], 403);
             }
 
             if($action =="Rejected")

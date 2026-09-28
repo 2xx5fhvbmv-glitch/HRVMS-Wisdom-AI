@@ -176,6 +176,19 @@ class ManningResponseController extends Controller
             // (predating Casual/Intern manning) behaves exactly as before.
             $validated['employment_type'] = $validated['employment_type'] ?? 'Permanent';
 
+            // W-04: same department check saveDraft() uses above — a HOD
+            // could save a DRAFT only for their own department, but this
+            // final submit had no such check and would take any dept_id.
+            // HR/Finance (budgetAccessLevel 'full') bypass it and can
+            // submit for any department.
+            if (Common::budgetAccessLevel() !== 'full') {
+                $scopedDeptIds = Common::getScopedDepartmentIds();
+                if (is_array($scopedDeptIds) && !in_array((int) $validated['dept_id'], $scopedDeptIds, true)) {
+                    DB::rollBack();
+                    return response()->json(['success' => false, 'message' => 'You do not have access to this department.'], 403);
+                }
+            }
+
             // Casual/Intern submissions need HR to have configured at
             // least one active cost rate first — otherwise the budget
             // this submission drives (Common::computeBudgetCostMonthlyValue()
@@ -864,6 +877,19 @@ class ManningResponseController extends Controller
             return response()->json(['message' => 'Budget item not found.'], 404);
         }
 
+        // W-04: department check — HOD/EXCOM only their own department's
+        // budget lines. The department comes from the record itself
+        // (Parent_SMRP_id -> store_manning_response_parents.Department_id),
+        // not a client-sent value. HR/Finance (budgetAccessLevel 'full')
+        // bypass it and can edit any department.
+        if (Common::budgetAccessLevel() !== 'full') {
+            $scopedDeptIds = Common::getScopedDepartmentIds();
+            $parentDeptId = (int) StoreManningResponseParent::where('id', $budget->Parent_SMRP_id)->value('Department_id');
+            if (is_array($scopedDeptIds) && !in_array($parentDeptId, $scopedDeptIds, true)) {
+                return response()->json(['message' => 'You do not have access to this department.'], 403);
+            }
+        }
+
         $budget->Current_Basic_salary = $request->input('basic_salary');
         $budget->Proposed_Basic_salary = $request->input('proposed_basic_salary');
         $budget->Months = json_encode($request->input('month_data')); // Save months as JSON
@@ -889,6 +915,16 @@ class ManningResponseController extends Controller
                 ->first();
 
             if ($parent) {
+                // W-04: department check, using the found record's own
+                // Department_id (not the client-sent Department_id used to
+                // find it) — HR/Finance bypass, see updateBudgetData() above.
+                if (Common::budgetAccessLevel() !== 'full') {
+                    $scopedDeptIds = Common::getScopedDepartmentIds();
+                    if (is_array($scopedDeptIds) && !in_array((int) $parent->Department_id, $scopedDeptIds, true)) {
+                        return response()->json(['success' => false, 'message' => 'You do not have access to this department.'], 403);
+                    }
+                }
+
                 $parent->Total_Department_budget = $request->Total_Department_budget;
                 $parent->save();
 

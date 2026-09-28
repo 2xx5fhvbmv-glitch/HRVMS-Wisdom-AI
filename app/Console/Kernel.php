@@ -58,8 +58,12 @@ class Kernel extends ConsoleKernel
         // related fields when an Approved increment's effective_date
         // arrives. Idempotent via people_salary_increment.effective_day_applied_at.
         $schedule->command('salary-increment:apply-effective')->dailyAt('06:25');
+        // P-03 — mobile payslip downloads write a PDF to storage that
+        // nothing ever cleaned up; sweep anything older than an hour.
+        $schedule->command('payroll:cleanup-payslip-pdfs')->hourly();
+        $schedule->command('filemanagement:cleanup-temp-files')->hourly();
 
-        
+
 
     }
     

@@ -275,7 +275,9 @@ class RenewalController extends Controller
                     [
                         'emp_id' => 'required|string',
                         'flag'   => 'required|in:visa,insurance,work_permit_card_Test_Fee,slot_payment',
-                        'file'   => 'required|file|mimes:pdf,jpg,jpeg,png,gif,svg,webp,heic,heif|max:2048', // 2MB max
+                        // SVG dropped (V-04) — can carry script, and this file
+                        // opens directly in the resort/HR browser elsewhere.
+                        'file'   => 'required|file|mimes:pdf,jpg,jpeg,png,gif,webp,heic,heif|max:2048', // 2MB max
                     ],
                     [
                         'emp_id.required' => 'Employee ID is required.',
@@ -1535,8 +1537,16 @@ class RenewalController extends Controller
     {
         // Your passport must be valid for the entire duration of your work visa or work permit.
         $flag=$request->flag;
+        // Was forwarded to the AI extraction service with no type check at
+        // all (V-04).
+        $fileValidator = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:pdf,jpg,jpeg,png,gif,webp,heic,heif|max:5120',
+        ]);
+        if ($fileValidator->fails()) {
+            return response()->json(['success' => false, 'errors' => $fileValidator->errors()], 422);
+        }
         $file = $request->file('file');
-        
+
             $url = config('services.ai_extract.url').$flag;
             $curl = curl_init();
             $postFields = [
@@ -1644,8 +1654,16 @@ class RenewalController extends Controller
     }
 
     public function CheckCv(Request $request)
-    {   
+    {
         $flag = $request->flag;
+        // Was forwarded to the AI extraction service with no type check at
+        // all (V-04).
+        $fileValidator = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:pdf,doc,docx|max:5120',
+        ]);
+        if ($fileValidator->fails()) {
+            return response()->json(['success' => false, 'errors' => $fileValidator->errors()], 422);
+        }
         $file = $request->file('file');
         if($file)
         {
@@ -1697,8 +1715,16 @@ class RenewalController extends Controller
     }
 
     public function Education(Request $request)
-    {   
+    {
         $flag=$request->flag;
+        // Was forwarded to the AI extraction service with no type check at
+        // all (V-04).
+        $fileValidator = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png,heic,heif|max:5120',
+        ]);
+        if ($fileValidator->fails()) {
+            return response()->json(['success' => false, 'errors' => $fileValidator->errors()], 422);
+        }
         $file = $request->file('file');
         if($file)
         {
@@ -1753,8 +1779,16 @@ class RenewalController extends Controller
 
 
     public function Experience(Request $request)
-    {   
+    {
         $flag=$request->flag;
+        // Was forwarded to the AI extraction service with no type check at
+        // all (V-04).
+        $fileValidator = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png,heic,heif|max:5120',
+        ]);
+        if ($fileValidator->fails()) {
+            return response()->json(['success' => false, 'errors' => $fileValidator->errors()], 422);
+        }
         $file = $request->file('file');
 
         if($file)

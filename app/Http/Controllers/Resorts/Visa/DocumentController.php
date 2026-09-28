@@ -75,12 +75,6 @@ class DocumentController extends Controller
         return view('resorts.Visa.document.index',compact('page_title', 'documentTypes','nationalitys','countries','departments','positions',
         'sections','resort_divisions','payrollAllowance','employee_id'));
     }
-    public function FetchAithrowData(Request $request)
-    {
-        $url  = env('AI_URL');
-        dd($url );
-    }
-
     /*
      |--------------------------------------------------------------------------
      | Manual (no-AI) document-extraction endpoints
@@ -201,6 +195,17 @@ class DocumentController extends Controller
             ]);
         }
         $types = (array) $request->input('document_types', []);
+
+        // Neither 'documents' nor 'photo' had any type check at all (V-04) —
+        // any file type, including .php/.svg/.html, was accepted and filed
+        // as an official employee document.
+        $fileValidator = Validator::make($request->all(), [
+            'documents.*' => 'file|mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf,doc,docx|max:10240',
+            'photo'       => 'nullable|file|mimes:jpg,jpeg,png,heic,heif|max:10240',
+        ]);
+        if ($fileValidator->fails()) {
+            return response()->json(['success' => false, 'status' => 'error', 'message' => $fileValidator->errors()->first()]);
+        }
 
         // 4) Resolve the employee's categorized File Management folder. Every
         //    active employee owns one (categorized-folder invariant); fall back to

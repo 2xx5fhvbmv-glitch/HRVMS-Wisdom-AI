@@ -37,6 +37,9 @@ class PaymentConsentController extends Controller
     public $resort;
     public function __construct()
     {
+        // P-01: shopkeeper payment consent is HR/Finance only.
+        $this->middleware('payroll.access');
+
         $this->resort = Auth::guard('resort-admin')->user();
         if(!$this->resort) return;
     }

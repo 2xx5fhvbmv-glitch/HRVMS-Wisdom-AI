@@ -1735,6 +1735,14 @@ class EmployeeController extends Controller
             $resortAdmin = $employee->resortAdmin;
             $resortAdmin->password = $hashedPassword;
             $resortAdmin->save();
+            // Revoke every live mobile token — a reset password means the
+            // old one must stop working everywhere, same as self-service
+            // password change (S4-03).
+            try {
+                Common::revokeAllApiTokens($resortAdmin);
+            } catch (\Exception $e) {
+                \Log::warning('revokeAllApiTokens failed on HR password reset: ' . $e->getMessage());
+            }
             // Hydrate GetEmployee so the notification template can read
             // Emp_id for the mobile-app login section of the email.
             $resortAdmin->setRelation('GetEmployee', $employee);
@@ -2941,6 +2949,14 @@ class EmployeeController extends Controller
         $employee->deleted_at = now();
         $employee->save();
 
+        // Cut off mobile/web API access immediately (S4-01) — failure here
+        // must never roll back the (already-saved) status change.
+        try {
+            Common::revokeAllApiTokens($employee->resortAdmin);
+        } catch (\Exception $e) {
+            \Log::warning('revokeAllApiTokens failed on employee delete: ' . $e->getMessage());
+        }
+
         return response()->json(['message' => 'Employee deleted successfully.']);
     }
 
@@ -2963,6 +2979,17 @@ class EmployeeController extends Controller
             }
 
             DB::commit();
+
+            // Cut off mobile/web API access immediately (S4-01), after commit
+            // so a revoke failure can never roll back the status change.
+            foreach ($employees as $employee) {
+                try {
+                    Common::revokeAllApiTokens($employee->resortAdmin);
+                } catch (\Exception $e) {
+                    \Log::warning('revokeAllApiTokens failed on bulk delete: ' . $e->getMessage());
+                }
+            }
+
             return response()->json(['message' => 'Selected employees deleted successfully.']);
         } catch (\Exception $e) {
             DB::rollBack();

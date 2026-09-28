@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Route;
 	Route::post('login', [App\Http\Controllers\API\LoginController::class, 'apiLogin'])->middleware('throttle:mobile-login')->name('api.resort.login');
 	Route::post('forgotpassword', [App\Http\Controllers\API\LoginController::class, 'apiForgotPassword'])->middleware('throttle:mobile-password-reset')->name('api.resort.forgotpassword');
 
-	Route::middleware(['auth:api', 'applyResortSmtp'])->group(function () {
+	Route::middleware(['auth:api', 'account.active', 'applyResortSmtp'])->group(function () {
 
 		Route::get('on-boarding/get-onboarding-virtual-facility', [App\Http\Controllers\API\OnBoardingController::class, 'getOnboardingVirtualFacility']);
 

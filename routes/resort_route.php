@@ -59,7 +59,7 @@ Route::prefix('resort')->namespace('Resort')->group(function () {
 });
 
 /*** Admin Authenticated Routes ***/
-Route::prefix('resort')->middleware(['auth:resort-admin','forcePasswordChange:resort','revalidate','checkResortPermission','applyResortSmtp'])->namespace('Resorts')->group(function () {
+Route::prefix('resort')->middleware(['auth:resort-admin','account.active','forcePasswordChange:resort','revalidate','checkResortPermission','applyResortSmtp'])->namespace('Resorts')->group(function () {
 
     /*** Logout ***/
     Route::get( '/logout', ['App\Http\Controllers\Resorts\ResortLoginController','logout'] )->name('resort.logout');
@@ -1435,27 +1435,30 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
 
 
 
-      // Visa
+      // Visa (V-02: whole module gated HR/Finance/GM-read via visa.access;
+      // every mutating route additionally gated HR/Finance-only via
+      // visa.write — was completely open to every portal login before.)
+      Route::middleware(['visa.access'])->group(function () {
 
       Route::get('visa/configuration', 'Visa\ConfigurationController@index')->name('visa.config');
-      Route::post('visa/nationality', 'Visa\ConfigurationController@NationalityStore')->name('resort.visa.nationality.store');
+      Route::post('visa/nationality', 'Visa\ConfigurationController@NationalityStore')->name('resort.visa.nationality.store')->middleware('visa.write');
       Route::get('visa/nationality/index', 'Visa\ConfigurationController@NationalityIndex')->name('resort.visa.NationalityIndex');
-      Route::put('/visa/nationality/update/{id?}', 'Visa\ConfigurationController@NationalityUpdate')->name('resort.visa.nationality.update');
-      Route::delete('visa/nationality/destroy/{id}', 'Visa\ConfigurationController@Destroy')->name('resort.visa.nationality.destroy');
+      Route::put('/visa/nationality/update/{id?}', 'Visa\ConfigurationController@NationalityUpdate')->name('resort.visa.nationality.update')->middleware('visa.write');
+      Route::delete('visa/nationality/destroy/{id}', 'Visa\ConfigurationController@Destroy')->name('resort.visa.nationality.destroy')->middleware('visa.write');
       Route::get('visa/nationality/export', 'Visa\ConfigurationController@Nationalityexport')->name('visa.natioanlity.export');
-      Route::post('visa/nationality/import', 'Visa\ConfigurationController@NationalityImport')->name('resort.visa.nationality.Import');
-      Route::post('visa/amt-form', 'Visa\ConfigurationController@VisaAmtForm')->name('resort.visa.VisaAmtForm');
-      Route::post('visa/deposit-refund', 'Visa\ConfigurationController@DepositRefundStore')->name('resort.visa.DepositRefundStore');
-      Route::post('visa/reminder-alert', 'Visa\ConfigurationController@Reminderalert')->name('resort.visa.Reminderalert');
+      Route::post('visa/nationality/import', 'Visa\ConfigurationController@NationalityImport')->name('resort.visa.nationality.Import')->middleware('visa.write');
+      Route::post('visa/amt-form', 'Visa\ConfigurationController@VisaAmtForm')->name('resort.visa.VisaAmtForm')->middleware('visa.write');
+      Route::post('visa/deposit-refund', 'Visa\ConfigurationController@DepositRefundStore')->name('resort.visa.DepositRefundStore')->middleware('visa.write');
+      Route::post('visa/reminder-alert', 'Visa\ConfigurationController@Reminderalert')->name('resort.visa.Reminderalert')->middleware('visa.write');
       Route::get('visa/document-type/index', 'Visa\ConfigurationController@DocumentTypeIndex')->name('resort.visa.DocumentTypeIndex');
-      Route::post('visa/document-type', 'Visa\ConfigurationController@DocumentType')->name('resort.visa.DocumentType');
-      Route::put('/visa/document-type/{id?}', 'Visa\ConfigurationController@DocumentTypeUpdate')->name('resort.visa.DocumentType.update');
-      Route::delete('visa/document-type/delete/{id}', 'Visa\ConfigurationController@DocumentTypeDelete')->name('resort.visa.DocumentTypeDelete');
+      Route::post('visa/document-type', 'Visa\ConfigurationController@DocumentType')->name('resort.visa.DocumentType')->middleware('visa.write');
+      Route::put('/visa/document-type/{id?}', 'Visa\ConfigurationController@DocumentTypeUpdate')->name('resort.visa.DocumentType.update')->middleware('visa.write');
+      Route::delete('visa/document-type/delete/{id}', 'Visa\ConfigurationController@DocumentTypeDelete')->name('resort.visa.DocumentTypeDelete')->middleware('visa.write');
 
-      Route::post('visa/wallet/store', 'Visa\ConfigurationController@VisaWalletsStore')->name('resort.visa.VisaWalletsStore');
+      Route::post('visa/wallet/store', 'Visa\ConfigurationController@VisaWalletsStore')->name('resort.visa.VisaWalletsStore')->middleware('visa.write');
       Route::get('visa/wallet/index', 'Visa\ConfigurationController@WalletIndex')->name('resort.visa.WalletIndex');
-      Route::put('/visa/wallet/update/{id?}', 'Visa\ConfigurationController@UpdateWallet')->name('resort.visa.UpdateWallet');
-      Route::delete('visa/wallet/destroy/{id}', 'Visa\ConfigurationController@WalletDestroy')->name('resort.visa.WalletDestroy');
+      Route::put('/visa/wallet/update/{id?}', 'Visa\ConfigurationController@UpdateWallet')->name('resort.visa.UpdateWallet')->middleware('visa.write');
+      Route::delete('visa/wallet/destroy/{id}', 'Visa\ConfigurationController@WalletDestroy')->name('resort.visa.WalletDestroy')->middleware('visa.write');
 
 
       // Route::post('visa/document-segmentation', 'Visa\ConfigurationController@DocumentSegmentationStore')->name('resort.visa.DocumentSegmentationStore');
@@ -1465,19 +1468,19 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       // Manual (no-AI) document-extraction endpoints — replace the AI_URL calls
       // so the create-employee wizard advances past step 2 even when the AI
       // service is down. See DocumentController for details.
-      Route::post('visa/manual/passport-expiry', 'Visa\DocumentController@PassportExpiryManual')->name('resort.visa.PassportExpiryManual');
-      Route::post('visa/manual/check-cv', 'Visa\DocumentController@CheckCvManual')->name('resort.visa.CheckCvManual');
-      Route::post('visa/manual/education', 'Visa\DocumentController@EducationManual')->name('resort.visa.EducationManual');
-      Route::post('visa/manual/experience', 'Visa\DocumentController@ExperienceManual')->name('resort.visa.ExperienceManual');
+      Route::post('visa/manual/passport-expiry', 'Visa\DocumentController@PassportExpiryManual')->name('resort.visa.PassportExpiryManual')->middleware('visa.write');
+      Route::post('visa/manual/check-cv', 'Visa\DocumentController@CheckCvManual')->name('resort.visa.CheckCvManual')->middleware('visa.write');
+      Route::post('visa/manual/education', 'Visa\DocumentController@EducationManual')->name('resort.visa.EducationManual')->middleware('visa.write');
+      Route::post('visa/manual/experience', 'Visa\DocumentController@ExperienceManual')->name('resort.visa.ExperienceManual')->middleware('visa.write');
 
-      Route::post('visa/xpact-edit-amt', 'Visa\DashboardController@VisaXpactUpdateAmt')->name('resort.visa.VisaXpactEditAmt');
+      Route::post('visa/xpact-edit-amt', 'Visa\DashboardController@VisaXpactUpdateAmt')->name('resort.visa.VisaXpactEditAmt')->middleware('visa.write');
 
 
       //  Visa Renewal
       Route::get('visa/renewal', 'Visa\RenewalController@index')->name('resort.visa.RenewalView');
-      Route::post('visa/getemployee/details', 'Visa\RenewalController@GetEmployeeDetails')->name('resorts.visa.renewal.getEmployeeDetails');
-      Route::post('visa/upload-separate-file-using-ai', 'Visa\RenewalController@UploadSeparetFileUsingAi')->name('resorts.visa.renewal.UploadSeparetFileUsingAi');
-      Route::post('visa/upload-quota-slot', 'Visa\RenewalController@UploadQuotaSlot')->name('resorts.visa.renewal.UploadQuotaSlot');
+      Route::post('visa/getemployee/details', 'Visa\RenewalController@GetEmployeeDetails')->name('resorts.visa.renewal.getEmployeeDetails')->middleware('visa.write');
+      Route::post('visa/upload-separate-file-using-ai', 'Visa\RenewalController@UploadSeparetFileUsingAi')->name('resorts.visa.renewal.UploadSeparetFileUsingAi')->middleware('visa.write');
+      Route::post('visa/upload-quota-slot', 'Visa\RenewalController@UploadQuotaSlot')->name('resorts.visa.renewal.UploadQuotaSlot')->middleware('visa.write');
       Route::get('visa/renewal', 'Visa\RenewalController@index')->name('resort.visa.RenewalView');
       Route::get('visa/overview-dashboard-expiry', 'Visa\RenewalController@OrverviewDashbordExpiry')->name('resort.visa.OrverviewDashbordExpiry');
 
@@ -1487,22 +1490,22 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       // Expat Employee
       Route::get('visa/xpact-employee', 'Visa\XpactEmployeeController@XpactEmpIndex')->name('resort.visa.xpactEmployee');
       Route::get('visa/xpact-employee/details/{id}', 'Visa\XpactEmployeeController@XpactEmpDetails')->name('resort.visa.XpactEmpDetails');
-      Route::post('visa/xpact-employee/details/update', 'Visa\XpactEmployeeController@UpdateXpatDetails')->name('resort.visa.UpdateXpatDetails');
+      Route::post('visa/xpact-employee/details/update', 'Visa\XpactEmployeeController@UpdateXpatDetails')->name('resort.visa.UpdateXpatDetails')->middleware('visa.write');
       Route::get('visa/quota-slot/pending-fee', 'Visa\XpactEmployeeController@XpactEmpBudgetCost')->name('resort.visa.Quota_Slot_PendingFee');
-      Route::post('visa/quota-slot/makr-as-paid', 'Visa\XpactEmployeeController@QuotaSlotMakrasPaid')->name('resort.visa.Quota_Slot_MakrasPaid');
+      Route::post('visa/quota-slot/makr-as-paid', 'Visa\XpactEmployeeController@QuotaSlotMakrasPaid')->name('resort.visa.Quota_Slot_MakrasPaid')->middleware('visa.write');
       Route::get('visa/past-transection-history', 'Visa\XpactEmployeeController@PastTransectionHistory')->name('resort.visa.PastTransectionHistory');
-      Route::post('visa/employee-wise-file-upload', 'Visa\XpactEmployeeController@EmployeeWiseVisaDocumentUpload')->name('resort.visa.EmployeeWiseVisaDocumentUpload');
+      Route::post('visa/employee-wise-file-upload', 'Visa\XpactEmployeeController@EmployeeWiseVisaDocumentUpload')->name('resort.visa.EmployeeWiseVisaDocumentUpload')->middleware('visa.write');
       Route::get('visa/xpact-employee-file-download/{id?}', 'Visa\XpactEmployeeController@XpactEmpFileDownload')->name('resort.visa.XpactEmpFileDownload');
     // VerifyDetails
 
      Route::get('visa/verify-details','Visa\RenewalController@VerifyDetails')->name('resort.visa.VerifyDetails');
-     Route::post('visa/verify-details/update','Visa\RenewalController@UpdateExpiryRecord')->name('resort.visa.UpdateExpiryRecord');
-     Route::post('visa/verify-details/submit','Visa\RenewalController@SubmitVerifiedDetails')->name('resort.visa.SubmitVerifiedDetails');
+     Route::post('visa/verify-details/update','Visa\RenewalController@UpdateExpiryRecord')->name('resort.visa.UpdateExpiryRecord')->middleware('visa.write');
+     Route::post('visa/verify-details/submit','Visa\RenewalController@SubmitVerifiedDetails')->name('resort.visa.SubmitVerifiedDetails')->middleware('visa.write');
 
 
       // Visa Dashboard Routes
 
-      Route::post('visa/wallet-to-wallet-transfer', 'Visa\FundTransferController@VisaWalletToWalletTransfer')->name('resort.visa.VisaWalletToWalletTransfer');
+      Route::post('visa/wallet-to-wallet-transfer', 'Visa\FundTransferController@VisaWalletToWalletTransfer')->name('resort.visa.VisaWalletToWalletTransfer')->middleware('visa.write');
       Route::get('visa/transection-history', 'Visa\FundTransferController@TransectionHistory')->name('resort.visa.TransectionHistory');
       Route::get('visa/transaction-history/list', 'Visa\FundTransferController@TransectionHistoryIndex')->name('resort.visa.TransectionHistoryIndex');
       Route::get('visa/nationality-wise-employee-deposit-and-count', 'Visa\DashboardController@NatioanlityWiseEmployeeDepositAndCount')->name('resort.visa.NatioanlityWiseEmployeeDepositAndCount');
@@ -1518,7 +1521,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
 
       //  Xpact Sync
       Route::get('visa/xpact-sync', 'Visa\FetchDataAiController@index')->name('resort.visa.XpactSync');
-      Route::post('visa/store', 'Visa\FetchDataAiController@store')->name('resorts.visa.xpactsync.store');
+      Route::post('visa/store', 'Visa\FetchDataAiController@store')->name('resorts.visa.xpactsync.store')->middleware('visa.write');
       Route::get('visa/xpact-sync/status/{id}', 'Visa\FetchDataAiController@syncStatus')->name('resorts.visa.xpactsync.status');
 
       //  Visa Expiry page
@@ -1526,31 +1529,31 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::get('visa/expiry','Visa\ExpiryController@index')->name('resort.visa.Expiry');
 
       //Steps
-      Route::post('visa/passport-expiry','Visa\RenewalController@PassportExpiry')->name('visa.passport.Checkexpiry');
-      Route::post('visa/check-cv','Visa\RenewalController@CheckCv')->name('resort.visa.CheckCv');
-      Route::post('visa/education','Visa\RenewalController@Education')->name('resort.visa.Education');
-      Route::post('visa/experience','Visa\RenewalController@Experience')->name('resort.visa.Experience');
-      Route::post('visa/create-employee','Visa\DocumentController@CreateEmployee')->name('resort.visa.CreateEmployee');
+      Route::post('visa/passport-expiry','Visa\RenewalController@PassportExpiry')->name('visa.passport.Checkexpiry')->middleware('visa.write');
+      Route::post('visa/check-cv','Visa\RenewalController@CheckCv')->name('resort.visa.CheckCv')->middleware('visa.write');
+      Route::post('visa/education','Visa\RenewalController@Education')->name('resort.visa.Education')->middleware('visa.write');
+      Route::post('visa/experience','Visa\RenewalController@Experience')->name('resort.visa.Experience')->middleware('visa.write');
+      Route::post('visa/create-employee','Visa\DocumentController@CreateEmployee')->name('resort.visa.CreateEmployee')->middleware('visa.write');
 
 
 
       // Payment Request
       Route::get('visa/payment-request','Visa\PaymentRequestController@Create')->name('resort.visa.PaymentRequest');
-      Route::post('visa/payment-request/submit', 'Visa\PaymentRequestController@PaymentRequestSubmit')->name('resort.visa.PaymentRequestSubmit');
+      Route::post('visa/payment-request/submit', 'Visa\PaymentRequestController@PaymentRequestSubmit')->name('resort.visa.PaymentRequestSubmit')->middleware('visa.write');
       Route::get('visa/bulk-renewal', 'Visa\PaymentRequestController@BulkRenewal')->name('resort.visa.BulkRenewal');
-      Route::post('visa/bulk-renewal/pay', 'Visa\PaymentRequestController@BulkRenewalPay')->name('resort.visa.BulkRenewalPay');
+      Route::post('visa/bulk-renewal/pay', 'Visa\PaymentRequestController@BulkRenewalPay')->name('resort.visa.BulkRenewalPay')->middleware('visa.write');
       Route::get('visa/payment-request/index','Visa\PaymentRequestController@index')->name('resort.visa.PaymentRequestIndex');
       Route::get('visa/payment-request/renewal/{id}','Visa\PaymentRequestController@UsingPaymentRequestRenewal')->name('resort.visa.UsingPaymentRequestRenewal');
       Route::get('visa/payment-request/details/{id}','Visa\PaymentRequestController@PaymentRequestDetails')->name('resort.visa.PaymentRequestDetails');
 
-      Route::post('visa/payment-request/rejected', 'Visa\PaymentRequestController@PaymentRequestRejected')->name('resort.visa.PaymentRequestRejected');
+      Route::post('visa/payment-request/rejected', 'Visa\PaymentRequestController@PaymentRequestRejected')->name('resort.visa.PaymentRequestRejected')->middleware('visa.write');
       Route::get('visa/payment-request/download/{id}','Visa\PaymentRequestController@DownloadPymentRequest')->name('resort.visa.DownloadPymentRequest');
       Route::get('visa/payment-request/throw-renewal/{id}/{childid}','Visa\PaymentRequestController@PaymentRequestThrowRenewal')->name('resort.visa.PaymentRequestThrowRenewal');
 
 
     // PaymentDepositRequestController
       Route::get('visa/deposit-request','Visa\PaymentDepositRequestController@index')->name('resort.visa.DepositRequest');
-      Route::post('visa/deposit-request/refund', 'Visa\PaymentDepositRequestController@DepositeRefundStore')->name('visa.deposit.refund.store');
+      Route::post('visa/deposit-request/refund', 'Visa\PaymentDepositRequestController@DepositeRefundStore')->name('visa.deposit.refund.store')->middleware('visa.write');
       Route::post('visa/deposit-request/search','Visa\PaymentDepositRequestController@DepositRequestSearch')->name('visa.deposit.refund.search');
       Route::get('visa/deposit-request/dashboard','Visa\PaymentDepositRequestController@DashboardDepositRequest')->name('visa.deposit.DashboardDepositRequest');
 
@@ -1558,6 +1561,8 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::get('visa/liabilities','Visa\LiabilitiesController@Index')->name('resort.visa.Liabilities');
       Route::get('visa/fetch-total-employees','Visa\LiabilitiesController@FetchTotalEmployees')->name('resort.visa.FetchTotalEmployees');
       Route::get('visa/liability-breakdown','Visa\LiabilitiesController@LiabilityBreakdown')->name('resort.visa.LiabilityBreakdown');
+
+      }); // end visa.access group
 
     //Incident Module
 
