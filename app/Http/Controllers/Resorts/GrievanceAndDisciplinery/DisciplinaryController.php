@@ -606,8 +606,16 @@ class DisciplinaryController extends Controller
     }
     public function RequestForStatement(Request $request)
     {
+        // D-02: same gap as S2-02 (Grievance) — Disciplinary_id is a
+        // human-readable case number, one global sequence across every
+        // resort, with no resort_id filter here at all. Any resort's admin
+        // could flip Request_For_Statement on another resort's case and
+        // notify its real witnesses.
         $id = $request->id;
-        $parent_id = disciplinarySubmit::where('Disciplinary_id',$id)->first();
+        $parent_id = disciplinarySubmit::where('Disciplinary_id',$id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$parent_id) {
+            return response()->json(['success' => false, 'message' => 'Disciplinary case not found.'], 404);
+        }
         $parent_id->Request_For_Statement = 'Yes';
         $parent_id ->save();
         $witness = DisciplinaryWitness::where("Disciplinary_id",$parent_id->Disciplinary_id)->update(['Request_For_Statement'=>'Yes','Wintness_Status'=>"Requested"]);
