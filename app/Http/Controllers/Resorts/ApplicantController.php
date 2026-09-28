@@ -130,8 +130,13 @@ class ApplicantController extends Controller
 
             // Handle video file upload
             if ($request->hasFile('video')) {
+                $request->validate([
+                    'video' => 'file|mimetypes:video/mp4,video/webm,video/ogg,video/quicktime|max:51200',
+                ]);
                 $video = $request->file('video');
-                $path = $video->store('temp/videos', 'public'); // Save video in a temporary folder
+                $extension = $video->extension() ?: 'mp4';
+                $path = 'temp/applicant-drafts/' . Session::getId() . '/' . \Illuminate\Support\Str::uuid() . '.' . $extension;
+                \App\Helpers\StorageHelper::put($path, file_get_contents($video->getRealPath()));
                 $sessionData['video_path'] = $path; // Save file path instead of the file object
             }
 
@@ -142,6 +147,8 @@ class ApplicantController extends Controller
             Session::put('applicant_form', $existingData);
 
             return response()->json(['success' => true, 'message' => 'Step data saved successfully.']);
+        } catch (ValidationException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage(), 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
@@ -153,7 +160,12 @@ class ApplicantController extends Controller
         $sessionData = Session::get('applicant_form', []);
 
         if (isset($sessionData[$step])) {
-            return response()->json(['success' => true, 'data' => $sessionData[$step]]);
+            $data = $sessionData[$step];
+            if (isset($data['video_path'])) {
+                unset($data['video_path']);
+                $data['has_video'] = true;
+            }
+            return response()->json(['success' => true, 'data' => $data]);
         }
 
         return response()->json(['success' => false, 'message' => 'No data found for this step.']);
