@@ -1201,7 +1201,13 @@ class BoardingPassController extends Controller
             $comments                               =   $request->input('reason', null); // Optional comments
             $employee                               =   $this->user->GetEmployee;
             $currentApproverId                      =   $employee->id; // Assuming the logged-in user is the approver
-            $employeeTravelPasses                   =   EmployeeTravelPass::find($passId);
+            // L-05: no resort_id filter — the "all approvals completed" /
+            // not-your-turn branches below return
+            // Common::buildIslandPassApprovalFlow() (approver names, ranks,
+            // comments) before any authorization check runs, so any
+            // authenticated employee could read another resort's approval
+            // trail just by supplying its pass_id.
+            $employeeTravelPasses                   =   EmployeeTravelPass::where('resort_id', $this->resort_id)->find($passId);
 
             if (!$employeeTravelPasses) {
                 return response()->json([
