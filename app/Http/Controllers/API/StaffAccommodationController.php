@@ -676,6 +676,7 @@ class StaffAccommodationController extends Controller
             'RoomNo'                                    =>  'required',
             'descriptionIssues'                         =>  'required',
             'priority'                                  =>  'required',
+            'Image'                                     =>  'nullable|file|mimes:jpeg,png,jpg,heic,heif',
         ]);
 
         if ($validator->fails()) {
@@ -709,7 +710,13 @@ class StaffAccommodationController extends Controller
             if ($request->hasFile('Image')) {
                 $imageFile                              =   $request->file('Image');
                 $imageName                              =   time() . '_' . $imageFile->getClientOriginalName();
-                $imageFile->move($path_path, $imageName);
+                // Was UploadedFile::move() into a raw relative path, which lands
+                // under public/ (the web root) on a standard request — any file
+                // type was accepted, so a crafted filename was a code-execution
+                // path. Route through StorageHelper (disk-agnostic, never the web
+                // root) at the exact same logical path so existing readers
+                // (temporaryUrl($path_path.'/'.Image)) keep working unchanged.
+                \App\Helpers\StorageHelper::put($path_path . '/' . $imageName, file_get_contents($imageFile->getRealPath()));
                 $maintanaceRequestEdit->Image           =   $imageName;
             }
 

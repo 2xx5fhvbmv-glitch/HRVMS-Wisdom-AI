@@ -2931,7 +2931,7 @@ class AccommodationController extends Controller
         $validator = Validator::make($request->all(), [
             'request_id'                                    =>  'required',
             'status'                                        =>  'required',
-            'Image'                                         =>  'required',
+            'Image'                                         =>  'required|file|mimes:jpeg,png,jpg,heic,heif',
         ]);
 
         if ($validator->fails()) {
@@ -2944,7 +2944,7 @@ class AccommodationController extends Controller
             $employee_id                                    =   $this->user->GetEmployee->id;
             $employee                                       =   $this->user->GetEmployee;
             $requestId                                      =   $request->input('request_id');
-            $maintanance                                    =   MaintanaceRequest::find($requestId);
+            $maintanance                                    =   MaintanaceRequest::where('id', $requestId)->where('resort_id', $this->resort_id)->first();
 
             if (!$maintanance) {
                 return response()->json(['success' => false, 'message' => 'Maintenance request not found'], 200);
@@ -2954,10 +2954,14 @@ class AccommodationController extends Controller
 
                 if ($request->hasFile('Image')) {
                     $path                                   =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
-                    
+
                     $imageFile                                  =   $request->file('Image');
                     $imageName                                  =   time() . '_' . $imageFile->getClientOriginalName();
-                    $imageFile->move($path, $imageName);
+                    // Was UploadedFile::move() into a raw relative path (lands under
+                    // public/, the web root, on a standard request). Route through
+                    // StorageHelper at the same logical path so existing readers
+                    // (temporaryUrl($path.'/'.Completed_Image)) keep working unchanged.
+                    \App\Helpers\StorageHelper::put($path . '/' . $imageName, file_get_contents($imageFile->getRealPath()));
                     $maintanance->Completed_Image               =   $imageName;
                 }
             
