@@ -677,6 +677,7 @@
     <script>
         var isHrDepartment = @json($isHrDepartment);
         var defaultApplicantPicture = "{{ url(config('settings.default_picture')) }}";
+        function escHtml(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
         $(document).ready(function() {
             datatablelist();
             // Grid is the default visible view now — #grid_main_view is
@@ -2132,7 +2133,7 @@
                         { data: 'first_name', name: 'first_name', render: function (data, type, row) {
                             return `<div class="tableUser-block">
                                 <div class="img-circle"><img src="${row.profileImg || defaultApplicantPicture}" alt="user"></div>
-                                <span class="userApplicants-btn" data-id="${row.applicant_id}">${row.name}</span>
+                                <span class="userApplicants-btn" data-id="${row.applicant_id}">${escHtml(row.name)}</span>
                             </div>`;
                         }},
                         { data: 'countryName', name: 'countryName' },

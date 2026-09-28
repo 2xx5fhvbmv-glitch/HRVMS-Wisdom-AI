@@ -1568,10 +1568,13 @@ class LeaveController extends Controller
         } else {
             $validatorRules['reason'] = 'nullable|string|max:2000';
         }
+        // L-09: was a plain, unscoped 'exists:employees,id' — any resort's
+        // employee id validated, letting one resort's leave form add
+        // another resort's employee as task delegate.
         if ($rules['task_delegation'] === 'mandatory') {
-            $validatorRules['task_delegation'] = 'required|exists:employees,id';
+            $validatorRules['task_delegation'] = ['required', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $resort_id)];
         } else {
-            $validatorRules['task_delegation'] = 'nullable|exists:employees,id';
+            $validatorRules['task_delegation'] = ['nullable', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $resort_id)];
         }
         if ($rules['destination'] !== 'hidden') {
             $validatorRules['destination'] = 'nullable|string|max:255';
