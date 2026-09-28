@@ -1905,7 +1905,10 @@ class BoardingPassController extends Controller
         DB::beginTransaction();
         try {
 
-            $pass                                   = EmployeeTravelPass::findOrFail($request->pass_id);
+            // L-04: no resort_id filter — any HR/Security employee could
+            // edit any pass's arrival/departure time cross-tenant by
+            // supplying another resort's pass_id.
+            $pass                                   = EmployeeTravelPass::where('resort_id', $this->resort_id)->findOrFail($request->pass_id);
 
             // A confirmed/closed manifest is an archive record — its passes'
             // times must not change under it after the fact.
@@ -1965,6 +1968,9 @@ class BoardingPassController extends Controller
         $validator = Validator::make($request->all(), [
             'pass_id'                           => 'required',
             'employee_ids'                      => 'required|array',
+            // Was accepting any id — assignments (and the notification below)
+            // could target another resort's employees (X-02c).
+            'employee_ids.*'                    => ['integer', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
         ]);
 
         if ($validator->fails()) {
@@ -2047,6 +2053,9 @@ class BoardingPassController extends Controller
         $validator = Validator::make($request->all(), [
             'manifest_id'                       => 'required',
             'employee_ids'                      => 'required|array',
+            // Was accepting any id — the manifest/passes are resort-scoped
+            // above, but the employees being assigned weren't (X-02d).
+            'employee_ids.*'                    => ['integer', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
         ]);
 
         if ($validator->fails()) {
