@@ -12824,6 +12824,25 @@ class Common
         ];
     }
 
+    /**
+     * SV-01: survey respondent masking ("Anonymous/Confidential Respondent
+     * #N") was numbering masked rows by their position in the invite-order
+     * query result — stable and reconstructable (the create-survey
+     * participant list preserves that same order), so anyone who could
+     * reconstruct the invite order could map "#N" straight back to a named
+     * employee. Returns [originalKey => shuffled ordinal] for just the rows
+     * that need masking, so the number carries no invite-order information.
+     */
+    public static function shuffledMaskOrdinals($maskedKeys): array
+    {
+        $keys = collect($maskedKeys)->values()->shuffle();
+        $map = [];
+        foreach ($keys as $ordinal => $key) {
+            $map[$key] = $ordinal + 1;
+        }
+        return $map;
+    }
+
 }
 
 ?>
