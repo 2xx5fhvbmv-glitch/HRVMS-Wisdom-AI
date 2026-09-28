@@ -62,6 +62,8 @@
 
 @section('import-scripts')
 <script>
+    function escHtml(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
+
     $(document).ready(function() {
         loadRemindersTable();
     });
@@ -87,7 +89,7 @@
             },
             columns: [
                 { data: 'first_name', name: 'first_name', render: function(data, type, row) {
-                    return '<div class="tableUser-block"><div class="img-circle"><img src="'+row.profileImg+'" alt="user"></div><span>'+row.name+'</span></div>';
+                    return '<div class="tableUser-block"><div class="img-circle"><img src="'+row.profileImg+'" alt="user"></div><span>'+escHtml(row.name)+'</span></div>';
                 }},
                 { data: 'position_title', name: 'position_title' },
                 { data: 'department', name: 'department' },

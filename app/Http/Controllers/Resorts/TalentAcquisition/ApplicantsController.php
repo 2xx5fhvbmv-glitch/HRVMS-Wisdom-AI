@@ -1540,7 +1540,7 @@ class ApplicantsController extends Controller
                     {
                         $FianlResponse ='<tr>
                             <th>Name:</th>
-                            <td>'.ucfirst($Final_response_data->first_name.' '.$Final_response_data->last_name).'</td>
+                            <td>'.e(ucfirst($Final_response_data->first_name.' '.$Final_response_data->last_name)).'</td>
                         </tr>
                         <tr>
                             <th>Position:</th>

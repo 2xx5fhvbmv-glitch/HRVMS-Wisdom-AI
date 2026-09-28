@@ -1576,7 +1576,15 @@ class LeaveController extends Controller
         if ($rules['destination'] !== 'hidden') {
             $validatorRules['destination'] = 'nullable|string|max:255';
         }
-        $validatorRules['attachments'] = ($rules['attachment'] === 'mandatory') ? 'required|file|mimes:pdf,doc,docx,jpeg,jpg,png,gif,svg,webp,heic,heif|max:5120' : 'nullable|file|mimes:pdf,doc,docx,jpeg,jpg,png,gif,svg,webp,heic,heif|max:5120';
+        // L-07 (part): SVG can carry an embedded <script>/onload payload and
+        // this file is served straight out of public/ with no auth —
+        // opening it directly in a browser (or an <img>/<a> pointing at
+        // its URL elsewhere in the app) would execute it. Dropped from the
+        // allowed types; the storage-location half of this finding
+        // (public_path()/->move() instead of StorageHelper, and every
+        // dashboard variant's read side that assumes a public URL) is
+        // flagged, not fixed here — see SECURITY_AUDIT_REMAINING.md.
+        $validatorRules['attachments'] = ($rules['attachment'] === 'mandatory') ? 'required|file|mimes:pdf,doc,docx,jpeg,jpg,png,gif,webp,heic,heif|max:5120' : 'nullable|file|mimes:pdf,doc,docx,jpeg,jpg,png,gif,webp,heic,heif|max:5120';
         // Opt-in to use accumulated Day Off credit against this leave —
         // system-generated split, not a manual category combine.
         $validatorRules['day_off_quantity'] = 'nullable|integer|min:0';

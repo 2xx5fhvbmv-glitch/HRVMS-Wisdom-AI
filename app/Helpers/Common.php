@@ -3369,7 +3369,13 @@ class Common
         $template = str_replace("\xC2\xA0", ' ', (string) $template);
 
         foreach ($data as $key => $value) {
-            $val          = (string) ($value ?? '');
+            // Every caller passes plain scalars (name, date, link) to be
+            // interpolated into an HTML email body — none intentionally
+            // carry markup. Left unescaped, an applicant-controlled value
+            // (e.g. candidate_name) rendered raw HTML/JS in the recipient's
+            // mail client. commonEmail.blade.php renders the whole body
+            // with {!! !!}, so this is the one place to close it.
+            $val          = htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
             $underscore   = $key;                                    // candidate_name
             $spaced       = str_replace('_', ' ', $key);             // candidate name
             $titleSpaced  = ucwords($spaced);                        // Candidate Name
