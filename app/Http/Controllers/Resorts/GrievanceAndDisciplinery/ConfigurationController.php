@@ -319,7 +319,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            DisciplinaryCategoriesModel::where("id",$id)->delete();
+            DisciplinaryCategoriesModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
 
             DB::commit();
             return response()->json([
@@ -488,7 +488,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            OffensesModel::where("id",$id)->delete();
+            OffensesModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
 
             DB::commit();
             return response()->json([
@@ -644,7 +644,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            ActionStore::where("id",$id)->delete();
+            ActionStore::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -803,7 +803,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            SeverityStore::where("id",$id)->delete();
+            SeverityStore::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -1066,7 +1066,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            CodeOfCounduct::where("id",$id)->delete();
+            CodeOfCounduct::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -1241,7 +1241,12 @@ class ConfigurationController extends Controller
     public function LatterTempleteEdit($id)
     {
         $id = (int)base64_decode($id);
-        $d = DisciplineryLatterTemplete::find($id);
+        // D-01: was ::find($id) with no resort filter — leaked another
+        // resort's letter-template content (form structure).
+        $d = DisciplineryLatterTemplete::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$d) {
+            return response()->json(['success' => false, 'message' => 'Template not found.'], 404);
+        }
         $form_structure = json_decode($d->Latter_Structure, true);
         $data=[$form_structure,$d->Latter_Temp_name,$d->id];
         return response()->json([
@@ -1257,7 +1262,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            DisciplineryLatterTemplete::where("id",$id)->delete();
+            DisciplineryLatterTemplete::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -1885,7 +1890,7 @@ class ConfigurationController extends Controller
         try
         {
 
-            DisciplinaryDelegationRule::where("id",$id)->delete();
+            DisciplinaryDelegationRule::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
 
             DB::commit();
             return response()->json([
