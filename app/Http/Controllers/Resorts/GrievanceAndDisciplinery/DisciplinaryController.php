@@ -321,6 +321,24 @@ class DisciplinaryController extends Controller
         $Offence_id =  base64_decode($request->Offence_id);
         $Action_id =  base64_decode($request->Action_id);
         $Severity_id =  base64_decode($request->Severity_id);
+        // D-05 (+ same root cause on the sibling reference fields):
+        // Category/Offence/Action/Severity/committee ids were all trusted
+        // straight from the client with no resort check, same shape as the
+        // Employee_id/witness gap already fixed above — a new case could
+        // be filed against another resort's committee (which then gets
+        // notified below) or reference data.
+        if ($Category_id && !DisciplinaryCategoriesModel::where('id', $Category_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid category.'], 422);
+        }
+        if ($Offence_id && !OffensesModel::where('id', $Offence_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid offence.'], 422);
+        }
+        if ($Action_id && !ActionStore::where('id', $Action_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid action.'], 422);
+        }
+        if ($Severity_id && !SeverityStore::where('id', $Severity_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid severity.'], 422);
+        }
         // Form datepicker emits d/m/Y but the column is a DATE — passing
         // "10/05/2026" straight in made MySQL store 0000-00-00. Parse to
         // Y-m-d here. Tolerate already-Y-m-d values (e.g. API callers).
@@ -341,6 +359,12 @@ class DisciplinaryController extends Controller
         $priority_level = $request->priority_level;
         $Incident_description = $request->incident_description;
         $committiee_id = $request->filled('assign_to') ? $request->assign_to : null;
+        // D-05: was trusted straight from the client — a new case could be
+        // assigned to another resort's committee, whose real members then
+        // get notified below.
+        if ($committiee_id && !DisciplineryAssignCommittee::where('id', $committiee_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid committee.'], 422);
+        }
         $Request_For_Statement = ($request->Request_For_Statement == "on")? 'Yes':'No';
         $Attachment  = $request->attachment;
         $upload_signed_document  = $request->upload_signed_document;
