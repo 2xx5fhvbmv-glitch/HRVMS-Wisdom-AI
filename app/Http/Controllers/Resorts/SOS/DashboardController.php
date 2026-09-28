@@ -36,6 +36,24 @@ class DashboardController extends Controller
         // $reporting_to = $this->resort->GetEmployee->id;
         // $this->underEmp_id = Common::getSubordinates($reporting_to);
     }
+
+    /**
+     * SO-02: destroy(), updateStatus() (marks a real emergency as a drill)
+     * and updateMassInstruction() (push to every device) had no role check
+     * at all — their routes aren't registered in ResortModulePagesSeeder, so
+     * the module_pages permission middleware defaults to allow for any
+     * logged-in portal user, any rank. Same Common::hasFullDataAccess()
+     * gate used codebase-wide for this "everyone vs HR/GM" decision.
+     */
+    private function requireHrAccess()
+    {
+        $employee = optional($this->resort)->GetEmployee;
+        $isSecurityManager = optional(optional($employee)->position)->position_title === 'Security Manager';
+        if (!$isSecurityManager && !Common::hasFullDataAccess($employee)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+        return null;
+    }
     public function index(Request $request)
     {
         // This page + its DataTables ajax had no permission check at all —
@@ -184,6 +202,7 @@ class DashboardController extends Controller
 
     public function destroy($id)
     {
+      if ($guard = $this->requireHrAccess()) return $guard;
       try {
           $data = SOSHistoryModel::where('resort_id', $this->resort->resort_id)->whereId($id)->first();
           if(!$data){
@@ -209,6 +228,7 @@ class DashboardController extends Controller
 
     public function updateStatus(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $request->validate([
             'type' => 'required|in:Drilled,Real',
         ]);
@@ -415,6 +435,7 @@ class DashboardController extends Controller
 
     public function updateMassInstruction(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $request->validate([
             'sos_history_id' => ['required', Rule::exists('sos_history', 'id')->where('resort_id', $this->resort->resort_id)],
             'mass_instruction' => 'required|string|max:255',

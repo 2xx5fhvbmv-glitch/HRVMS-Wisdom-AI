@@ -719,8 +719,18 @@ class SOSController extends Controller
                                                                     'e.Admin_Parent_id',
                                                                     'rd.name as department',
                                                                 );
+                                                                // SO-01: everyone except a plain department HOD got the
+                                                                // full, unfiltered list — every employee's live GPS,
+                                                                // name and photo for this SOS, not just responders/
+                                                                // management. HR/GM/HR-dept-HOD and the Security Manager
+                                                                // legitimately need resort-wide visibility for incident
+                                                                // command; a regular HOD is already scoped to their own
+                                                                // subordinates above; everyone else (ordinary employee,
+                                                                // supervisor, etc.) only gets their own entry.
                                                                 if($isHOD) {
                                                                     $sosHistoryEmployeeStatus->whereIn('e.id', $this->underEmp_id);
+                                                                } elseif (!$isSecurityManager && !Common::hasFullDataAccess($employee)) {
+                                                                    $sosHistoryEmployeeStatus->where('e.id', $employee->id);
                                                                 }
 
             $sosHistoryEmployeeStatus                   =   $sosHistoryEmployeeStatus->get()->map(function ($item) {
