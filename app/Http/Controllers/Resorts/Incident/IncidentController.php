@@ -513,6 +513,18 @@ class IncidentController extends Controller
             $incident_details->severity = $request->severity;
         }
 
+        // IN-02: this wrote $request->status onto the SAME status column
+        // approveOrReject() (GM/GM-delegate only) uses for the final
+        // Approved/Rejected decision — any committee member submitting an
+        // investigation entry could set status to Approved directly,
+        // skipping GM approval entirely. Those two values are reserved for
+        // that endpoint; block them here regardless of what the caller is.
+        if (in_array(strtolower((string) $request->status), ['approved', 'rejected'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This status can only be set via the GM approval decision.',
+            ], 403);
+        }
         $incident_details->status = $request->status;
         $incident_details->outcome_type =  $request->outcomeType;
         $incident_details->preventive_measures =  $request->pre_mea;
