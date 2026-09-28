@@ -646,7 +646,29 @@ class DisciplinaryController extends Controller
             }
 
             $id  = $request->Disciplinary_form_id;
-            $committee_member_id  = $request->committee_member_id;
+
+            // D-03: committee_member_id was taken straight from the request
+            // with no check it matched the caller at all — anyone could
+            // submit investigation findings (and a signature snapshot)
+            // filed in a DIFFERENT committee member's name, and there was
+            // no check the caller was even on the assigned committee
+            // before allowing a "resolved" status flip.
+            $case = disciplinarySubmit::where('resort_id', $this->resort->resort_id)
+                ->where('Disciplinary_id', $id)
+                ->first(['Committee_id', 'Disciplinary_id']);
+            if (!$case) {
+                return response()->json(['success' => false, 'message' => 'Disciplinary case not found.'], 404);
+            }
+            $callerEmployeeId = optional($this->resort->GetEmployee)->id;
+            $isCommitteeMember = $callerEmployeeId && $case->Committee_id && DisciplineryCommitteeMembers::where('Parent_committee_id', $case->Committee_id)
+                ->where('MemberId', $callerEmployeeId)
+                ->exists();
+            if (!$isCommitteeMember) {
+                return response()->json(['success' => false, 'message' => 'You are not a member of the committee assigned to this case.'], 403);
+            }
+            // Never trust the client's claimed identity for whose entry
+            // this is — always the caller's own employee id.
+            $committee_member_id  = $callerEmployeeId;
             $invesigation_date = $request->invesigation_date;
             $resolution_date = $request->resolution_date;
             $outcome_type = $request->outcome_type;
