@@ -21,6 +21,9 @@ class JobAdvertisementController extends Controller
     {
         $this->resort = Auth::guard('resort-admin')->user();
         if(!$this->resort) return;
+
+        // T-05: job-advert templates had zero role checks. Decided policy: HR only.
+        abort_unless(Common::hasFullDataAccess(optional($this->resort)->GetEmployee), 403, 'Unauthorized action.');
     }
 
     public function index()

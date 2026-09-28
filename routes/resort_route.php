@@ -17,21 +17,21 @@ Route::prefix('resort')->namespace('Resort')->group(function () {
   Route::get('/applicant-form/{id?}', ['App\Http\Controllers\Resorts\ApplicantController','showapplicantForm'])->name('resort.applicantForm');
 
   //save session draft data for each step
-  Route::post('/applicant-form/save-draft', ['App\Http\Controllers\Resorts\ApplicantController','saveDraft'])->name('save.applicantinfo.draft');
-  Route::post('/applicant-form/get-draft', ['App\Http\Controllers\Resorts\ApplicantController', 'getDraftStepData'])->name('get.applicantinfo.draft');
+  Route::post('/applicant-form/save-draft', ['App\Http\Controllers\Resorts\ApplicantController','saveDraft'])->middleware('throttle:applicant-form-step')->name('save.applicantinfo.draft');
+  Route::post('/applicant-form/get-draft', ['App\Http\Controllers\Resorts\ApplicantController', 'getDraftStepData'])->middleware('throttle:applicant-form-step')->name('get.applicantinfo.draft');
 
-  Route::post('/applicant_form/store', ['App\Http\Controllers\Resorts\ApplicantController','applicant_formStore'])->name('resort.applicantFormstore');
+  Route::post('/applicant_form/store', ['App\Http\Controllers\Resorts\ApplicantController','applicant_formStore'])->middleware('throttle:applicant-form-submit')->name('resort.applicantFormstore');
 
   // AI CV auto-fill: applicant uploads their CV → we parse it via the
   // FastAPI service and return structured fields the front-end can
   // pre-populate (first/last name, email, phone, dob, country, work +
   // education arrays). Public route — same auth posture as the form
   // itself (applicant fills it without logging in).
-  Route::post('/applicant-form/cv-extract', ['App\Http\Controllers\Resorts\ApplicantController','extractCv'])->name('resort.applicant.cvExtract');
+  Route::post('/applicant-form/cv-extract', ['App\Http\Controllers\Resorts\ApplicantController','extractCv'])->middleware('throttle:applicant-form-heavy')->name('resort.applicant.cvExtract');
 
-  Route::post('/applicant_temp/video-remove', ['App\Http\Controllers\Resorts\ApplicantController','applicant_tempVideoremove'])->name('resort.applicant_tempVideoremove');
+  Route::post('/applicant_temp/video-remove', ['App\Http\Controllers\Resorts\ApplicantController','applicant_tempVideoremove'])->middleware('throttle:applicant-form-step')->name('resort.applicant_tempVideoremove');
 
-  Route::post('/applicant_temp/video-store', ['App\Http\Controllers\Resorts\ApplicantController','applicant_tempVideoStore'])->name('resort.applicant_tempVideoStore');
+  Route::post('/applicant_temp/video-store', ['App\Http\Controllers\Resorts\ApplicantController','applicant_tempVideoStore'])->middleware('throttle:applicant-form-heavy')->name('resort.applicant_tempVideoStore');
   // Interview Invitation - Public (no auth)
   Route::get('/interview-invitation/{token}', ['App\Http\Controllers\Resorts\InterviewInvitationController','show'])->name('resort.interview.invitation.show');
   Route::post('/interview-invitation/{token}/accept', ['App\Http\Controllers\Resorts\InterviewInvitationController','accept'])->name('resort.interview.invitation.accept');

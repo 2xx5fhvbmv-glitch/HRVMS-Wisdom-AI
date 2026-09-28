@@ -81,6 +81,20 @@ class RouteServiceProvider extends ServiceProvider
             });
         }
 
+        // Public, no-login talent-acquisition applicant-form endpoints
+        // (T-06) — unauthenticated by design, so IP is the only key
+        // available. Step saves are cheap; cv-extract/video-store proxy to
+        // the AI/storage backends and are the ones worth capping hardest.
+        RateLimiter::for('applicant-form-step', function ($request) {
+            return Limit::perMinute(10)->by($request->ip());
+        });
+        RateLimiter::for('applicant-form-heavy', function ($request) {
+            return Limit::perMinute(3)->by($request->ip());
+        });
+        RateLimiter::for('applicant-form-submit', function ($request) {
+            return Limit::perHour(5)->by($request->ip());
+        });
+
         parent::boot();
     }
 

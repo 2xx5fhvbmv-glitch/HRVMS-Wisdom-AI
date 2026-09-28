@@ -87,21 +87,28 @@ class ApplicantController extends Controller
         if ($linkDetails->link_Expiry_date) {
             $expiryDate = \Carbon\Carbon::parse($linkDetails->link_Expiry_date);
             $today = \Carbon\Carbon::now();
-            
-            if ($today->greaterThan($expiryDate)) {
 
-            // Redirect to a dedicated page for expired links
-            // return view('resorts.applicant_form.expired_link', [
-            //     'message' => 'This application link has expired.',
-            //     'linkDetails' => $linkDetails
-            // ]);
-            
-            // Alternative approach using named route:
-            // return redirect()->route('application.expired')->with('error', 'This application link has expired.');
+            if ($today->greaterThan($expiryDate)) {
+                return redirect()->back()->with('error', 'This application link has expired.');
             }
         }
 
-        $get_vacancies = Vacancies::where('id',$get_ids['2'])->first();
+        $get_vacancies = Vacancies::where('id', $v_id)->where('Resort_id', $resort_id)->first();
+        if (!$get_vacancies) {
+            return redirect()->back()->with('error', 'Application link not found.');
+        }
+
+        // Pin resort_id/vacancy_id to the validated link for this browser
+        // session — applicant_formStore / applicant_tempVideoStore trust
+        // these session values instead of the client-supplied hidden
+        // fields of the same name, so a tampered resort_id/vacancy_id in
+        // the posted form can no longer file an application into a
+        // different resort's vacancy.
+        Session::put('applicant_link', [
+            'resort_id' => (int) $resort_id,
+            'vacancy_id' => (int) $v_id,
+            'ta_child_id' => $ta_childid,
+        ]);
         $get_questionnaire = Questionnaire::where('Resort_id',$resort_id)
                         ->where('Department_id',$get_vacancies->department)
                         ->where('Division_id',$get_vacancies->division)
@@ -192,7 +199,7 @@ class ApplicantController extends Controller
         // Previously this called /extract_job_info, which was tuned for
         // JDs — the LLM emitted loose keys we had to normalise here.
         // The new endpoint returns the form-field schema directly.
-        $url  = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/extract_cv';
+        $url  = rtrim((string) config('services.cv_extractor.url'), '/') . '/extract_cv';
 
         $cFile = curl_file_create(
             $file->getRealPath(),
@@ -325,13 +332,27 @@ class ApplicantController extends Controller
                 'terms_conditions' => 'required',
                 'select_months' => 'nullable|required_without:select_years|integer|between:1,12',
                 'select_years' => 'nullable|required_without:select_months|integer|between:1,5',
-                'curriculum_file' => 'required|file|max:5120',
-                'passport' => 'required|file|max:5120',
-                'profile_picture' => 'required|mimes:jpeg,jpg,png,gif,svg,webp,heic,heif|max:5120',
-                'full_length_photo' => 'required|mimes:jpeg,jpg,png,gif,svg,webp,heic,heif|max:5120',
+                'curriculum_file' => 'required|file|mimes:pdf,doc,docx|max:5120',
+                'passport' => 'required|file|mimes:pdf,jpg,jpeg,png,heic,heif|max:5120',
+                'profile_picture' => 'required|mimes:jpeg,jpg,png,webp,heic,heif|max:5120',
+                'full_length_photo' => 'required|mimes:jpeg,jpg,png,webp,heic,heif|max:5120',
+                'other_document' => 'nullable|array|max:5',
+                'other_document.*' => 'file|mimes:pdf,doc,docx,jpg,jpeg,png,heic,heif|max:5120',
                 'resort_id' => 'required|integer',
                 'vacancy_id' => 'required|integer',
             ]);
+
+            // Trust only the resort_id/vacancy_id pinned to this session
+            // when the applicant opened a valid, unexpired application
+            // link (showapplicantForm) — never the client-supplied hidden
+            // fields of the same name (T-06: those let anyone file an
+            // application into any resort/vacancy without ever having a
+            // link).
+            $linkContext = Session::get('applicant_link');
+            if (!$linkContext) {
+                return response()->json(['success' => false, 'message' => 'Your application link has expired or is invalid. Please reopen the application link and try again.'], 422);
+            }
+            $request->merge(['resort_id' => $linkContext['resort_id'], 'vacancy_id' => $linkContext['vacancy_id']]);
             $vacancy_id = $request->vacancy_id;
 
             // Fetch country and timezone
@@ -758,65 +779,46 @@ class ApplicantController extends Controller
 
     public function applicant_tempVideoStore(Request $request)
     {
-        \Log::info('Request received:', $request->all());
+        $request->validate([
+            'video' => 'required|file|mimetypes:video/mp4,video/webm,video/ogg,video/quicktime|max:51200',
+        ]);
 
-        // $request->validate([
-        //     'video' => 'required|mimes:mp4,webm,ogg,mkv,tmp|max:50000',
-        // ]);
-        
-        // if (!$request->hasFile('video')) {
-        //     Log::error('Video file is missing');
-        //     return response()->json(['message' => 'No video file uploaded'], 400);
-        // }
-        // Process file upload
-
+        // Never trust resort_id/vacancy_id from the request (T-06) — an
+        // anonymous caller could otherwise drop a video into any resort's
+        // talent-acquisition storage. Resolve them from the same
+        // session context showapplicantForm pinned after validating the
+        // application link.
+        $linkContext = Session::get('applicant_link');
+        if (!$linkContext) {
+            return response()->json(['message' => 'Your application link has expired or is invalid.'], 422);
+        }
 
         try
         {
             $ipAddress = $request->ip();
-            $systemInfo = [
-                'os' => php_uname(), // Operating System details
-                'ipAddress' => $ipAddress,
-            ];
 
-            $videoPath = config('settings.Resort_Applicant'); // Base path
+            $status = Common::TalentAcquisitionFolder($linkContext['resort_id'], $linkContext['vacancy_id'], $request->file('video'));
 
-            // // Ensure directory exists
-            // if (!file_exists(public_path($videoPath))) {
-            //     mkdir(public_path($videoPath), 0755, true);
-            // }
+            if($status == true)
+            {
+                $tempData = Temp_language_video_store::create([
+                    'resort_id' => $linkContext['resort_id'],
+                    'video' =>$status['path'],
+                    'os' => '',
+                    'ipAddress' => $ipAddress,
+                ]);
+                Session::push('applicant_temp_video_ids', $tempData->id);
 
-            
-            // Store the uploaded file
-            // if ($request->hasFile('video')) {
-                $fileName = uniqid('video_', true) . '.' . $request->video->getClientOriginalExtension();
-
-                // Common::uploadFile($request->video, $fileName, $videoPath);
-
-                $vacancy_id =  $request->vacancy_id;
-                $status = Common::TalentAcquisitionFolder($request->resort_id,$vacancy_id,$request->video);
-          
-                if($status == true)
-                {
-                    $tempData = Temp_language_video_store::create([
-                        'resort_id' => $request->resort_id,
-                        'video' =>$status['path'],
-                        'os' => $systemInfo['os'],
-                        'ipAddress' => $systemInfo['ipAddress'],
-                    ]);
-
-                    return response()->json([
-                        'message' => 'Video uploaded successfully!',
-                        'path' => $status['path'],
-                        'video_id' => $tempData->id,
-                    ]);
-                }
-                else
-                {
-                    return response()->json(['message' => 'Failed to create folder'], 500);
-                }
-                
-
+                return response()->json([
+                    'message' => 'Video uploaded successfully!',
+                    'path' => $status['path'],
+                    'video_id' => $tempData->id,
+                ]);
+            }
+            else
+            {
+                return response()->json(['message' => 'Failed to create folder'], 500);
+            }
 
             return response()->json(['message' => 'Failed to upload video'], 400);
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -827,7 +829,25 @@ class ApplicantController extends Controller
 
     public function applicant_tempVideoremove(Request $request)
     {
-    	$remove_data = Temp_language_video_store::find('1')->delete();
+        $ownVideoIds = Session::get('applicant_temp_video_ids', []);
+        $videoId = $request->input('video_id');
+
+        if ($videoId) {
+            // Remove one specific temp video — only if it's one this
+            // session itself uploaded.
+            if (!in_array((int) $videoId, $ownVideoIds, true)) {
+                return response()->json(['message' => 'Video not found.'], 404);
+            }
+            Temp_language_video_store::where('id', $videoId)->delete();
+            Session::put('applicant_temp_video_ids', array_values(array_diff($ownVideoIds, [(int) $videoId])));
+        } elseif (!empty($ownVideoIds)) {
+            // No id given (page-unload cleanup) — clear only this
+            // session's own temp videos, never row #1 for every visitor.
+            Temp_language_video_store::whereIn('id', $ownVideoIds)->delete();
+            Session::forget('applicant_temp_video_ids');
+        }
+
+        return response()->json(['message' => 'Video removed.']);
     }
 
     /**

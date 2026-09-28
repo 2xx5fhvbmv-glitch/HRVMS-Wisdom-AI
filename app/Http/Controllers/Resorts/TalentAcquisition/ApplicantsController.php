@@ -1450,7 +1450,10 @@ class ApplicantsController extends Controller
                     'ApplicantInterviewtime' => $applicantTime,
                     'InterViewDate' => $interviewDate,
                     'EmailTemplateId' => $request->EmailTemplate,
-                    'MeetingLink' => $request->MeetingLink ?? '',
+                    // Only accept https:// links (T-07) — this is stored
+                    // and later rendered as a raw <a href>; a javascript:
+                    // URI here would execute when HR clicks "Join".
+                    'MeetingLink' => (str_starts_with((string) $request->MeetingLink, 'https://')) ? $request->MeetingLink : '',
                     'interviewer_id' => $interviewerId,
                     'invitation_token' => Str::uuid(),
                 ]
@@ -1592,6 +1595,7 @@ class ApplicantsController extends Controller
 
     public function SendInterviewEmail(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $interviewId = base64_decode($request->interview_id);
         $templateId = $request->email_template_id;
 
@@ -1652,6 +1656,7 @@ class ApplicantsController extends Controller
 
     public function DeletePendingInterview(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $interviewId = base64_decode($request->interview_id);
         $interview = ApplicantInterViewDetails::where('resort_id', $this->resort->resort_id)->find($interviewId);
 
@@ -2659,6 +2664,7 @@ class ApplicantsController extends Controller
     }
     public function RevertBack(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         DB::beginTransaction();
         try
         {
@@ -3377,6 +3383,7 @@ class ApplicantsController extends Controller
 
     public function sendConsentRequest(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
             'consent_expiry_date' => 'required|date',
@@ -3423,6 +3430,7 @@ class ApplicantsController extends Controller
 
     public function checkAvailability(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
             'email_template_id' => 'required',

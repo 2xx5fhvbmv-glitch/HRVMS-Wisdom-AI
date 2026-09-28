@@ -37,6 +37,10 @@ class ConfigController extends Controller
         $this->resort = Auth::guard('resort-admin')->user();
         if(!$this->resort) return;
 
+        // T-05: recruitment settings had zero role checks — any portal
+        // user could change fee/notification/job-advert config. Decided
+        // policy: HR only (not even GM).
+        abort_unless(Common::hasFullDataAccess(optional($this->resort)->GetEmployee), 403, 'Unauthorized action.');
 
         $this->rank = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id:3;
 

@@ -10767,8 +10767,13 @@ class Common
             // Store the original file object
             $uploadedFile = $file_name;
 
-            // Generate new filename
-            $newFileName = uniqid('video_', true) . '.' . $uploadedFile->getClientOriginalExtension();
+            // Generate new filename — extension() sniffs the actual file
+            // content's MIME type (Symfony's guesser), unlike
+            // getClientOriginalExtension() which trusts whatever
+            // extension the uploader's browser sent (T-03: a ".php" file
+            // renamed to look like a video would otherwise land on disk
+            // with a ".php" extension).
+            $newFileName = uniqid('video_', true) . '.' . ($uploadedFile->extension() ?: 'bin');
 
             // Now upload the file to the folder
             $filePath = $basePath . '/' . $newFileName;
@@ -10789,7 +10794,7 @@ class Common
             try {
                 $localBasePath = 'public/talent_acquisition/' . $main_folder . '/' . base64_encode($vacancy_id);
                 $uploadedFile = $file_name;
-                $newFileName = uniqid('video_', true) . '.' . $uploadedFile->getClientOriginalExtension();
+                $newFileName = uniqid('video_', true) . '.' . ($uploadedFile->extension() ?: 'bin');
                 $filePath = $uploadedFile->storeAs($localBasePath, $newFileName, 'local');
 
                 $data['status'] = true;
@@ -10821,7 +10826,7 @@ class Common
             $prefix = 'applicant_';
             $randomPart = Str::random(8);
             $timestamp = time();
-            $newFileName = $prefix . $timestamp . '_' . $randomPart . '.' . $uploadedFile->getClientOriginalExtension();
+            $newFileName = $prefix . $timestamp . '_' . $randomPart . '.' . ($uploadedFile->extension() ?: 'bin');
 
             $basePath = $main_folder . '/public/talent_acquisition/' . base64_encode($vacancy_id);
 
