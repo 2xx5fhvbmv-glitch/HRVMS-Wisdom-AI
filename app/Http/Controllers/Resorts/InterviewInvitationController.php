@@ -122,9 +122,13 @@ class InterviewInvitationController extends Controller
                 ->with('error', 'This invitation is no longer valid.');
         }
 
+        $request->validate([
+            'rejection_reason' => 'nullable|string|max:1000',
+        ]);
+
         $interview->update([
             'Status' => 'Invitation Rejected',
-            'rejection_reason' => $request->rejection_reason,
+            'rejection_reason' => $request->rejection_reason ? preg_replace('/[\x00-\x1F\x7F]/u', '', $request->rejection_reason) : null,
         ]);
 
         // Send notification email to interviewer
@@ -147,7 +151,7 @@ class InterviewInvitationController extends Controller
 
             $applicant = Applicant_form_data::find($interview->Applicant_id);
             $resort = Resort::find($interview->resort_id);
-            $candidateName = $applicant ? ucfirst($applicant->first_name) . ' ' . ucfirst($applicant->last_name) : 'Unknown';
+            $candidateName = $applicant ? e(ucfirst($applicant->first_name) . ' ' . ucfirst($applicant->last_name)) : 'Unknown';
             $interviewDate = Carbon::parse($interview->InterViewDate)->format('d M Y');
             $resortName = $resort->resort_name ?? '';
 
@@ -166,7 +170,7 @@ class InterviewInvitationController extends Controller
                 ";
             } else {
                 $subject = "Interview Declined - {$candidateName}";
-                $reasonHtml = $reason ? "<tr><td style='padding:8px;border:1px solid #ddd;font-weight:600;'>Reason</td><td style='padding:8px;border:1px solid #ddd;'>{$reason}</td></tr>" : '';
+                $reasonHtml = $reason ? "<tr><td style='padding:8px;border:1px solid #ddd;font-weight:600;'>Reason</td><td style='padding:8px;border:1px solid #ddd;'>" . nl2br(e($reason)) . "</td></tr>" : '';
                 $body = "
                     <p>Dear Interviewer,</p>
                     <p>We regret to inform you that <strong>{$candidateName}</strong> has <strong style='color:#dc3545;'>declined</strong> the interview invitation.</p>

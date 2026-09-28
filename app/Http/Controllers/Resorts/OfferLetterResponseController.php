@@ -104,9 +104,13 @@ class OfferLetterResponseController extends Controller
                 ->with('error', 'This offer letter has already been accepted.');
         }
 
+        $request->validate([
+            'rejection_reason' => 'nullable|string|max:1000',
+        ]);
+
         $offer->update([
             'status' => 'Rejected',
-            'rejection_reason' => $request->rejection_reason,
+            'rejection_reason' => $request->rejection_reason ? preg_replace('/[\x00-\x1F\x7F]/u', '', $request->rejection_reason) : null,
             'responded_at' => Carbon::now(),
         ]);
 
