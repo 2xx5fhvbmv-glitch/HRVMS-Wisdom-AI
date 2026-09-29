@@ -820,6 +820,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
 
     Route::get('accommodation/housekeeping-request', 'Accommodation\HousekeepingRequestController@index')->name('resort.accommodation.HousekeepingRequest');
     Route::post('accommodation/housekeeping-request/eligible-services', 'Accommodation\HousekeepingRequestController@eligibleServices')->name('resort.accommodation.HousekeepingRequestEligibleServices');
+    Route::get('accommodation/housekeeping-request/eligible-line-workers', 'Accommodation\HousekeepingRequestController@eligibleLineWorkers')->name('resort.accommodation.HousekeepingRequestEligibleLineWorkers');
     Route::post('accommodation/housekeeping-request/store', 'Accommodation\HousekeepingRequestController@store')->name('resort.accommodation.HousekeepingRequestStore');
     Route::get('accommodation/housekeeping-request/list', 'Accommodation\HousekeepingRequestController@list')->name('resort.accommodation.HousekeepingRequestList');
 

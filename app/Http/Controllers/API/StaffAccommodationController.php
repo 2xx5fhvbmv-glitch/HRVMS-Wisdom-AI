@@ -552,6 +552,10 @@ class StaffAccommodationController extends Controller
                     'id'              => $maintanaceRequest->Assigned_To,
                     'name'            => ucfirst($assignedEmployee->first_name . ' ' . $assignedEmployee->last_name),
                     'profile_picture' => Common::getResortUserPicture($assignedEmployee->Parent_id),
+                    'position_title'  => $assignedEmployee->position_title,
+                    'Emp_id'          => $assignedEmployee->Emp_id,
+                    'department_name' => $assignedEmployee->department_name,
+                    'personal_phone'  => $assignedEmployee->personal_phone,
                 ] : null;
 
                 $assignMaintReqStaffDetails                 =   ChildMaintananceRequest::join("employees as t3", "t3.id", "=", "child_maintanance_requests.ApprovedBy")

@@ -40,6 +40,7 @@ return [
 	'city_ladger_file' => 'public/uploads/city_ladger_file',
 	'GrievanceSubmission' => 'public/uploads/GrievanceSubmission',
 	'Housekeeping_Images'=>	'uploads/HousekeepingImages',
+	'HousekeepingRequestPhotos' => 'uploads/HousekeepingRequestPhotos',
 	'support_ticket_attachments' => 'uploads/support_ticket_attachments',
 	'chat_attachments' => 'uploads/chat_attachments',
 	'PayslipPdf' => 'uploads/payslip',

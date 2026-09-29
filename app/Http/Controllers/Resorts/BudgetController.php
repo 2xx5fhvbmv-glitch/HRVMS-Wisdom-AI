@@ -1813,12 +1813,114 @@ class BudgetController extends Controller
             default        => ['Permanent'],
         };
 
-        // The existing single-category tree builder below is wrapped in a
-        // closure (rather than moved into a separate method) so its ~500
-        // lines of already-proven batch-prefetch logic stay completely
-        // unmoved and unchanged — only invoked once per needed category
-        // instead of assuming exactly one.
-        $resolveCategory = function ($employmentType) use ($request, $selectedYear, $resortId, $employeeRankPosition, $mvrToDollarRate) {
+        // Single-category tree builder extracted into
+        // resolveConsolidatedCategoryTree() (below) — called once per needed
+        // category, and reused as-is by assembleConsolidatedExportData() for
+        // the Excel export instead of being copy-pasted there.
+
+        // Non-ajax direct-URL access never participates in the tab
+        // feature (the page's own JS always calls this via $.ajax with a
+        // category_view) — preserve the exact original single-category
+        // (Permanent) behavior/response shape for that path untouched.
+        $categoryResults = [];
+        foreach ($categoriesNeeded as $cat) {
+            $categoryResults[$cat] = $this->resolveConsolidatedCategoryTree($cat, $selectedYear, $resortId, $employeeRankPosition, $mvrToDollarRate, $request->ajax());
+        }
+
+        if ($categoryView === 'nonpermanent') {
+            $activeSub = in_array($request->input('sub'), ['Casual', 'Intern'], true) ? $request->input('sub') : 'Casual';
+            $consolidatedBudget = $categoryResults[$activeSub]['consolidatedBudget'];
+            $header = $categoryResults[$activeSub]['header'];
+            $resortCosts = $categoryResults[$activeSub]['resortCosts'];
+        } elseif ($categoryView === 'all') {
+            // Real merge (not a representative-fallback) — this endpoint
+            // builds one in-memory nested array per category rather than
+            // View Budget's lazy per-node AJAX system, so combining the up
+            // to 3 trees here is tractable: same division/department/
+            // section/position NAMES recur across categories (they're the
+            // same catalog entities), so matching on those names and
+            // summing each level's already-computed calculated_total
+            // (rather than re-deriving it) is correct and doesn't risk
+            // double-counting.
+            $merged = $this->mergeConsolidatedBudgetTrees(array_map(fn ($r) => $r['consolidatedBudget'], $categoryResults));
+            $consolidatedBudget = $merged;
+            $header = $categoryResults['Permanent']['header'];
+            // WP2.1 — "All Combined" blends employees of every category in
+            // one tree, so the cost-line columns must cover all 3
+            // categories' cost lines too (union by id+category so
+            // Permanent/Casual/Intern lines with colliding ids don't
+            // collapse into each other); a given row only has values under
+            // its own category's columns, which is correct here, not a bug.
+            $resortCosts = collect($categoryResults)->flatMap(fn ($r) => $r['resortCosts'])->values();
+        } else {
+            $consolidatedBudget = $categoryResults['Permanent']['consolidatedBudget'];
+            $header = $categoryResults['Permanent']['header'];
+            $resortCosts = $categoryResults['Permanent']['resortCosts'];
+        }
+
+        $html = view('resorts.renderfiles.consolidated', compact(
+            'consolidatedBudget',
+            'header',
+            'resortCosts',
+            'selectedYear',
+            'employeeRankPosition',
+            'mvrToDollarRate'
+        ))->render();
+
+        // WP7(D4) — Send To Finance/Send To GM must enable only once every
+        // department has submitted (for every category the current tab
+        // covers — 'all' needs all 3, 'nonpermanent' needs both Casual and
+        // Intern, 'permanent' needs just Permanent). This used to be
+        // hardcoded true, so the buttons' enabled state never reflected
+        // reality; the JS also had the true/false meaning backwards (see
+        // consolidated.blade.php fetchConsolidatedBudget()), so in practice
+        // the buttons were simply always disabled.
+        // WP7.1/WP7.3 — inactive depts must not count toward the total, and
+        // a draft (or a row sent back to draft by ReviseBudget() — A3) must
+        // not count as submitted, same fix as SendToFinance()'s own gate.
+        $allDepartments = ResortDepartment::where('resort_id', $resortId)->where('status', 'active')->get(['id', 'name']);
+        $submittedDeptIdsByCategory = [];
+        foreach ($categoriesNeeded as $cat) {
+            $submittedDeptIdsByCategory[$cat] = ManningResponse::where('year', $selectedYear)
+                ->where('resort_id', $resortId)
+                ->where('employment_type', $cat)
+                ->where('status', 'submitted')
+                ->pluck('dept_id')
+                ->unique()
+                ->all();
+        }
+        $missingDepartments = [];
+        foreach ($allDepartments as $dept) {
+            foreach ($categoriesNeeded as $cat) {
+                if (!in_array($dept->id, $submittedDeptIdsByCategory[$cat], true)) {
+                    $missingDepartments[] = $dept->name;
+                    break;
+                }
+            }
+        }
+        $totalDepartments = $allDepartments->count();
+        $missingDepartments = array_values(array_unique($missingDepartments));
+
+        return response()->json([
+            'html' => $html,
+            'isBudgetCompleted' => empty($missingDepartments),
+            'totalDepartments' => $totalDepartments,
+            'submittedDepartments' => $totalDepartments - count($missingDepartments),
+            'missingDepartments' => $missingDepartments,
+        ]);
+    }
+
+    /**
+     * Builds the full division/department/section/position tree for one
+     * employment-type category (Permanent/Casual/Intern), batch-fetching
+     * everything up front. Extracted out of viewConsolidatedBudget() (its
+     * sole caller before this) so assembleConsolidatedExportData() can call
+     * it too, instead of duplicating this ~700-line closure into the
+     * Excel export path. $ajaxLike takes the place of $request->ajax() —
+     * every real caller already resolves that to true before this runs.
+     */
+    protected function resolveConsolidatedCategoryTree($employmentType, $selectedYear, $resortId, $employeeRankPosition, $mvrToDollarRate, bool $ajaxLike = true)
+    {
         // Retrieve manning responses by resort and year
         if(($employeeRankPosition['position'] != "HR" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" )) && ($employeeRankPosition['position'] != "GM" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" )) && ($employeeRankPosition['position'] != "Finance" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" ))) {
             $yearlyBudgets = ManningResponse::where('year', $selectedYear)
@@ -1895,7 +1997,7 @@ class BudgetController extends Controller
         // least the legacy non-ajax $MainArray branch is reachable. Short-
         // circuit with an empty tree instead of falling into that branch,
         // which doesn't handle ajax requests at all.
-        if ($request->ajax() && $departmentsInScope->isEmpty()) {
+        if ($ajaxLike && $departmentsInScope->isEmpty()) {
             return ['consolidatedBudget' => [], 'header' => []];
         }
 
@@ -2452,7 +2554,7 @@ class BudgetController extends Controller
             // Intern tab rendered Permanent-shaped cost cells (all blank)
             // while the row total was correctly computed from the real
             // category — cells summed to less than the total.
-            if ($request->ajax()) {
+            if ($ajaxLike) {
                 return compact('consolidatedBudget', 'header', 'resortCosts');
             }
         }
@@ -2510,104 +2612,12 @@ class BudgetController extends Controller
                 $DepartmentTotal=[];
             }
 
-            if ($request->ajax()) {
+            if ($ajaxLike) {
                 return view('resorts.renderfiles.consolidatedold', compact('MainArray','header','DepartmentTotal','resortId'));
             }
         }
 
         // Non-AJAX requests never reach here (redirected at the top of viewConsolidatedBudget()).
-        }; // end $resolveCategory closure
-
-        // Non-ajax direct-URL access never participates in the tab
-        // feature (the page's own JS always calls this via $.ajax with a
-        // category_view) — preserve the exact original single-category
-        // (Permanent) behavior/response shape for that path untouched.
-        $categoryResults = [];
-        foreach ($categoriesNeeded as $cat) {
-            $categoryResults[$cat] = $resolveCategory($cat);
-        }
-
-        if ($categoryView === 'nonpermanent') {
-            $activeSub = in_array($request->input('sub'), ['Casual', 'Intern'], true) ? $request->input('sub') : 'Casual';
-            $consolidatedBudget = $categoryResults[$activeSub]['consolidatedBudget'];
-            $header = $categoryResults[$activeSub]['header'];
-            $resortCosts = $categoryResults[$activeSub]['resortCosts'];
-        } elseif ($categoryView === 'all') {
-            // Real merge (not a representative-fallback) — this endpoint
-            // builds one in-memory nested array per category rather than
-            // View Budget's lazy per-node AJAX system, so combining the up
-            // to 3 trees here is tractable: same division/department/
-            // section/position NAMES recur across categories (they're the
-            // same catalog entities), so matching on those names and
-            // summing each level's already-computed calculated_total
-            // (rather than re-deriving it) is correct and doesn't risk
-            // double-counting.
-            $merged = $this->mergeConsolidatedBudgetTrees(array_map(fn ($r) => $r['consolidatedBudget'], $categoryResults));
-            $consolidatedBudget = $merged;
-            $header = $categoryResults['Permanent']['header'];
-            // WP2.1 — "All Combined" blends employees of every category in
-            // one tree, so the cost-line columns must cover all 3
-            // categories' cost lines too (union by id+category so
-            // Permanent/Casual/Intern lines with colliding ids don't
-            // collapse into each other); a given row only has values under
-            // its own category's columns, which is correct here, not a bug.
-            $resortCosts = collect($categoryResults)->flatMap(fn ($r) => $r['resortCosts'])->values();
-        } else {
-            $consolidatedBudget = $categoryResults['Permanent']['consolidatedBudget'];
-            $header = $categoryResults['Permanent']['header'];
-            $resortCosts = $categoryResults['Permanent']['resortCosts'];
-        }
-
-        $html = view('resorts.renderfiles.consolidated', compact(
-            'consolidatedBudget',
-            'header',
-            'resortCosts',
-            'selectedYear',
-            'employeeRankPosition',
-            'mvrToDollarRate'
-        ))->render();
-
-        // WP7(D4) — Send To Finance/Send To GM must enable only once every
-        // department has submitted (for every category the current tab
-        // covers — 'all' needs all 3, 'nonpermanent' needs both Casual and
-        // Intern, 'permanent' needs just Permanent). This used to be
-        // hardcoded true, so the buttons' enabled state never reflected
-        // reality; the JS also had the true/false meaning backwards (see
-        // consolidated.blade.php fetchConsolidatedBudget()), so in practice
-        // the buttons were simply always disabled.
-        // WP7.1/WP7.3 — inactive depts must not count toward the total, and
-        // a draft (or a row sent back to draft by ReviseBudget() — A3) must
-        // not count as submitted, same fix as SendToFinance()'s own gate.
-        $allDepartments = ResortDepartment::where('resort_id', $resortId)->where('status', 'active')->get(['id', 'name']);
-        $submittedDeptIdsByCategory = [];
-        foreach ($categoriesNeeded as $cat) {
-            $submittedDeptIdsByCategory[$cat] = ManningResponse::where('year', $selectedYear)
-                ->where('resort_id', $resortId)
-                ->where('employment_type', $cat)
-                ->where('status', 'submitted')
-                ->pluck('dept_id')
-                ->unique()
-                ->all();
-        }
-        $missingDepartments = [];
-        foreach ($allDepartments as $dept) {
-            foreach ($categoriesNeeded as $cat) {
-                if (!in_array($dept->id, $submittedDeptIdsByCategory[$cat], true)) {
-                    $missingDepartments[] = $dept->name;
-                    break;
-                }
-            }
-        }
-        $totalDepartments = $allDepartments->count();
-        $missingDepartments = array_values(array_unique($missingDepartments));
-
-        return response()->json([
-            'html' => $html,
-            'isBudgetCompleted' => empty($missingDepartments),
-            'totalDepartments' => $totalDepartments,
-            'submittedDepartments' => $totalDepartments - count($missingDepartments),
-            'missingDepartments' => $missingDepartments,
-        ]);
     }
 
     /**

@@ -44,12 +44,27 @@ class DashboardController extends Controller
      * the module_pages permission middleware defaults to allow for any
      * logged-in portal user, any rank. Same Common::hasFullDataAccess()
      * gate used codebase-wide for this "everyone vs HR/GM" decision.
+     *
+     * Trello "Housekeeping – Request Flow & HOD Visibility Issues": the read
+     * routes below (index/view/team-activity/employee-safety/map/mass-
+     * instruction history) only had the module_pages permission tick
+     * (`sos.dashboard.index`) as their gate — a Position with that box
+     * checked, e.g. Housekeeping HOD, got full SOS History access purely
+     * from config, with no code-level floor. hasSosHistoryAccess() is that
+     * floor, same boundary this method already enforces for the
+     * destructive routes; both AND with the permission tick, neither
+     * replaces it.
      */
-    private function requireHrAccess()
+    private function hasSosHistoryAccess(): bool
     {
         $employee = optional($this->resort)->GetEmployee;
         $isSecurityManager = optional(optional($employee)->position)->position_title === 'Security Manager';
-        if (!$isSecurityManager && !Common::hasFullDataAccess($employee)) {
+        return $isSecurityManager || Common::hasFullDataAccess($employee);
+    }
+
+    private function requireHrAccess()
+    {
+        if (!$this->hasSosHistoryAccess()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
         }
         return null;
@@ -60,6 +75,9 @@ class DashboardController extends Controller
         // the sidebar hid the link, but any resort-admin could open the URL
         // and read the full SOS history.
         if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
+            return abort(403, 'Unauthorized action.');
+        }
+        if (!$this->hasSosHistoryAccess()) {
             return abort(403, 'Unauthorized action.');
         }
 
@@ -286,6 +304,9 @@ class DashboardController extends Controller
         if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized action.');
         }
+        if (!$this->hasSosHistoryAccess()) {
+            return abort(403, 'Unauthorized action.');
+        }
 
         $page_title ='SOS Detail';
         $id = base64_decode($id);
@@ -302,6 +323,9 @@ class DashboardController extends Controller
     public function viewTeamActivityDetails(Request $request,$id)
     {
         if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
+            return abort(403, 'Unauthorized action.');
+        }
+        if (!$this->hasSosHistoryAccess()) {
             return abort(403, 'Unauthorized action.');
         }
         $page_title ='Team Activity';
@@ -332,6 +356,9 @@ class DashboardController extends Controller
     {
         if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized action.');
+        }
+        if (!$this->hasSosHistoryAccess()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
         }
         $sosExists = SOSHistoryModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists();
         if (!$sosExists) {
@@ -369,6 +396,9 @@ class DashboardController extends Controller
         if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized action.');
         }
+        if (!$this->hasSosHistoryAccess()) {
+            return abort(403, 'Unauthorized action.');
+        }
         $page_title ='Employee Safety Status';
         $id = base64_decode($id);
         $resort_id = $this->resort->resort_id;
@@ -404,6 +434,9 @@ class DashboardController extends Controller
     {
         if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized action.');
+        }
+        if (!$this->hasSosHistoryAccess()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
         }
         $sosExists = SOSHistoryModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists();
         if (!$sosExists) {
@@ -475,6 +508,9 @@ class DashboardController extends Controller
         if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized action.');
         }
+        if (!$this->hasSosHistoryAccess()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         // Raw numeric id, not base64 — matches the sibling AJAX filter
         // methods (filterEmployeeSafetyDetails/filterTeamActivityDetails)
         // this is called alongside, both of which take $id as-is.
@@ -496,6 +532,9 @@ class DashboardController extends Controller
     public function showMap($id)
     {
         if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
+            return abort(403, 'Unauthorized action.');
+        }
+        if (!$this->hasSosHistoryAccess()) {
             return abort(403, 'Unauthorized action.');
         }
         $id = base64_decode($id);
@@ -528,6 +567,9 @@ class DashboardController extends Controller
     {
         if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized action.');
+        }
+        if (!$this->hasSosHistoryAccess()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
         }
         $sosExists = SOSHistoryModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists();
         if (!$sosExists) {

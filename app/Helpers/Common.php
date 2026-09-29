@@ -5472,6 +5472,49 @@ class Common
     }
 
     /**
+     * True for an active Housekeeping-department employee who is NOT
+     * HOD/EXCOM (rank 1/2) — the "Line Worker" a housekeeping task should
+     * actually be assignable to. HousekeepingRequestController@assign()
+     * previously only checked isHousekeepingDepartment(), so a Housekeeping
+     * HOD/EXCOM could be picked as the cleaner themselves (Trello: "Verify
+     * recipient mapping ... not HOD/XCOM or unrelated employees").
+     */
+    public static function isHousekeepingLineWorker($employee): bool
+    {
+        return $employee
+            && !in_array((int) $employee->rank, [1, 2], true)
+            && self::isHousekeepingDepartment($employee->Dept_id ?? null)
+            && in_array($employee->status, [null, 'Active', 'Probationary'], true);
+    }
+
+    /**
+     * Active Housekeeping-department employees eligible to be assigned a
+     * cleaning task (i.e. NOT the HOD/EXCOM) — same eligible-assignee set
+     * isHousekeepingLineWorker() checks a single employee against, as a
+     * list for populating an "Assign to" dropdown.
+     */
+    public static function getResortHousekeepingLineWorkers($resortId)
+    {
+        $hkDeptIds = \App\Models\ResortDepartment::where('resort_id', $resortId)
+            ->pluck('id')
+            ->filter(fn($id) => self::isHousekeepingDepartment($id))
+            ->all();
+
+        if (empty($hkDeptIds)) {
+            return collect();
+        }
+
+        return \App\Models\Employee::with('resortAdmin')
+            ->where('resort_id', $resortId)
+            ->whereIn('Dept_id', $hkDeptIds)
+            ->whereNotIn('rank', [1, 2])
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->get();
+    }
+
+    /**
      * sos_history.status drifted across 3 migrations (Drill-active renamed
      * Drill-Active; Under-Control/Drill-Under-Control added then dropped
      * again) and several call sites were written against an earlier version
@@ -6651,11 +6694,21 @@ class Common
         // defensive tenant boundary. $resortId is optional so existing
         // callers keep working; pass it to close the gap defense-in-depth.
         $query = ResortAdmin::join('employees as t1', 't1.Admin_Parent_id', '=', 'resort_admins.id')
+            ->leftJoin('resort_positions as t2', 't2.id', '=', 't1.Position_id')
+            ->leftJoin('resort_departments as t3', 't3.id', '=', 't1.Dept_id')
             ->where('t1.id', $emp_id);
         if ($resortId !== null) {
             $query->where('t1.resort_id', $resortId);
         }
-        return $query->first(['resort_admins.id as Parent_id','resort_admins.first_name','resort_admins.last_name']);
+        return $query->first([
+            'resort_admins.id as Parent_id',
+            'resort_admins.first_name',
+            'resort_admins.last_name',
+            'resort_admins.personal_phone',
+            't1.Emp_id',
+            't2.position_title',
+            't3.name as department_name',
+        ]);
     }
     private function getNextApprover($leave)
     {

@@ -694,6 +694,10 @@ class AccommodationController extends Controller
                     'id'               => $MaintanaceRequest->Assigned_To,
                     'name'             => ucfirst($assignedEmployee->first_name . ' ' . $assignedEmployee->last_name),
                     'profile_picture'  => Common::getResortUserPicture($assignedEmployee->Parent_id),
+                    'position_title'   => $assignedEmployee->position_title,
+                    'Emp_id'           => $assignedEmployee->Emp_id,
+                    'department_name'  => $assignedEmployee->department_name,
+                    'personal_phone'   => $assignedEmployee->personal_phone,
                 ] : null;
                 // **Check & Assign Image Path**
                 // Image can be a plain filename (web upload) or a
