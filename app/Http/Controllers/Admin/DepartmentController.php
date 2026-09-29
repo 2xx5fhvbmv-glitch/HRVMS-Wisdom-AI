@@ -22,7 +22,6 @@ class DepartmentController extends Controller
    
     public function index()
     {
-        // return view('admin.manufecturers.index');
         $data = new Department;
         // dd($data);
         return view('admin.departments.index',compact('data'));

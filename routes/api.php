@@ -56,6 +56,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('profile/visa-category', [App\Http\Controllers\API\ProfileController::class, 'getVisaCategory']);
 		Route::get('profile/visa-data/{visa_category}', [App\Http\Controllers\API\ProfileController::class, 'getVisaData']);
 		Route::get('resort/test-push-notification', [App\Http\Controllers\API\ProfileController::class, 'testPushNotification']);
+		Route::post('resort/profile-change-password', [App\Http\Controllers\API\ProfileController::class, 'changePassword']);
 
 		// Job Description consent (Part 2.5)
 		Route::get('job-description', [App\Http\Controllers\API\JobDescriptionController::class, 'index']);

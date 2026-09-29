@@ -29,6 +29,15 @@ class VisaReportController extends Controller
     public function __construct()
     {
         $this->resort = auth()->guard('resort-admin')->user();
+
+        // R-01: this only ever checked the generic "Reports" permission,
+        // not the visa.access rule V-02 already established for the rest
+        // of the Visa module — an L&D manager (hasFullDataAccess() admits
+        // them, canAccessVisa() doesn't) could read every visa/work-permit/
+        // quota record in the resort via this report screen alone.
+        if ($this->resort && !Common::canAccessVisa()) {
+            abort(403, 'Unauthorized access');
+        }
     }
 
     private function registry(): array

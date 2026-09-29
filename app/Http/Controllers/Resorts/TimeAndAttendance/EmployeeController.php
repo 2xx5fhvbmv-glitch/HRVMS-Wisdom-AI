@@ -46,6 +46,37 @@ class EmployeeController extends Controller
         $this->underEmp_id = Common::getSubordinates($reporting_to);
     }
 
+    /**
+     * A-05: the Employee Details page and its 4 sibling data-loading
+     * methods (AttandanceHisotry, EmpDetailsPrint, EmpDetailsFilters,
+     * attandanceHisotryExport) all queried an employee by id scoped to
+     * this resort only — no department limit at all, so any portal user
+     * could view any other department's employee. Same HR/EXCOM-see-all,
+     * everyone-else-own-department rule
+     * AttandanceRegisterController::ResigterRosterSearch already applies
+     * to the register list.
+     */
+    private function assertCanViewEmployeeDetail($employeeId): int
+    {
+        $targetDeptId = Employee::where('id', $employeeId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->value('Dept_id');
+
+        if ($targetDeptId === null) {
+            abort(404, 'Employee not found.');
+        }
+
+        $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->GetEmployee ?? null);
+        $callerDeptId = $this->resort->GetEmployee->Dept_id ?? null;
+
+        if (!in_array($employeeRankPosition['position'] ?? null, ['HR', 'EXCOM'], true)
+            && (int) $targetDeptId !== (int) $callerDeptId) {
+            abort(403, 'You do not have access to this employee.');
+        }
+
+        return (int) $targetDeptId;
+    }
+
     private function getDetailSelectColumns($resortId, $monthStartingDate, $monthEndingDate)
     {
         return [
@@ -675,6 +706,7 @@ class EmployeeController extends Controller
             return abort(403, 'Unauthorized access');
         }
         $id = base64_decode($id);
+        $this->assertCanViewEmployeeDetail($id);
         $page_title = "Employee Details";
         $Dept_id = $this->resort->GetEmployee->Dept_id;
         $Rank =  $this->resort->GetEmployee->rank;
@@ -712,18 +744,6 @@ class EmployeeController extends Controller
 
             if (!$employee) {
                 abort(404, 'Employee not found.');
-            }
-
-            // A-05: $Dept_id/$Rank above were fetched but never used to
-            // restrict which employee's detail page could be opened — any
-            // portal user could view any other department's employee by
-            // id. Same HR/EXCOM-see-all, everyone-else-own-department rule
-            // AttandanceRegisterController::ResigterRosterSearch already
-            // applies to the register list.
-            $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->GetEmployee ?? null);
-            if (!in_array($employeeRankPosition['position'] ?? null, ['HR', 'EXCOM'], true)
-                && (int) $employee->Dept_id !== (int) $Dept_id) {
-                abort(403, 'You do not have access to this employee.');
             }
 
             $department  = ResortDepartment::where('id', $employee->Dept_id)->value('name');
@@ -1243,6 +1263,7 @@ class EmployeeController extends Controller
         if (empty($id)) {
             return redirect()->route('resort.timeandattendance.employee')->with('error', 'Please open the print page from Employee Details using the Download button.');
         }
+        $this->assertCanViewEmployeeDetail($id);
 
         $dates = isset($request->hiddenInput) ? explode("-", $request->hiddenInput) : null;
         if ($dates && count($dates) >= 2) {
@@ -1517,6 +1538,7 @@ class EmployeeController extends Controller
 
     public function AttandanceHisotry(Request $request,$id)
     {
+        $this->assertCanViewEmployeeDetail($id);
         if($request->ajax())
         {
             $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
@@ -1840,6 +1862,7 @@ class EmployeeController extends Controller
             $monthEndingDate = $cutoffPeriod['end']->format('Y-m-d');
         }
         $id = base64_decode($request->emp_id);
+        $this->assertCanViewEmployeeDetail($id);
         $page_title = "Employee Details";
         $Rank =  $this->resort->GetEmployee->rank;
         $resortId = $this->resort->resort_id;
@@ -2214,6 +2237,7 @@ public function attandanceHisotryExport(Request $request)
         return redirect()->route('resort.timeandattendance.employee')
             ->with('error', 'Export requires employee and date range. Please use Export CSV from the employee details print page.');
     }
+    $this->assertCanViewEmployeeDetail($id);
 
     // ===============================
     // 1️⃣ Single Merged Query

@@ -18,8 +18,8 @@
     $signatures: array of ['name' => string, 'signature_img' => ?string (StorageHelper-relative path), 'timestamp' => ?\Carbon\Carbon|string]
 --}}
 <style>
-    .wai-sig-block-row { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 24px; }
-    .wai-sig-block { display: inline-block; min-width: 180px; }
+    .wai-sig-block-row { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 24px; page-break-inside: avoid; }
+    .wai-sig-block { display: inline-block; min-width: 180px; page-break-inside: avoid; }
     .wai-sig-block .wai-sig-img { height: 45px; max-width: 160px; display: block; margin-bottom: 2px; }
     .wai-sig-block .wai-sig-line { border-top: 1px solid #333; width: 160px; margin-top: 2px; margin-bottom: 4px; }
     .wai-sig-block .wai-sig-name { font-size: 12px; font-weight: bold; }

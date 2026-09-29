@@ -1455,7 +1455,12 @@ class TimeAndAttendanceController extends Controller
         // Server time is unambiguous 24-hour and isn't subject to the
         // client's clock/format, so use it as the source of truth.
         $checkInTime                                        =   Carbon::now()->format('H:i:s');
-        $date                                               =   $request->current_date;
+        // A-04: current_date was taken from the phone verbatim — an
+        // employee could set their device's clock back (or forward) and
+        // check in against a past/future date, creating a falsified
+        // attendance record. Same reasoning as the time fix above: server
+        // date is the source of truth for when a check-in actually happens.
+        $date                                               =   Carbon::now(config('app.timezone'))->format('Y-m-d');
         // Ensure in_time_location is a string (handle array case like GPS coordinates)
         $inTimeLocationRaw                                  =   $request->in_time_location;
         $inTimeLocation                                     =   is_array($inTimeLocationRaw) ? json_encode($inTimeLocationRaw) : (string)$inTimeLocationRaw;

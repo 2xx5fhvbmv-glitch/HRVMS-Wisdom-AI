@@ -750,7 +750,8 @@ class DutyRosterController extends Controller
         $Overtime = $request->ShiftOverTime;
         $DayOfDate = $request->DayOfDate;
         $DayWiseTotalHours = $request->TotalHoursModel;
-        $DayOfDateModel = $request->DayOfDateModel;
+        $DayOffDatesModel = $request->DayOffDatesModel ?? '';
+        $dayOffDatesArrayModel = !empty($DayOffDatesModel) ? array_map('trim', explode(',', $DayOffDatesModel)) : [];
 
         // Attd_id is client-supplied; if present it must already belong to
         // this resort — otherwise the updateOrCreate() below would silently
@@ -801,7 +802,27 @@ class DutyRosterController extends Controller
                         $createPayload["Status"]    = 'Present';
                     }
 
+                    $isDayOffEdit = in_array($shift_Date->format('Y-m-d'), $dayOffDatesArrayModel);
+                    if ($isDayOffEdit) {
+                        $createPayload["Status"] = 'DayOff';
+                    }
+
                     $DutyRosterEntry = DutyRosterEntry::updateOrCreate(['id'=>$Attd_id], $createPayload);
+
+                    // Turning this date into a Day Off through the edit-cell
+                    // modal can strand a credit already earned for its week
+                    // (same rule StoreDutyRoster's single-date branch applies).
+                    if ($isDayOffEdit) {
+                        $weekOf = $shift_Date->copy();
+                        DB::table('employee_day_off_credits')
+                            ->where('emp_id', $DutyRosterEntry->Emp_id ?: $editEmpId)
+                            ->where('resort_id', $this->resort->resort_id)
+                            ->whereBetween('week_start_date', [
+                                $weekOf->copy()->startOfWeek(Carbon::MONDAY)->format('Y-m-d'),
+                                $weekOf->copy()->endOfWeek(Carbon::SUNDAY)->format('Y-m-d'),
+                            ])
+                            ->delete();
+                    }
 
                     // Handle overtime from employee_overtimes table (for reporting/payroll)
                     if ($DutyRosterEntry && $Overtime) {
@@ -876,7 +897,7 @@ class DutyRosterController extends Controller
 
                 DutyRoster::where("id",$DutyRosterEntry->roster_id)
                     ->where('resort_id', $this->resort->resort_id)
-                    ->update(["DayOfDate"=>$DayOfDateModel]);
+                    ->update(["DayOfDate"=>$DayOffDatesModel]);
                 // roster_id back to the client — the "No Shift Assigned"/
                 // create-on-edit path has no roster_id available client-side
                 // until this resolves it (an existing entry's edit button

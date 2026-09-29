@@ -24,6 +24,14 @@ class GrievanceReportController extends Controller
     public function __construct()
     {
         $this->resort = auth()->guard('resort-admin')->user();
+
+        // R-01: this only ever checked the generic "Reports" permission —
+        // anyone HR granted basic Reports access to could read every
+        // Grievance & Disciplinary case in the resort regardless of
+        // whether they have access to that module itself.
+        if ($this->resort && !Common::hasFullDataAccess()) {
+            abort(403, 'Unauthorized access');
+        }
     }
 
     private function registry(): array

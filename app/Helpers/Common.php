@@ -4852,6 +4852,64 @@ class Common
         }
     }
 
+    /** S8 — account lockout after repeated failed logins. */
+    const LOGIN_LOCKOUT_THRESHOLD = 5;
+    const LOGIN_LOCKOUT_MINUTES = 15;
+
+    /**
+     * S8 — both the web portal (ResortLoginController::login()) and the
+     * mobile API (Logincontroller::apiLogin()) authenticate the same
+     * resort_admins row (shared 'resort-admins' provider), so lockout state
+     * lives here once and both call sites share this trio of helpers.
+     */
+    public static function isAccountLocked(ResortAdmin $admin): bool
+    {
+        return $admin->locked_until && Carbon::parse($admin->locked_until)->isFuture();
+    }
+
+    public static function registerFailedLogin(ResortAdmin $admin): void
+    {
+        $admin->failed_login_attempts = ($admin->failed_login_attempts ?? 0) + 1;
+
+        if ($admin->failed_login_attempts >= self::LOGIN_LOCKOUT_THRESHOLD) {
+            $admin->locked_until = now()->addMinutes(self::LOGIN_LOCKOUT_MINUTES);
+            $admin->failed_login_attempts = 0;
+            $admin->save();
+            self::notifyAccountLocked($admin);
+            return;
+        }
+
+        $admin->save();
+    }
+
+    public static function registerSuccessfulLogin(ResortAdmin $admin): void
+    {
+        if ($admin->failed_login_attempts || $admin->locked_until) {
+            $admin->failed_login_attempts = 0;
+            $admin->locked_until = null;
+            $admin->save();
+        }
+    }
+
+    private static function notifyAccountLocked(ResortAdmin $admin): void
+    {
+        try {
+            $name = trim($admin->first_name . ' ' . $admin->last_name) ?: $admin->email;
+            self::applyResortSmtpConfig($admin->resort_id);
+            Mail::to($admin->email)->send(new \App\Mail\IncidentNotificationMail(
+                $name,
+                'Your account has been locked',
+                'Your account was locked for ' . self::LOGIN_LOCKOUT_MINUTES . ' minutes after ' . self::LOGIN_LOCKOUT_THRESHOLD . ' failed login attempts. If this wasn\'t you, please contact HR immediately.',
+                [],
+                null,
+                null,
+                $admin->resort_id
+            ));
+        } catch (\Exception $e) {
+            \Log::warning('Account-lock notification failed for ' . $admin->email . ': ' . $e->getMessage());
+        }
+    }
+
     /**
      * Revoke every live mobile/web API token for a resort-admin account (S4-01).
      * Called right after an employee/admin is deactivated so access is cut off

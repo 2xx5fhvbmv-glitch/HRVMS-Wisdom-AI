@@ -158,87 +158,124 @@
                 </div>
                 <div class="col-xl-4 col-lg-5">
                     <div class="card budget-e-box mb-30 AppendLifeCycleofRequest AppendRequestManningRequest">
-                        @if( isset($getNotifications) && isset($getNotifications->loginid))
+                        @php
+                            // 10.1 — these three used to be an @elseif chain,
+                            // so whichever came first (reminder > timeline >
+                            // rejected) hid the other two entirely: an
+                            // unanswered Casual/Intern rejection had no way
+                            // to Respond while a Permanent reminder/timeline
+                            // was also active. All three are independent
+                            // dashboard facts, not mutually exclusive states
+                            // — render every one that has data, behind a
+                            // pill toggle so the card doesn't grow unbounded.
+                            $wfpHasReminder = isset($getNotifications) && isset($getNotifications->loginid);
+                            $wfpHasTimeline = !empty($BudgetStatus) && count($BudgetStatus);
+                            $wfpHasRejected = $BudgetRejactedStatus->isNotEmpty();
+                            $wfpFirstTab = $wfpHasReminder ? 'reminder' : ($wfpHasTimeline ? 'timeline' : 'rejected');
+                        @endphp
+                        @if ($wfpHasReminder || $wfpHasTimeline || $wfpHasRejected)
                             <div class="card-title d-flex justify-content-between">
                                 <h3>Requests</h3>
                             </div>
-                            <div class="requestsUser-block ">
-                                <div class="">
-                                    <div class="img-circle">
-                                    <img src="{{Common::getResortUserPicture($getNotifications->loginid) }}" alt="image">
+                            @if ((int) $wfpHasReminder + (int) $wfpHasTimeline + (int) $wfpHasRejected > 1)
+                                <ul class="nav nav-pills mb-2" role="tablist">
+                                    @if ($wfpHasReminder)
+                                        <li class="nav-item"><button type="button" class="nav-link {{ $wfpFirstTab === 'reminder' ? 'active' : '' }}" data-bs-toggle="pill" data-bs-target="#wfpReqReminder">Respond</button></li>
+                                    @endif
+                                    @if ($wfpHasTimeline)
+                                        <li class="nav-item"><button type="button" class="nav-link {{ $wfpFirstTab === 'timeline' ? 'active' : '' }}" data-bs-toggle="pill" data-bs-target="#wfpReqTimeline">Status</button></li>
+                                    @endif
+                                    @if ($wfpHasRejected)
+                                        <li class="nav-item"><button type="button" class="nav-link {{ $wfpFirstTab === 'rejected' ? 'active' : '' }}" data-bs-toggle="pill" data-bs-target="#wfpReqRejected">Revise ({{ $BudgetRejactedStatus->count() }})</button></li>
+                                    @endif
+                                </ul>
+                            @endif
+                            <div class="tab-content">
+                                @if ($wfpHasReminder)
+                                <div class="tab-pane fade {{ $wfpFirstTab === 'reminder' ? 'show active' : '' }}" id="wfpReqReminder">
+                                    <div class="requestsUser-block ">
+                                        <div class="">
+                                            <div class="img-circle">
+                                            <img src="{{Common::getResortUserPicture($getNotifications->loginid) }}" alt="image">
+                                            </div>
+                                            <div class="">
+                                                <h6>{{ $getNotifications->first_name }} {{ $getNotifications->middle_name }}</h6>
+                                                <p>{{ strtoupper($getNotifications->DepartmentName) }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="dfs">
+                                            <input type="hidden" name="message_id" id="message_id" value="{{(isset( $getNotifications->message_id)?   $getNotifications->message_id :'') }}">
+                                            <h5>{{ (isset($getNotifications->reminder_message_subject )) ? $getNotifications->reminder_message_subject : $getNotifications->message_subject }}</h5>
+                                        </div>
                                     </div>
-                                    <div class="">
-                                        <h6>{{ $getNotifications->first_name }} {{ $getNotifications->middle_name }}</h6>
-                                        <p>{{ strtoupper($getNotifications->DepartmentName) }}</p>
+                                    <div class="text-center">
+                                        <a href="#sendRespond-modal" data-bs-toggle="modal" class="btn btn-sm wfp-btn-primary">Send
+                                            Response</a>
                                     </div>
                                 </div>
-                                <div class="dfs">
-                                    <input type="hidden" name="message_id" id="message_id" value="{{(isset( $getNotifications->message_id)?   $getNotifications->message_id :'') }}">
-                                    <h5>{{ (isset($getNotifications->reminder_message_subject )) ? $getNotifications->reminder_message_subject : $getNotifications->message_subject }}</h5>
-                                </div>
-                            </div>
-                            <div class="text-center">
-                                <a href="#sendRespond-modal" data-bs-toggle="modal" class="btn btn-sm wfp-btn-primary">Send
-                                    Response</a>
-                            </div>
-                        @elseif(!empty($BudgetStatus) && count($BudgetStatus))
-                            <div class="card-title d-flex justify-content-between">
-                                <h3>Manning {{ ($Year ?? date('Y')) + 1 }}</h3>
-                            </div>
-                            <ul class="manning-timeline">
-                                @php
-                                    // Defined all the possible steps for budget approval in sitesetting Array
-                                    $allSteps = config('settings.manningRequestLifeCycle');
-                                @endphp
-                                @if (!empty($allSteps))
-                                    @foreach ($allSteps as $stepKey => $stepName)
-                                        <li class="@if(array_key_exists($stepKey, $BudgetStatus) && $BudgetStatus[$stepKey]['comments'] == $stepName)
-                                                active
-                                            @else
-                                                complete
-                                            @endif">
-                                            <span>{{ $stepName }} </span>
-                                        </li>
-                                    @endforeach
                                 @endif
-                            </ul>
-                        @elseif($BudgetRejactedStatus->isNotEmpty())
-                            <div class="card-title d-flex justify-content-between">
-                                <h3>Requests</h3>
-                            </div>
-                            {{-- WP5 — was a single object (->first()), so a
-                                 department with more than one category
-                                 rejected at once only ever showed the
-                                 latest one; the loop below now renders one
-                                 block per still-rejected category. The
-                                 fixed-id hidden inputs this used to read
-                                 into (#budget/#BudgetRejacted_message_id/
-                                 #BudgetRejacted_employment_type) would
-                                 collide across entries, so the modal now
-                                 reads the actual clicked button's data-*
-                                 attributes via event.relatedTarget instead
-                                 (see the show.bs.modal handler below). --}}
-                            @foreach($BudgetRejactedStatus as $rejected)
-                            <div class="requestsUser-block ">
-                                <div class="">
-                                    <div class="img-circle">
-                                    <img src="{{Common::getResortUserPicture($rejected->loginid) }}" alt="image">
+                                @if ($wfpHasTimeline)
+                                <div class="tab-pane fade {{ $wfpFirstTab === 'timeline' ? 'show active' : '' }}" id="wfpReqTimeline">
+                                    <div class="card-title d-flex justify-content-between">
+                                        <h3>Manning {{ ($Year ?? date('Y')) + 1 }}</h3>
                                     </div>
-                                    <div class="">
-                                        <h6>{{ $rejected->first_name }} {{ $rejected->middle_name }}</h6>
-                                        <p>{{ strtoupper($rejected->DepartmentName) }}</p>
+                                    <ul class="manning-timeline">
+                                        @php
+                                            // Defined all the possible steps for budget approval in sitesetting Array
+                                            $allSteps = config('settings.manningRequestLifeCycle');
+                                        @endphp
+                                        @if (!empty($allSteps))
+                                            @foreach ($allSteps as $stepKey => $stepName)
+                                                <li class="@if(array_key_exists($stepKey, $BudgetStatus) && $BudgetStatus[$stepKey]['comments'] == $stepName)
+                                                        active
+                                                    @else
+                                                        complete
+                                                    @endif">
+                                                    <span>{{ $stepName }} </span>
+                                                </li>
+                                            @endforeach
+                                        @endif
+                                    </ul>
+                                </div>
+                                @endif
+                                @if ($wfpHasRejected)
+                                <div class="tab-pane fade {{ $wfpFirstTab === 'rejected' ? 'show active' : '' }}" id="wfpReqRejected">
+                                    {{-- WP5 — was a single object (->first()), so a
+                                         department with more than one category
+                                         rejected at once only ever showed the
+                                         latest one; the loop below now renders one
+                                         block per still-rejected category. The
+                                         fixed-id hidden inputs this used to read
+                                         into (#budget/#BudgetRejacted_message_id/
+                                         #BudgetRejacted_employment_type) would
+                                         collide across entries, so the modal now
+                                         reads the actual clicked button's data-*
+                                         attributes via event.relatedTarget instead
+                                         (see the show.bs.modal handler below). --}}
+                                    @foreach($BudgetRejactedStatus as $rejected)
+                                    <div class="requestsUser-block ">
+                                        <div class="">
+                                            <div class="img-circle">
+                                            <img src="{{Common::getResortUserPicture($rejected->loginid) }}" alt="image">
+                                            </div>
+                                            <div class="">
+                                                <h6>{{ $rejected->first_name }} {{ $rejected->middle_name }}</h6>
+                                                <p>{{ strtoupper($rejected->DepartmentName) }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="dfs">
+                                            <p class="mb-1"><strong>{{ $rejected->employment_type ?? 'Permanent' }} budget {{ $rejected->year ?? '' }}</strong></p>
+                                            <h5>{{ (isset($rejected->reminder_message_subject )) ? $rejected->reminder_message_subject : $rejected->message_subject }}</h5>
+                                        </div>
                                     </div>
+                                    <div class="text-center mb-2">
+                                        <a href="#sendRespond-modal" data-message_id="{{ $rejected->message_id ?? '' }}" data-Budget_id="{{ $rejected->Budget_id ?? '' }}" data-employment_type="{{ $rejected->employment_type ?? 'Permanent' }}" data-bs-toggle="modal" class="btn btn-sm wfp-btn-primary">Revise
+                                            Response</a>
+                                    </div>
+                                    @endforeach
                                 </div>
-                                <div class="dfs">
-                                    <p class="mb-1"><strong>{{ $rejected->employment_type ?? 'Permanent' }} budget {{ $rejected->year ?? '' }}</strong></p>
-                                    <h5>{{ (isset($rejected->reminder_message_subject )) ? $rejected->reminder_message_subject : $rejected->message_subject }}</h5>
-                                </div>
+                                @endif
                             </div>
-                            <div class="text-center mb-2">
-                                <a href="#sendRespond-modal" data-message_id="{{ $rejected->message_id ?? '' }}" data-Budget_id="{{ $rejected->Budget_id ?? '' }}" data-employment_type="{{ $rejected->employment_type ?? 'Permanent' }}" data-bs-toggle="modal" class="btn btn-sm wfp-btn-primary">Revise
-                                    Response</a>
-                            </div>
-                            @endforeach
                         @else
                             <p>No Requests</p>
                         @endif

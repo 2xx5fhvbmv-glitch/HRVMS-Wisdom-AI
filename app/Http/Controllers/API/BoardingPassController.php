@@ -22,6 +22,7 @@ use App\Notifications\AlternativeDateSuggestedNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Options;
 use Validator;
+use Illuminate\Validation\Rule;
 use Auth;
 use File;
 use DB;
@@ -1661,7 +1662,14 @@ class BoardingPassController extends Controller
             // (employee_id references employees.id) with a raw 500 instead
             // of a clean validation error.
             'employee_ids'                      => 'nullable|array',
-            'employee_ids.*'                    => 'nullable|integer|exists:employees,id',
+            // L-09: exists:employees,id only proved the id exists
+            // somewhere, never that it belongs to this resort — scoped it,
+            // same as the parallel task_delegation fix in this method's
+            // sibling flow.
+            'employee_ids.*'                    => [
+                'nullable', 'integer',
+                Rule::exists('employees', 'id')->where('resort_id', $this->resort_id),
+            ],
             'visitors'                          => 'array',
             'visitors.*'                        => 'string',
         ]);

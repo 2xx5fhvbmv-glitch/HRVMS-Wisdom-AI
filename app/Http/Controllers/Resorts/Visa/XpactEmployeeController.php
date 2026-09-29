@@ -885,7 +885,12 @@ class XpactEmployeeController extends Controller
                 })
               
                
-                ->rawColumns(['Year','TransactionType','Amount', 'Date','ReceiptNo', 'Status'])
+                // V-06: ReceiptNumber is free text HR types in when recording
+                // a payment ($request->Receipt_number) — printing it raw was
+                // a stored XSS. The other columns here are either
+                // server-computed or fixed HTML (the <b> wrapper/badge), so
+                // they still need to stay raw.
+                ->rawColumns(['Year','TransactionType','Amount', 'Date', 'Status'])
                 ->make(true);
         }
     }

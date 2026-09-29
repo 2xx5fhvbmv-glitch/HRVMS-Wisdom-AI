@@ -47,6 +47,18 @@ class Logincontroller extends Controller
             $employee                               =   Employee::where('Emp_id', $request->emp_id)->first();
             $resortAdmin                            =   $employee ? ResortAdmin::where('id', $employee->Admin_Parent_id)->first() : null;
 
+            // S8 — account lockout: same shared resort_admins state the web
+            // portal login checks (Common::isAccountLocked()), checked
+            // before the password hash so a locked account can't be
+            // brute-forced during its lockout window.
+            if ($resortAdmin && Common::isAccountLocked($resortAdmin)) {
+                Common::logLoginAttempt('mobile', $request->emp_id, false, $request);
+                return response()->json([
+                    'success'                       =>  false,
+                    'message'                       =>  'Too many failed login attempts. Please try again in a few minutes.'
+                ], 200);
+            }
+
             // Enumeration fix: account-state checks (inactive employee,
             // non-permanent employment type, inactive resort admin) used to
             // run BEFORE the password check, so a wrong password on a real
@@ -62,6 +74,9 @@ class Logincontroller extends Controller
             $passwordValid = Hash::check(is_string($request->password) ? $request->password : '', $resortAdmin->password ?? self::INVALID_CREDENTIALS_HASH);
             if (!$resortAdmin || !$passwordValid) {
                 Common::logLoginAttempt('mobile', $request->emp_id, false, $request);
+                if ($resortAdmin) {
+                    Common::registerFailedLogin($resortAdmin);
+                }
                 return response()->json([
                     'success'                       =>  false,
                     'message'                       =>  'Invalid Employee ID or password. Please try again'
@@ -136,6 +151,7 @@ class Logincontroller extends Controller
             $tokenResult                            =   $resortAdmin->createToken('ResortAdminToken');
             $token                                  =   $tokenResult->accessToken;
             Common::logLoginAttempt('mobile', $request->emp_id, true, $request);
+            Common::registerSuccessfulLogin($resortAdmin);
 
             // Was never captured at login at all — the app had to remember
             // to call the separate add-device-token endpoint afterward, and

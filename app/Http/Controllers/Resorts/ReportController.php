@@ -47,7 +47,12 @@ class ReportController extends Controller
             {
                 return  $row->description;
             })
-            ->rawColumns(['name', 'description','action'])
+            // R-03: name/description are free text set at report creation
+            // (ReportController::store()) — printing them raw was a stored
+            // XSS (anyone who could create a report could inject a
+            // <script> that ran for every later viewer of this list).
+            // 'action' is the only column that's genuinely built HTML.
+            ->rawColumns(['action'])
             ->make(true);
         }
         $page_title = 'Reports';
@@ -100,6 +105,29 @@ class ReportController extends Controller
         }
         return $def;
     }
+
+    /**
+     * R-01: the builder let anyone holding the single generic "Reports"
+     * permission pick ANY module as a data source — including Payroll
+     * (bank accounts/salaries) and Budget — regardless of whether they
+     * have access to that module itself (e.g. an L&D manager, who
+     * Common::hasFullDataAccess() legitimately admits for general
+     * reporting, could still pick "Payroll" and read every salary).
+     * Reuses each module's own established access rule where one exists;
+     * everything else falls back to the general HR/GM/master-admin gate,
+     * which is a strict tightening from "anyone with Reports access"
+     * either way.
+     */
+    private function moduleAccessAllowed(string $module): bool
+    {
+        return match ($module) {
+            'Payroll' => Common::canAccessPayroll(),
+            'Budget' => in_array(Common::budgetAccessLevel(), ['full', 'approve'], true),
+            'Visa' => Common::canAccessVisa(),
+            default => Common::hasFullDataAccess(),
+        };
+    }
+
     public function store(Request $request)
     {
 
@@ -118,6 +146,12 @@ class ReportController extends Controller
         $def = $this->findEntityDef($validated['module'], $validated['entity']);
         if (!$def) {
             return response()->json(['success' => false, 'message' => 'That data source is not available for reporting.'], 422);
+        }
+
+        // R-01: don't let a report be created against a module the caller
+        // doesn't actually have access to.
+        if (!$this->moduleAccessAllowed($validated['module'])) {
+            return response()->json(['success' => false, 'message' => 'You do not have access to that module.'], 403);
         }
 
         // Keep only fields that exist in this entity, preserving the catalog order
@@ -206,6 +240,16 @@ class ReportController extends Controller
         $def = $this->findEntityDef($params['module'] ?? null, $params['entity'] ?? null);
         // Legacy reports (old column-based query_params) have no entity definition.
         if (!$def) {
+            return ['columns' => [], 'rows' => []];
+        }
+
+        // R-01: a report saved against a module the caller (still) doesn't
+        // have access to — e.g. someone else on the resort created it, or
+        // the caller's role/department changed since — returns nothing
+        // rather than the underlying module's data. Single choke point:
+        // every data-returning caller (FetchReportData/export/AiInsideReport)
+        // goes through runReport().
+        if (!$this->moduleAccessAllowed($params['module'] ?? '')) {
             return ['columns' => [], 'rows' => []];
         }
 
@@ -564,8 +608,19 @@ class ReportController extends Controller
             return '';
         };
 
-        // Cached insight wins (also what the "WAI Insights" button stored).
-        $analysisText = empty($report->AiInsights) ? '' : $extractAnalysis($report->AiInsights);
+        // R-02: the AI analysis used to be cached once on the report row
+        // (AiInsights) and served to every viewer verbatim — the rows it
+        // was generated from are department-scoped per viewer (see
+        // runReport()), so a HOD opening a report an HR user had already
+        // generated the insight for saw HR's whole-resort analysis
+        // narrated back to them, not their own department's. Cache per
+        // (report, viewer scope) instead, so each distinct scope gets its
+        // own analysis of its own data.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $scopeKey = is_array($scopedDeptIds) ? implode('-', $scopedDeptIds) : 'all';
+        $cacheKey = "report_ai_insight:{$report->id}:{$scopeKey}";
+
+        $analysisText = (string) \Cache::get($cacheKey, '');
         if ($analysisText !== '') {
             return $analysisText;
         }
@@ -586,9 +641,14 @@ class ReportController extends Controller
         $jsonData = json_encode($requestData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $curl = curl_init();
         curl_setopt_array($curl, [
-            CURLOPT_URL => env('AI_Report_fetch_URL'),
+            // R-04: env() at call time returns null once config:cache runs
+            // in prod (same class as S2-07); config('services.ai_report.url')
+            // is cached at boot instead. Also had no timeout at all — a
+            // slow/dead AI service could hang the request indefinitely.
+            CURLOPT_URL => config('services.ai_report.url'),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
+            CURLOPT_TIMEOUT => 90,
             CURLOPT_POSTFIELDS => $jsonData,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
@@ -604,8 +664,7 @@ class ReportController extends Controller
         }
         $analysisText = $extractAnalysis($response);
         if ($analysisText !== '') {
-            $report->AiInsights = json_encode(['analysis' => $analysisText]);
-            $report->save();
+            \Cache::put($cacheKey, $analysisText, now()->addDay());
         }
         return $analysisText;
     }

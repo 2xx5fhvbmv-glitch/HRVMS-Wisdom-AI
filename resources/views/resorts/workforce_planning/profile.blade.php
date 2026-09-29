@@ -292,13 +292,12 @@ $(document).ready(function(){
         }, "First Name can only contain letters and spaces.");
 
         $.validator.addMethod("strongPassword", function(value, element) {
-            return this.optional(element) || 
+            return this.optional(element) ||
                 /[A-Z]/.test(value) &&     // uppercase
                 /[a-z]/.test(value) &&     // lowercase
                 /\d/.test(value) &&        // digit
-                /[!@#$%^&*(),.?":{}|<>]/.test(value) && // special character
-                value.length >= 8 && value.length <= 16;
-        }, "Password must be 8–16 characters and include uppercase, lowercase, number, and special character.");
+                value.length >= 12;
+        }, "Password must be at least 12 characters and include uppercase, lowercase, and a number.");
 
 
         $.validator.addMethod("notCommonPassword", function(value) {

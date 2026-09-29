@@ -282,11 +282,13 @@ class ConfigurationController extends Controller
         
         session()->forget('import_errors');
         $filePath = $request->file('nationality')->store('imports');
-        
+
         // Step 4: Process the import synchronously
         // try {
-       
+
             Excel::import(new VisaNationalityImport(), $filePath);
+            // V-06: the uploaded spreadsheet was never cleaned up after import.
+            \Storage::delete($filePath);
             $importErrors = session('import_errors');
             if (!empty($importErrors)) {
                 return response()->json([
@@ -295,7 +297,7 @@ class ConfigurationController extends Controller
                     'errors' => $importErrors
                 ], 422);
             }
-            
+
             return response()->json([
                 'success' => true,
                 'msg' => "Visa Nationality Import Stored successfully"

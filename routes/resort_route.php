@@ -345,7 +345,6 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::post('/resorts/{resortId}/budget/get-configuration', 'BudgetController@getConfiguration')
     ->name('resort.budget.getConfiguration');
 
-    // Route::get('/get-HodEmployeelist', ['App\Http\Controllers\Resorts\EmployeeController','HodEmployeelist'])->name('resort.employeelist');
 
     /* end of employee */
     /* Resort Internal Page Permission */

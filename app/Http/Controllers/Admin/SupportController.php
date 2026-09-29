@@ -23,7 +23,6 @@ class SupportController extends Controller
 
     public function index()
     {
-        // return view('admin.manufecturers.index');
         $type = Auth::guard('admin')->user()->type;
         // dd($type);
         $data = new Support;

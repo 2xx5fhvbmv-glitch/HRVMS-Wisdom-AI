@@ -24,6 +24,12 @@ class IncidentReportController extends Controller
     public function __construct()
     {
         $this->resort = auth()->guard('resort-admin')->user();
+
+        // R-01: this only ever checked the generic "Reports" permission —
+        // see GrievanceReportController for the same gap/fix.
+        if ($this->resort && !Common::hasFullDataAccess()) {
+            abort(403, 'Unauthorized access');
+        }
     }
 
     private function registry(): array

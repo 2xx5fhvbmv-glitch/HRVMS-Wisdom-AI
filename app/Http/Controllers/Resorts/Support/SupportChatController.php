@@ -28,7 +28,6 @@ class SupportChatController extends Controller
     public function index($support_id)
     {
         $page_title = 'Support Chat';
-        // return view('admin.manufecturers.index');
         $supportId = base64_decode($support_id);
         $support = Support::with(['support_category','createdBy','assignedAdmin'])->where('id',$supportId)->where('resort_id', $this->resort->resort_id)->first();
         if (!$support) {

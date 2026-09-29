@@ -21,7 +21,6 @@ class DivisionController extends Controller
 
     public function index()
     {
-        // return view('admin.manufecturers.index');
         $data = new Division;
         // dd($data);
         return view('admin.divisions.index',compact('data'));

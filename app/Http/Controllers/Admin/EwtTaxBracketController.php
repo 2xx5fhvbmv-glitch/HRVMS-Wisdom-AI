@@ -18,7 +18,6 @@ class EwtTaxBracketController extends Controller
 
     public function index()
     {
-        // return view('admin.manufecturers.index');
         $data = new EwtTaxBracket;
         // dd($data);
         return view('admin.ewt.index',compact('data'));

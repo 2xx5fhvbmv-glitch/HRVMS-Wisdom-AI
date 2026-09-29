@@ -50,7 +50,10 @@ trait PredefinedReportActions
      */
     protected function computeAiInsightsText(string $name, ?string $description, array $columns, array $rows): string
     {
-        $url = env('AI_Report_fetch_URL');
+        // R-04: env() at call time returns null once config:cache runs in
+        // prod (same class as S2-07); config('services.ai_report.url') is
+        // cached at boot instead.
+        $url = config('services.ai_report.url');
         if (!$url || empty($rows)) {
             return '';
         }

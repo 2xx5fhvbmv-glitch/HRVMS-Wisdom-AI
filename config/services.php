@@ -93,4 +93,14 @@ return [
     'cv_extractor' => [
         'url' => env('AI_BASE_URL', env('AI_URL', 'http://localhost:8001')),
     ],
+
+    // R-04: same env()-at-call-time problem as ai_extract/cv_extractor
+    // above — ReportController::aiAnalysisText() and
+    // Concerns\PredefinedReportActions::computeAiInsightsText() both read
+    // env('AI_Report_fetch_URL') directly, which returns null once
+    // config:cache runs in prod, silently dropping report rows (incl.
+    // payroll bank accounts, passport numbers) into a request to nothing.
+    'ai_report' => [
+        'url' => env('AI_Report_fetch_URL'),
+    ],
 ];
