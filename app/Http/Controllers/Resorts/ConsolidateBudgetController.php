@@ -7,11 +7,10 @@ use Illuminate\Http\Request;
 use App\Exports\ConsolidateBudgetData;
 use App\Helpers\Common;
 use Maatwebsite\Excel\Facades\Excel;
-use Auth;
 
 class ConsolidateBudgetController extends Controller
 {
-    public function ExportBudget()
+    public function ExportBudget(Request $request, BudgetController $budgetController)
     {
         // W-03: whole-resort consolidated budget export — HR/Finance only.
         if (Common::budgetAccessLevel() !== 'full') {
@@ -19,10 +18,9 @@ class ConsolidateBudgetController extends Controller
         }
 
         try {
-            $resortId = Auth::guard('resort-admin')->user()->resort_id;
+            $exportData = $budgetController->assembleConsolidatedExportData($request);
 
-        return Excel::download(new ConsolidateBudgetData($resortId), 'consolidated_budget.xlsx');
-            
+            return Excel::download(new ConsolidateBudgetData($exportData), 'consolidated_budget.xlsx');
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

@@ -131,7 +131,7 @@ class OnBoardingController extends Controller
             // (culturalInsights, AssignedStaffDashboard, itineraryTimeline)
             // but was never called from this, the main dashboard.
             $EmployeeItineraries->download_all               =   $this->resolveItineraryDownloads($EmployeeItineraries);
-            // $EmployeeItineraries->facility_tour_categories_image  =   $FacilityTourCategories;  
+            $EmployeeItineraries->facility_tour_categories_image  =   $this->resolveFacilityTourCategories();
 
             return response()->json([
                 'success'                                   => true,
@@ -1024,52 +1024,12 @@ class OnBoardingController extends Controller
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
-        
-        $resort_id                                      =   $this->resort_id;
+
         try {
-           $categories = FacilityTourCategories::where('resort_id', $resort_id)
-            ->select('id', 'resort_id', 'name', 'status', 'thumbnail_image')
-            ->get();
-
-            $categoryIds = $categories->pluck('id')->toArray();
-
-            $images = FacilityTourImages::whereIn('facility_tour_category_id', $categoryIds)
-                ->select('id', 'facility_tour_category_id', 'image')
-                ->get()
-                ->groupBy('facility_tour_category_id');
-
-            $allPaths = collect($categories)->pluck('thumbnail_image')
-                ->merge($images->flatten()->pluck('image'))
-                ->unique()
-                ->filter()
-                ->toArray();
-
-            $fileMap = ChildFileManagement::whereIn('File_Path', $allPaths)
-                ->get()
-                ->keyBy('File_Path');
-
-            $awsFileMap = [];
-            foreach ($fileMap as $file) {
-
-                $awsFileMap[$file->File_Path] = Common::GetAWSFile($file->id, $resort_id);
-
-            }
-
-            $final = $categories->map(function ($item) use ($images, $awsFileMap) {
-                $item->thumbnail_image_path = $awsFileMap[$item->thumbnail_image] ?? '';
-
-                $item->facility_tour_images = ($images[$item->id] ?? collect())->map(function ($img) use ($awsFileMap) {
-                    $img->imagePath = $awsFileMap[$img->image] ?? '';
-                    return $img;
-                });
-
-                return $item;
-            });
-
             return response()->json([
                 'success' => true,
                 'message' => "Virtual facility retrieved successfully.",
-                'facility_tour_categories_image' => $final,
+                'facility_tour_categories_image' => $this->resolveFacilityTourCategories(),
             ], 200);
 
         } catch (\Exception $e) {
@@ -1078,6 +1038,54 @@ class OnBoardingController extends Controller
             \Log::error($e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
+    }
+
+    /**
+     * Shared by onBoardingDashboard() and the dedicated
+     * on-boarding/get-onboarding-virtual-facility screen.
+     */
+    private function resolveFacilityTourCategories()
+    {
+        $resort_id  =   $this->resort_id;
+
+        $categories = FacilityTourCategories::where('resort_id', $resort_id)
+            ->select('id', 'resort_id', 'name', 'status', 'thumbnail_image')
+            ->get();
+
+        $categoryIds = $categories->pluck('id')->toArray();
+
+        $images = FacilityTourImages::whereIn('facility_tour_category_id', $categoryIds)
+            ->select('id', 'facility_tour_category_id', 'image')
+            ->get()
+            ->groupBy('facility_tour_category_id');
+
+        $allPaths = collect($categories)->pluck('thumbnail_image')
+            ->merge($images->flatten()->pluck('image'))
+            ->unique()
+            ->filter()
+            ->toArray();
+
+        $fileMap = ChildFileManagement::whereIn('File_Path', $allPaths)
+            ->get()
+            ->keyBy('File_Path');
+
+        $awsFileMap = [];
+        foreach ($fileMap as $file) {
+
+            $awsFileMap[$file->File_Path] = Common::GetAWSFile($file->id, $resort_id);
+
+        }
+
+        return $categories->map(function ($item) use ($images, $awsFileMap) {
+            $item->thumbnail_image_path = $awsFileMap[$item->thumbnail_image] ?? '';
+
+            $item->facility_tour_images = ($images[$item->id] ?? collect())->map(function ($img) use ($awsFileMap) {
+                $img->imagePath = $awsFileMap[$img->image] ?? '';
+                return $img;
+            });
+
+            return $item;
+        });
     }
 
     /**

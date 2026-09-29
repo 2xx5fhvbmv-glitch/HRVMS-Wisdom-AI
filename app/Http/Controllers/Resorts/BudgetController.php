@@ -2376,6 +2376,13 @@ class BudgetController extends Controller
                             $empMonthlySalariesByEmployee[$employee->emp_id] ?? [],
                             (float) ($empAllowanceByEmployee[$employee->emp_id] ?? 0)
                         );
+                        // Annual allowance leg (employees_allowance), broken
+                        // out separately from yearly_total — the Consolidated
+                        // Budget export needs this as its own visible,
+                        // editable column so its row Total can reconstruct
+                        // (and stay reconcilable with) yearly_total via a
+                        // live formula instead of a baked-in number.
+                        $employee->allowance_yearly = (float) ($empAllowanceByEmployee[$employee->emp_id] ?? 0) * 12;
                     }
 
                     // Load vacant budget cost configurations - SUM FOR ENTIRE YEAR.
@@ -2618,6 +2625,99 @@ class BudgetController extends Controller
         }
 
         // Non-AJAX requests never reach here (redirected at the top of viewConsolidatedBudget()).
+    }
+
+    /**
+     * Assembles the data for all 5 Consolidated Budget export sheets
+     * (Permanent, Casual, Intern, Casual & Intern, Consolidated) in one
+     * call, for ConsolidateBudgetController::ExportBudget(). Reuses
+     * resolveConsolidatedCategoryTree() (the same tree builder the on-screen
+     * page uses) and mergeConsolidatedBudgetTrees() (unchanged) rather than
+     * duplicating either. Unlike the on-screen page, which only resolves
+     * whichever category tab is active, the export always needs all 3 raw
+     * categories regardless of which tab was open when Export was clicked.
+     */
+    public function assembleConsolidatedExportData(Request $request): array
+    {
+        $resortId = $this->resort->resort_id;
+
+        $requested = $request->input('year');
+        $year = (is_numeric($requested) && (int) $requested >= 2000 && (int) $requested <= 2100)
+            ? (int) $requested
+            : (int) now()->year;
+
+        $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
+
+        $mvrToDollarRate = 1 / 15.42;
+        $resortSettingsForRate = ResortSiteSettings::where('resort_id', $resortId)->first();
+        if ($resortSettingsForRate && $resortSettingsForRate->DollertoMVR) {
+            $mvrToDollarRate = 1 / $resortSettingsForRate->DollertoMVR;
+        }
+
+        $categoryResults = [];
+        foreach (['Permanent', 'Casual', 'Intern'] as $cat) {
+            $categoryResults[$cat] = $this->resolveConsolidatedCategoryTree($cat, $year, $resortId, $employeeRankPosition, $mvrToDollarRate, true);
+        }
+
+        // Casual and Permanent cost tables are separate, independently
+        // auto-incrementing tables (resort_budget_costs vs
+        // resort_nonpermanent_budget_costs) — their ->id values can
+        // legitimately collide across categories. Tagging each cost with
+        // the category it came from lets the export sheet key its columns
+        // by (category, id) on merged sheets instead of id alone, so an
+        // employee's cost_breakdown (itself keyed by their own category's
+        // cost ids) never gets read into the wrong category's column.
+        $tagCostsWithCategory = fn (string $cat, $costs) => collect($costs)->map(function ($cost) use ($cat) {
+            $cost->export_category = $cat;
+            return $cost;
+        });
+
+        // resolveConsolidatedCategoryTree()'s empty-department-scope early
+        // return only carries 'consolidatedBudget'/'header' (no
+        // 'resortCosts') — pre-existing, unrelated to this export, but the
+        // export must not fatal on it. Default to empty rather than assume
+        // the key exists.
+        $costsFor = fn (string $cat) => $categoryResults[$cat]['resortCosts'] ?? collect();
+
+        $casualAndIntern = $this->mergeConsolidatedBudgetTrees([
+            $categoryResults['Casual']['consolidatedBudget'],
+            $categoryResults['Intern']['consolidatedBudget'],
+        ]);
+        $casualAndInternCosts = collect(['Casual', 'Intern'])
+            ->flatMap(fn ($cat) => $tagCostsWithCategory($cat, $costsFor($cat)))
+            ->values();
+
+        $consolidated = $this->mergeConsolidatedBudgetTrees(array_map(fn ($r) => $r['consolidatedBudget'], $categoryResults));
+        $consolidatedCosts = collect(['Permanent', 'Casual', 'Intern'])
+            ->flatMap(fn ($cat) => $tagCostsWithCategory($cat, $costsFor($cat)))
+            ->values();
+
+        return [
+            'year' => $year,
+            'mvrToDollarRate' => $mvrToDollarRate,
+            'sheets' => [
+                'Permanent' => [
+                    'tree' => $categoryResults['Permanent']['consolidatedBudget'],
+                    'resortCosts' => $costsFor('Permanent'),
+                ],
+                'Casual' => [
+                    'tree' => $categoryResults['Casual']['consolidatedBudget'],
+                    'resortCosts' => $costsFor('Casual'),
+                ],
+                'Intern' => [
+                    'tree' => $categoryResults['Intern']['consolidatedBudget'],
+                    'resortCosts' => $costsFor('Intern'),
+                ],
+                'Casual & Intern' => [
+                    'tree' => $casualAndIntern,
+                    'resortCosts' => $casualAndInternCosts,
+                ],
+                'Consolidated' => [
+                    'tree' => $consolidated,
+                    'resortCosts' => $consolidatedCosts,
+                ],
+            ],
+        ];
     }
 
     /**
