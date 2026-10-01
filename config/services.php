@@ -85,4 +85,22 @@ return [
         'url' => env('AI_extract_work_details_URL'),
         'base_url' => env('AI_URL', 'http://localhost:8001/'),
     ],
+
+    // Same env()-at-call-time problem as ai_extract above, hitting the
+    // applicant CV-extract endpoint instead (T-07): with config cached in
+    // prod, env('AI_BASE_URL') returns null and every call silently fell
+    // back to localhost:8001.
+    'cv_extractor' => [
+        'url' => env('AI_BASE_URL', env('AI_URL', 'http://localhost:8001')),
+    ],
+
+    // R-04: same env()-at-call-time problem as ai_extract/cv_extractor
+    // above — ReportController::aiAnalysisText() and
+    // Concerns\PredefinedReportActions::computeAiInsightsText() both read
+    // env('AI_Report_fetch_URL') directly, which returns null once
+    // config:cache runs in prod, silently dropping report rows (incl.
+    // payroll bank accounts, passport numbers) into a request to nothing.
+    'ai_report' => [
+        'url' => env('AI_Report_fetch_URL'),
+    ],
 ];

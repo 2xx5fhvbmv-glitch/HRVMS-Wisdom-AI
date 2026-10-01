@@ -62,17 +62,21 @@ class SupportChatController extends Controller
 
         $validatedData = $request->validate([
             'support_id' => 'required|exists:support,id',
-            'senderId' => 'required',
-            'senderType' => 'required|string',
             'receiverId' => 'nullable',
             'receiverType' => 'nullable|string',
             'receiver_name' => 'nullable|string',
             'receiver_image' => 'nullable|string',
-            'senderName' => 'required|string',
-            'senderImage' => 'nullable|string',
             'message' => 'nullable|string',
-            'attachments.*' => 'nullable|file|max:51200'
+            'attachments.*' => 'nullable|file|max:51200|mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf,doc,docx,xls,xlsx,csv,txt,mp4,mov'
         ]);
+
+        // Sender identity is set from the authenticated admin session, never
+        // trusted from the form (S3-05).
+        $admin = Auth::guard('admin')->user();
+        $validatedData['senderId']    = $admin->id;
+        $validatedData['senderType']  = 'admin';
+        $validatedData['senderName']  = trim($admin->first_name . ' ' . $admin->last_name);
+        $validatedData['senderImage'] = $admin->profile_pic ?? '';
 
         // Resolve the actual receiver from the support ticket. We don't trust
         // the form's receiverId — the customer's GetEmployee->id rendered in
@@ -141,7 +145,8 @@ class SupportChatController extends Controller
             $validatedData['senderImage'],
             $validatedData['receiver_name'],
             $validatedData['receiver_image'],
-            $uploadedFiles
+            $uploadedFiles,
+            $validatedData['support_id']
         ))->toOthers();
 
         return response()->json([

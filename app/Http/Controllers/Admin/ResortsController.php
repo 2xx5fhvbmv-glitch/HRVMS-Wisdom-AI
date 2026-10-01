@@ -575,6 +575,16 @@ class ResortsController extends Controller
             }
 
             $resortAdmin->save();
+
+            // Cut off mobile/web API access immediately when a resort admin
+            // account is deactivated (S4-01).
+            if (strtolower($resortAdmin->status) === 'inactive') {
+                try {
+                    Common::revokeAllApiTokens($resortAdmin);
+                } catch (\Exception $e) {
+                    \Log::warning('revokeAllApiTokens failed on resort admin update: ' . $e->getMessage());
+                }
+            }
         }
 
         // Update business hours if Support_SLA is 'Business Hours only'

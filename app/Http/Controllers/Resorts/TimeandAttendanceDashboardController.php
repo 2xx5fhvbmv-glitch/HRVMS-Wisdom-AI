@@ -2188,10 +2188,22 @@ class TimeandAttendanceDashboardController extends Controller
             // $today = Carbon::today()->format('Y-m-d');
             $today = $request->date;
             $currentTime = Carbon::now()->format('H:i');
-            // Get duty roster
-            $dutyRoster = DB::table('duty_rosters')->where('id', $rosterId)->first();
+            // A-02: was unscoped by resort_id — any portal user in any
+            // resort could check in/out an employee belonging to a
+            // DIFFERENT resort by guessing a roster_id.
+            $dutyRoster = DB::table('duty_rosters')
+                ->where('id', $rosterId)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
             if (!$dutyRoster) {
                 return response()->json(['success' => false, 'message' => 'Duty roster not found.']);
+            }
+
+            // A-02: zero role check previously — any portal user could
+            // check in/out any employee. HR/GM or the employee's own
+            // HOD/EXCOM only, never the employee themselves.
+            if (!Common::canManageAttendanceFor($dutyRoster->Emp_id, $this->resort->GetEmployee)) {
+                return response()->json(['success' => false, 'message' => 'You are not authorized to check in/out this employee.'], 403);
             }
 
             // Get shift settings
@@ -2202,11 +2214,13 @@ class TimeandAttendanceDashboardController extends Controller
 
             // Get or create attendance record (match by roster_id+date, or Emp_id+date so we find API-created records)
             $attendance = ParentAttendace::where('roster_id', $rosterId)
+                ->where('resort_id', $this->resort->resort_id)
                 ->where('date', $today)
                 ->first();
 
             if (!$attendance && !empty($dutyRoster->Emp_id)) {
                 $attendance = ParentAttendace::where('Emp_id', $dutyRoster->Emp_id)
+                    ->where('resort_id', $this->resort->resort_id)
                     ->where('date', $today)
                     ->first();
             }
@@ -2516,8 +2530,16 @@ class TimeandAttendanceDashboardController extends Controller
                     continue;
                 }
 
-                $overtime = EmployeeOvertime::find($entryId);
+                // A-01: was an unscoped find($entryId) with zero role
+                // check — any portal user in any resort could approve any
+                // other resort's overtime entry, including their own.
+                $overtime = EmployeeOvertime::where('id', $entryId)
+                    ->where('resort_id', $this->resort->resort_id)
+                    ->first();
                 if (!$overtime) {
+                    continue;
+                }
+                if (!Common::canManageAttendanceFor($overtime->Emp_id, $this->resort->GetEmployee)) {
                     continue;
                 }
 

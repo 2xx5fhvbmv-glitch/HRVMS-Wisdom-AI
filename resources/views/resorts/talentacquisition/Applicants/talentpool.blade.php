@@ -260,6 +260,8 @@
 
 @section('import-scripts')
 <script>
+    function escHtml(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
+
     $(document).ready(function () {
 
         flatpickr('#consent_expiry_date', {
@@ -590,7 +592,7 @@
                         { data: 'first_name', name: 'first_name', render: function (data, type, row) {
                             return `<div class="tableUser-block">
                                 <div class="img-circle"><img src="${row.profileImg}" alt="user"></div>
-                                <span class="userApplicants-btn" data-id="${row.applicant_id}">${row.name}</span>
+                                <span class="userApplicants-btn" data-id="${row.applicant_id}">${escHtml(row.name)}</span>
                             </div>`;
                         }},
 

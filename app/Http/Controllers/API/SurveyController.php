@@ -305,6 +305,22 @@ class SurveyController extends Controller
             return response()->json(['success' => false, 'message' => 'Array lengths do not match'], 200);
         }
 
+        // SV-02: survey_emp_ta_id was trusted straight from the client and
+        // used as the write key below — an employee who supplied a
+        // colleague's survey_employees id (e.g. a nearby sequential id)
+        // overwrote that colleague's SurveyResult rows. Verify every
+        // (parent_survey_id, survey_emp_ta_id) pair actually belongs to the
+        // calling employee before writing any of them.
+        foreach ($request->parent_survey_id as $index => $parentSurveyId) {
+            $ownsRow = SurveyEmployee::where('id', (int) $request->survey_emp_ta_id[$index])
+                ->where('Parent_survey_id', (int) $parentSurveyId)
+                ->where('Emp_id', $employee_id)
+                ->exists();
+            if (!$ownsRow) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized survey participant reference.'], 403);
+            }
+        }
+
         DB::beginTransaction();
         try {
 

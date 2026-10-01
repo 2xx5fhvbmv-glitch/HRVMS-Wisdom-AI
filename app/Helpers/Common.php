@@ -3369,7 +3369,13 @@ class Common
         $template = str_replace("\xC2\xA0", ' ', (string) $template);
 
         foreach ($data as $key => $value) {
-            $val          = (string) ($value ?? '');
+            // Every caller passes plain scalars (name, date, link) to be
+            // interpolated into an HTML email body — none intentionally
+            // carry markup. Left unescaped, an applicant-controlled value
+            // (e.g. candidate_name) rendered raw HTML/JS in the recipient's
+            // mail client. commonEmail.blade.php renders the whole body
+            // with {!! !!}, so this is the one place to close it.
+            $val          = htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
             $underscore   = $key;                                    // candidate_name
             $spaced       = str_replace('_', ' ', $key);             // candidate name
             $titleSpaced  = ucwords($spaced);                        // Candidate Name
@@ -4846,6 +4852,79 @@ class Common
         }
     }
 
+    /** S8 — account lockout after repeated failed logins. */
+    const LOGIN_LOCKOUT_THRESHOLD = 5;
+    const LOGIN_LOCKOUT_MINUTES = 15;
+
+    /**
+     * S8 — both the web portal (ResortLoginController::login()) and the
+     * mobile API (Logincontroller::apiLogin()) authenticate the same
+     * resort_admins row (shared 'resort-admins' provider), so lockout state
+     * lives here once and both call sites share this trio of helpers.
+     */
+    public static function isAccountLocked(ResortAdmin $admin): bool
+    {
+        return $admin->locked_until && Carbon::parse($admin->locked_until)->isFuture();
+    }
+
+    public static function registerFailedLogin(ResortAdmin $admin): void
+    {
+        $admin->failed_login_attempts = ($admin->failed_login_attempts ?? 0) + 1;
+
+        if ($admin->failed_login_attempts >= self::LOGIN_LOCKOUT_THRESHOLD) {
+            $admin->locked_until = now()->addMinutes(self::LOGIN_LOCKOUT_MINUTES);
+            $admin->failed_login_attempts = 0;
+            $admin->save();
+            self::notifyAccountLocked($admin);
+            return;
+        }
+
+        $admin->save();
+    }
+
+    public static function registerSuccessfulLogin(ResortAdmin $admin): void
+    {
+        if ($admin->failed_login_attempts || $admin->locked_until) {
+            $admin->failed_login_attempts = 0;
+            $admin->locked_until = null;
+            $admin->save();
+        }
+    }
+
+    private static function notifyAccountLocked(ResortAdmin $admin): void
+    {
+        try {
+            $name = trim($admin->first_name . ' ' . $admin->last_name) ?: $admin->email;
+            self::applyResortSmtpConfig($admin->resort_id);
+            Mail::to($admin->email)->send(new \App\Mail\IncidentNotificationMail(
+                $name,
+                'Your account has been locked',
+                'Your account was locked for ' . self::LOGIN_LOCKOUT_MINUTES . ' minutes after ' . self::LOGIN_LOCKOUT_THRESHOLD . ' failed login attempts. If this wasn\'t you, please contact HR immediately.',
+                [],
+                null,
+                null,
+                $admin->resort_id
+            ));
+        } catch (\Exception $e) {
+            \Log::warning('Account-lock notification failed for ' . $admin->email . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Revoke every live mobile/web API token for a resort-admin account (S4-01).
+     * Called right after an employee/admin is deactivated so access is cut off
+     * immediately instead of surviving up to the token's remaining lifetime.
+     * Wrapped by the caller in try/catch — a revoke failure must never roll
+     * back the status-change transaction it's attached to.
+     */
+    public static function revokeAllApiTokens(?ResortAdmin $admin): void
+    {
+        if (!$admin) {
+            return;
+        }
+        $admin->tokens()->where('revoked', false)->update(['revoked' => true]);
+    }
+
     /**
      * Resolve an Emp_main_id value (stored as numeric id, base64 id, or Emp_id
      * string like "DR-22") to a numeric employee primary key, or null if not found.
@@ -5393,6 +5472,49 @@ class Common
     }
 
     /**
+     * True for an active Housekeeping-department employee who is NOT
+     * HOD/EXCOM (rank 1/2) — the "Line Worker" a housekeeping task should
+     * actually be assignable to. HousekeepingRequestController@assign()
+     * previously only checked isHousekeepingDepartment(), so a Housekeeping
+     * HOD/EXCOM could be picked as the cleaner themselves (Trello: "Verify
+     * recipient mapping ... not HOD/XCOM or unrelated employees").
+     */
+    public static function isHousekeepingLineWorker($employee): bool
+    {
+        return $employee
+            && !in_array((int) $employee->rank, [1, 2], true)
+            && self::isHousekeepingDepartment($employee->Dept_id ?? null)
+            && in_array($employee->status, [null, 'Active', 'Probationary'], true);
+    }
+
+    /**
+     * Active Housekeeping-department employees eligible to be assigned a
+     * cleaning task (i.e. NOT the HOD/EXCOM) — same eligible-assignee set
+     * isHousekeepingLineWorker() checks a single employee against, as a
+     * list for populating an "Assign to" dropdown.
+     */
+    public static function getResortHousekeepingLineWorkers($resortId)
+    {
+        $hkDeptIds = \App\Models\ResortDepartment::where('resort_id', $resortId)
+            ->pluck('id')
+            ->filter(fn($id) => self::isHousekeepingDepartment($id))
+            ->all();
+
+        if (empty($hkDeptIds)) {
+            return collect();
+        }
+
+        return \App\Models\Employee::with('resortAdmin')
+            ->where('resort_id', $resortId)
+            ->whereIn('Dept_id', $hkDeptIds)
+            ->whereNotIn('rank', [1, 2])
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->get();
+    }
+
+    /**
      * sos_history.status drifted across 3 migrations (Drill-active renamed
      * Drill-Active; Under-Control/Drill-Under-Control added then dropped
      * again) and several call sites were written against an earlier version
@@ -5595,6 +5717,174 @@ class Common
         }
 
         return false;
+    }
+
+    /**
+     * Payroll access gate (security audit P-01, product decision 2026-09-26):
+     * HR department, Finance department, or master admin only. Deliberately
+     * narrower than hasFullDataAccess() — that one also admits the GM and
+     * L&D managers, both explicitly excluded from payroll. The GM keeps
+     * approval-only access through the existing per-step checks in
+     * PayrollController::approvePayroll / PayslipController::approveFinalSettlement /
+     * AdvanceSalaryController::updateStatus — this gate does not sit in front
+     * of those, only in front of browsing/editing payroll data.
+     */
+    public static function canAccessPayroll($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+
+            $employee = $user->GetEmployee ?? null;
+        }
+
+        if (!$employee) return false;
+
+        if ((int) $employee->rank === 3) return true;
+
+        return self::isHRDepartment($employee->Dept_id ?? null)
+            || self::isFinanceDepartment($employee->Dept_id ?? null);
+    }
+
+    /**
+     * Visa module access gate (security audit V-02, product decision
+     * 2026-09-26): HR full, Finance money+read, GM read-only. Was
+     * completely ungated — any portal user could open expat passport/
+     * visa/work-permit data and run visa payments/deposits/wallet transfers.
+     */
+    public static function canAccessVisa($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        if ((int) $employee->rank === 3) return true; // HR
+        if ((int) $employee->rank === 8) return true; // GM (read-only, enforced by canWriteVisa)
+        if (in_array((int) $employee->rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null)) {
+            return true; // HR HOD/EXCOM
+        }
+
+        return self::isFinanceDepartment($employee->Dept_id ?? null); // Finance
+    }
+
+    /**
+     * Visa write gate — HR or Finance only. GM has canAccessVisa() (read)
+     * but never this, per the decided "GM read-only" split.
+     */
+    public static function canWriteVisa($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        if ((int) $employee->rank === 3) return true; // HR
+        if (in_array((int) $employee->rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null)) {
+            return true; // HR HOD/EXCOM
+        }
+
+        return self::isFinanceDepartment($employee->Dept_id ?? null); // Finance
+    }
+
+    /**
+     * Manning & Budgeting access tiers (security audit W-03, product
+     * decision 2026-09-26):
+     *   - 'full'           HR / Finance / master admin — view all
+     *                       departments, edit, configure costs, export.
+     *   - 'approve'        GM — read-only consolidated view + approval
+     *                       (see W-02's approveBudget/approveAllDepartmentBudgets).
+     *   - 'own_department' HOD/EXCOM of any other department — their own
+     *                       department's manning request/budget only.
+     *   - 'none'           everyone else, including L&D managers.
+     *
+     * Deliberately not hasFullDataAccess()/getScopedDepartmentIds(): those
+     * admit L&D managers into "full", which this decision excludes, and
+     * give every ordinary employee their whole department rather than
+     * "none". GM detection uses 'rank' (config('settings.eligibilty')'s
+     * 8 => 'GM' label) — 'position' only matches when the department is
+     * literally named "General Manager"/"GM", which real GM records aren't.
+     */
+    public static function budgetAccessLevel($employee = null): string
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return 'none';
+
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return 'full';
+            }
+
+            $employee = $user->GetEmployee ?? null;
+        }
+
+        if (!$employee) return 'none';
+
+        if (self::canAccessPayroll($employee)) {
+            return 'full';
+        }
+
+        $rankPosition = self::getEmployeeRankPosition($employee);
+
+        if (($rankPosition['rank'] ?? null) === 'GM') {
+            return 'approve';
+        }
+
+        if (in_array($rankPosition['rank'] ?? null, ['HOD', 'EXCOM'], true)) {
+            return 'own_department';
+        }
+
+        return 'none';
+    }
+
+    /**
+     * A-01/A-02 (Time & Attendance audit): who may approve/edit another
+     * employee's attendance record (check-in/out, overtime approval).
+     * HR/GM/master admin (hasFullDataAccess) may act on anyone. Otherwise
+     * the caller must be a HOD/EXCOM of the TARGET employee's own
+     * department — and never the target themselves, even if they hold
+     * that rank in that department ("decided: never allowed", same rule
+     * already applied for PE-07/L-06 self-approval).
+     */
+    public static function canManageAttendanceFor($targetEmployeeId, $callerEmployee = null): bool
+    {
+        if ($callerEmployee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+
+            $callerEmployee = $user->GetEmployee ?? null;
+        }
+
+        if (!$callerEmployee) return false;
+
+        // Never self, regardless of rank.
+        if ((int) $targetEmployeeId === (int) $callerEmployee->id) return false;
+
+        if (self::hasFullDataAccess($callerEmployee)) return true;
+
+        $rankPosition = self::getEmployeeRankPosition($callerEmployee);
+        if (!in_array($rankPosition['rank'] ?? null, ['HOD', 'EXCOM'], true)) return false;
+
+        $targetDeptId = \App\Models\Employee::where('id', $targetEmployeeId)->value('Dept_id');
+        return $targetDeptId !== null && (int) $targetDeptId === (int) ($callerEmployee->Dept_id ?? 0);
     }
 
     /**
@@ -6404,11 +6694,21 @@ class Common
         // defensive tenant boundary. $resortId is optional so existing
         // callers keep working; pass it to close the gap defense-in-depth.
         $query = ResortAdmin::join('employees as t1', 't1.Admin_Parent_id', '=', 'resort_admins.id')
+            ->leftJoin('resort_positions as t2', 't2.id', '=', 't1.Position_id')
+            ->leftJoin('resort_departments as t3', 't3.id', '=', 't1.Dept_id')
             ->where('t1.id', $emp_id);
         if ($resortId !== null) {
             $query->where('t1.resort_id', $resortId);
         }
-        return $query->first(['resort_admins.id as Parent_id','resort_admins.first_name','resort_admins.last_name']);
+        return $query->first([
+            'resort_admins.id as Parent_id',
+            'resort_admins.first_name',
+            'resort_admins.last_name',
+            'resort_admins.personal_phone',
+            't1.Emp_id',
+            't2.position_title',
+            't3.name as department_name',
+        ]);
     }
     private function getNextApprover($leave)
     {
@@ -10761,8 +11061,13 @@ class Common
             // Store the original file object
             $uploadedFile = $file_name;
 
-            // Generate new filename
-            $newFileName = uniqid('video_', true) . '.' . $uploadedFile->getClientOriginalExtension();
+            // Generate new filename — extension() sniffs the actual file
+            // content's MIME type (Symfony's guesser), unlike
+            // getClientOriginalExtension() which trusts whatever
+            // extension the uploader's browser sent (T-03: a ".php" file
+            // renamed to look like a video would otherwise land on disk
+            // with a ".php" extension).
+            $newFileName = uniqid('video_', true) . '.' . ($uploadedFile->extension() ?: 'bin');
 
             // Now upload the file to the folder
             $filePath = $basePath . '/' . $newFileName;
@@ -10783,7 +11088,7 @@ class Common
             try {
                 $localBasePath = 'public/talent_acquisition/' . $main_folder . '/' . base64_encode($vacancy_id);
                 $uploadedFile = $file_name;
-                $newFileName = uniqid('video_', true) . '.' . $uploadedFile->getClientOriginalExtension();
+                $newFileName = uniqid('video_', true) . '.' . ($uploadedFile->extension() ?: 'bin');
                 $filePath = $uploadedFile->storeAs($localBasePath, $newFileName, 'local');
 
                 $data['status'] = true;
@@ -10815,7 +11120,7 @@ class Common
             $prefix = 'applicant_';
             $randomPart = Str::random(8);
             $timestamp = time();
-            $newFileName = $prefix . $timestamp . '_' . $randomPart . '.' . $uploadedFile->getClientOriginalExtension();
+            $newFileName = $prefix . $timestamp . '_' . $randomPart . '.' . ($uploadedFile->extension() ?: 'bin');
 
             $basePath = $main_folder . '/public/talent_acquisition/' . base64_encode($vacancy_id);
 
@@ -10879,7 +11184,12 @@ class Common
             $pagesList = ModulePages::where('internal_route',$routeName)
                     ->where('TypeOfPage','InsideOfPage')->where('type','normal')->first();
             if(!$pagesList){
-                return true; // No page found for this route
+                // X-01: this used to be a bare `return true` — any route not
+                // seeded as a module_pages row (≈91% of portal routes) was
+                // open to any logged-in portal user of any rank. Extend
+                // coverage via config/route_permissions.php before falling
+                // back to the old permissive default.
+                return self::checkRoutePermissionsMap($routeName, $Resort_id, $employee);
             }
             $hasViewPermission = Common::resortHasPermission($pagesList->Module_Id, $pagesList->id, $permission_id);;
         }
@@ -10889,6 +11199,64 @@ class Common
         }else{
             return false;
         }
+    }
+
+    /**
+     * X-01: second layer of route coverage, checked only when a route has
+     * no module_pages row at all. config/route_permissions.php maps a route
+     * to the page whose permission tick should gate it (and which tick —
+     * view/create/edit/delete, not always "view" the way the middleware's
+     * default check is). A route in neither place is report-only: logged
+     * and still allowed, so adding the map/this method changes nothing on
+     * its own — see config/route_permissions.php's own doc comment for the
+     * rollout plan before 'enforce_unmapped' is ever flipped to true.
+     */
+    private static function checkRoutePermissionsMap($routeName, $resortId, $employee)
+    {
+        $config = config('route_permissions', []);
+        $enforceUnmapped = $config['enforce_unmapped'] ?? false;
+        $entry = $config['map'][$routeName] ?? null;
+
+        if ($entry === null) {
+            \Log::warning('UNMAPPED_ROUTE', ['route' => $routeName, 'resort_id' => $resortId, 'employee_id' => $employee->id ?? null]);
+            return $enforceUnmapped ? false : true;
+        }
+
+        [$ownerPage, $required] = $entry;
+
+        if ($ownerPage === '*' && $required === 'any_authenticated') {
+            return true;
+        }
+
+        $pagesList = ModulePages::where('internal_route', $ownerPage)->first();
+        if (!$pagesList) {
+            // The map points at a page that doesn't exist — fail toward the
+            // existing default rather than silently trusting a typo.
+            \Log::warning('ROUTE_PERMISSIONS_BAD_OWNER_PAGE', ['route' => $routeName, 'owner_page' => $ownerPage]);
+            return $enforceUnmapped ? false : true;
+        }
+
+        $permissionId = match ($required) {
+            'create' => config('settings.resort_permissions.create'),
+            'edit'   => config('settings.resort_permissions.edit'),
+            'delete' => config('settings.resort_permissions.delete'),
+            default  => config('settings.resort_permissions.view'),
+        };
+
+        $allowed = (bool) Common::resortHasPermission($pagesList->Module_Id, $pagesList->id, $permissionId);
+        if (!$allowed && !$enforceUnmapped) {
+            // Report-only applies here too: almost no resort has explicit
+            // ticks configured for these newly-mapped pages yet (this audit
+            // found ~9% coverage overall), so enforcing a real "deny" the
+            // moment a route is added to the map would 403 legitimate
+            // HR/GM users the in-method check already allows — a functional
+            // regression, not a security fix. Log so HR can review/
+            // configure ticks before 'enforce_unmapped' ever flips to true.
+            \Log::warning('ROUTE_PERMISSIONS_WOULD_DENY', ['route' => $routeName, 'resort_id' => $resortId, 'employee_id' => $employee->id ?? null]);
+            return true;
+        }
+
+        return $allowed;
     }
 
     public static function getCurrentCutoffPeriod($cutoff_day)
@@ -12628,6 +12996,25 @@ class Common
             'contactEmail'   => $setting->contact_email,
             'website'        => $setting->website,
         ];
+    }
+
+    /**
+     * SV-01: survey respondent masking ("Anonymous/Confidential Respondent
+     * #N") was numbering masked rows by their position in the invite-order
+     * query result — stable and reconstructable (the create-survey
+     * participant list preserves that same order), so anyone who could
+     * reconstruct the invite order could map "#N" straight back to a named
+     * employee. Returns [originalKey => shuffled ordinal] for just the rows
+     * that need masking, so the number carries no invite-order information.
+     */
+    public static function shuffledMaskOrdinals($maskedKeys): array
+    {
+        $keys = collect($maskedKeys)->values()->shuffle();
+        $map = [];
+        foreach ($keys as $ordinal => $key) {
+            $map[$key] = $ordinal + 1;
+        }
+        return $map;
     }
 
 }

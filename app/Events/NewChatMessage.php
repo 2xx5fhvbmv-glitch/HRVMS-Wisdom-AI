@@ -1,7 +1,7 @@
 <?php
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -18,8 +18,9 @@ class NewChatMessage implements ShouldBroadcastNow
     public $receiverName;
     public $receiverImage;
     public $attachments;
+    public $supportId;
 
-    public function __construct($message, $senderId, $receiverId, $senderName, $senderImage, $receiverName, $receiverImage, $attachments = [])
+    public function __construct($message, $senderId, $receiverId, $senderName, $senderImage, $receiverName, $receiverImage, $attachments = [], $supportId = null)
     {
         $this->message = $message;
         $this->senderId = $senderId;
@@ -29,16 +30,15 @@ class NewChatMessage implements ShouldBroadcastNow
         $this->receiverName = $receiverName;
         $this->receiverImage = $receiverImage;
         $this->attachments = is_array($attachments) ? $attachments : [];
+        $this->supportId = $supportId;
     }
 
     public function broadcastOn()
     {
-        // Public channel — both the admin (auth:admin guard) and resort
-        // (auth:resort-admin guard) panels need to listen, and Laravel's
-        // default /broadcasting/auth only validates against the web guard.
-        // Keeping this public sidesteps multi-guard auth wiring; the channel
-        // name itself includes the receiver id, so cross-leakage is minimal.
-        return new Channel('chat.' . $this->receiverId);
+        // Private, per-ticket channel. Both admin and resort-admin guards
+        // are authorized in routes/channels.php; /broadcasting/auth
+        // (routes/web.php) resolves both guards before calling Broadcast::auth().
+        return new PrivateChannel('support-ticket.' . $this->supportId);
     }
 
     public function broadcastWith()

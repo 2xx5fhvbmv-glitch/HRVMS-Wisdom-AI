@@ -7,14 +7,19 @@ use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 class ConsolidateBudgetData implements WithMultipleSheets, Export
 {
-    public function __construct(protected int $resortId)
+    public function __construct(protected array $exportData)
     {
     }
 
     public function sheets(): array
     {
-        return [
-            new ConsolidateBudgetMainSheet($this->resortId),
-        ];
+        $mvrToDollarRate = $this->exportData['mvrToDollarRate'];
+
+        $sheets = [];
+        foreach ($this->exportData['sheets'] as $title => $sheet) {
+            $sheets[] = new ConsolidateBudgetMainSheet($title, $sheet['tree'], $sheet['resortCosts'], $mvrToDollarRate);
+        }
+
+        return $sheets;
     }
 }

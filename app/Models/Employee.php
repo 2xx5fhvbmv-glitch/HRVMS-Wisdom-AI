@@ -16,6 +16,13 @@ use Illuminate\Support\Str;
 
 class Employee extends Model
 {
+    // Allow-list, not a block-list: any status not in here is blocked from
+    // logging in (mobile or web), including a new status enum value added
+    // later without an explicit decision (S4-02). Product-owner decision
+    // 2026-09-26: On Leave / Onboarding / Offboarding keep access; Inactive,
+    // Terminated, Resigned, Suspended do not.
+    const LOGIN_ALLOWED_STATUSES = ['Active', 'On Leave', 'Onboarding', 'Offboarding'];
+
     use HasFactory,Notifiable;
     use SoftDeletes;
     protected $table="employees";

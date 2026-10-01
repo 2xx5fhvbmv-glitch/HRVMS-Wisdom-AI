@@ -10,6 +10,15 @@ use Auth;
 use DB;
 class TaEmailTemplateController extends Controller
 {
+    public function __construct()
+    {
+        // T-05: email templates had zero role checks. Decided policy: HR only.
+        $resortAdmin = Auth::guard('resort-admin')->user();
+        if ($resortAdmin) {
+            abort_unless(Common::hasFullDataAccess(optional($resortAdmin)->GetEmployee), 403, 'Unauthorized action.');
+        }
+    }
+
     public function index()
     {
         $resort_id= Auth::guard('resort-admin')->user()->resort_id;

@@ -582,6 +582,15 @@ class AttandanceRegisterController extends Controller
                 return response()->json(['success'=>false,'message' => 'Record not found.'], 404);
             }
 
+            // A-01: this approves/rejects overtime, previously with zero
+            // role check at all — any portal user could approve anyone's
+            // overtime, including their own. HR/GM or the employee's own
+            // HOD/EXCOM only, never the employee themselves.
+            if (!Common::canManageAttendanceFor($ParentAttendace->Emp_id, $this->resort->GetEmployee)) {
+                DB::rollback();
+                return response()->json(['success' => false, 'message' => 'You are not authorized to approve this overtime.'], 403);
+            }
+
             $DayWiseTotalHours = $ParentAttendace->DayWiseTotalHours;
             $OldOverTime = $ParentAttendace->OverTime ?? "00:00";
             if ($ParentAttendace)

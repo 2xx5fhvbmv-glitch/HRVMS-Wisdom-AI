@@ -195,20 +195,17 @@
         const receiverImage = $("#receiver_image").val();
 
         // === Real-time incoming messages ===
-        // Server broadcasts NewChatMessage on chat.{receiver_id} (public).
-        // userId here is the logged-in resort employee's id, declared in
-        // resources/views/resorts/layouts/js.blade.php. Subscribe on our own
-        // id and append messages we receive from the admin side. Guard for
-        // when Echo isn't loaded (e.g. BROADCAST_DRIVER=log on dev).
-        if (typeof window.Echo !== 'undefined' && typeof userId !== 'undefined' && userId) {
-            window.Echo.channel('chat.' + userId)
+        // Server broadcasts NewChatMessage on the private
+        // 'support-ticket.{supportId}' channel, authorized per-ticket in
+        // routes/channels.php. Guard for when Echo isn't loaded (e.g.
+        // BROADCAST_DRIVER=log on dev).
+        if (typeof window.Echo !== 'undefined' && supportId) {
+            window.Echo.private('support-ticket.' + supportId)
                 .listen('NewChatMessage', function (e) {
                     console.log('[chat] incoming', { senderId: e.senderId, receiverId: e.receiverId, message: e.message });
-                    // The channel `chat.{userId}` is already scoped to THIS
-                    // user, so any event we receive on it is meant for us.
-                    // Don't add a senderId filter — for unassigned tickets
-                    // assigned_to is null and the comparison would always
-                    // drop messages.
+                    // Don't add a senderId filter beyond this — for
+                    // unassigned tickets assigned_to is null and the
+                    // comparison would always drop messages.
                     if (String(e.senderId) === String(userId)) return; // skip own echo
 
                     appendMessage({

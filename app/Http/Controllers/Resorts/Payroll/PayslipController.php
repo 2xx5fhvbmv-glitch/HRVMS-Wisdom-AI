@@ -52,6 +52,12 @@ class PayslipController extends Controller
     public $resort;
     public function __construct()
     {
+        // P-01: payslips and final settlements are HR/Finance only.
+        // approveFinalSettlement/getFinalSettlementApprovalStatus carry their
+        // own per-step approver checks the GM must pass through, so they're
+        // excluded from this blanket gate.
+        $this->middleware('payroll.access')->except(['approveFinalSettlement', 'getFinalSettlementApprovalStatus']);
+
         $this->resort = Auth::guard('resort-admin')->user();
         if(!$this->resort) return;
     }
@@ -397,10 +403,10 @@ class PayslipController extends Controller
 
     public function finalsettlement(Request $request)
     {
-        if(Common::checkRouteWisePermission('payslip.finalsettlement',config('settings.resort_permissions.create')) == false)
-        {
-            return redirect()->route('final.settlement.list');
-        }
+        // P-01: dead check removed — the route name it checked
+        // ('payslip.finalsettlement') was never registered, so this always
+        // passed. Access is now enforced by the payroll.access middleware
+        // in __construct().
         $page_title ='Full and Final Settlement';
         $resort_id = $this->resort->resort_id;
         // employee.position/employee.department eager-loaded alongside the
@@ -753,10 +759,8 @@ class PayslipController extends Controller
 
     public function review($id)
     {
-        if(Common::checkRouteWisePermission('payslip.finalsettlement',config('settings.resort_permissions.view')) == false)
-        {
-            return abort(403, 'Unauthorized action.');
-        }
+        // P-01: dead check removed (see finalsettlement() above) — enforced
+        // by the payroll.access middleware in __construct() now.
         $page_title = 'Review Final Settlement';
         $finalSettlement = FinalSettlement::with([
             'employee.resortAdmin',
@@ -1322,10 +1326,8 @@ class PayslipController extends Controller
 
     public function settlementList()
     {
-        if(Common::checkRouteWisePermission('payslip.finalsettlement',config('settings.resort_permissions.view')) == false)
-        {
-            return abort(403, 'Unauthorized action.');
-        }
+        // P-01: dead check removed (see finalsettlement() above) — enforced
+        // by the payroll.access middleware in __construct() now.
         $page_title = 'Final Settlements';
         $resort_id = $this->resort->resort_id;
          $positions = ResortPosition::where('status','active')->where('resort_id',$resort_id)->get();

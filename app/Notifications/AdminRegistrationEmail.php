@@ -7,6 +7,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Auth\Notifications\ResetPassword as ResetPasswordNotification;
 use Illuminate\Support\Facades\Lang;
+use Illuminate\Support\Facades\Password;
 use App\Models\Admin;
 use App\Models\EmailTemplate;
 use App\Models\Settings;
@@ -46,7 +47,15 @@ class AdminRegistrationEmail extends ResetPasswordNotification
     $user_name = ucwords($this->admin->first_name.' '.$this->admin->last_name);
     // $resort_name = ucwords($this->data->resort_name);
     $email = $this->admin->email;
-    $password = $this->password;
+
+    // S8: no plaintext password over email anymore — a real reset token
+    // (same broker/table the Forgot Password flow uses) drives a
+    // set-your-password link instead. $this->password is kept only so
+    // existing callers (AdminController::store()) don't need signature
+    // changes; it's no longer read here.
+    $resetToken = Password::broker('admins')->createToken($admin);
+    $resetUrl = url('/') . route('admin.password.reset', ['token' => $resetToken, 'email' => $email], false);
+    $setPasswordButton = '<a style="padding:5px 10px;background-color:#DA2128;color:#ffffff" href="'.$resetUrl.'">Set your password</a>';
 
     $login_route = route('admin.loginindex');
     $login_button = '<a style="padding:5px 10px;background-color:#DA2128;color:#ffffff" href="'.$login_route.'">Login here</a>';
@@ -57,12 +66,11 @@ class AdminRegistrationEmail extends ResetPasswordNotification
 
     $data['body'] = isset( $emailTemplate ) && $emailTemplate->body != '' ? $emailTemplate->body : "<p>Dear [User Name],</p>
 
-<p>Welcome to Wisdom AI ! Your account has been successfully registered. Below are your credentials to access your account:</p>
+<p>Welcome to Wisdom AI ! Your account has been successfully registered. Your login email is [Email]. Click below to set your password:</p>
 
-<p><strong>Email:</strong> [Email]</p>
-<p><strong>Password:</strong> [Password]</p>
+<p>[Password]</p>
 
-<p>Please keep these credentials safe and do not share them with anyone. You can log in to your account using the following link:</p>
+<p>This link will expire in 60 minutes. Once set, you can log in using the following link:</p>
 
 <p>[Login Url]</p>
 
@@ -80,7 +88,7 @@ class AdminRegistrationEmail extends ResetPasswordNotification
     $yummy = [
       $user_name,
       $email,
-      $password,
+      $setPasswordButton,
       $login_button,
     ];
 

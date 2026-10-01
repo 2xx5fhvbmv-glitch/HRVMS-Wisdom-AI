@@ -7,9 +7,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\ResortNonpermanentBudgetCost;
 use App\Models\ResortPosition;
+use App\Helpers\Common;
 
 class NonpermanentBudgetCostController extends Controller
 {
+    public function __construct()
+    {
+        // W-03: budget cost items (allowances/benefits/rates) — HR/Finance only.
+        if (Common::budgetAccessLevel() !== 'full') {
+            abort(403, 'Unauthorized access');
+        }
+    }
+
     public function index()
     {
         $page_title = 'Cost Configuration for Casuals & Interns';

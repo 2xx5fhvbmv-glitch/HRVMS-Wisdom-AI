@@ -83,7 +83,7 @@
                     </div>
                     <div class="dvi-desc">
                         <div class="dk">Description</div>
-                        <div class="dv">{!! $Disciplinary_parent->Incident_description !!}</div>
+                        <div class="dv">{{ $Disciplinary_parent->Incident_description }}</div>
                     </div>
                     <div class="dvi-facts">
                         <div class="dvi-fact"><span class="k">Disciplinary ID</span><span class="pill ref-pill">{{ $Disciplinary_parent->Disciplinary_id }}</span></div>

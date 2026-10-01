@@ -851,6 +851,14 @@ class CycleController extends Controller
 
     public function Destroy($id)
     {
+        // PF-04: only mutating method in this controller with no gate — every
+        // other one (create/CycleStore/attachTemplate/viewCycle/cycleAnalytics)
+        // requires hasFullDataAccess(). Deleting a cycle cascades to
+        // PerformaChildCycle rows, which hold every participant's actual
+        // self-review/manager-review content, not just cycle metadata.
+        if (!Common::hasFullDataAccess()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and GM can delete a performance cycle.'], 403);
+        }
         $id = base64_decode($id);
 
         $cycle = PerformanceCycle::where('resort_id', $this->resort->resort_id)->find($id);

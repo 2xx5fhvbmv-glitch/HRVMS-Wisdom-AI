@@ -1,8 +1,8 @@
 <style>
     /* Menu button height matched to the search bar it sits beside (40px) —
        was ~52px, taller than the search bar next to it. .menu-box only
-       exists in this file (the vertical-menu header), not in
-       header1.blade.php, so this is safe to apply unscoped. */
+       exists in this file (the vertical-menu header), so this is safe
+       to apply unscoped. */
     .menu-box .btn {
         padding: 4px 30px;
     }
@@ -17,8 +17,7 @@
     }
 
     /* Same placeholder treatment for the expandable search box that opens
-       under the horizontal menu bar (also present, as its own separate
-       copy, in header1.blade.php) — it was still showing the old
+       under the horizontal menu bar — it was still showing the old
        full-opacity white placeholder since it doesn't share the
        .search-bar-nav wrapper the fix above targets. */
     .serch-box input::placeholder {
@@ -30,10 +29,8 @@
        asymmetric padding (padding-right only) and an 11.2px font that
        barely fit — enlarged slightly, evenly centered, with a subtle ring
        so it reads clearly instead of looking like a stray clipped dot.
-       .notification-nav is also used by header1.blade.php's bell icon;
-       unlike .top-navbar's background (which meant something different in
-       each file), a cleaner badge is equally correct in both, so this one
-       is left unscoped on purpose. */
+       Left unscoped on purpose — a cleaner badge is safe wherever
+       .notification-nav appears. */
     .notification-nav span {
         top: -4px;
         right: 2px;

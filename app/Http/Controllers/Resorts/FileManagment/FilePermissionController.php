@@ -102,6 +102,12 @@ class FilePermissionController extends Controller
 
     public function StoreFilePermission(Request $request)
     {
+        // Was missing entirely (FM-03) — any portal user could change which
+        // department/position can see which files, unlike index() which
+        // already gates on this permission.
+        if (Common::checkRouteWisePermission('FileManage.Permission', config('settings.resort_permissions.create')) == false) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $department = $request->department;
         if (isset($request->position)) {
             $positions = $request->position;

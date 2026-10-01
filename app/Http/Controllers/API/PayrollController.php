@@ -802,7 +802,14 @@ class PayrollController extends Controller
             // write here either silently disappears or errors depending on
             // the server's filesystem, while the returned asset() URL
             // never resolved to a real file there either way.
-            $relativePath                               =   trim(config('settings.PayslipPdf'), '/') . '/' . time() . '_payslip.pdf';
+            //
+            // P-03: the old time()-based name was only the current second,
+            // with no resort/employee/random component — two employees
+            // downloading in the same second collided on one file, and on
+            // local-disk servers (StorageHelper::temporaryUrl() falls back
+            // to a plain, unsigned URL there) the name was guessable in
+            // sequence. Scoped per resort+employee with a UUID instead.
+            $relativePath                               =   trim(config('settings.PayslipPdf'), '/') . '/' . $this->resort_id . '/' . $employee_id . '/' . \Illuminate\Support\Str::uuid() . '.pdf';
             StorageHelper::put($relativePath, $pdf->output());
             $pdfUrl                                     =   StorageHelper::temporaryUrl($relativePath);
 

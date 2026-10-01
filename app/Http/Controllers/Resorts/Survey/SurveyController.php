@@ -665,7 +665,7 @@ class SurveyController extends Controller
 
             return datatables()->of($ParentSurvey)
             ->addColumn('SurveyName', function ($row) {
-                return $row->Surevey_title;
+                return e($row->Surevey_title);
             })
             ->addColumn('NoOfApplicant', function ($row) {
                 $count = SurveyEmployee::where("Parent_survey_id",$row->id)->count();
@@ -836,15 +836,24 @@ class SurveyController extends Controller
         $privacy = ParentSurvey::where('id', $surveyId)->where('resort_id', $this->resort->resort_id)->value('survey_privacy_type');
         $showRespondentIdentity = $this->canSeeRespondentIdentity($privacy);
 
-        $parent = ParentSurvey::join('survey_employees as t1',"t1.Parent_survey_id","=","parent_surveys.id")
+        $parentRows = ParentSurvey::join('survey_employees as t1',"t1.Parent_survey_id","=","parent_surveys.id")
                     ->join('employees as t2',"t2.id","=","t1.Emp_id")
                     ->join('resort_admins as t3',"t3.id","=","t2.Admin_Parent_id")
                     ->where("parent_surveys.id",$surveyId)
                     ->where('parent_surveys.resort_id',$this->resort->resort_id)
 
                     ->get(['t3.id as Parentid','t3.first_name','t3.last_name','t1.Emp_id','t1.emp_status'])
-                    ->values()
-                    ->map(function($ak, $idx) use ($showRespondentIdentity, $privacy){
+                    ->values();
+
+        // SV-01: the ordinal used to be $idx+1 — this row's position in the
+        // invite-order query result, which is stable and reconstructable
+        // (the create-survey participant list preserves the same order), so
+        // "#N" could be mapped straight back to a named employee. Assign
+        // shuffled ordinals to just the masked rows instead.
+        $maskedKeys = $parentRows->filter(fn($ak) => $ak->emp_status === 'yes' && !$showRespondentIdentity)->keys();
+        $ordinalByKey = Common::shuffledMaskOrdinals($maskedKeys);
+
+        $parent = $parentRows->map(function($ak, $idx) use ($showRespondentIdentity, $privacy, $ordinalByKey){
 
                         // Same masking as GetSurveyResults()/Result.blade —
                         // was showing every assigned employee's real name
@@ -855,7 +864,7 @@ class SurveyController extends Controller
                         // legitimate need and doesn't leak who answered.
                         if ($ak->emp_status === 'yes' && !$showRespondentIdentity) {
                             $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
-                            $ak->EmployeeName = $label . ' #' . ($idx + 1);
+                            $ak->EmployeeName = $label . ' #' . $ordinalByKey[$idx];
                             $ak->profileImg = asset('resorts_assets/images/user.svg');
                         } else {
                             $ak->EmployeeName = ucfirst($ak->first_name . ' ' . $ak->last_name);
@@ -876,7 +885,7 @@ class SurveyController extends Controller
                                     <div class="img-box">
                                         <img src="'.$p-> profileImg.'" alt="" class="img-fluid">
                                     </div>
-                                    <a href="javascript:void(0)">'.$p-> EmployeeName.'</a>
+                                    <a href="javascript:void(0)">'.e($p->EmployeeName).'</a>
                                 </div>
                             </div>';
             }
@@ -939,7 +948,7 @@ class SurveyController extends Controller
 
             return datatables()->of($ParentSurvey)
             ->addColumn('SurveyName', function ($row) {
-                return $row->Surevey_title;
+                return e($row->Surevey_title);
             })
             ->addColumn('NoOfApplicant', function ($row) {
                 $count = SurveyEmployee::where("Parent_survey_id",$row->id)->count();
@@ -1034,7 +1043,7 @@ class SurveyController extends Controller
             }
             return datatables()->of($ParentSurvey)
             ->addColumn('SurveyName', function ($row) {
-                return $row->Surevey_title;
+                return e($row->Surevey_title);
             })
             ->addColumn('NoOfApplicant', function ($row) {
                 $count = SurveyEmployee::where("Parent_survey_id",$row->id)->count();
@@ -1152,7 +1161,7 @@ class SurveyController extends Controller
                                     <div class="img-box">
                                         <img src="'.$p-> profileImg.'" alt="" class="img-fluid">
                                     </div>
-                                    <a href="javascript:void(0)">'.$p-> EmployeeName.'</a>
+                                    <a href="javascript:void(0)">'.e($p->EmployeeName).'</a>
                                 </div>
                             </div>';
             }
@@ -1257,7 +1266,7 @@ class SurveyController extends Controller
         
             return datatables()->of($ParentSurvey)
             ->addColumn('SurveyName', function ($row) {
-                return $row->title;
+                return e($row->title);
             })
             ->addColumn('NoOfApplicant', function ($row) {
                 $id = base64_encode($row->id); 
@@ -1335,13 +1344,18 @@ class SurveyController extends Controller
         $privacy = $ParentSurvey->survey_privacy_type;
         $showRespondentIdentity = $this->canSeeRespondentIdentity($privacy);
 
-        $ResponedEmp =  SurveyEmployee::join('employees as t1',"t1.id","=","survey_employees.Emp_id")
+        $ResponedEmpRows = SurveyEmployee::join('employees as t1',"t1.id","=","survey_employees.Emp_id")
                                         ->join("resort_admins as t2","t2.id","=","t1.Admin_Parent_id")
                                         ->where("survey_employees.Parent_survey_id",$id)
                                         ->where('survey_employees.emp_status','yes')
                                         ->get(['t1.id as emp_id','t2.first_name','t2.last_name','t2.id as ParentId'] )
-                                        ->values()
-                                        ->map(function($i, $idx) use ($showRespondentIdentity, $privacy) {
+                                        ->values();
+        // SV-01: ($idx+1) was this row's position in invite/insertion order
+        // — the respondent *set* is itself derivable from the full invite
+        // list (elsewhere showing real names for non-respondents), so which
+        // invite-position landed at which ordinal here still deanonymized.
+        $ordinalByKey = $showRespondentIdentity ? [] : Common::shuffledMaskOrdinals($ResponedEmpRows->keys());
+        $ResponedEmp = $ResponedEmpRows->map(function($i, $idx) use ($showRespondentIdentity, $privacy, $ordinalByKey) {
                                             if ($showRespondentIdentity) {
                                                 $i->emp_id  = base64_encode($i->emp_id);
                                                 $i->EmployeeName = ucfirst($i->first_name . ' ' .  $i->last_name);
@@ -1350,7 +1364,7 @@ class SurveyController extends Controller
                                                 // Mask: stable per-row label, no real ID surfaced to the client.
                                                 $label = $privacy === 'Anonymous' ? 'Anonymous' : 'Confidential';
                                                 $i->emp_id  = base64_encode('All'); // disable per-respondent export
-                                                $i->EmployeeName = ($idx + 1) . ' ' . $label;
+                                                $i->EmployeeName = $ordinalByKey[$idx] . ' ' . $label;
                                                 $i->profileImg = asset('resorts_assets/images/user.svg');
                                                 $i->first_name = $label;
                                                 $i->last_name = '';
@@ -1374,18 +1388,21 @@ class SurveyController extends Controller
             ->orderBy('t2.id')
             ->get();
 
+        // SV-01: $maskedSeq used to increment in `orderBy('t2.id')` (invite)
+        // order — stable and reconstructable. Shuffle the ordinal assigned
+        // to each distinct respondent instead.
+        $ordinalByEmpTaId = $showRespondentIdentity ? [] : Common::shuffledMaskOrdinals($fetchAllQA->pluck('Emp_id')->unique());
+
         $respondentAnswers = [];
         $maskedLabelByEmpTaId = [];
-        $maskedSeq = 0;
         foreach ($fetchAllQA as $q) {
             if (!isset($respondentAnswers[$q->Emp_id])) {
                 if ($showRespondentIdentity) {
                     $name = trim($q->first_name . ' ' . $q->last_name);
                 } else {
                     if (!isset($maskedLabelByEmpTaId[$q->Emp_id])) {
-                        $maskedSeq++;
                         $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
-                        $maskedLabelByEmpTaId[$q->Emp_id] = $label . ' #' . $maskedSeq;
+                        $maskedLabelByEmpTaId[$q->Emp_id] = $label . ' #' . $ordinalByEmpTaId[$q->Emp_id];
                     }
                     $name = $maskedLabelByEmpTaId[$q->Emp_id];
                 }
@@ -1544,7 +1561,9 @@ class SurveyController extends Controller
         // Map Survey_emp_ta_id → masked label so each unique respondent keeps
         // a stable pseudonym across all their answers.
         $maskedLabelByEmpTaId = [];
-        $maskedSeq = 0;
+        // SV-01: $maskedSeq incremented in orderBy('t2.id') (invite) order —
+        // stable and reconstructable. Shuffled instead.
+        $ordinalByEmpTaId = $showRespondentIdentity ? [] : Common::shuffledMaskOrdinals($fetchQuestions->pluck('Emp_id')->unique());
 
         foreach ($fetchQuestions as $q) {
             // Check if the employee has answered the question
@@ -1559,9 +1578,8 @@ class SurveyController extends Controller
                 $participantName = $q->first_name . ' ' . $q->last_name;
             } else {
                 if (!isset($maskedLabelByEmpTaId[$q->Emp_id])) {
-                    $maskedSeq++;
                     $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
-                    $maskedLabelByEmpTaId[$q->Emp_id] = $label . ' #' . $maskedSeq;
+                    $maskedLabelByEmpTaId[$q->Emp_id] = $label . ' #' . $ordinalByEmpTaId[$q->Emp_id];
                 }
                 $participantName = $maskedLabelByEmpTaId[$q->Emp_id];
             }
@@ -1606,18 +1624,20 @@ class SurveyController extends Controller
         $privacy = $parent->survey_privacy_type ?? null;
         $showRespondentIdentity = $this->canSeeRespondentIdentity($privacy);
 
-        $participantEmp = SurveyEmployee::join('employees as t1', 't1.id', '=', 'survey_employees.Emp_id')
+        $participantEmpRows = SurveyEmployee::join('employees as t1', 't1.id', '=', 'survey_employees.Emp_id')
             ->join('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
             ->where('survey_employees.Parent_survey_id', $decodedId)
             ->get(['t2.first_name', 't2.last_name', 't2.id as ParentId'])
-            ->values()
-            ->map(function ($i, $idx) use ($showRespondentIdentity, $privacy) {
+            ->values();
+        // SV-01: ($idx+1) was invite-order position, stable/reconstructable.
+        $ordinalByKey = $showRespondentIdentity ? [] : Common::shuffledMaskOrdinals($participantEmpRows->keys());
+        $participantEmp = $participantEmpRows->map(function ($i, $idx) use ($showRespondentIdentity, $privacy, $ordinalByKey) {
                 if ($showRespondentIdentity) {
                     $i->EmployeeName = ucfirst($i->first_name . ' ' . $i->last_name);
                     $i->profileImg = Common::getResortUserPicture($i->ParentId);
                 } else {
                     $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
-                    $i->EmployeeName = $label . ' #' . ($idx + 1);
+                    $i->EmployeeName = $label . ' #' . $ordinalByKey[$idx];
                     $i->profileImg = asset('resorts_assets/images/user.svg');
                 }
                 return $i;

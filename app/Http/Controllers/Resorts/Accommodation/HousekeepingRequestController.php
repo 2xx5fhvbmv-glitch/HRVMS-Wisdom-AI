@@ -50,8 +50,9 @@ class HousekeepingRequestController extends Controller
             ->where('status', 'Active')
             ->get();
         $buildings = BuildingModel::where('resort_id', $this->resort->resort_id)->get();
+        $lineWorkers = Common::getResortHousekeepingLineWorkers($this->resort->resort_id);
 
-        return view('resorts.Accommodation.HousekeepingRequest.index', compact('page_title', 'employees', 'buildings'));
+        return view('resorts.Accommodation.HousekeepingRequest.index', compact('page_title', 'employees', 'buildings', 'lineWorkers'));
     }
 
     public function eligibleServices(Request $request)
@@ -106,12 +107,32 @@ class HousekeepingRequestController extends Controller
             'scheduled_date' => 'required|date',
             'scheduled_time' => 'required',
             'remarks' => 'nullable|string',
+            'assigned_to_employee_id' => 'nullable|integer',
+            // frequency is the count of days HR picked; recurring_days is the
+            // day-of-week set itself (ISO 1=Mon..7=Sun) — kept as two fields
+            // instead of deriving one from the other so an inconsistent
+            // submission (e.g. frequency=3 with 2 days) is rejected rather
+            // than silently generating the wrong number of occurrences.
+            'frequency' => 'nullable|integer|min:1|max:7',
+            'recurring_days' => 'nullable|array',
+            'recurring_days.*' => 'integer|min:1|max:7',
         ], [
             'building_id.required_without' => 'Please select an employee, or a building/room.',
             'service_ids.required' => 'Please select at least one service.',
         ]);
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+        if ($request->filled('recurring_days') && count($request->recurring_days) !== (int) $request->frequency) {
+            return response()->json(['success' => false, 'message' => 'Selected days must match the chosen frequency.'], 422);
+        }
+
+        $assignee = null;
+        if ($request->filled('assigned_to_employee_id')) {
+            $assignee = Employee::where('id', $request->assigned_to_employee_id)->where('resort_id', $resortId)->first();
+            if (!Common::isHousekeepingLineWorker($assignee)) {
+                return response()->json(['success' => false, 'message' => 'Assignee must be an active Housekeeping Line Worker (not HOD/EXCOM).'], 422);
+            }
         }
 
         $employee = null;
@@ -167,6 +188,16 @@ class HousekeepingRequestController extends Controller
             }
         }
 
+        // Rolling-4-week generation: one HousekeepingRequest row per
+        // (service x occurrence date), each independently trackable
+        // (own status/assignee/photos) via the shared batch_id. A
+        // non-recurring submission is just the single scheduled_date, same
+        // as before.
+        $recurringDays = $request->filled('recurring_days') ? array_map('intval', $request->recurring_days) : [];
+        $occurrenceDates = empty($recurringDays)
+            ? [$request->scheduled_date]
+            : $this->buildRecurringOccurrenceDates($request->scheduled_date, $recurringDays, 28);
+
         try {
             DB::beginTransaction();
 
@@ -175,20 +206,25 @@ class HousekeepingRequestController extends Controller
             $created = [];
 
             foreach ($serviceIds as $serviceId) {
-                $created[] = HousekeepingRequest::create([
-                    'resort_id' => $resortId,
-                    'batch_id' => $batchId,
-                    'employee_id' => $employee->id ?? null,
-                    'housekeeping_service_id' => $serviceId,
-                    'raised_by' => $raisedBy,
-                    'BuildingName' => $buildingId,
-                    'FloorNo' => $floor,
-                    'RoomNo' => $room,
-                    'remarks' => $request->remarks,
-                    'scheduled_date' => $request->scheduled_date,
-                    'scheduled_time' => $request->scheduled_time,
-                    'status' => 'Pending',
-                ]);
+                foreach ($occurrenceDates as $occurrenceDate) {
+                    $created[] = HousekeepingRequest::create([
+                        'resort_id' => $resortId,
+                        'batch_id' => $batchId,
+                        'employee_id' => $employee->id ?? null,
+                        'assigned_to_employee_id' => $assignee->id ?? null,
+                        'housekeeping_service_id' => $serviceId,
+                        'raised_by' => $raisedBy,
+                        'BuildingName' => $buildingId,
+                        'FloorNo' => $floor,
+                        'RoomNo' => $room,
+                        'remarks' => $request->remarks,
+                        'scheduled_date' => $occurrenceDate,
+                        'scheduled_time' => $request->scheduled_time,
+                        'frequency' => $request->frequency,
+                        'recurring_days' => empty($recurringDays) ? null : json_encode($recurringDays),
+                        'status' => 'Pending',
+                    ]);
+                }
             }
 
             DB::commit();
@@ -224,6 +260,27 @@ class HousekeepingRequestController extends Controller
                 \Log::warning('HousekeepingRequestController::store HOD notify failed: ' . $e->getMessage());
             }
 
+            // One notification per submission, not one per generated
+            // occurrence — the Line Worker sees every date on the task in
+            // their mobile Housekeeping Services/Tasks list already; a
+            // recurring "3x/week" schedule shouldn't spam 12 separate pushes.
+            if ($assignee) {
+                try {
+                    Common::notifyEmployees(
+                        $resortId,
+                        [$assignee->id],
+                        'Housekeeping Task Assigned',
+                        count($occurrenceDates) > 1
+                            ? 'You have ' . count($occurrenceDates) . ' housekeeping tasks scheduled, starting ' . \Carbon\Carbon::parse($occurrenceDates[0])->format('d M Y') . '.'
+                            : 'You have been assigned a housekeeping task for ' . \Carbon\Carbon::parse($occurrenceDates[0])->format('d M Y') . '.',
+                        'Housekeeping Request',
+                        $created[0]->id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('HousekeepingRequestController::store assignee notify failed: ' . $e->getMessage());
+                }
+            }
+
             return response()->json(['success' => true, 'message' => 'Housekeeping request(s) created successfully']);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -232,6 +289,41 @@ class HousekeepingRequestController extends Controller
             \Log::error($e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
+    }
+
+    /**
+     * ISO weekday (1=Mon..7=Sun) dates matching $days, from $startDate
+     * through the next $windowDays. $startDate is the anchor/start of the
+     * window, not necessarily an occurrence itself — e.g. HR picks a
+     * Thursday start date with Mon/Tue/Wed selected; the first generated
+     * occurrence is the next matching Monday, not the Thursday.
+     */
+    private function buildRecurringOccurrenceDates(string $startDate, array $days, int $windowDays): array
+    {
+        $start = \Carbon\Carbon::parse($startDate);
+        $dates = [];
+        for ($i = 0; $i < $windowDays; $i++) {
+            $date = $start->copy()->addDays($i);
+            if (in_array($date->dayOfWeekIso, $days, true)) {
+                $dates[] = $date->toDateString();
+            }
+        }
+        return $dates;
+    }
+
+    /** Eligible "Assign to" dropdown for the create form and any future re-assign action. */
+    public function eligibleLineWorkers()
+    {
+        $lineWorkers = Common::getResortHousekeepingLineWorkers($this->resort->resort_id)
+            ->map(function ($emp) {
+                return [
+                    'id' => $emp->id,
+                    'name' => trim(($emp->resortAdmin->first_name ?? '') . ' ' . ($emp->resortAdmin->last_name ?? '')) . ' (' . $emp->Emp_id . ')',
+                ];
+            })
+            ->values();
+
+        return response()->json(['success' => true, 'data' => $lineWorkers]);
     }
 
     public function list(Request $request)
@@ -249,6 +341,8 @@ class HousekeepingRequestController extends Controller
             ->leftJoin('building_models as bm', 'bm.id', '=', 'housekeeping_requests.BuildingName')
             ->join('employees as raiser_emp', 'raiser_emp.id', '=', 'housekeeping_requests.raised_by')
             ->join('resort_admins as raiser', 'raiser.id', '=', 'raiser_emp.Admin_Parent_id')
+            ->leftJoin('employees as assignee_emp', 'assignee_emp.id', '=', 'housekeeping_requests.assigned_to_employee_id')
+            ->leftJoin('resort_admins as assignee', 'assignee.id', '=', 'assignee_emp.Admin_Parent_id')
             ->where('housekeeping_requests.resort_id', $resortId)
             ->when($scopedDeptIds !== null, function ($query) use ($scopedDeptIds) {
                 // A restricted HOD/XCOM only ever sees their own department's
@@ -266,7 +360,9 @@ class HousekeepingRequestController extends Controller
                 'hsc.name as service_name',
                 'bm.BuildingName as building_name',
                 'raiser.first_name as raiser_first_name',
-                'raiser.last_name as raiser_last_name'
+                'raiser.last_name as raiser_last_name',
+                'assignee.first_name as assignee_first_name',
+                'assignee.last_name as assignee_last_name'
             )
             ->orderBy('housekeeping_requests.created_at', 'desc')
             ->get()
@@ -275,6 +371,7 @@ class HousekeepingRequestController extends Controller
                     ? trim($row->emp_first_name . ' ' . $row->emp_last_name) . ' (' . $row->emp_code . ')'
                     : trim(($row->building_name ?? 'Building') . (($row->FloorNo || $row->RoomNo) ? ', ' : '') . ($row->FloorNo ? 'Floor ' . $row->FloorNo : '') . ($row->RoomNo ? ' Room ' . $row->RoomNo : ''));
                 $row->RaisedBy = trim($row->raiser_first_name . ' ' . $row->raiser_last_name);
+                $row->AssignedTo = $row->assigned_to_employee_id ? trim($row->assignee_first_name . ' ' . $row->assignee_last_name) : '-';
                 $row->ScheduledOn = $row->scheduled_date
                     ? \Carbon\Carbon::parse($row->scheduled_date)->format('d M Y') . ($row->scheduled_time ? ' ' . \Carbon\Carbon::parse($row->scheduled_time)->format('h:i A') : '')
                     : '-';
@@ -285,20 +382,43 @@ class HousekeepingRequestController extends Controller
             ->editColumn('RequestedFor', fn($row) => e($row->RequestedFor))
             ->editColumn('service_name', fn($row) => e($row->service_name))
             ->editColumn('RaisedBy', fn($row) => e($row->RaisedBy))
+            ->editColumn('AssignedTo', fn($row) => e($row->AssignedTo))
             ->editColumn('ScheduledOn', fn($row) => e($row->ScheduledOn))
             ->editColumn('status', function ($row) {
                 $map = [
                     'Pending' => 'badge-themeWarning',
-                    'Approved' => 'badge-blueNew',
+                    'Accepted' => 'badge-blueNew',
                     'In-Progress' => 'badge-blueNew',
                     'Completed' => 'badge-success',
-                    'Rejected' => 'badge-danger',
+                    'Not Completed' => 'badge-danger',
                 ];
                 $class = $map[$row->status] ?? 'badge-themeWarning';
                 return '<span class="badge ' . $class . ' border-0">' . e($row->status) . '</span>';
             })
             ->editColumn('remarks', fn($row) => e($row->remarks))
-            ->rawColumns(['status'])
+            ->editColumn('photos', function ($row) {
+                if (empty($row->photos)) {
+                    return '-';
+                }
+                $basePath = config('settings.HousekeepingRequestPhotos') . '/' . $row->resort_id;
+                $links = [];
+                foreach (explode(',', $row->photos) as $i => $filename) {
+                    $filename = trim($filename);
+                    if ($filename === '') {
+                        continue;
+                    }
+                    try {
+                        $path = $basePath . '/' . $filename;
+                        if (\App\Helpers\StorageHelper::disk()->exists($path)) {
+                            $links[] = '<a href="' . e(\App\Helpers\StorageHelper::temporaryUrl($path, 30)) . '" target="_blank">Photo ' . ($i + 1) . '</a>';
+                        }
+                    } catch (\Throwable $e) {
+                        // skip files that fail to resolve
+                    }
+                }
+                return $links ? implode(' | ', $links) : '-';
+            })
+            ->rawColumns(['status', 'photos'])
             ->make(true);
     }
 }

@@ -25,6 +25,27 @@ class PipPdpController extends Controller
         $this->resort = Auth::guard('resort-admin')->user();
     }
 
+    /**
+     * PF-03: pipStore/pdpStore/pip(Archive|Restore)/pdp(Archive|Restore) had
+     * no access check at all — only resort_id — so any authenticated portal
+     * user of any rank/department could put an arbitrary employee on a
+     * PIP/PDP or archive/restore any plan. renderPlanView/storePlanResponse
+     * already gate via canAccessPlan()/canManagePlan(); this reuses the same
+     * scoping model pipIndex()/pdpIndex() already apply to their own
+     * listings (Common::getPerformanceScopedEmpIds() — null for GM/HR/L&D
+     * leadership, else the caller's own department or subordinates+self),
+     * rather than a flat HR-only gate that would block a legitimate HOD from
+     * managing their own team.
+     */
+    private function assertEmployeeInPerformanceScope($employeeId)
+    {
+        $scopedIds = Common::getPerformanceScopedEmpIds();
+        if (is_array($scopedIds) && !in_array((int) $employeeId, $scopedIds, true)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+        return null;
+    }
+
     // ==================== PIP ====================
 
     public function pipIndex(Request $request)
@@ -66,6 +87,7 @@ class PipPdpController extends Controller
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
+        if ($guard = $this->assertEmployeeInPerformanceScope($request->employee_id)) return $guard;
 
         $plan = EmployeePipPlan::create([
             'resort_id' => $this->resort->resort_id,
@@ -95,6 +117,7 @@ class PipPdpController extends Controller
         if (!$plan) {
             return response()->json(['success' => false, 'message' => 'Plan not found'], 404);
         }
+        if ($guard = $this->assertEmployeeInPerformanceScope($plan->employee_id)) return $guard;
         $plan->update(['status' => 'archived']);
         $this->notifyPlanStatusChange('pip', $plan, 'archived');
         return response()->json(['success' => true, 'message' => 'PIP plan archived']);
@@ -106,6 +129,7 @@ class PipPdpController extends Controller
         if (!$plan) {
             return response()->json(['success' => false, 'message' => 'Plan not found'], 404);
         }
+        if ($guard = $this->assertEmployeeInPerformanceScope($plan->employee_id)) return $guard;
         $plan->update(['status' => 'active']);
         $this->notifyPlanStatusChange('pip', $plan, 'restored');
         return response()->json(['success' => true, 'message' => 'PIP plan restored']);
@@ -172,6 +196,7 @@ class PipPdpController extends Controller
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
+        if ($guard = $this->assertEmployeeInPerformanceScope($request->employee_id)) return $guard;
 
         $plan = EmployeePdpPlan::create([
             'resort_id' => $this->resort->resort_id,
@@ -201,6 +226,7 @@ class PipPdpController extends Controller
         if (!$plan) {
             return response()->json(['success' => false, 'message' => 'Plan not found'], 404);
         }
+        if ($guard = $this->assertEmployeeInPerformanceScope($plan->employee_id)) return $guard;
         $plan->update(['status' => 'archived']);
         $this->notifyPlanStatusChange('pdp', $plan, 'archived');
         return response()->json(['success' => true, 'message' => 'PDP plan archived']);
@@ -212,6 +238,7 @@ class PipPdpController extends Controller
         if (!$plan) {
             return response()->json(['success' => false, 'message' => 'Plan not found'], 404);
         }
+        if ($guard = $this->assertEmployeeInPerformanceScope($plan->employee_id)) return $guard;
         $plan->update(['status' => 'active']);
         $this->notifyPlanStatusChange('pdp', $plan, 'restored');
         return response()->json(['success' => true, 'message' => 'PDP plan restored']);

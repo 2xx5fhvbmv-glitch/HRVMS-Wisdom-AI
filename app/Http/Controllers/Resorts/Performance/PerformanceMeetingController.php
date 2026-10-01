@@ -767,21 +767,13 @@ class PerformanceMeetingController extends Controller
         $meeting = $participant->meeting;
         $action = request('action', null);
 
-        // Auto-accept if action=accept and not yet responded
-        if ($action === 'accept' && $participant->status === 'pending') {
-            $participant->update([
-                'status' => 'accepted',
-                'responded_at' => now(),
-            ]);
-            $this->notifyMeetingResponse($participant, $meeting, 'accepted');
-            return view('resorts.Performance.Meeting.response', [
-                'error' => null,
-                'meeting' => $meeting,
-                'participant' => $participant,
-                'action' => 'accepted',
-                'message' => 'You have accepted the meeting invitation.'
-            ]);
-        }
+        // PF-08: this GET handler used to silently accept the meeting the
+        // instant the page loaded (`?action=accept` + status still pending)
+        // — a link-scanner/prefetcher following the emailed link, or the
+        // link just being forwarded/shared, auto-committed the response
+        // with no explicit confirmation. The view already has a real POST
+        // "Accept" button (meeting.respond.submit / submitMeetingResponse)
+        // for this exact page — just render it instead of mutating on GET.
 
         return view('resorts.Performance.Meeting.response', [
             'error' => null,
@@ -800,6 +792,11 @@ class PerformanceMeetingController extends Controller
         }
 
         $status = $request->input('status');
+        // PF-08: status was saved verbatim with no allow-list — any string
+        // in the POST body became the participant's stored status.
+        if (!in_array($status, ['accepted', 'declined'], true)) {
+            return back()->with('error', 'Invalid response.');
+        }
         $reason = $request->input('reason', '');
 
         if ($status === 'declined' && empty(trim($reason))) {

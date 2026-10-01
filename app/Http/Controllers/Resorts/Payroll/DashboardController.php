@@ -24,6 +24,9 @@ class DashboardController extends Controller
     public $resort;
     public function __construct()
     {
+        // P-01: payroll dashboards/charts/drafts are HR/Finance only.
+        $this->middleware('payroll.access');
+
         $this->resort = Auth::guard('resort-admin')->user();
         if(!$this->resort) return;
     }

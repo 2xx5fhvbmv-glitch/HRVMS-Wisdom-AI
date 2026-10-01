@@ -316,11 +316,17 @@ class BoardingPassController extends Controller
 
             $passApprovalFlow = collect();
 
+            // L-06: the HOD step below already excludes the applicant (falls
+            // back to reporting_to when they're their own dept's HOD) — the
+            // SM and HR steps never got that same treatment, so an
+            // applicant who happens to be the resort's Security Manager or
+            // sole HR employee approved their own pass at that stage.
             $positionIds = ResortPosition::where('resort_id', $resort_id)
                 ->whereIn('position_title', ['Security Manager', 'SM'])
                 ->pluck('id');
             $smApprover = Employee::whereIn('Position_id', $positionIds)
                 ->where('resort_id', $resort_id)->where('status', 'Active')
+                ->where('id', '!=', $employee->id)
                 ->select('id', 'rank')->orderBy('id')->first();
             if ($smApprover) {
                 $smApprover->approver_role = 'SM';
@@ -329,7 +335,8 @@ class BoardingPassController extends Controller
 
             $hrApprover = Employee::select('id', 'rank')
                 ->whereIn('id', Common::getResortHrEmployeeIds($resort_id))
-                ->where('status', 'Active')->orderBy('id')->first();
+                ->where('status', 'Active')->where('id', '!=', $employee->id)
+                ->orderBy('id')->first();
             if ($hrApprover) {
                 $hrApprover->approver_role = 'HR';
                 $passApprovalFlow->push($hrApprover);
@@ -407,60 +414,51 @@ class BoardingPassController extends Controller
                 'message'                       =>  'Boarding pass not found.',
             ], 404);
         }
-        $employeeTravelPassStatus               =   EmployeeTravelPassStatus::where('travel_pass_id', $passId)
-                                                        ->where('approver_id', $currentApproverId)
-                                                        ->where('status', 'Pending')
-                                                        ->orderBy('id', 'desc')
+        // L-02 (order half): this used to look up a Pending row filtered by
+        // ->where('approver_id', $currentApproverId) straight away — i.e.
+        // "do I personally have a pending step", with no check that it was
+        // actually THIS step's turn. Rows are created in SM, HR, HOD order
+        // (store()), so HOD's row has the highest id; the chain's real
+        // "currently due" step is always the highest-id row still Pending,
+        // matching CLAUDE.md's documented HOD -> HR -> SM order. Mirrors
+        // API\BoardingPassController::boardingPassApprovedAction() exactly.
+        // Without this, the SM (lowest id, created first) could act
+        // immediately, before HOD/HR had approved anything.
+        $currentDueStatus = EmployeeTravelPassStatus::where('travel_pass_id', $passId)
+            ->where('status', 'Pending')
+            ->orderBy('id', 'desc')
+            ->first();
 
-                                                        ->first();
-                                      
-             
-        // $rankConfig                             =   config('settings.Position_Rank');
-        // $currentApproverRank                    =   array_key_exists($employee->rank, $rankConfig) ? $rankConfig[$employee->rank] : '';
-        // $lastApproverRank                       =   array_key_exists($employeeTravelPassStatus->approver_rank, $rankConfig) ? $rankConfig[$employeeTravelPassStatus->approver_rank] : '';
-        // $actionname                             =   ($action == "Approved") ?  "approve":"reject" ;
-        // if ($employeeTravelPassStatus && $employeeTravelPassStatus->approver_id != $currentApproverId) 
-        // {
-        //     return response()->json([
-        //         'status'                        =>  'error',
-        //         'message'                       =>  "You cannot $actionname this request. The request must first be approved by the $lastApproverRank.",
-        //     ], 403);
-        // }
-
-        // Check if current user is the approver, or acting as a delegate for an approver on leave
-        $effectiveApproverId = $currentApproverId;
+        $employeeTravelPassStatus = null;
         $delegateComment = '';
-        $hasOwnRow = EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)
-            ->where('approver_id', $currentApproverId)->where('status', 'Pending')->exists();
-
-        if (!$hasOwnRow) {
-            // Check if current user is a delegate for any pending approver
-            $pendingApproverIds = EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)
-                ->where('status', 'Pending')->pluck('approver_id')->toArray();
-            foreach ($pendingApproverIds as $pId) {
-                if (Common::hasDelegationAuthority($currentApproverId, $pId, $this->resort->resort_id)) {
-                    $effectiveApproverId = $pId;
-                    $delegateComment = ' (Acted by delegate)';
-                    break;
-                }
+        if ($currentDueStatus) {
+            if ((int) $currentDueStatus->approver_id === (int) $currentApproverId) {
+                $employeeTravelPassStatus = $currentDueStatus;
+            } elseif (Common::hasDelegationAuthority($currentApproverId, $currentDueStatus->approver_id, $this->resort->resort_id)) {
+                $employeeTravelPassStatus = $currentDueStatus;
+                $delegateComment = ' (Acted by delegate)';
             }
         }
 
-        if ($effectiveApproverId !== $currentApproverId) {
-            $employeeTravelPassStatus            =   EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)
-                                                        ->where('approver_id', $effectiveApproverId)
-                                                        ->where('status', 'Pending')
-                                                        ->orderBy('id', 'desc')
-                                                        ->first();
+        // L-02: with no pending approval row matched to this caller (not
+        // the nominal approver, not a delegate), execution used to fall
+        // through anyway — the 'Rejected' branch below sets the pass's
+        // status unconditionally, with no reference to
+        // $employeeTravelPassStatus at all, letting ANY employee in the
+        // resort reject ANY other employee's pass regardless of the
+        // approval chain.
+        if (!$employeeTravelPassStatus) {
+            return response()->json([
+                'success'                       =>  false,
+                'message'                       =>  'You are not authorized to act on this boarding pass.',
+            ], 403);
         }
 
-        if ($employeeTravelPassStatus) {
-            EmployeeTravelPassStatus::where('id', $employeeTravelPassStatus->id)->update([
-                'status'                        =>  $action,
-                'comments'                      =>  ($comments ?? '') . $delegateComment,
-                'approved_at'                   =>  now(),
-            ]);
-        }
+        EmployeeTravelPassStatus::where('id', $employeeTravelPassStatus->id)->update([
+            'status'                        =>  $action,
+            'comments'                      =>  ($comments ?? '') . $delegateComment,
+            'approved_at'                   =>  now(),
+        ]);
 
         $allApproved                            =   EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)
                                                         ->where('status', '!=', 'Approved')

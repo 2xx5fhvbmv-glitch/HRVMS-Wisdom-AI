@@ -50,6 +50,22 @@ class ApplicantsController extends Controller
         if(!$this->resort) return;
     }
 
+    /**
+     * T-05: document downloads, applicant delete, offer/contract send and
+     * salary allocation had no role check at all — any authenticated
+     * portal user of any rank/department could call them directly (the
+     * UI's $isHrUser button-hiding is cosmetic only). Same
+     * Common::hasFullDataAccess() gate used codebase-wide for this
+     * "everyone vs HR/GM" decision.
+     */
+    private function requireHrAccess()
+    {
+        if (!Common::hasFullDataAccess(optional($this->resort)->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+        return null;
+    }
+
     public function VacnacyWiseApplicants(Request $request, $id)
     {
         $page_title="Applicants";
@@ -1331,6 +1347,15 @@ class ApplicantsController extends Controller
                 return response()->json(['error' => 'Resort not found'], 404);
             }
 
+            // Every Applicant_form_data::find($ApplicantID) below is otherwise
+            // unscoped — a client on resort A could pass resort B's applicant
+            // id and this method would create an interview row (resort_id=A)
+            // pointing at resort B's applicant, and email them. Gate once here
+            // instead of scoping each of the 3 lookups separately.
+            if (!Applicant_form_data::where('id', $ApplicantID)->where('resort_id', $Resort_id)->exists()) {
+                return response()->json(['error' => 'Applicant not found'], 404);
+            }
+
             $interviewerId = $this->resort->id;
             // interviewer_id column stores a resort_admins id (compared against
             // ResortAdmin elsewhere in this method) — track the matching
@@ -1425,7 +1450,10 @@ class ApplicantsController extends Controller
                     'ApplicantInterviewtime' => $applicantTime,
                     'InterViewDate' => $interviewDate,
                     'EmailTemplateId' => $request->EmailTemplate,
-                    'MeetingLink' => $request->MeetingLink ?? '',
+                    // Only accept https:// links (T-07) — this is stored
+                    // and later rendered as a raw <a href>; a javascript:
+                    // URI here would execute when HR clicks "Join".
+                    'MeetingLink' => (str_starts_with((string) $request->MeetingLink, 'https://')) ? $request->MeetingLink : '',
                     'interviewer_id' => $interviewerId,
                     'invitation_token' => Str::uuid(),
                 ]
@@ -1515,7 +1543,7 @@ class ApplicantsController extends Controller
                     {
                         $FianlResponse ='<tr>
                             <th>Name:</th>
-                            <td>'.ucfirst($Final_response_data->first_name.' '.$Final_response_data->last_name).'</td>
+                            <td>'.e(ucfirst($Final_response_data->first_name.' '.$Final_response_data->last_name)).'</td>
                         </tr>
                         <tr>
                             <th>Position:</th>
@@ -1567,6 +1595,7 @@ class ApplicantsController extends Controller
 
     public function SendInterviewEmail(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $interviewId = base64_decode($request->interview_id);
         $templateId = $request->email_template_id;
 
@@ -1627,6 +1656,7 @@ class ApplicantsController extends Controller
 
     public function DeletePendingInterview(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $interviewId = base64_decode($request->interview_id);
         $interview = ApplicantInterViewDetails::where('resort_id', $this->resort->resort_id)->find($interviewId);
 
@@ -1919,6 +1949,7 @@ class ApplicantsController extends Controller
 
     public function destoryApplicant(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $id = base64_decode($request->base64_id);
 
         DB::beginTransaction();
@@ -2633,6 +2664,7 @@ class ApplicantsController extends Controller
     }
     public function RevertBack(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         DB::beginTransaction();
         try
         {
@@ -2670,8 +2702,9 @@ class ApplicantsController extends Controller
 
     public function GetAwsFiles(Request $request)
     {
-       
-       
+        if ($guard = $this->requireHrAccess()) return $guard;
+
+
         $ApplicantID = base64_decode($request->id);
         $flag        = $request->flag;
 
@@ -2741,6 +2774,7 @@ class ApplicantsController extends Controller
 
     public function GetAllAwsFiles(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $ApplicantID = base64_decode($request->id);
         $fields = ['curriculum_vitae', 'passport_img', 'passport_photo', 'full_length_photo', 'other_document'];
         $applicant = Applicant_form_data::where('id', $ApplicantID)
@@ -2801,6 +2835,7 @@ class ApplicantsController extends Controller
      */
     public function DownloadAllFilesZip(Request $request, $id)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $ApplicantID = base64_decode($id);
 
         $applicant = Applicant_form_data::leftJoin('vacancies as v', 'v.id', '=', 'applicant_form_data.Parent_v_id')
@@ -3063,6 +3098,7 @@ class ApplicantsController extends Controller
 
     public function sendOfferLetter(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
         ]);
@@ -3206,6 +3242,7 @@ class ApplicantsController extends Controller
 
     public function sendContract(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
         ]);
@@ -3346,6 +3383,7 @@ class ApplicantsController extends Controller
 
     public function sendConsentRequest(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
             'consent_expiry_date' => 'required|date',
@@ -3392,6 +3430,7 @@ class ApplicantsController extends Controller
 
     public function checkAvailability(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
             'email_template_id' => 'required',
@@ -3474,6 +3513,7 @@ class ApplicantsController extends Controller
 
     public function deleteTalentPoolApplicant(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $applicant_id = base64_decode($request->applicant_id);
         $applicant = Applicant_form_data::find($applicant_id);
         if (!$applicant) {
@@ -3502,6 +3542,7 @@ class ApplicantsController extends Controller
 
     public function saveSalaryAllocation(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;
         $applicantId = base64_decode($request->applicant_id);
         $resortId = $this->resort->resort_id;
 

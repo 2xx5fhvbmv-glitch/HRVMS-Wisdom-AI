@@ -476,15 +476,23 @@ class StaffAccommodationController extends Controller
 
         try {
             $maintanaceId                                   =   base64_decode($maintanaceId, true);
-            
+            $employee                                        =   $this->user->GetEmployee;
+
+            // Was scoped to resort_id only — any employee in the resort could
+            // view a colleague's maintenance request (description, photos,
+            // room) by guessing/incrementing the base64 id. Sibling methods
+            // (staffMaintenanceReqList, the dashboard card list above) already
+            // scope to the requester; this one didn't.
             $maintanaceRequest                              =   MaintanaceRequest::join("employees as t3", "t3.id", "=", "maintanace_requests.Raised_By")
                                                                     ->join('inventory_modules as t2', 't2.id', '=', 'maintanace_requests.item_id')
                                                                     ->where('maintanace_requests.resort_id', $this->resort_id)
+                                                                    ->where('maintanace_requests.Raised_By', $employee->id)
                                                                     ->where('maintanace_requests.id', $maintanaceId)
                                                                     ->first(['maintanace_requests.*','t2.ItemName']);
-            
+
             $MaintanaceRequestChild                         =   MaintanaceRequest::join('child_maintanance_requests as t1',"t1.maintanance_request_id","=","maintanace_requests.id")
                                                                     ->where('maintanace_requests.resort_id',$this->resort_id)
+                                                                    ->where('maintanace_requests.Raised_By', $employee->id)
                                                                     ->where('maintanace_requests.id',$maintanaceId)
                                                                     ->where('t1.ApprovedBy','!=',0)
                                                                     ->orderBy("t1.id", "ASC")
@@ -544,6 +552,10 @@ class StaffAccommodationController extends Controller
                     'id'              => $maintanaceRequest->Assigned_To,
                     'name'            => ucfirst($assignedEmployee->first_name . ' ' . $assignedEmployee->last_name),
                     'profile_picture' => Common::getResortUserPicture($assignedEmployee->Parent_id),
+                    'position_title'  => $assignedEmployee->position_title,
+                    'Emp_id'          => $assignedEmployee->Emp_id,
+                    'department_name' => $assignedEmployee->department_name,
+                    'personal_phone'  => $assignedEmployee->personal_phone,
                 ] : null;
 
                 $assignMaintReqStaffDetails                 =   ChildMaintananceRequest::join("employees as t3", "t3.id", "=", "child_maintanance_requests.ApprovedBy")
@@ -676,6 +688,7 @@ class StaffAccommodationController extends Controller
             'RoomNo'                                    =>  'required',
             'descriptionIssues'                         =>  'required',
             'priority'                                  =>  'required',
+            'Image'                                     =>  'nullable|file|mimes:jpeg,png,jpg,heic,heif',
         ]);
 
         if ($validator->fails()) {
@@ -693,7 +706,12 @@ class StaffAccommodationController extends Controller
             $date                                       =   $parsedDate ? $parsedDate->format('Y-m-d') : date('Y-m-d');
             $path_path                                  =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
             
-            $maintanaceRequestEdit                      =   MaintanaceRequest::where('id', $request->request_id)->where('resort_id', $this->resort_id)->first();
+            // Was scoped to resort_id only — any employee in the resort could
+            // edit a colleague's maintenance request. This endpoint is the
+            // requester's own self-service edit (Eng-dept actions go through
+            // handleMaintananceAction/engDepartmentStaffMaintenanceReqComplete),
+            // so it must be scoped to the requester too.
+            $maintanaceRequestEdit                      =   MaintanaceRequest::where('id', $request->request_id)->where('resort_id', $this->resort_id)->where('Raised_By', $this->user->GetEmployee->id)->first();
 
             if (!$maintanaceRequestEdit) {
                 return response()->json(['success' => false, 'message' => 'Maintenance Request not found'], 200);
@@ -709,7 +727,13 @@ class StaffAccommodationController extends Controller
             if ($request->hasFile('Image')) {
                 $imageFile                              =   $request->file('Image');
                 $imageName                              =   time() . '_' . $imageFile->getClientOriginalName();
-                $imageFile->move($path_path, $imageName);
+                // Was UploadedFile::move() into a raw relative path, which lands
+                // under public/ (the web root) on a standard request — any file
+                // type was accepted, so a crafted filename was a code-execution
+                // path. Route through StorageHelper (disk-agnostic, never the web
+                // root) at the exact same logical path so existing readers
+                // (temporaryUrl($path_path.'/'.Image)) keep working unchanged.
+                \App\Helpers\StorageHelper::put($path_path . '/' . $imageName, file_get_contents($imageFile->getRealPath()));
                 $maintanaceRequestEdit->Image           =   $imageName;
             }
 

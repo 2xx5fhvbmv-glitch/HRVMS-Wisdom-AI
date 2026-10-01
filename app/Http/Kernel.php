@@ -87,6 +87,7 @@ class Kernel extends HttpKernel
         'redirectIfNotCorrect.dashboard' => \App\Http\Middleware\RedirectIfNotCorrectDashboard::class,
         'checkResortPermission' => \App\Http\Middleware\CheckResortPermission::class,
         'applyResortSmtp' => \App\Http\Middleware\ApplyResortSmtpConfig::class,
+        'account.active' => \App\Http\Middleware\EnsureAccountActive::class,
 
 
         // Add rank-check middleware here
@@ -101,6 +102,9 @@ class Kernel extends HttpKernel
         // — a second, module-neutral alias so a boarding-pass route doesn't
         // read as gated by "sos.manager".
         'security.manager' => \App\Http\Middleware\EnsureSOSSecurityManagerAccess::class,
+        'payroll.access' => \App\Http\Middleware\EnsurePayrollAccess::class,
+        'visa.access' => \App\Http\Middleware\EnsureVisaAccess::class,
+        'visa.write' => \App\Http\Middleware\EnsureVisaWriteAccess::class,
 
 
 

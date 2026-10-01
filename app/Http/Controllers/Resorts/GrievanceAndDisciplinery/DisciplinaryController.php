@@ -321,6 +321,24 @@ class DisciplinaryController extends Controller
         $Offence_id =  base64_decode($request->Offence_id);
         $Action_id =  base64_decode($request->Action_id);
         $Severity_id =  base64_decode($request->Severity_id);
+        // D-05 (+ same root cause on the sibling reference fields):
+        // Category/Offence/Action/Severity/committee ids were all trusted
+        // straight from the client with no resort check, same shape as the
+        // Employee_id/witness gap already fixed above — a new case could
+        // be filed against another resort's committee (which then gets
+        // notified below) or reference data.
+        if ($Category_id && !DisciplinaryCategoriesModel::where('id', $Category_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid category.'], 422);
+        }
+        if ($Offence_id && !OffensesModel::where('id', $Offence_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid offence.'], 422);
+        }
+        if ($Action_id && !ActionStore::where('id', $Action_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid action.'], 422);
+        }
+        if ($Severity_id && !SeverityStore::where('id', $Severity_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid severity.'], 422);
+        }
         // Form datepicker emits d/m/Y but the column is a DATE — passing
         // "10/05/2026" straight in made MySQL store 0000-00-00. Parse to
         // Y-m-d here. Tolerate already-Y-m-d values (e.g. API callers).
@@ -341,6 +359,12 @@ class DisciplinaryController extends Controller
         $priority_level = $request->priority_level;
         $Incident_description = $request->incident_description;
         $committiee_id = $request->filled('assign_to') ? $request->assign_to : null;
+        // D-05: was trusted straight from the client — a new case could be
+        // assigned to another resort's committee, whose real members then
+        // get notified below.
+        if ($committiee_id && !DisciplineryAssignCommittee::where('id', $committiee_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid committee.'], 422);
+        }
         $Request_For_Statement = ($request->Request_For_Statement == "on")? 'Yes':'No';
         $Attachment  = $request->attachment;
         $upload_signed_document  = $request->upload_signed_document;
@@ -606,8 +630,16 @@ class DisciplinaryController extends Controller
     }
     public function RequestForStatement(Request $request)
     {
+        // D-02: same gap as S2-02 (Grievance) — Disciplinary_id is a
+        // human-readable case number, one global sequence across every
+        // resort, with no resort_id filter here at all. Any resort's admin
+        // could flip Request_For_Statement on another resort's case and
+        // notify its real witnesses.
         $id = $request->id;
-        $parent_id = disciplinarySubmit::where('Disciplinary_id',$id)->first();
+        $parent_id = disciplinarySubmit::where('Disciplinary_id',$id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$parent_id) {
+            return response()->json(['success' => false, 'message' => 'Disciplinary case not found.'], 404);
+        }
         $parent_id->Request_For_Statement = 'Yes';
         $parent_id ->save();
         $witness = DisciplinaryWitness::where("Disciplinary_id",$parent_id->Disciplinary_id)->update(['Request_For_Statement'=>'Yes','Wintness_Status'=>"Requested"]);
@@ -638,7 +670,29 @@ class DisciplinaryController extends Controller
             }
 
             $id  = $request->Disciplinary_form_id;
-            $committee_member_id  = $request->committee_member_id;
+
+            // D-03: committee_member_id was taken straight from the request
+            // with no check it matched the caller at all — anyone could
+            // submit investigation findings (and a signature snapshot)
+            // filed in a DIFFERENT committee member's name, and there was
+            // no check the caller was even on the assigned committee
+            // before allowing a "resolved" status flip.
+            $case = disciplinarySubmit::where('resort_id', $this->resort->resort_id)
+                ->where('Disciplinary_id', $id)
+                ->first(['Committee_id', 'Disciplinary_id']);
+            if (!$case) {
+                return response()->json(['success' => false, 'message' => 'Disciplinary case not found.'], 404);
+            }
+            $callerEmployeeId = optional($this->resort->GetEmployee)->id;
+            $isCommitteeMember = $callerEmployeeId && $case->Committee_id && DisciplineryCommitteeMembers::where('Parent_committee_id', $case->Committee_id)
+                ->where('MemberId', $callerEmployeeId)
+                ->exists();
+            if (!$isCommitteeMember) {
+                return response()->json(['success' => false, 'message' => 'You are not a member of the committee assigned to this case.'], 403);
+            }
+            // Never trust the client's claimed identity for whose entry
+            // this is — always the caller's own employee id.
+            $committee_member_id  = $callerEmployeeId;
             $invesigation_date = $request->invesigation_date;
             $resolution_date = $request->resolution_date;
             $outcome_type = $request->outcome_type;

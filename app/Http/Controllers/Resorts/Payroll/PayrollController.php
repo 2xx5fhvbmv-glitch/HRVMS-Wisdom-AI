@@ -58,6 +58,13 @@ class PayrollController extends Controller
     public $resort;
     public function __construct()
     {
+        // P-01: HR/Finance only. index() has its own bespoke
+        // supervisor/approver/Finance-lead access control below and
+        // approvePayroll/getApprovalStatus carry their own per-step
+        // approver checks the GM must pass through — none of those three
+        // can be gated by the blanket HR/Finance rule.
+        $this->middleware('payroll.access')->except(['index', 'approvePayroll', 'getApprovalStatus']);
+
         $this->resort = Auth::guard('resort-admin')->user();
         if(!$this->resort) return;
     }
@@ -409,6 +416,32 @@ class PayrollController extends Controller
     //     }
     // }
 
+    /**
+     * P-02: resort-scoped payroll lookup that also enforces the draft-only
+     * edit window. A payroll that is locked/pending_approval/approved must
+     * not be silently overwritten by any of the save* steps below — only
+     * a fresh or still-draft payroll is editable.
+     *
+     * @return array{0: ?Payroll, 1: ?\Illuminate\Http\JsonResponse}
+     */
+    private function editablePayrollOrError($payrollId, $resortId)
+    {
+        $payroll = Payroll::where('id', $payrollId)->where('resort_id', $resortId)->first();
+
+        if (!$payroll) {
+            return [null, response()->json(['success' => false, 'message' => 'Payroll not found.'], 404)];
+        }
+
+        if ($payroll->status !== 'draft') {
+            return [null, response()->json([
+                'success' => false,
+                'message' => 'This payroll is locked/awaiting approval/approved and can no longer be changed.',
+            ], 422)];
+        }
+
+        return [$payroll, null];
+    }
+
     public function saveDraftPayroll(Request $request)
     {
         $request->validate([
@@ -426,19 +459,20 @@ class PayrollController extends Controller
             // one for that same period.
             $payrollCategory = $request->payroll_category ?: 'Permanent';
 
-            // ❌ Check if a locked payroll already exists for the same date range
-            $lockedPayrollExists = Payroll::where('resort_id', $resortId)
+            // P-02: a payroll for this same period that's already past
+            // draft (locked/pending_approval/approved) must be refused, not
+            // silently reset back to draft by the updateOrCreate below.
+            $existingPayroll = Payroll::where('resort_id', $resortId)
                 ->where('payroll_category', $payrollCategory)
                 ->where('start_date', $request->start_date)
                 ->where('end_date', $request->end_date)
-                ->where('status', 'locked')
-                ->exists();
+                ->first();
 
-            if ($lockedPayrollExists) {
+            if ($existingPayroll && $existingPayroll->status !== 'draft') {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Payroll is locked for the selected date range and cannot be edited.'
-                ], 403);
+                    'message' => 'This payroll is locked/awaiting approval/approved and can no longer be changed.'
+                ], 422);
             }
 
             // ✅ Proceed to save or update draft
@@ -474,12 +508,10 @@ class PayrollController extends Controller
             $resortId = $this->resort->resort_id;
 
             // payroll_id is the write key for every PayrollEmployees row
-            // below — verify it belongs to this resort before attaching
-            // anyone to it, otherwise a caller could attach an employee to
-            // (or pull employees from) another resort's draft payroll.
-            if (!Payroll::where('id', $request->payroll_id)->where('resort_id', $resortId)->exists()) {
-                return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
-            }
+            // below — verify it belongs to this resort and is still
+            // editable (P-02) before attaching anyone to it.
+            [, $error] = $this->editablePayrollOrError($request->payroll_id, $resortId);
+            if ($error) return $error;
 
             $employeeIds = $request->employee_ids ?? [];
 
@@ -549,11 +581,11 @@ class PayrollController extends Controller
 
         try {
             // payroll_id is the write key below — verify it belongs to this
-            // resort before writing, otherwise a caller could pollute
-            // another resort's draft payroll with attendance data.
-            if (!Payroll::where('id', $request->payroll_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            // resort and is still editable (P-02) before writing.
+            [, $error] = $this->editablePayrollOrError($request->payroll_id, $this->resort->resort_id);
+            if ($error) {
                 DB::rollBack();
-                return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
+                return $error;
             }
 
             $activityLog = []; // ✅ Array to track changes
@@ -648,10 +680,9 @@ class PayrollController extends Controller
     {
         try {
             // payroll_id is the write key below — verify it belongs to
-            // this resort before writing/creating an attendance row for it.
-            if (!Payroll::where('id', $request->payroll_id)->where('resort_id', $this->resort->resort_id)->exists()) {
-                return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
-            }
+            // this resort and is still editable (P-02) before writing.
+            [, $error] = $this->editablePayrollOrError($request->payroll_id, $this->resort->resort_id);
+            if ($error) return $error;
 
             // ✅ Fetch attendance record (DO NOT reset existing data)
             $attendance = PayrollTimeAndAttendance::where([
@@ -777,6 +808,16 @@ class PayrollController extends Controller
         $payroll = Payroll::where('id', $request->payroll_id)
             ->where('resort_id', $this->resort->resort_id)
             ->firstOrFail();
+
+        // P-02: refuse writes to a payroll that's already past draft.
+        if ($payroll->status !== 'draft') {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'This payroll is locked/awaiting approval/approved and can no longer be changed.',
+            ], 422);
+        }
+
         // Extract month and year from payroll dates for service charge calculations
         $payrollDate = Carbon::parse($payroll->start_date);
         $month = $payrollDate->month;
@@ -903,10 +944,11 @@ class PayrollController extends Controller
         // dd($request->all());
         try {
             // payroll_id is the write key below — verify it belongs to
-            // this resort before writing deduction rows against it.
-            if (!Payroll::where('id', $request->payroll_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            // this resort and is still editable (P-02) before writing.
+            [, $error] = $this->editablePayrollOrError($request->payroll_id, $this->resort->resort_id);
+            if ($error) {
                 DB::rollBack();
-                return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
+                return $error;
             }
 
             foreach ($request->DeductionData as $deduction) {
@@ -1005,10 +1047,11 @@ class PayrollController extends Controller
         // dd($request->reviewData);
         try {
             // payroll_id is the write key below — verify it belongs to
-            // this resort before writing review rows against it.
-            if (!Payroll::where('id', $request->payroll_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            // this resort and is still editable (P-02) before writing.
+            [, $error] = $this->editablePayrollOrError($request->payroll_id, $this->resort->resort_id);
+            if ($error) {
                 DB::rollBack();
-                return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
+                return $error;
             }
 
             foreach ($request->reviewData as $review) {
@@ -1167,11 +1210,11 @@ class PayrollController extends Controller
             // This locks/finalizes a payroll purely by client-supplied id,
             // then marks that payroll's salary-advance recovery schedules
             // and staff-shop payments "Paid" below — verify it belongs to
-            // this resort first, or a caller could lock/corrupt another
-            // resort's payroll.
-            if (!Payroll::where('id', $payrollId)->where('resort_id', $this->resort->resort_id)->exists()) {
+            // this resort and is still in draft (P-02) before locking it.
+            [, $error] = $this->editablePayrollOrError($payrollId, $this->resort->resort_id);
+            if ($error) {
                 DB::rollBack();
-                return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
+                return $error;
             }
 
             // Calculate totals from DB (don't trust frontend values which may have comma formatting issues)
@@ -1265,6 +1308,17 @@ class PayrollController extends Controller
         $resortId = $this->resort->resort_id;
 
         $payroll = Payroll::where('id', $payrollId)->where('resort_id', $resortId)->firstOrFail();
+
+        // P-02: only a locked (fully reviewed) payroll can be sent for
+        // approval — not a still-open draft, and not one already
+        // pending_approval/approved (re-sending after rejection goes
+        // through saveSummaryToPayroll first, which puts it back to locked).
+        if ($payroll->status !== 'locked') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This payroll must be locked before it can be sent for approval.',
+            ], 422);
+        }
 
         // Define the 3-step approval chain
         $approvalChain = [
@@ -2634,7 +2688,9 @@ class PayrollController extends Controller
         ->values();
 
         // Merge deduction breakdown from payroll_deductions table
-        if ($request->payrollId) {
+        // P-04: same resort-ownership check as the getEmployeesOnly/
+        // getServiceChargeOnly branches above — this one skipped it.
+        if ($request->payrollId && Payroll::where('id', $request->payrollId)->where('resort_id', $resortId)->exists()) {
             $savedDeductions = PayrollDeduction::where('payroll_id', $request->payrollId)
                 ->get()
                 ->keyBy('Emp_id');

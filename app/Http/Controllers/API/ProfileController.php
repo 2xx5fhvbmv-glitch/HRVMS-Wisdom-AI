@@ -386,8 +386,11 @@ class ProfileController extends Controller
         Common::notifyEmployees($this->resort_id, [$employee->GetEmployee->id], 'Password Changed', 'Your password was changed successfully. If this wasn\'t you, please contact HR immediately.', 'Profile');
       }
 
-      $accessToken        = $employee->token();
-      $accessToken->revoke();
+      // Revoke every live token, not just the one used for this request
+      // (S4-03) — "change my password" is exactly what a user does when
+      // they suspect someone else has their account, so every other
+      // device/phone must be logged out too, the same as forgot-password.
+      $employee->tokens()->update(['revoked' => true]);
 
       Auth::guard('employee')->logout();
 

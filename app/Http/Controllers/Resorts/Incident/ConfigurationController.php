@@ -190,8 +190,12 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            IncidentSubCategory::where("category_id",$id)->delete();
-            IncidentCategory::where("id",$id)->delete();
+            // IN-01: unscoped — deleted another resort's category (and its
+            // subcategories) by id. incident_subcategories carries its own
+            // resort_id, so scope both deletes directly rather than via a
+            // subquery.
+            IncidentSubCategory::where("category_id",$id)->where('resort_id', $this->resort->resort_id)->delete();
+            IncidentCategory::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
 
             DB::commit();
             return response()->json([
@@ -363,7 +367,8 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            IncidentSubCategory::where("id",$id)->delete();
+            // IN-01: unscoped — deleted another resort's subcategory by id.
+            IncidentSubCategory::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
 
             DB::commit();
             return response()->json([
@@ -555,7 +560,9 @@ class ConfigurationController extends Controller
                 }
             ],
             'committee_members' => 'nullable|array', // Members should be an array
-            'committee_members.*' => 'exists:employees,id', // Validate each member exists in the employees table
+            // IN-01: was unscoped 'exists:employees,id' — any resort's
+            // employee could be added to another resort's committee.
+            'committee_members.*' => [\Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
         ]);
 
         if ($validator->fails()) {
@@ -568,7 +575,10 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try {
             // Update Committee Name
-            $committee = IncidentCommittee::findOrFail($id);
+            // IN-01: was ::findOrFail($id) with no resort filter — another
+            // resort's committee could be renamed / have its members
+            // replaced.
+            $committee = IncidentCommittee::where('resort_id', $this->resort->resort_id)->findOrFail($id);
             $committee->update(['commitee_name' => $request->committee_name]);
 
             // Update Committee Members
@@ -811,7 +821,8 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            IncidentFollowupActions::where("id",$id)->delete();
+            // IN-01: unscoped — deleted another resort's follow-up action.
+            IncidentFollowupActions::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
 
             DB::commit();
             return response()->json([
@@ -947,7 +958,8 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            IncidentActionTaken::where("id",$id)->delete();
+            // IN-01: unscoped — deleted another resort's action-taken row.
+            IncidentActionTaken::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
 
             DB::commit();
             return response()->json([
@@ -1083,7 +1095,8 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            IncidentOutcomeType::where("id",$id)->delete();
+            // IN-01: unscoped — deleted another resort's outcome type.
+            IncidentOutcomeType::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
 
             DB::commit();
             return response()->json([

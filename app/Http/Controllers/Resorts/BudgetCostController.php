@@ -18,6 +18,14 @@ use App\Helpers\Common;
 
 class BudgetCostController extends Controller
 {
+    public function __construct()
+    {
+        // W-03: budget cost items (allowances/benefits/rates) — HR/Finance only.
+        if (Common::budgetAccessLevel() !== 'full') {
+            abort(403, 'Unauthorized access');
+        }
+    }
+
     public function index()
     {
         

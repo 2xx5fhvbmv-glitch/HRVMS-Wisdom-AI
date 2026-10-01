@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Route;
 	Route::post('login', [App\Http\Controllers\API\LoginController::class, 'apiLogin'])->middleware('throttle:mobile-login')->name('api.resort.login');
 	Route::post('forgotpassword', [App\Http\Controllers\API\LoginController::class, 'apiForgotPassword'])->middleware('throttle:mobile-password-reset')->name('api.resort.forgotpassword');
 
-	Route::middleware(['auth:api', 'applyResortSmtp'])->group(function () {
+	Route::middleware(['auth:api', 'account.active', 'applyResortSmtp'])->group(function () {
 
 		Route::get('on-boarding/get-onboarding-virtual-facility', [App\Http\Controllers\API\OnBoardingController::class, 'getOnboardingVirtualFacility']);
 
@@ -56,6 +56,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('profile/visa-category', [App\Http\Controllers\API\ProfileController::class, 'getVisaCategory']);
 		Route::get('profile/visa-data/{visa_category}', [App\Http\Controllers\API\ProfileController::class, 'getVisaData']);
 		Route::get('resort/test-push-notification', [App\Http\Controllers\API\ProfileController::class, 'testPushNotification']);
+		Route::post('resort/profile-change-password', [App\Http\Controllers\API\ProfileController::class, 'changePassword']);
 
 		// Job Description consent (Part 2.5)
 		Route::get('job-description', [App\Http\Controllers\API\JobDescriptionController::class, 'index']);
@@ -248,6 +249,10 @@ use Illuminate\Support\Facades\Route;
 			Route::get('accommodation/housekeeping-requests/list', [App\Http\Controllers\API\HousekeepingRequestController::class, 'requestList']);
 			Route::get('accommodation/housekeeping-requests/view/{id}', [App\Http\Controllers\API\HousekeepingRequestController::class, 'requestView']);
 			Route::post('accommodation/housekeeping-requests/update-status', [App\Http\Controllers\API\HousekeepingRequestController::class, 'updateStatus']);
+			// HOD/XCOM assigns a Housekeeping employee to clean the request
+			// (Housekeeping – Employee Task Flow & Completion Tracking). Was
+			// a plain 404 in prod — never registered.
+			Route::post('accommodation/housekeeping-requests/{id}/assign', [App\Http\Controllers\API\HousekeepingRequestController::class, 'assign']);
 
 			//Employee Managament
 			Route::post('employee-management/hr-employee-overview', [App\Http\Controllers\API\EmployeeManagementController::class, 'hrEmployeeOverview']);
@@ -318,6 +323,17 @@ use Illuminate\Support\Facades\Route;
 		Route::post('accommodation/housekeeping-emp',[App\Http\Controllers\API\AccommodationController::class, 'housekeepingEmployee']);
 		Route::get('accommodation/housekeeping-emp-accept/{room_id}',[App\Http\Controllers\API\AccommodationController::class, 'empAcceptHousekeeping']);
 		Route::post('accommodation/housekeeping-emp-add/{room_id}',[App\Http\Controllers\API\AccommodationController::class, 'empAddTaskHousekeeping']);
+
+		// Housekeeping Employee Dashboard (Trello: Housekeeping – Employee
+		// Task Flow & Completion Tracking) — the catalog-driven
+		// housekeeping_requests table's employee-facing self-service flow,
+		// distinct from the housekeeping-emp-* routes above (legacy
+		// housekeeping_schedules system).
+		Route::get('accommodation/housekeeping-requests/my-assigned', [App\Http\Controllers\API\HousekeepingRequestController::class, 'myAssignedList']);
+		Route::get('accommodation/housekeeping-requests/my-assigned/{id}', [App\Http\Controllers\API\HousekeepingRequestController::class, 'myAssignedView']);
+		Route::post('accommodation/housekeeping-requests/{id}/accept', [App\Http\Controllers\API\HousekeepingRequestController::class, 'accept']);
+		Route::post('accommodation/housekeeping-requests/{id}/start', [App\Http\Controllers\API\HousekeepingRequestController::class, 'start']);
+		Route::post('accommodation/housekeeping-requests/{id}/complete', [App\Http\Controllers\API\HousekeepingRequestController::class, 'complete']);
 
 		//Employee List in Accommodation
 		Route::get('accommodation/employee-list', [App\Http\Controllers\API\AccommodationController::class, 'employeeList']);

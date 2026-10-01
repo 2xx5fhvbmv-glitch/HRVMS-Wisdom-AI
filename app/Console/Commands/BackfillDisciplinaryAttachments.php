@@ -40,6 +40,7 @@ class BackfillDisciplinaryAttachments extends Command
     private int $migrated = 0;
     private int $alreadyOk = 0;
     private array $missing = [];
+    private array $failed = [];
 
     public function handle()
     {
@@ -91,7 +92,7 @@ class BackfillDisciplinaryAttachments extends Command
         }
 
         $this->newLine();
-        $this->info(($dryRun ? '[dry-run] ' : '') . "Migrated: {$this->migrated}, already OK: {$this->alreadyOk}, missing: " . count($this->missing));
+        $this->info(($dryRun ? '[dry-run] ' : '') . "Migrated: {$this->migrated}, already OK: {$this->alreadyOk}, missing: " . count($this->missing) . ', failed: ' . count($this->failed));
 
         if (!empty($this->missing)) {
             $this->warn('Unrecoverable (not found on old local disk or configured disk):');
@@ -100,7 +101,14 @@ class BackfillDisciplinaryAttachments extends Command
             }
         }
 
-        return self::SUCCESS;
+        if (!empty($this->failed)) {
+            $this->error('Failed to write (old local copy still intact, do not delete it):');
+            foreach ($this->failed as $f) {
+                $this->line("  resort_id={$f['resort_id']} Disciplinary_id={$f['Disciplinary_id']} field={$f['field']} file={$f['filename']}");
+            }
+        }
+
+        return empty($this->failed) ? self::SUCCESS : self::FAILURE;
     }
 
     private function splitFilenames(?string $value): array
@@ -140,8 +148,22 @@ class BackfillDisciplinaryAttachments extends Command
 
         $this->line(($dryRun ? '[dry-run] would migrate: ' : 'migrating: ') . "{$relativePath}");
 
-        if (!$dryRun) {
-            StorageHelper::put($relativePath, file_get_contents($oldLocalPath));
+        if ($dryRun) {
+            $this->migrated++;
+            return;
+        }
+
+        $contents = file_get_contents($oldLocalPath);
+        $written = $contents !== false && StorageHelper::put($relativePath, $contents);
+
+        if (!$written || !StorageHelper::exists($relativePath)) {
+            $this->failed[] = [
+                'resort_id' => $resortId,
+                'Disciplinary_id' => $disciplinaryId,
+                'field' => $field,
+                'filename' => $filename,
+            ];
+            return;
         }
 
         $this->migrated++;

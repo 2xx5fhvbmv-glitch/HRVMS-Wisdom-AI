@@ -186,7 +186,7 @@ class InterviewAssessmentController extends Controller
 
     public function update(Request $request, $id)
     {
-        $form = InterviewAssessmentForm::findOrFail($id);
+        $form = InterviewAssessmentForm::where('resort_id', $this->resort->resort_id)->findOrFail($id);
 
       
         $validator =  Validator::make($request->all(), [

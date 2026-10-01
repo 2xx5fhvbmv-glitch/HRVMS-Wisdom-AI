@@ -14,6 +14,7 @@ use App\Models\Resort;
 use App\Jobs\ImportOccupancyJob;
 use App\Imports\OccupnacyImport;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Helpers\Common;
 class OccupancyController extends Controller
 {
     protected $Authdata ='';
@@ -21,6 +22,11 @@ class OccupancyController extends Controller
     {
         $this->Authdata = Auth::guard('resort-admin')->user();
         if(!$this->Authdata) return;
+
+        // W-03: the occupancy forecast that drives staffing numbers — HR/Finance only.
+        if (Common::budgetAccessLevel() !== 'full') {
+            abort(403, 'Unauthorized access');
+        }
     }
     public function storeOccupancy(Request $request)
     {
@@ -199,6 +205,9 @@ class OccupancyController extends Controller
             $import = new OccupnacyImport();
             Excel::import($import, $fullPath);
 
+            // W-06: the uploaded spreadsheet was never cleaned up after import.
+            \Storage::delete($relativePath);
+
             // Collect errors and affected IDs
             $importErrors = session('import_errors', []);
             $affectedIds = $import->getAffectedIds();
@@ -215,6 +224,11 @@ class OccupancyController extends Controller
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::emergency("Message: " . $e->getMessage());
+
+            // W-06: don't leave the upload behind on a failed import either.
+            if (isset($relativePath)) {
+                \Storage::delete($relativePath);
+            }
 
             $response = [
                 'success' => false,

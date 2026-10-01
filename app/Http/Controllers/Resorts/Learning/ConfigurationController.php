@@ -111,6 +111,12 @@ class ConfigurationController extends Controller
         $categories = LearningCategory::where('resort_id', $this->resort->resort_id)->orderBy('id', 'desc')->get();
 
             return datatables()->of($categories)
+                ->addColumn('category', function ($row) {
+                    return e($row->category);
+                })
+                ->addColumn('color', function ($row) {
+                    return e($row->color);
+                })
                 ->addColumn('action', function ($row) {
                     $id = htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8');
 

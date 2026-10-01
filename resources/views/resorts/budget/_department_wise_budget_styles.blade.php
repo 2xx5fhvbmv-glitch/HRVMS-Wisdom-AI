@@ -40,8 +40,8 @@
         default.css carries an older #filled-positions-table block (nth-child
         sticky offsets, table-layout:fixed, text-align:left, width:180px) built
         for this same table's previous nested-table markup — still relied on by
-        sibling views (view1.blade.php, view_budget_all_dp.blade.php) that keep
-        that id and that layout. This table uses id="dwb-positions-table"
+        the sibling view view_budget_all_dp.blade.php, which keeps that id and
+        that layout. This table uses id="dwb-positions-table"
         instead so none of that legacy CSS matches it, rather than editing a
         shared stylesheet two other pages still depend on.
     --}}

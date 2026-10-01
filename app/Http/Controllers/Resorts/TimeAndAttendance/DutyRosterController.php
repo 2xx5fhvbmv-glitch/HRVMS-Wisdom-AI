@@ -750,7 +750,8 @@ class DutyRosterController extends Controller
         $Overtime = $request->ShiftOverTime;
         $DayOfDate = $request->DayOfDate;
         $DayWiseTotalHours = $request->TotalHoursModel;
-        $DayOfDateModel = $request->DayOfDateModel;
+        $DayOffDatesModel = $request->DayOffDatesModel ?? '';
+        $dayOffDatesArrayModel = !empty($DayOffDatesModel) ? array_map('trim', explode(',', $DayOffDatesModel)) : [];
 
         // Attd_id is client-supplied; if present it must already belong to
         // this resort — otherwise the updateOrCreate() below would silently
@@ -801,7 +802,27 @@ class DutyRosterController extends Controller
                         $createPayload["Status"]    = 'Present';
                     }
 
+                    $isDayOffEdit = in_array($shift_Date->format('Y-m-d'), $dayOffDatesArrayModel);
+                    if ($isDayOffEdit) {
+                        $createPayload["Status"] = 'DayOff';
+                    }
+
                     $DutyRosterEntry = DutyRosterEntry::updateOrCreate(['id'=>$Attd_id], $createPayload);
+
+                    // Turning this date into a Day Off through the edit-cell
+                    // modal can strand a credit already earned for its week
+                    // (same rule StoreDutyRoster's single-date branch applies).
+                    if ($isDayOffEdit) {
+                        $weekOf = $shift_Date->copy();
+                        DB::table('employee_day_off_credits')
+                            ->where('emp_id', $DutyRosterEntry->Emp_id ?: $editEmpId)
+                            ->where('resort_id', $this->resort->resort_id)
+                            ->whereBetween('week_start_date', [
+                                $weekOf->copy()->startOfWeek(Carbon::MONDAY)->format('Y-m-d'),
+                                $weekOf->copy()->endOfWeek(Carbon::SUNDAY)->format('Y-m-d'),
+                            ])
+                            ->delete();
+                    }
 
                     // Handle overtime from employee_overtimes table (for reporting/payroll)
                     if ($DutyRosterEntry && $Overtime) {
@@ -876,7 +897,7 @@ class DutyRosterController extends Controller
 
                 DutyRoster::where("id",$DutyRosterEntry->roster_id)
                     ->where('resort_id', $this->resort->resort_id)
-                    ->update(["DayOfDate"=>$DayOfDateModel]);
+                    ->update(["DayOfDate"=>$DayOffDatesModel]);
                 // roster_id back to the client — the "No Shift Assigned"/
                 // create-on-edit path has no roster_id available client-side
                 // until this resolves it (an existing entry's edit button
@@ -1556,17 +1577,21 @@ class DutyRosterController extends Controller
             return response()->json(['success' => false, 'message' => 'Please provide at least one overtime entry.']);
         }
 
-        // Department validation: everyone can only approve OT for their own department.
-        // Dept_id is not resort-namespaced, so this alone doesn't prove
-        // Emp_id belongs to this resort (see audit "LIKELY" finding) — verify
-        // the employee is actually in this resort before trusting Dept_id.
-        $loggedInDeptId = $this->resort->GetEmployee->Dept_id ?? '';
+        // Employee must exist in this resort — Dept_id is not
+        // resort-namespaced, so the role check below doesn't by itself
+        // prove Emp_id belongs to this resort.
         $targetEmployee = Employee::where('id', $Emp_id)->where('resort_id', $resort_id)->first();
         if (!$targetEmployee) {
             return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
         }
-        if ($loggedInDeptId != $targetEmployee->Dept_id) {
-            return response()->json(['success' => false, 'message' => 'You can only manage overtime for employees in your own department.']);
+
+        // A-01: the previous "same department" check let ANY employee in
+        // the department approve OT, including their own (same department
+        // as themselves is always true) — not just that department's
+        // HOD/EXCOM. HR/GM or the employee's own HOD/EXCOM only, never the
+        // employee themselves.
+        if (!Common::canManageAttendanceFor($Emp_id, $this->resort->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage overtime for this employee.'], 403);
         }
 
         $dateCarbon = Carbon::parse($date);

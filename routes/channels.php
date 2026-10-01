@@ -20,6 +20,16 @@ Broadcast::channel('chat.{receiver_id}', function ($user, $receiver_id) {
     return (int) $user->id === (int) $receiver_id;
 });
 
+// Support ticket live chat (Admin + Resort panels). Scoped per ticket, not
+// per user id, since one ticket's admin and employee sides must share a
+// channel without colliding with unrelated users of the same numeric id.
+Broadcast::channel('support-ticket.{supportId}', function ($user, $supportId) {
+    if ($user instanceof \App\Models\Admin) {
+        return true;
+    }
+    return \App\Models\Support::where('id', $supportId)->where('resort_id', $user->resort_id)->exists();
+}, ['guards' => ['admin', 'resort-admin']]);
+
 Broadcast::channel('group.{group_id}', function ($user, $group_id) {
     $isMember = \App\Models\GroupChatMember::where('chat_group_id', $group_id)
         ->where('user_id', $user->id)

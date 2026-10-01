@@ -28,7 +28,6 @@ class SupportChatController extends Controller
     public function index($support_id)
     {
         $page_title = 'Support Chat';
-        // return view('admin.manufecturers.index');
         $supportId = base64_decode($support_id);
         $support = Support::with(['support_category','createdBy','assignedAdmin'])->where('id',$supportId)->where('resort_id', $this->resort->resort_id)->first();
         if (!$support) {
@@ -69,17 +68,21 @@ class SupportChatController extends Controller
         // employee's outbound message and notify the support pool generically.
         $validatedData = $request->validate([
             'support_id'     => ['required', \Illuminate\Validation\Rule::exists('support', 'id')->where('resort_id', $this->resort->resort_id)],
-            'senderId'       => 'required',
-            'senderType'     => 'required|string',
             'receiverId'     => 'nullable',
             'receiverType'   => 'nullable|string',
             'receiver_name'  => 'nullable|string',
             'receiver_image' => 'nullable|string',
-            'senderName'     => 'required|string',
-            'senderImage'    => 'nullable|string',
             'message'        => 'nullable|string',
-            'attachments.*'  => 'nullable|file|max:51200' // 50MB max size
+            'attachments.*'  => 'nullable|file|max:51200|mimes:jpg,jpeg,png,gif,webp,heic,heif,pdf,doc,docx,xls,xlsx,csv,txt,mp4,mov' // 50MB max size
         ]);
+
+        // Sender identity is set from the authenticated session, never trusted
+        // from the form — otherwise any employee could post as "Support Team"
+        // / a spoofed admin id (S3-05).
+        $validatedData['senderId']    = $employee->id;
+        $validatedData['senderType']  = 'employee';
+        $validatedData['senderName']  = trim($employee->first_name . ' ' . $employee->last_name);
+        $validatedData['senderImage'] = Common::getResortUserPicture($this->resort->id);
 
         // Resolve the actual receiver from the support ticket. We don't trust
         // the receiverId the form posted — that field is rendered from
@@ -158,7 +161,8 @@ class SupportChatController extends Controller
             $validatedData['senderImage'],
             $validatedData['receiver_name'],
             $validatedData['receiver_image'],
-            $uploadedFiles
+            $uploadedFiles,
+            $validatedData['support_id']
         ))->toOthers();
 
         return response()->json([

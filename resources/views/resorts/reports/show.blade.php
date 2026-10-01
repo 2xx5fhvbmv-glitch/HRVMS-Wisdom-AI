@@ -191,7 +191,11 @@
 </style>
 @endsection
 @section('import-scripts')
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<!-- R-03: was unpinned (npm/marked/marked.min.js resolves to whatever the
+     latest published version is at request time, with no integrity check —
+     a compromised/malicious marked release would run on every page load).
+     Pinned to a specific version with a subresource-integrity hash. -->
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 $(document).ready(function() {
 
@@ -301,10 +305,19 @@ $(document).ready(function() {
                     $(".AIInSide").attr('disabled', false).text('WAI Insights');
 
                     // Render the markdown the AI returns as formatted HTML.
+                    // R-03: marked.parse() does not sanitize HTML embedded in
+                    // its input — a raw <script>/<img onerror> in the AI's
+                    // response text ran verbatim once inserted via .html().
+                    // Escaping HTML entities first turns any literal markup
+                    // in the source text into inert characters before marked
+                    // ever sees it, while marked's own generated tags
+                    // (**bold**, # heading, etc., added after this escape)
+                    // still render normally.
                     var md = response.data || '';
+                    var escapedMd = $('<div>').text(md).html();
                     var html = (typeof marked !== 'undefined')
-                        ? (marked.parse ? marked.parse(md) : marked(md))
-                        : $('<div>').text(md).html();
+                        ? (marked.parse ? marked.parse(escapedMd) : marked(escapedMd))
+                        : escapedMd;
                     $('#jsonContainer').html(html);
 
                     // Show insights, keep the report data intact behind it so the

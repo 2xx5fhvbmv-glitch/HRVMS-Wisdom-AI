@@ -35,6 +35,11 @@ class AppServiceProvider extends ServiceProvider
         Paginator::useBootstrap();
         Schema::defaultStringLength(191);
 
+        // Mobile personal access tokens defaulted to Passport's 1-year
+        // lifetime (S4-04). Product-owner decision 2026-09-26: Option A,
+        // 90 days — staff re-enter their password every 90 days.
+        \Laravel\Passport\Passport::personalAccessTokensExpireIn(now()->addDays(90));
+
         // Audit log for the Employment tab. Without this observer the
         // change log only captured edits made through
         // EmployeeController::updateEmploymentData; updates from the

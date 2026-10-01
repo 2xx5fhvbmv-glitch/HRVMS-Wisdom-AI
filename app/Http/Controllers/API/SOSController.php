@@ -507,19 +507,28 @@ class SOSController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
         try {
-            $sosHistoryEmployeeStatus                   =   SosHistoryEmployeeStatus::where('sos_history_id', $request->sos_history_id)
-                                                                ->where('emp_id', $this->user->GetEmployee->id)
-                                                                ->first();
-
-            if (!$sosHistoryEmployeeStatus) {
-                return response()->json(['success' => false, 'message' => 'SOS not found'], 200);
-            }
-
-            $sosHistoryEmployeeStatus->status           =   $request->status;
-            $sosHistoryEmployeeStatus->address          =   $request->address;
-            $sosHistoryEmployeeStatus->latitude         =   $request->latitude;
-            $sosHistoryEmployeeStatus->longitude        =   $request->longitude;
-            $sosHistoryEmployeeStatus->save();
+            // updateOrCreate, not find-or-404: the row only pre-exists here
+            // because handleSOSActionWithTeam() bulk-seeds one per employee
+            // who was status='Active' at the moment the SOS was raised. An
+            // employee activated afterward (or otherwise missed by that
+            // snapshot) has no row yet, so a plain find-or-fail silently
+            // 200'd "SOS not found" and never recorded Safe — the employee
+            // saw a normal-looking response, but the row stayed at whatever
+            // SOSLocationUpdate's own updateOrCreate later created it as
+            // (status defaults to 'Unknown'), and employeeOpenSOS/
+            // employeeAndTeamLocation never learned they were Safe.
+            $sosHistoryEmployeeStatus                   =   SosHistoryEmployeeStatus::updateOrCreate(
+                                                                [
+                                                                    'sos_history_id'     =>  $request->sos_history_id,
+                                                                    'emp_id'             =>  $this->user->GetEmployee->id,
+                                                                ],
+                                                                [
+                                                                    'status'             =>  $request->status,
+                                                                    'address'            =>  $request->address,
+                                                                    'latitude'           =>  $request->latitude,
+                                                                    'longitude'          =>  $request->longitude,
+                                                                ]
+                                                            );
 
             // Safe/Unsafe self-report during an active SOS goes to everyone
             // who needs to know: the team dispatched to this incident, HR,
@@ -719,8 +728,18 @@ class SOSController extends Controller
                                                                     'e.Admin_Parent_id',
                                                                     'rd.name as department',
                                                                 );
+                                                                // SO-01: everyone except a plain department HOD got the
+                                                                // full, unfiltered list — every employee's live GPS,
+                                                                // name and photo for this SOS, not just responders/
+                                                                // management. HR/GM/HR-dept-HOD and the Security Manager
+                                                                // legitimately need resort-wide visibility for incident
+                                                                // command; a regular HOD is already scoped to their own
+                                                                // subordinates above; everyone else (ordinary employee,
+                                                                // supervisor, etc.) only gets their own entry.
                                                                 if($isHOD) {
                                                                     $sosHistoryEmployeeStatus->whereIn('e.id', $this->underEmp_id);
+                                                                } elseif (!$isSecurityManager && !Common::hasFullDataAccess($employee)) {
+                                                                    $sosHistoryEmployeeStatus->where('e.id', $employee->id);
                                                                 }
 
             $sosHistoryEmployeeStatus                   =   $sosHistoryEmployeeStatus->get()->map(function ($item) {

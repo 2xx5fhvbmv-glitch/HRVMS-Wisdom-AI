@@ -135,7 +135,41 @@
                             <input type="time" class="form-control" name="scheduled_time" id="scheduled_time" required
                                 data-parsley-required-message="Please select a time.">
                         </div>
-                        <div class="col-md-4"></div>
+                        <div class="col-md-4">
+                            <label for="assigned_to_employee_id" class="form-label">ASSIGN TO <small class="text-muted">(Optional)</small></label>
+                            <select class="form-select" name="assigned_to_employee_id" id="assigned_to_employee_id">
+                                <option value="">Unassigned — HOD/XCOM will assign later</option>
+                                @foreach($lineWorkers as $lw)
+                                    <option value="{{ $lw->id }}">{{ trim(($lw->resortAdmin->first_name ?? '') . ' ' . ($lw->resortAdmin->last_name ?? '')) }} ({{ $lw->Emp_id }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row gx-4 g-3 mb-3">
+                        <div class="col-md-4">
+                            <label for="frequency" class="form-label">FREQUENCY <small class="text-muted">(Optional — leave blank for a one-off request)</small></label>
+                            <select class="form-select" name="frequency" id="frequency">
+                                <option value="">One-off (just the date above)</option>
+                                <option value="1">1 time / week</option>
+                                <option value="2">2 times / week</option>
+                                <option value="3">3 times / week</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8" id="recurringDaysBlock" style="display:none;">
+                            <label class="form-label">RECURRING DAYS<span class="red-mark">*</span> <small class="text-muted">(next 4 weeks)</small></label>
+                            <div class="d-flex flex-wrap gap-3">
+                                @foreach(['1'=>'Mon','2'=>'Tue','3'=>'Wed','4'=>'Thu','5'=>'Fri','6'=>'Sat','7'=>'Sun'] as $iso => $label)
+                                <label class="form-check form-check-inline border rounded px-3 py-2">
+                                    <input type="checkbox" class="form-check-input recurring-day-checkbox" name="recurring_days[]" value="{{ $iso }}"> {{ $label }}
+                                </label>
+                                @endforeach
+                            </div>
+                            <div id="recurring_days_error" class="text-danger small"></div>
+                        </div>
+                    </div>
+
+                    <div class="row gx-4 g-3 mb-3">
                         <div class="col-md-8">
                             <label for="remarks" class="form-label">SPECIAL INSTRUCTIONS <small class="text-muted">(Optional)</small></label>
                             <textarea class="form-control" id="remarks" rows="3" name="remarks" placeholder="Any special instructions"></textarea>
@@ -159,8 +193,10 @@
                                 <th>Service</th>
                                 <th>Scheduled</th>
                                 <th>Raised By</th>
+                                <th>Assigned To</th>
                                 <th>Status</th>
                                 <th>Instructions</th>
+                                <th>Completion Photos</th>
                             </tr>
                         </thead>
                     </table>
@@ -197,6 +233,21 @@ $(document).ready(function () {
 
     $('#modeEmployeeBtn').on('click', function () { switchMode(false); });
     $('#modeRoomBtn').on('click', function () { switchMode(true); });
+
+    $('#frequency').on('change', function () {
+        var freq = parseInt($(this).val(), 10) || 0;
+        $('#recurringDaysBlock').toggle(freq > 0);
+        $('.recurring-day-checkbox').prop('checked', false);
+    });
+
+    $(document).on('change', '.recurring-day-checkbox', function () {
+        var freq = parseInt($('#frequency').val(), 10) || 0;
+        var checked = $('.recurring-day-checkbox:checked');
+        if (checked.length > freq) {
+            $(this).prop('checked', false);
+            toastr.error('You can only select ' + freq + ' day(s) for this frequency.', 'Error', { positionClass: 'toast-bottom-right' });
+        }
+    });
 
     function loadEligibleServices(empId) {
         $.ajax({
@@ -300,6 +351,11 @@ $(document).ready(function () {
             toastr.error('Please select an employee.', 'Error', { positionClass: 'toast-bottom-right' });
             return false;
         }
+        var freq = parseInt($('#frequency').val(), 10) || 0;
+        if (freq > 0 && $('.recurring-day-checkbox:checked').length !== freq) {
+            toastr.error('Please select exactly ' + freq + ' recurring day(s).', 'Error', { positionClass: 'toast-bottom-right' });
+            return false;
+        }
 
         var formData = form.serializeArray();
         if (!isRoomMode) {
@@ -347,8 +403,10 @@ $(document).ready(function () {
             { data: 'service_name', name: 'service_name' },
             { data: 'ScheduledOn', name: 'ScheduledOn' },
             { data: 'RaisedBy', name: 'RaisedBy' },
+            { data: 'AssignedTo', name: 'AssignedTo' },
             { data: 'status', name: 'status' },
             { data: 'remarks', name: 'remarks' },
+            { data: 'photos', name: 'photos', orderable: false, searchable: false },
         ]
     });
 });

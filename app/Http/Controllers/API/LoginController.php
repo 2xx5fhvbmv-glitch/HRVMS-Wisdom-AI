@@ -47,6 +47,18 @@ class Logincontroller extends Controller
             $employee                               =   Employee::where('Emp_id', $request->emp_id)->first();
             $resortAdmin                            =   $employee ? ResortAdmin::where('id', $employee->Admin_Parent_id)->first() : null;
 
+            // S8 — account lockout: same shared resort_admins state the web
+            // portal login checks (Common::isAccountLocked()), checked
+            // before the password hash so a locked account can't be
+            // brute-forced during its lockout window.
+            if ($resortAdmin && Common::isAccountLocked($resortAdmin)) {
+                Common::logLoginAttempt('mobile', $request->emp_id, false, $request);
+                return response()->json([
+                    'success'                       =>  false,
+                    'message'                       =>  'Too many failed login attempts. Please try again in a few minutes.'
+                ], 200);
+            }
+
             // Enumeration fix: account-state checks (inactive employee,
             // non-permanent employment type, inactive resort admin) used to
             // run BEFORE the password check, so a wrong password on a real
@@ -62,13 +74,19 @@ class Logincontroller extends Controller
             $passwordValid = Hash::check(is_string($request->password) ? $request->password : '', $resortAdmin->password ?? self::INVALID_CREDENTIALS_HASH);
             if (!$resortAdmin || !$passwordValid) {
                 Common::logLoginAttempt('mobile', $request->emp_id, false, $request);
+                if ($resortAdmin) {
+                    Common::registerFailedLogin($resortAdmin);
+                }
                 return response()->json([
                     'success'                       =>  false,
                     'message'                       =>  'Invalid Employee ID or password. Please try again'
                 ],200);
             }
 
-            if ($employee->status == "Inactive") {
+            // Allow-list, not a block-list (S4-02): Terminated/Resigned/
+            // Suspended must also be blocked, and any future status is
+            // blocked by default until added to Employee::LOGIN_ALLOWED_STATUSES.
+            if (!in_array($employee->status, Employee::LOGIN_ALLOWED_STATUSES, true)) {
                 return response()->json([
                     'success'                       =>  false,
                     'message'                       =>  'Account is deactivated'
@@ -87,7 +105,21 @@ class Logincontroller extends Controller
                 ],200);
             }
 
-            if ($resortAdmin->status == "Inactive") {
+            // Case-sensitive `== "Inactive"` never matched — the super-admin
+            // form saves resort_admins.status as lowercase 'active'/'inactive'
+            // (S4-02). Compare case-insensitively and allow only 'active'.
+            if (strtolower($resortAdmin->status) !== 'active') {
+                return response()->json([
+                    'success'                       =>  false,
+                    'message'                       =>  'Account is deactivated'
+                ],200);
+            }
+
+            // Mobile login had no resort-status check at all (S4-02) — a
+            // client resort switched off (contract ended) could still use
+            // the app. Mirror the web login's check.
+            $resort = \App\Models\Resort::find($employee->resort_id);
+            if (!$resort || strtolower($resort->status) !== 'active') {
                 return response()->json([
                     'success'                       =>  false,
                     'message'                       =>  'Account is deactivated'
@@ -119,6 +151,7 @@ class Logincontroller extends Controller
             $tokenResult                            =   $resortAdmin->createToken('ResortAdminToken');
             $token                                  =   $tokenResult->accessToken;
             Common::logLoginAttempt('mobile', $request->emp_id, true, $request);
+            Common::registerSuccessfulLogin($resortAdmin);
 
             // Was never captured at login at all — the app had to remember
             // to call the separate add-device-token endpoint afterward, and

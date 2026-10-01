@@ -303,58 +303,5 @@ class EmployeeController extends Controller
 
 
 
-    // HOD UNDER EMPLOYEEList
-    // public function HodEmployeelist()
-    // {
-
-
-    //         if ($request->ajax())
-    //         {
-
-    //             $user = Auth::guard('resort-admin')->user();
-
-    //             $position_id = $user->GetEmployee->Position_id;
-    //             $Dept_id = $user->GetEmployee->Dept_id;
-
-
-    //             $employees = Employee::where('resort_id', $user->resort_id)
-    //                 ->where('position_id', $position_id)
-    //                 ->where('dept_id', $Dept_id)
-    //                 ->where('resort_id', $user->resort_id)
-    //                 ->where('rank',"=",'others')
-    //                 ->get();
-
-
-    //                 return datatables()->of($employees)
-    //                 ->addColumn('name', function ($row)
-    //                 {
-    //                     $userprofile = url('resorts_assets/images/'.$row->profile_photo);
-    //                     return '<img src="' . $userprofile . '" alt="user" class="profile-image"> ' . ucfirst($row->first_name . ' ' . $row->middle_name . ' ' . $row->last_name);
-    //                 })
-    //                 ->editColumn('Department', function ($row)
-    //                 {
-    //                     return $row->department ? $row->department->name : 'No Department Selected';
-    //                 })
-    //                 ->editColumn('Position', function ($row)
-    //                 {
-    //                     return $row->position ? $row->position->position_title : 'No Position Selected';
-    //                 })
-    //                 ->editColumn('Rank', function ($row)
-    //                 {
-    //                     return $row->rank;
-    //                 })
-    //                 ->editColumn('Nation', function ($row)
-    //                 {
-    //                     return $row->nationality;
-    //                 })
-    //                 ->rawColumns(['name', 'Department', 'Position', 'Rank', 'Nation']) // Added Nation to rawColumns
-    //                 ->make(true);
-
-    //         }
-    //         return view('resorts.employees.hodEmployeeindex');
-
-    // }
-
-
 
 }

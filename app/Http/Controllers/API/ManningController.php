@@ -17,25 +17,23 @@ class ManningController extends Controller
     }
     public function getDivisions(Request $request)
     {
-        
-        if (!Auth::guard('api')->check()) {
+        $user = Auth::guard('api')->user();
+        if (!$user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        // Validate the input
-        $request->validate([
-            'resort_id' => 'required|integer|exists:resorts,id',
-        ]);
-
         try {
-            // Fetch resort_id from the query parameter
-            $resortId = $request->query('resort_id');
-        
-            // Check if resort_id is provided
-            if (!$resortId) {
-                return response()->json(['success' => false, 'message' => 'resort_id is required'], 400);
+            // W-01: was reading resort_id from the query string (only
+            // validated against exists:resorts,id) — any authenticated
+            // mobile employee of any resort could read another resort's
+            // org structure by changing the id. Always the caller's own
+            // resort; a mismatched resort_id is refused, not ignored.
+            if ($request->filled('resort_id') && (int) $request->query('resort_id') !== (int) $user->resort_id) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
             }
-        
+
+            $resortId = $user->resort_id;
+
             // Fetch the employees for the specified resort
             $divisions = ResortDivision::where('resort_id', $resortId)->get();
         
@@ -51,25 +49,19 @@ class ManningController extends Controller
     }
     public function getDepartments(Request $request)
     {
-        
-        if (!Auth::guard('api')->check()) {
+        $user = Auth::guard('api')->user();
+        if (!$user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
-        
-        // Validate the input
-        $request->validate([
-            'resort_id' => 'required|integer|exists:resorts,id',
-        ]);
 
         try {
-            // Fetch resort_id from the query parameter
-            $resortId = $request->query('resort_id');
-            // dd($resortId);
-            // Check if resort_id is provided
-            if (!$resortId) {
-                return response()->json(['success' => false, 'message' => 'resort_id is required'], 400);
+            // W-01: see getDivisions() above.
+            if ($request->filled('resort_id') && (int) $request->query('resort_id') !== (int) $user->resort_id) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
             }
-        
+
+            $resortId = $user->resort_id;
+
             // Fetch the employees for the specified resort
             $departments = ResortDepartment::select([
                 'resort_departments.id',
@@ -100,25 +92,19 @@ class ManningController extends Controller
 
     public function getSections(Request $request)
     {
-        
-        if (!Auth::guard('api')->check()) {
+        $user = Auth::guard('api')->user();
+        if (!$user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        // Validate the input
-        $request->validate([
-            'resort_id' => 'required|integer|exists:resorts,id',
-        ]);
-
         try {
-            // Fetch resort_id from the query parameter
-            $resortId = $request->query('resort_id');
-        
-            // Check if resort_id is provided
-            if (!$resortId) {
-                return response()->json(['success' => false, 'message' => 'resort_id is required'], 400);
+            // W-01: see getDivisions() above.
+            if ($request->filled('resort_id') && (int) $request->query('resort_id') !== (int) $user->resort_id) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
             }
-        
+
+            $resortId = $user->resort_id;
+
             // Fetch the employees for the specified resort
             $sections = ResortSection::select([
                 'resort_sections.id',
@@ -152,25 +138,19 @@ class ManningController extends Controller
 
     public function getPositions(Request $request)
     {
-        
-        if (!Auth::guard('api')->check()) {
+        $user = Auth::guard('api')->user();
+        if (!$user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        // Validate the input
-        $request->validate([
-            'resort_id' => 'required|integer|exists:resorts,id',
-        ]);
-
         try {
-            // Fetch resort_id from the query parameter
-            $resortId = $request->query('resort_id');
-        
-            // Check if resort_id is provided
-            if (!$resortId) {
-                return response()->json(['success' => false, 'message' => 'resort_id is required'], 400);
+            // W-01: see getDivisions() above.
+            if ($request->filled('resort_id') && (int) $request->query('resort_id') !== (int) $user->resort_id) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
             }
-        
+
+            $resortId = $user->resort_id;
+
             // Fetch the employees for the specified resort
             $positions = ResortPosition::select([
                 'resort_positions.id',

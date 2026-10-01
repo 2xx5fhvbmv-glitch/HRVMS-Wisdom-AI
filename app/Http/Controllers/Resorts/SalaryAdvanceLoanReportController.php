@@ -41,6 +41,9 @@ class SalaryAdvanceLoanReportController extends Controller
 
     public function __construct()
     {
+        // P-01: salary-advance/loan reports are HR/Finance only.
+        $this->middleware('payroll.access');
+
         $this->resort = auth()->guard('resort-admin')->user();
     }
 
@@ -92,7 +95,12 @@ class SalaryAdvanceLoanReportController extends Controller
     {
         if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.view')) == false) return abort(403, 'Unauthorized access');
         $rid = $this->resort->resort_id;
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: this controller is HR/Finance only now (payroll.access
+        // middleware); getScopedDepartmentIds() would incorrectly narrow
+        // Finance (not in hasFullDataAccess()'s set) to its own department,
+        // but the 2026-09-26 decision gives Finance full, all-department
+        // access same as HR.
+        $scoped = null;
 
         $reports = collect($this->registry())->map(fn($r, $key) => [
             'key' => $key, 'name' => $r['name'], 'description' => $r['description'],
@@ -206,7 +214,12 @@ class SalaryAdvanceLoanReportController extends Controller
     public function salaryAdvanceLoanRegister(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: this controller is HR/Finance only now (payroll.access
+        // middleware); getScopedDepartmentIds() would incorrectly narrow
+        // Finance (not in hasFullDataAccess()'s set) to its own department,
+        // but the 2026-09-26 decision gives Finance full, all-department
+        // access same as HR.
+        $scoped = null;
 
         $rows = $this->baseQuery($rid, $scoped)
             ->when($f['department'] ?? null, fn($q) => $q->where('e.Dept_id', $f['department']))
@@ -243,7 +256,12 @@ class SalaryAdvanceLoanReportController extends Controller
     public function pendingSalaryAdvanceLoanApproval(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: this controller is HR/Finance only now (payroll.access
+        // middleware); getScopedDepartmentIds() would incorrectly narrow
+        // Finance (not in hasFullDataAccess()'s set) to its own department,
+        // but the 2026-09-26 decision gives Finance full, all-department
+        // access same as HR.
+        $scoped = null;
 
         $rows = $this->baseQuery($rid, $scoped)
             ->whereIn('pa.status', ['Pending', 'In-Progress', 'Rejected'])
@@ -280,7 +298,12 @@ class SalaryAdvanceLoanReportController extends Controller
     public function loanSalaryAdvanceRepayment(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: this controller is HR/Finance only now (payroll.access
+        // middleware); getScopedDepartmentIds() would incorrectly narrow
+        // Finance (not in hasFullDataAccess()'s set) to its own department,
+        // but the 2026-09-26 decision gives Finance full, all-department
+        // access same as HR.
+        $scoped = null;
 
         $advances = $this->baseQuery($rid, $scoped)
             ->where('pa.status', 'Approved')
@@ -331,7 +354,12 @@ class SalaryAdvanceLoanReportController extends Controller
     public function repaymentSchedule(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: this controller is HR/Finance only now (payroll.access
+        // middleware); getScopedDepartmentIds() would incorrectly narrow
+        // Finance (not in hasFullDataAccess()'s set) to its own department,
+        // but the 2026-09-26 decision gives Finance full, all-department
+        // access same as HR.
+        $scoped = null;
 
         $advances = $this->baseQuery($rid, $scoped)
             ->where('pa.status', 'Approved')
@@ -379,7 +407,12 @@ class SalaryAdvanceLoanReportController extends Controller
     public function payrollDeductionHistory(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: this controller is HR/Finance only now (payroll.access
+        // middleware); getScopedDepartmentIds() would incorrectly narrow
+        // Finance (not in hasFullDataAccess()'s set) to its own department,
+        // but the 2026-09-26 decision gives Finance full, all-department
+        // access same as HR.
+        $scoped = null;
 
         $advances = $this->baseQuery($rid, $scoped)
             ->when($f['department'] ?? null, fn($q) => $q->where('e.Dept_id', $f['department']))
@@ -424,7 +457,12 @@ class SalaryAdvanceLoanReportController extends Controller
     public function salaryAdvanceLoanExecutiveSummary(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $scoped = Common::getScopedDepartmentIds();
+        // P-01: this controller is HR/Finance only now (payroll.access
+        // middleware); getScopedDepartmentIds() would incorrectly narrow
+        // Finance (not in hasFullDataAccess()'s set) to its own department,
+        // but the 2026-09-26 decision gives Finance full, all-department
+        // access same as HR.
+        $scoped = null;
 
         $base = fn() => $this->baseQuery($rid, $scoped)
             ->when($f['from_date'] ?? null, fn($q) => $q->whereDate('pa.request_date', '>=', $f['from_date']))

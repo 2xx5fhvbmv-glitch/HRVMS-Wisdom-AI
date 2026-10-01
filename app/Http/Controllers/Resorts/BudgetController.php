@@ -3,6 +3,7 @@ namespace App\Http\Controllers\Resorts;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use App\Models\ManningandbudgetingConfigfiles;
 use App\Services\BudgetCalculationService;
 use App\Jobs\ConsolidateBudgetImportJob;
@@ -1812,12 +1813,114 @@ class BudgetController extends Controller
             default        => ['Permanent'],
         };
 
-        // The existing single-category tree builder below is wrapped in a
-        // closure (rather than moved into a separate method) so its ~500
-        // lines of already-proven batch-prefetch logic stay completely
-        // unmoved and unchanged — only invoked once per needed category
-        // instead of assuming exactly one.
-        $resolveCategory = function ($employmentType) use ($request, $selectedYear, $resortId, $employeeRankPosition, $mvrToDollarRate) {
+        // Single-category tree builder extracted into
+        // resolveConsolidatedCategoryTree() (below) — called once per needed
+        // category, and reused as-is by assembleConsolidatedExportData() for
+        // the Excel export instead of being copy-pasted there.
+
+        // Non-ajax direct-URL access never participates in the tab
+        // feature (the page's own JS always calls this via $.ajax with a
+        // category_view) — preserve the exact original single-category
+        // (Permanent) behavior/response shape for that path untouched.
+        $categoryResults = [];
+        foreach ($categoriesNeeded as $cat) {
+            $categoryResults[$cat] = $this->resolveConsolidatedCategoryTree($cat, $selectedYear, $resortId, $employeeRankPosition, $mvrToDollarRate, $request->ajax());
+        }
+
+        if ($categoryView === 'nonpermanent') {
+            $activeSub = in_array($request->input('sub'), ['Casual', 'Intern'], true) ? $request->input('sub') : 'Casual';
+            $consolidatedBudget = $categoryResults[$activeSub]['consolidatedBudget'];
+            $header = $categoryResults[$activeSub]['header'];
+            $resortCosts = $categoryResults[$activeSub]['resortCosts'];
+        } elseif ($categoryView === 'all') {
+            // Real merge (not a representative-fallback) — this endpoint
+            // builds one in-memory nested array per category rather than
+            // View Budget's lazy per-node AJAX system, so combining the up
+            // to 3 trees here is tractable: same division/department/
+            // section/position NAMES recur across categories (they're the
+            // same catalog entities), so matching on those names and
+            // summing each level's already-computed calculated_total
+            // (rather than re-deriving it) is correct and doesn't risk
+            // double-counting.
+            $merged = $this->mergeConsolidatedBudgetTrees(array_map(fn ($r) => $r['consolidatedBudget'], $categoryResults));
+            $consolidatedBudget = $merged;
+            $header = $categoryResults['Permanent']['header'];
+            // WP2.1 — "All Combined" blends employees of every category in
+            // one tree, so the cost-line columns must cover all 3
+            // categories' cost lines too (union by id+category so
+            // Permanent/Casual/Intern lines with colliding ids don't
+            // collapse into each other); a given row only has values under
+            // its own category's columns, which is correct here, not a bug.
+            $resortCosts = collect($categoryResults)->flatMap(fn ($r) => $r['resortCosts'])->values();
+        } else {
+            $consolidatedBudget = $categoryResults['Permanent']['consolidatedBudget'];
+            $header = $categoryResults['Permanent']['header'];
+            $resortCosts = $categoryResults['Permanent']['resortCosts'];
+        }
+
+        $html = view('resorts.renderfiles.consolidated', compact(
+            'consolidatedBudget',
+            'header',
+            'resortCosts',
+            'selectedYear',
+            'employeeRankPosition',
+            'mvrToDollarRate'
+        ))->render();
+
+        // WP7(D4) — Send To Finance/Send To GM must enable only once every
+        // department has submitted (for every category the current tab
+        // covers — 'all' needs all 3, 'nonpermanent' needs both Casual and
+        // Intern, 'permanent' needs just Permanent). This used to be
+        // hardcoded true, so the buttons' enabled state never reflected
+        // reality; the JS also had the true/false meaning backwards (see
+        // consolidated.blade.php fetchConsolidatedBudget()), so in practice
+        // the buttons were simply always disabled.
+        // WP7.1/WP7.3 — inactive depts must not count toward the total, and
+        // a draft (or a row sent back to draft by ReviseBudget() — A3) must
+        // not count as submitted, same fix as SendToFinance()'s own gate.
+        $allDepartments = ResortDepartment::where('resort_id', $resortId)->where('status', 'active')->get(['id', 'name']);
+        $submittedDeptIdsByCategory = [];
+        foreach ($categoriesNeeded as $cat) {
+            $submittedDeptIdsByCategory[$cat] = ManningResponse::where('year', $selectedYear)
+                ->where('resort_id', $resortId)
+                ->where('employment_type', $cat)
+                ->where('status', 'submitted')
+                ->pluck('dept_id')
+                ->unique()
+                ->all();
+        }
+        $missingDepartments = [];
+        foreach ($allDepartments as $dept) {
+            foreach ($categoriesNeeded as $cat) {
+                if (!in_array($dept->id, $submittedDeptIdsByCategory[$cat], true)) {
+                    $missingDepartments[] = $dept->name;
+                    break;
+                }
+            }
+        }
+        $totalDepartments = $allDepartments->count();
+        $missingDepartments = array_values(array_unique($missingDepartments));
+
+        return response()->json([
+            'html' => $html,
+            'isBudgetCompleted' => empty($missingDepartments),
+            'totalDepartments' => $totalDepartments,
+            'submittedDepartments' => $totalDepartments - count($missingDepartments),
+            'missingDepartments' => $missingDepartments,
+        ]);
+    }
+
+    /**
+     * Builds the full division/department/section/position tree for one
+     * employment-type category (Permanent/Casual/Intern), batch-fetching
+     * everything up front. Extracted out of viewConsolidatedBudget() (its
+     * sole caller before this) so assembleConsolidatedExportData() can call
+     * it too, instead of duplicating this ~700-line closure into the
+     * Excel export path. $ajaxLike takes the place of $request->ajax() —
+     * every real caller already resolves that to true before this runs.
+     */
+    protected function resolveConsolidatedCategoryTree($employmentType, $selectedYear, $resortId, $employeeRankPosition, $mvrToDollarRate, bool $ajaxLike = true)
+    {
         // Retrieve manning responses by resort and year
         if(($employeeRankPosition['position'] != "HR" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" )) && ($employeeRankPosition['position'] != "GM" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" )) && ($employeeRankPosition['position'] != "Finance" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" ))) {
             $yearlyBudgets = ManningResponse::where('year', $selectedYear)
@@ -1894,7 +1997,7 @@ class BudgetController extends Controller
         // least the legacy non-ajax $MainArray branch is reachable. Short-
         // circuit with an empty tree instead of falling into that branch,
         // which doesn't handle ajax requests at all.
-        if ($request->ajax() && $departmentsInScope->isEmpty()) {
+        if ($ajaxLike && $departmentsInScope->isEmpty()) {
             return ['consolidatedBudget' => [], 'header' => []];
         }
 
@@ -2273,6 +2376,13 @@ class BudgetController extends Controller
                             $empMonthlySalariesByEmployee[$employee->emp_id] ?? [],
                             (float) ($empAllowanceByEmployee[$employee->emp_id] ?? 0)
                         );
+                        // Annual allowance leg (employees_allowance), broken
+                        // out separately from yearly_total — the Consolidated
+                        // Budget export needs this as its own visible,
+                        // editable column so its row Total can reconstruct
+                        // (and stay reconcilable with) yearly_total via a
+                        // live formula instead of a baked-in number.
+                        $employee->allowance_yearly = (float) ($empAllowanceByEmployee[$employee->emp_id] ?? 0) * 12;
                     }
 
                     // Load vacant budget cost configurations - SUM FOR ENTIRE YEAR.
@@ -2451,7 +2561,7 @@ class BudgetController extends Controller
             // Intern tab rendered Permanent-shaped cost cells (all blank)
             // while the row total was correctly computed from the real
             // category — cells summed to less than the total.
-            if ($request->ajax()) {
+            if ($ajaxLike) {
                 return compact('consolidatedBudget', 'header', 'resortCosts');
             }
         }
@@ -2509,104 +2619,105 @@ class BudgetController extends Controller
                 $DepartmentTotal=[];
             }
 
-            if ($request->ajax()) {
+            if ($ajaxLike) {
                 return view('resorts.renderfiles.consolidatedold', compact('MainArray','header','DepartmentTotal','resortId'));
             }
         }
 
         // Non-AJAX requests never reach here (redirected at the top of viewConsolidatedBudget()).
-        }; // end $resolveCategory closure
+    }
 
-        // Non-ajax direct-URL access never participates in the tab
-        // feature (the page's own JS always calls this via $.ajax with a
-        // category_view) — preserve the exact original single-category
-        // (Permanent) behavior/response shape for that path untouched.
+    /**
+     * Assembles the data for all 5 Consolidated Budget export sheets
+     * (Permanent, Casual, Intern, Casual & Intern, Consolidated) in one
+     * call, for ConsolidateBudgetController::ExportBudget(). Reuses
+     * resolveConsolidatedCategoryTree() (the same tree builder the on-screen
+     * page uses) and mergeConsolidatedBudgetTrees() (unchanged) rather than
+     * duplicating either. Unlike the on-screen page, which only resolves
+     * whichever category tab is active, the export always needs all 3 raw
+     * categories regardless of which tab was open when Export was clicked.
+     */
+    public function assembleConsolidatedExportData(Request $request): array
+    {
+        $resortId = $this->resort->resort_id;
+
+        $requested = $request->input('year');
+        $year = (is_numeric($requested) && (int) $requested >= 2000 && (int) $requested <= 2100)
+            ? (int) $requested
+            : (int) now()->year;
+
+        $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
+
+        $mvrToDollarRate = 1 / 15.42;
+        $resortSettingsForRate = ResortSiteSettings::where('resort_id', $resortId)->first();
+        if ($resortSettingsForRate && $resortSettingsForRate->DollertoMVR) {
+            $mvrToDollarRate = 1 / $resortSettingsForRate->DollertoMVR;
+        }
+
         $categoryResults = [];
-        foreach ($categoriesNeeded as $cat) {
-            $categoryResults[$cat] = $resolveCategory($cat);
+        foreach (['Permanent', 'Casual', 'Intern'] as $cat) {
+            $categoryResults[$cat] = $this->resolveConsolidatedCategoryTree($cat, $year, $resortId, $employeeRankPosition, $mvrToDollarRate, true);
         }
 
-        if ($categoryView === 'nonpermanent') {
-            $activeSub = in_array($request->input('sub'), ['Casual', 'Intern'], true) ? $request->input('sub') : 'Casual';
-            $consolidatedBudget = $categoryResults[$activeSub]['consolidatedBudget'];
-            $header = $categoryResults[$activeSub]['header'];
-            $resortCosts = $categoryResults[$activeSub]['resortCosts'];
-        } elseif ($categoryView === 'all') {
-            // Real merge (not a representative-fallback) — this endpoint
-            // builds one in-memory nested array per category rather than
-            // View Budget's lazy per-node AJAX system, so combining the up
-            // to 3 trees here is tractable: same division/department/
-            // section/position NAMES recur across categories (they're the
-            // same catalog entities), so matching on those names and
-            // summing each level's already-computed calculated_total
-            // (rather than re-deriving it) is correct and doesn't risk
-            // double-counting.
-            $merged = $this->mergeConsolidatedBudgetTrees(array_map(fn ($r) => $r['consolidatedBudget'], $categoryResults));
-            $consolidatedBudget = $merged;
-            $header = $categoryResults['Permanent']['header'];
-            // WP2.1 — "All Combined" blends employees of every category in
-            // one tree, so the cost-line columns must cover all 3
-            // categories' cost lines too (union by id+category so
-            // Permanent/Casual/Intern lines with colliding ids don't
-            // collapse into each other); a given row only has values under
-            // its own category's columns, which is correct here, not a bug.
-            $resortCosts = collect($categoryResults)->flatMap(fn ($r) => $r['resortCosts'])->values();
-        } else {
-            $consolidatedBudget = $categoryResults['Permanent']['consolidatedBudget'];
-            $header = $categoryResults['Permanent']['header'];
-            $resortCosts = $categoryResults['Permanent']['resortCosts'];
-        }
+        // Casual and Permanent cost tables are separate, independently
+        // auto-incrementing tables (resort_budget_costs vs
+        // resort_nonpermanent_budget_costs) — their ->id values can
+        // legitimately collide across categories. Tagging each cost with
+        // the category it came from lets the export sheet key its columns
+        // by (category, id) on merged sheets instead of id alone, so an
+        // employee's cost_breakdown (itself keyed by their own category's
+        // cost ids) never gets read into the wrong category's column.
+        $tagCostsWithCategory = fn (string $cat, $costs) => collect($costs)->map(function ($cost) use ($cat) {
+            $cost->export_category = $cat;
+            return $cost;
+        });
 
-        $html = view('resorts.renderfiles.consolidated', compact(
-            'consolidatedBudget',
-            'header',
-            'resortCosts',
-            'selectedYear',
-            'employeeRankPosition',
-            'mvrToDollarRate'
-        ))->render();
+        // resolveConsolidatedCategoryTree()'s empty-department-scope early
+        // return only carries 'consolidatedBudget'/'header' (no
+        // 'resortCosts') — pre-existing, unrelated to this export, but the
+        // export must not fatal on it. Default to empty rather than assume
+        // the key exists.
+        $costsFor = fn (string $cat) => $categoryResults[$cat]['resortCosts'] ?? collect();
 
-        // WP7(D4) — Send To Finance/Send To GM must enable only once every
-        // department has submitted (for every category the current tab
-        // covers — 'all' needs all 3, 'nonpermanent' needs both Casual and
-        // Intern, 'permanent' needs just Permanent). This used to be
-        // hardcoded true, so the buttons' enabled state never reflected
-        // reality; the JS also had the true/false meaning backwards (see
-        // consolidated.blade.php fetchConsolidatedBudget()), so in practice
-        // the buttons were simply always disabled.
-        // WP7.1/WP7.3 — inactive depts must not count toward the total, and
-        // a draft (or a row sent back to draft by ReviseBudget() — A3) must
-        // not count as submitted, same fix as SendToFinance()'s own gate.
-        $allDepartments = ResortDepartment::where('resort_id', $resortId)->where('status', 'active')->get(['id', 'name']);
-        $submittedDeptIdsByCategory = [];
-        foreach ($categoriesNeeded as $cat) {
-            $submittedDeptIdsByCategory[$cat] = ManningResponse::where('year', $selectedYear)
-                ->where('resort_id', $resortId)
-                ->where('employment_type', $cat)
-                ->where('status', 'submitted')
-                ->pluck('dept_id')
-                ->unique()
-                ->all();
-        }
-        $missingDepartments = [];
-        foreach ($allDepartments as $dept) {
-            foreach ($categoriesNeeded as $cat) {
-                if (!in_array($dept->id, $submittedDeptIdsByCategory[$cat], true)) {
-                    $missingDepartments[] = $dept->name;
-                    break;
-                }
-            }
-        }
-        $totalDepartments = $allDepartments->count();
-        $missingDepartments = array_values(array_unique($missingDepartments));
-
-        return response()->json([
-            'html' => $html,
-            'isBudgetCompleted' => empty($missingDepartments),
-            'totalDepartments' => $totalDepartments,
-            'submittedDepartments' => $totalDepartments - count($missingDepartments),
-            'missingDepartments' => $missingDepartments,
+        $casualAndIntern = $this->mergeConsolidatedBudgetTrees([
+            $categoryResults['Casual']['consolidatedBudget'],
+            $categoryResults['Intern']['consolidatedBudget'],
         ]);
+        $casualAndInternCosts = collect(['Casual', 'Intern'])
+            ->flatMap(fn ($cat) => $tagCostsWithCategory($cat, $costsFor($cat)))
+            ->values();
+
+        $consolidated = $this->mergeConsolidatedBudgetTrees(array_map(fn ($r) => $r['consolidatedBudget'], $categoryResults));
+        $consolidatedCosts = collect(['Permanent', 'Casual', 'Intern'])
+            ->flatMap(fn ($cat) => $tagCostsWithCategory($cat, $costsFor($cat)))
+            ->values();
+
+        return [
+            'year' => $year,
+            'mvrToDollarRate' => $mvrToDollarRate,
+            'sheets' => [
+                'Permanent' => [
+                    'tree' => $categoryResults['Permanent']['consolidatedBudget'],
+                    'resortCosts' => $costsFor('Permanent'),
+                ],
+                'Casual' => [
+                    'tree' => $categoryResults['Casual']['consolidatedBudget'],
+                    'resortCosts' => $costsFor('Casual'),
+                ],
+                'Intern' => [
+                    'tree' => $categoryResults['Intern']['consolidatedBudget'],
+                    'resortCosts' => $costsFor('Intern'),
+                ],
+                'Casual & Intern' => [
+                    'tree' => $casualAndIntern,
+                    'resortCosts' => $casualAndInternCosts,
+                ],
+                'Consolidated' => [
+                    'tree' => $consolidated,
+                    'resortCosts' => $consolidatedCosts,
+                ],
+            ],
+        ];
     }
 
     /**
@@ -2844,6 +2955,11 @@ class BudgetController extends Controller
 
     public function UploadconfigFiles(Request $request)
     {
+        // W-03: replaces the whole resort's budget configuration — HR/Finance only.
+        if (Common::budgetAccessLevel($this->resort->getEmployee) !== 'full') {
+            return response()->json(['success' => false, 'msg' => 'Unauthorized access'], 403);
+        }
+
         $consolidatdebudget_Year = $request->consolidatdebudget_Year;
         $hasFile = $request->hasFile('consolidatedbudget');
 
@@ -2914,9 +3030,15 @@ class BudgetController extends Controller
                 try {
                     $filePath = $request->file('consolidatedbudget')->store('imports');
                     Excel::import(new ConsolidateBudgetImport($data), $filePath);
+                    // W-06: a successful import was never cleaned up — only
+                    // deleted on failure below.
+                    \Storage::delete($filePath);
                 }
                 catch (\Exception $e)
                 {
+                    if (isset($filePath)) {
+                        \Storage::delete($filePath);
+                    }
                     $response['msg'] = $e->getMessage() ?: 'Something went wrong. Please check the Excel file format and ensure headers match the template.';
                     $response['success'] = false;
                     return response()->json($response, 422);
@@ -2944,8 +3066,10 @@ class BudgetController extends Controller
 
     public function UpdateResortBudgetPositionWise(Request $request)
     {
-
-
+        // W-03: replaces resort-wide, position-wise budget data — HR/Finance only.
+        if (Common::budgetAccessLevel($this->resort->getEmployee) !== 'full') {
+            return response()->json(['success' => false, 'msg' => 'Unauthorized access'], 403);
+        }
 
         try
         {
@@ -3041,6 +3165,28 @@ class BudgetController extends Controller
                 return response()->json(['success' => false, 'message' => 'Budget not found.'], 404);
             }
 
+            // W-02 — only the GM approves; the button was already
+            // GM-only in the blade, but nothing on the server stopped a
+            // HOD/HR/Finance/anyone from sending this request directly.
+            // Deliberately checking 'rank' (config('settings.eligibilty')'s
+            // 8 => 'GM' label), not 'position' — position only resolves to
+            // 'GM' when the employee's department is literally named
+            // "General Manager"/"GM", which real GM records in this dataset
+            // aren't (e.g. "Executive Office"), so position always came
+            // back null for them. Same field PayrollController's own
+            // approval-step resolution already trusts for "is this the GM".
+            $pos = Common::getEmployeeRankPosition($this->resort->getEmployee);
+            if (($pos['rank'] ?? null) !== 'GM') {
+                return response()->json(['success' => false, 'message' => 'Only the GM can approve budgets.'], 403);
+            }
+
+            // Also refuse an approval that would skip the HR -> Finance
+            // steps — the GM can only act once the chain has actually
+            // reached them.
+            if ($manningResponse->budget_process_status !== 'GM') {
+                return response()->json(['success' => false, 'message' => 'This budget is not yet at the GM approval stage.'], 400);
+            }
+
             // Was: budget_process_status save fired BEFORE the BudgetStatus
             // insert, and the insert crashed on five NOT NULL columns
             // (resort_id / Department_id / message_id / OtherComments /
@@ -3134,16 +3280,27 @@ class BudgetController extends Controller
             return response()->json(['success' => false, 'message' => $validator->errors()->first()], 400);
         }
 
+        // W-02 — only the GM approves (see the 'rank' vs 'position' note
+        // in approveBudget() above).
+        $pos = Common::getEmployeeRankPosition($this->resort->getEmployee);
+        if (($pos['rank'] ?? null) !== 'GM') {
+            return response()->json(['success' => false, 'message' => 'Only the GM can approve budgets.'], 403);
+        }
+
         $year = $request->input('year');
         $resortId = $this->resort->resort_id;
         $userId = Auth::guard('resort-admin')->user()->id ?? null;
 
+        // Only budgets that have actually reached the GM stage — same rule
+        // as approveBudget() above, so bulk-approve can't skip HR/Finance
+        // for a department that hasn't been forwarded yet.
         $budgets = ManningResponse::where('resort_id', $resortId)
             ->where('year', $year)
+            ->where('budget_process_status', 'GM')
             ->get();
 
         if ($budgets->isEmpty()) {
-            return response()->json(['success' => false, 'message' => 'No budgets found for this year.'], 404);
+            return response()->json(['success' => false, 'message' => 'No budgets at the GM approval stage for this year.'], 404);
         }
 
         $signatureFields = $userId ? Common::snapshotSignature($userId, 'budget-approval', $resortId . '-' . $year . '-GM-all') : [];
@@ -3205,6 +3362,16 @@ class BudgetController extends Controller
             ->where('resort_id', $this->resort->resort_id)
             ->firstOrFail();
 
+        // W-03: 'full'/'approve' see any department's approval PDF;
+        // 'own_department' only their own department's; 'none' → 403.
+        $accessLevel = Common::budgetAccessLevel($this->resort->getEmployee);
+        if ($accessLevel === 'none' || (
+            $accessLevel === 'own_department'
+            && (int) $manningResponse->dept_id !== (int) ($this->resort->getEmployee->Dept_id ?? 0)
+        )) {
+            abort(403, 'Unauthorized access');
+        }
+
         $department = ResortDepartment::where('id', $manningResponse->dept_id)
             ->where('resort_id', $this->resort->resort_id)
             ->first();
@@ -3262,18 +3429,40 @@ class BudgetController extends Controller
             return response()->json(['success' => false, 'message' => 'You do not have access to this resort.'], 403);
         }
 
+        // W-03: cost configuration is explicitly excluded from the
+        // own_department tier in the 2026-09-26 decision — HR/Finance only,
+        // even a HOD editing their own department's cost items is refused.
+        if (Common::budgetAccessLevel($this->resort->getEmployee) !== 'full') {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
+
         try {
             // Validate the incoming request
+            // W-05: exists:resort_budget_costs,id only proves the row
+            // exists somewhere, never that it belongs to this resort —
+            // scope it, same as employee_id/position_id below.
             $validator = Validator::make($request->all(), [
-                'department_id' => 'required|integer',
-                'position_id' => 'required|integer',
+                'department_id' => [
+                    'required', 'integer',
+                    Rule::exists('resort_departments', 'id')->where('resort_id', $this->resort->resort_id),
+                ],
+                'position_id' => [
+                    'required', 'integer',
+                    Rule::exists('resort_positions', 'id')->where('resort_id', $this->resort->resort_id),
+                ],
                 'table_type' => 'required|in:employee,vacant',
-                'employee_id' => 'nullable|integer',
+                'employee_id' => [
+                    'nullable', 'integer',
+                    Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id),
+                ],
                 'vacant_index' => 'nullable|integer',
                 'basic_salary' => 'nullable|numeric|min:0',
                 'current_salary' => 'nullable|numeric|min:0',
                 'budget_costs' => 'required|array',
-                'budget_costs.*.cost_id' => 'required|integer|exists:resort_budget_costs,id',
+                'budget_costs.*.cost_id' => [
+                    'required', 'integer',
+                    Rule::exists('resort_budget_costs', 'id')->where('resort_id', $this->resort->resort_id),
+                ],
                 'budget_costs.*.value' => 'required|numeric|min:0',
                 'budget_costs.*.currency' => 'required|in:USD,MVR'
             ]);
@@ -3340,7 +3529,8 @@ class BudgetController extends Controller
                 $overtimeHolidayConfig = null;
                 $overtimeHolidayCostId = null;
                 foreach ($budgetCosts as $cost) {
-                    $budgetCost = ResortBudgetCost::find($cost['cost_id']);
+                    // W-05: resort-scoped — a bare find() would pull in another resort's cost item.
+                    $budgetCost = ResortBudgetCost::where('resort_id', $this->resort->resort_id)->find($cost['cost_id']);
                     if ($budgetCost && $this->isOvertimeHoliday($budgetCost)) {
                         $overtimeHolidayConfig = $cost;
                         $overtimeHolidayCostId = $cost['cost_id'];
@@ -3350,7 +3540,8 @@ class BudgetController extends Controller
 
                 // Insert new configurations
                 foreach ($budgetCosts as $cost) {
-                    $budgetCost = ResortBudgetCost::find($cost['cost_id']);
+                    // W-05: resort-scoped — a bare find() would pull in another resort's cost item.
+                    $budgetCost = ResortBudgetCost::where('resort_id', $this->resort->resort_id)->find($cost['cost_id']);
                     $isOvertimeHoliday = $budgetCost && $this->isOvertimeHoliday($budgetCost);
 
                     if ($isOvertimeHoliday) {
@@ -3435,7 +3626,8 @@ class BudgetController extends Controller
                 $overtimeHolidayConfig = null;
                 $overtimeHolidayCostId = null;
                 foreach ($budgetCosts as $cost) {
-                    $budgetCost = ResortBudgetCost::find($cost['cost_id']);
+                    // W-05: resort-scoped — a bare find() would pull in another resort's cost item.
+                    $budgetCost = ResortBudgetCost::where('resort_id', $this->resort->resort_id)->find($cost['cost_id']);
                     if ($budgetCost && $this->isOvertimeHoliday($budgetCost)) {
                         $overtimeHolidayConfig = $cost;
                         $overtimeHolidayCostId = $cost['cost_id'];
@@ -3445,7 +3637,8 @@ class BudgetController extends Controller
 
                 // Insert new configurations
                 foreach ($budgetCosts as $cost) {
-                    $budgetCost = ResortBudgetCost::find($cost['cost_id']);
+                    // W-05: resort-scoped — a bare find() would pull in another resort's cost item.
+                    $budgetCost = ResortBudgetCost::where('resort_id', $this->resort->resort_id)->find($cost['cost_id']);
                     $isOvertimeHoliday = $budgetCost && $this->isOvertimeHoliday($budgetCost);
 
                     if ($isOvertimeHoliday) {
@@ -3547,6 +3740,11 @@ class BudgetController extends Controller
         // configuration by editing the URL.
         if ((int) $resortId !== (int) $this->resort->resort_id) {
             return response()->json(['success' => false, 'message' => 'You do not have access to this resort.'], 403);
+        }
+
+        // W-03: cost configuration is HR/Finance only — see saveBudgetCostAssignment() above.
+        if (Common::budgetAccessLevel($this->resort->getEmployee) !== 'full') {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
         }
 
         try {
@@ -3664,6 +3862,16 @@ class BudgetController extends Controller
             $employmentType = $request->input('employment_type', 'Permanent');
             $resortId = auth()->guard('resort-admin')->user()->resort_id;
 
+            // W-03: 'full'/'approve' see any department; 'own_department'
+            // only their own; 'none' → 403.
+            $budgetLevel = Common::budgetAccessLevel($this->resort->getEmployee);
+            if ($budgetLevel === 'none' || (
+                $budgetLevel === 'own_department'
+                && (int) $departmentId !== (int) ($this->resort->getEmployee->Dept_id ?? 0)
+            )) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+            }
+
             // Get manning response for this department — OPTIONAL. The
             // previous build returned `success: false` when the dept had
             // no manning row yet, which silently zero'd out the dept's
@@ -3756,6 +3964,15 @@ class BudgetController extends Controller
             $position = ResortPosition::where('resort_id', $resortId)->find($positionId);
             if (!$position) {
                 return response()->json(['success' => false, 'message' => 'Position not found']);
+            }
+
+            // W-03: see getDepartmentHierarchy() above.
+            $budgetLevel = Common::budgetAccessLevel($this->resort->getEmployee);
+            if ($budgetLevel === 'none' || (
+                $budgetLevel === 'own_department'
+                && (int) $position->dept_id !== (int) ($this->resort->getEmployee->Dept_id ?? 0)
+            )) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
             }
 
             // "All Combined" tab: $employmentType arrives as the literal
@@ -3982,6 +4199,15 @@ class BudgetController extends Controller
                 return response()->json(['success' => false, 'message' => 'Position not found']);
             }
 
+            // W-03: see getDepartmentHierarchy() above.
+            $budgetLevel = Common::budgetAccessLevel($this->resort->getEmployee);
+            if ($budgetLevel === 'none' || (
+                $budgetLevel === 'own_department'
+                && (int) $employee->Dept_id !== (int) ($this->resort->getEmployee->Dept_id ?? 0)
+            )) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+            }
+
             // WP2 (D2) — this employee's own category, not always Permanent.
             $resortCosts = Common::getCachedActiveResortCosts($resortId, Common::manningCategory($employee->employment_type ?? ''));
 
@@ -4159,6 +4385,15 @@ class BudgetController extends Controller
                 return response()->json(['success' => false, 'message' => 'Position not found']);
             }
 
+            // W-03: see getDepartmentHierarchy() above.
+            $budgetLevel = Common::budgetAccessLevel($this->resort->getEmployee);
+            if ($budgetLevel === 'none' || (
+                $budgetLevel === 'own_department'
+                && (int) $position->dept_id !== (int) ($this->resort->getEmployee->Dept_id ?? 0)
+            )) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+            }
+
             // WP2 (D2) — a vacant slot's category comes from its position
             // (resort_positions.employee_category), the only place that
             // information exists for a slot with no employee yet.
@@ -4298,21 +4533,20 @@ class BudgetController extends Controller
             $employmentType = $request->input('employment_type', 'Permanent');
             $isAllCategories = $employmentType === 'all';
 
-            // Same rank-based scoping ViewBudget() applies to what's
-            // rendered — without this, a department-scoped HOD would see
-            // every other department's totals in this response, even
-            // though the page only ever renders their own.
-            //
-            // getRankWiseDepartmentIds() needs one concrete category name
-            // for its Finance/GM "which depts did THIS category's budget
-            // reach" branch — 'all' has no single such answer, so this
-            // uses Permanent's scope as a representative fallback for that
-            // one narrow, rare-role (Finance/GM HOD/XCOM) decision. Every
-            // other user (HR/GM/regular HOD) gets identical scoping
-            // regardless of category, so this only matters for that edge
-            // case, and only for department scoping — the actual employee
-            // totals below still cover every category when 'all'.
-            $rankWiseDepartments = $this->getRankWiseDepartmentIds($resortId, $year, $isAllCategories ? 'Permanent' : $employmentType);
+            // W-03: getRankWiseDepartmentIds() relies on the older
+            // hasFullDataAccess(), which grants L&D managers unrestricted
+            // (every department) access — exactly what the 2026-09-26
+            // budget decision excludes. Using budgetAccessLevel() directly
+            // here instead, scoped to just this endpoint (the shared
+            // getRankWiseDepartmentIds() helper is left untouched — it's
+            // also used by ViewManning/ViewBudget/etc., outside this fix).
+            $budgetLevel = Common::budgetAccessLevel($this->resort->getEmployee);
+            if ($budgetLevel === 'none') {
+                return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+            }
+            $rankWiseDepartments = $budgetLevel === 'own_department'
+                ? [(int) ($this->resort->getEmployee->Dept_id ?? 0)]
+                : ResortDepartment::where('resort_id', $resortId)->pluck('id')->toArray();
 
             // ---- Resort-wide lookups, once ----
             $dollarToMvr = (float) (DB::table('resort_site_settings')
@@ -4598,6 +4832,15 @@ class BudgetController extends Controller
      */
     public function updateEmployeeMonthlyBudget(Request $request)
     {
+        // W-03: changes an employee's budgeted salary figures directly —
+        // HR/Finance only (not the HOD/EXCOM own_department tier: the
+        // 2026-09-26 decision limits HOD/EXCOM to filling in their manning
+        // request, not editing hierarchy figures directly; not the GM
+        // either — "the GM doesn't edit figures").
+        if (Common::budgetAccessLevel($this->resort->getEmployee) !== 'full') {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
+
         try {
             $validator = Validator::make($request->all(), [
                 'employee_id' => 'required|integer',
@@ -4683,7 +4926,8 @@ class BudgetController extends Controller
                 $overtimeHolidayConfig = null;
                 $overtimeHolidayCostId = null;
                 foreach ($costConfigurations as $costConfig) {
-                    $budgetCost = ResortBudgetCost::find($costConfig['resort_budget_cost_id']);
+                    // W-05: resort-scoped — see saveBudgetCostAssignment() above.
+                    $budgetCost = ResortBudgetCost::where('resort_id', $this->resort->resort_id)->find($costConfig['resort_budget_cost_id']);
                     if ($budgetCost && $this->isOvertimeNormal($budgetCost)) {
                         $overtimeNormalConfig = $costConfig;
                     }
@@ -4695,7 +4939,8 @@ class BudgetController extends Controller
 
                 // Insert configurations for this month (without salary fields)
                 foreach ($costConfigurations as $costConfig) {
-                    $budgetCost = ResortBudgetCost::find($costConfig['resort_budget_cost_id']);
+                    // W-05: resort-scoped — see saveBudgetCostAssignment() above.
+                    $budgetCost = ResortBudgetCost::where('resort_id', $this->resort->resort_id)->find($costConfig['resort_budget_cost_id']);
                     $isOvertimeHoliday = $budgetCost && $this->isOvertimeHoliday($budgetCost);
 
                     // Skip overtime holiday here - we'll handle it separately for all 12 months
@@ -4720,7 +4965,8 @@ class BudgetController extends Controller
                     // Get employee basic salary for calculation
                     $employee = DB::table('employees')->where('id', $employeeId)->where('resort_id', $resortId)->first();
                     $employeeBasicSalary = $employee->basic_salary ?? 0;
-                    $budgetCost = ResortBudgetCost::find($overtimeHolidayCostId);
+                    // W-05: resort-scoped — see saveBudgetCostAssignment() above.
+                    $budgetCost = ResortBudgetCost::where('resort_id', $this->resort->resort_id)->find($overtimeHolidayCostId);
                     $multiplier = $budgetCost->amount ?? 1.5; // Default 1.5 for holiday OT
 
                     // Delete existing overtime holiday configurations for all months
@@ -4823,6 +5069,11 @@ class BudgetController extends Controller
      */
     public function updateVacantMonthlyBudget(Request $request)
     {
+        // W-03: HR/Finance only — see updateEmployeeMonthlyBudget() above.
+        if (Common::budgetAccessLevel($this->resort->getEmployee) !== 'full') {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
+
         try {
             $validator = Validator::make($request->all(), [
                 'vacant_budget_cost_id' => 'required|integer',
@@ -4920,7 +5171,8 @@ class BudgetController extends Controller
                 $overtimeHolidayConfig = null;
                 $overtimeHolidayCostId = null;
                 foreach ($costConfigurations as $costConfig) {
-                    $budgetCost = ResortBudgetCost::find($costConfig['resort_budget_cost_id']);
+                    // W-05: resort-scoped — see saveBudgetCostAssignment() above.
+                    $budgetCost = ResortBudgetCost::where('resort_id', $this->resort->resort_id)->find($costConfig['resort_budget_cost_id']);
                     if ($budgetCost && $this->isOvertimeNormal($budgetCost)) {
                         $overtimeNormalConfig = $costConfig;
                     }
@@ -4932,7 +5184,8 @@ class BudgetController extends Controller
 
                 // Insert configurations for this month (without salary fields)
                 foreach ($costConfigurations as $costConfig) {
-                    $budgetCost = ResortBudgetCost::find($costConfig['resort_budget_cost_id']);
+                    // W-05: resort-scoped — see saveBudgetCostAssignment() above.
+                    $budgetCost = ResortBudgetCost::where('resort_id', $this->resort->resort_id)->find($costConfig['resort_budget_cost_id']);
                     $isOvertimeHoliday = $budgetCost && $this->isOvertimeHoliday($budgetCost);
 
                     // Skip overtime holiday here - we'll handle it separately for all 12 months
@@ -4957,7 +5210,8 @@ class BudgetController extends Controller
                     // Get vacant budget cost basic salary for calculation
                     $vacantBudgetCost = ResortVacantBudgetCost::where('resort_id', $resortId)->find($vacantBudgetCostId);
                     $vacantBasicSalary = $vacantBudgetCost->basic_salary ?? 0;
-                    $budgetCost = ResortBudgetCost::find($overtimeHolidayCostId);
+                    // W-05: resort-scoped — see saveBudgetCostAssignment() above.
+                    $budgetCost = ResortBudgetCost::where('resort_id', $this->resort->resort_id)->find($overtimeHolidayCostId);
                     $multiplier = $budgetCost->amount ?? 1.5; // Default 1.5 for holiday OT
 
                     // Delete existing overtime holiday configurations for all months

@@ -11,9 +11,10 @@ class HousekeepingRequest extends Model
     protected $table = 'housekeeping_requests';
 
     protected $fillable = [
-        'resort_id', 'request_id', 'batch_id', 'employee_id', 'housekeeping_service_id',
-        'raised_by', 'BuildingName', 'FloorNo', 'RoomNo', 'remarks', 'scheduled_date',
-        'scheduled_time', 'status', 'completed_at',
+        'resort_id', 'request_id', 'batch_id', 'employee_id', 'assigned_to_employee_id',
+        'housekeeping_service_id', 'raised_by', 'BuildingName', 'FloorNo', 'RoomNo', 'remarks',
+        'scheduled_date', 'scheduled_time', 'status', 'completed_at', 'photos',
+        'frequency', 'recurring_days',
     ];
 
     protected static function boot()
@@ -35,5 +36,10 @@ class HousekeepingRequest extends Model
     public function employee()
     {
         return $this->belongsTo(Employee::class, 'employee_id');
+    }
+
+    public function assignedTo()
+    {
+        return $this->belongsTo(Employee::class, 'assigned_to_employee_id');
     }
 }

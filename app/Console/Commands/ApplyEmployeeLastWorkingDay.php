@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Models\Employee;
 use App\Http\Controllers\Resorts\People\Transfer\TransferController;
+use App\Helpers\Common;
 use Carbon\Carbon;
 
 /**
@@ -33,7 +34,7 @@ class ApplyEmployeeLastWorkingDay extends Command
         $due = Employee::where('status', 'Active')
             ->whereNotNull('last_working_day')
             ->whereDate('last_working_day', '<=', $today)
-            ->get(['id', 'resort_id', 'Dept_id', 'Position_id', 'Emp_id', 'last_working_day']);
+            ->get(['id', 'resort_id', 'Dept_id', 'Position_id', 'Emp_id', 'last_working_day', 'Admin_Parent_id']);
 
         if ($due->isEmpty()) {
             $this->info("No employees due to be deactivated today ({$today}).");
@@ -45,6 +46,13 @@ class ApplyEmployeeLastWorkingDay extends Command
             try {
                 $emp->status = 'Inactive';
                 $emp->save();
+
+                // Cut off mobile/web API access immediately (S4-01).
+                try {
+                    Common::revokeAllApiTokens($emp->resortAdmin);
+                } catch (\Throwable $tokenErr) {
+                    \Log::warning("revokeAllApiTokens failed for emp #{$emp->id}: " . $tokenErr->getMessage());
+                }
 
                 TransferController::adjustManningCount(
                     (int) $emp->resort_id,

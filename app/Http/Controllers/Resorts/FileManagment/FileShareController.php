@@ -530,17 +530,45 @@ class FileShareController extends Controller
     }
 
     /** Confirm the sharer owns the shareable item via resort_id. */
+    /**
+     * FM-02: this was resort-scoping only (any resort user could share any
+     * other employee's file/folder with anyone, including the whole
+     * organization, despite the method's name). Now a real ownership/rank
+     * check — same Common::FilePermissions() gate FileManageController
+     * uses for view/rename/delete, plus the equivalent categorized-folder
+     * owner-or-privileged-rank check for folders.
+     */
     protected function ownsShareable(string $type, int $id): bool
     {
         if ($type === 'file') {
-            return ChildFileManagement::where('id', $id)
+            $file = ChildFileManagement::where('id', $id)
                 ->where('resort_id', $this->resort->resort_id)
-                ->exists();
+                ->first();
+            if (!$file) {
+                return false;
+            }
+            $parentFolder = FilemangementSystem::where('id', $file->Parent_File_ID)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first(['Folder_Type']);
+            $accessFlag = $parentFolder->Folder_Type ?? 'categorized';
+            $accessCheck = Common::FilePermissions($file->unique_id, $this->resort, $accessFlag);
+            return is_array($accessCheck) && !empty($accessCheck['type']) && $accessCheck['type'] === true;
         }
         if ($type === 'folder') {
-            return FilemangementSystem::where('id', $id)
+            $folder = FilemangementSystem::where('id', $id)
                 ->where('resort_id', $this->resort->resort_id)
-                ->exists();
+                ->first();
+            if (!$folder) {
+                return false;
+            }
+            if ($folder->Folder_Type !== 'categorized') {
+                return true; // uncategorized/shared folders — resort scoping is enough
+            }
+            $actor = $this->resort->GetEmployee;
+            $rank = (int) ($actor->rank ?? 0);
+            $isPrivileged = in_array($rank, [3, 4, 8, 9], true)
+                || (in_array($rank, [1, 2], true) && Common::isHRDepartment($actor->Dept_id ?? null));
+            return $isPrivileged || ($actor && $folder->Folder_Name === $actor->Emp_id);
         }
         return false;
     }

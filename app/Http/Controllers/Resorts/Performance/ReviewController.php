@@ -107,13 +107,15 @@ class ReviewController extends Controller
         // Verify current user is the participant — OR an authorized overseer viewing a completed review read-only.
         $currentEmpId = $this->resort->GetEmployee->id ?? null;
         $participantId = Common::resolveEmpMainIdToNumeric($childCycle->Emp_main_id, $this->resort->resort_id);
-        // Overseer = anyone with full data access (HR / GM / HR-dept HOD/XCOM / super-admin)
-        // OR a user with the cycle-view permission. The previous check required only the
-        // explicit permission, which Engineering / non-HR-dept GM accounts on live were
-        // missing — so they got 403 even on completed reviews.
+        // PF-05: the checkRouteWisePermission('Performance.cycle', view) branch
+        // let anyone HR granted "View" on the Cycle *list* page also read any
+        // individual completed review's content, including a GM's own
+        // self-review — that permission is scoped to the cycle listing, not
+        // to a specific participant's record. hasFullDataAccess() already
+        // covers GM unconditionally (rank 8, any department) and HR/HR-dept
+        // HOD, which is what the removed branch was trying to patch for.
         $isOverseer = (strtolower((string) $childCycle->self_review_status) === 'completed')
-            && (Common::hasFullDataAccess()
-                || Common::checkRouteWisePermission('Performance.cycle', config('settings.resort_permissions.view')));
+            && Common::hasFullDataAccess();
         if ($currentEmpId != $participantId && !$isOverseer) {
             abort(403, 'You are not authorized to view this review');
         }
@@ -318,9 +320,11 @@ class ReviewController extends Controller
         }
 
         $currentEmpId = $this->resort->GetEmployee->id ?? null;
+        // PF-05: same over-broad checkRouteWisePermission branch as
+        // showSelfReview() — it gates the Cycle *list* page, not this
+        // specific manager's review content. Dropped, same reasoning.
         $isOverseer = (strtolower((string) $childCycle->manager_review_status) === 'completed')
-            && (Common::hasFullDataAccess()
-                || Common::checkRouteWisePermission('Performance.cycle', config('settings.resort_permissions.view')));
+            && Common::hasFullDataAccess();
         if ($currentEmpId != $childCycle->Manager_id && !$isOverseer) {
             abort(403, 'You are not the assigned manager for this review');
         }
@@ -554,6 +558,12 @@ class ReviewController extends Controller
      */
     public function exportGmReview($id)
     {
+        // PF-05: no authorization check at all — any authenticated portal
+        // user who knew/guessed the child-cycle id could pull the GM's
+        // completed self-review. Same overseer rule as showSelfReview().
+        if (!Common::hasFullDataAccess()) {
+            abort(403, 'You are not authorized to view this review');
+        }
         $id = base64_decode($id);
         $childCycle = PerformaChildCycle::join('performance_cycles as pc', 'pc.id', '=', 'performa_child_cycles.Parent_cycle_id')
             ->where('performa_child_cycles.id', $id)

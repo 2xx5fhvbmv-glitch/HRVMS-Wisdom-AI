@@ -562,15 +562,21 @@
     const userType = "employee";
     const panelType = "resort"; // Detect panel type
 
+    function escHtml(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
+
     function appendMessage(data, isSender) {
         let position = isSender ? "right" : "";
-        let senderName = data.senderName || "Unknown";
+        let senderName = escHtml(data.senderName || "Unknown");
         let time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        let safeMessage = escHtml(data.message || '');
 
         let senderImage = data.senderImage ? data.senderImage : null;
-        let senderInitials = senderName.split(" ").map(n => n.charAt(0)).join("").toUpperCase();
-        let imageHtml = senderImage
-            ? `<img class="direct-chat-img" src="${senderImage}" alt="user"/>`
+        let senderInitials = escHtml((data.senderName || "Unknown").split(" ").map(n => n.charAt(0)).join("").toUpperCase());
+        // Built via jQuery, not string interpolation into an attribute —
+        // an onerror= payload in senderImage would otherwise execute.
+        // Only https:/relative URLs are allowed as an image src.
+        let imageHtml = (senderImage && /^(https:\/\/|\/)/i.test(senderImage))
+            ? $('<img>').attr({ class: 'direct-chat-img', src: senderImage, alt: 'user' })[0].outerHTML
             : `<div class="profile-initials direct-chat-img">${senderInitials}</div>`;
 
         // **Attachments HTML**
@@ -583,9 +589,10 @@
             data.attachments.forEach(file => {
                 if (!file) return;
                 if (typeof file === "string") {
+                    if (!/^https:\/\//i.test(file)) return;
                     attachmentsHtml += `
-                        <a href="${file}" target="_blank" class="attachment-link">
-                            <i class="fa fa-file"></i> ${file.split('/').pop()}
+                        <a href="${escHtml(file)}" target="_blank" class="attachment-link">
+                            <i class="fa fa-file"></i> ${escHtml(file.split('/').pop())}
                         </a>`;
                     return;
                 }
@@ -594,8 +601,8 @@
                 if (!childId) return;
                 const encodedId = btoa(String(childId));
                 attachmentsHtml += `
-                    <a href="javascript:void(0)" class="download-link" data-id="${encodedId}">
-                        <i class="fa fa-file"></i> ${filename}
+                    <a href="javascript:void(0)" class="download-link" data-id="${escHtml(encodedId)}">
+                        <i class="fa fa-file"></i> ${escHtml(filename)}
                     </a>`;
             });
             attachmentsHtml += `</div>`;
@@ -612,11 +619,11 @@
                         <span class="direct-chat-timestamp float-${position === "right" ? "left" : "right"}">${time}</span>
                     </div>
                     ${imageHtml}
-                    <div class="direct-chat-text">${data.message || ''} ${attachmentsHtml}</div>
+                    <div class="direct-chat-text">${safeMessage} ${attachmentsHtml}</div>
                 </div>
             `;
         }
-        
+
         // **Resort Panel HTML**
         else if (panelType === "resort") {
             chatHtml = `
@@ -626,7 +633,7 @@
                     </div>
                     <div class="msg">
                         <div class="time">${time}</div>
-                        <p>${data.message || ''}</p>
+                        <p>${safeMessage}</p>
                         ${attachmentsHtml}
                     </div>
                 </div>

@@ -18,7 +18,6 @@ class SupportCategoryController extends Controller
 
     public function index()
     {
-        // return view('admin.manufecturers.index');
         $data = new SupportCategory;
         // dd($data);
         return view('admin.support_categories.index',compact('data'));

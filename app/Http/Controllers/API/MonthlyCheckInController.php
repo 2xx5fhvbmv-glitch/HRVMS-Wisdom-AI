@@ -229,7 +229,11 @@ class MonthlyCheckInController extends Controller
             'Area_of_Discussion'                            =>  'required',
             'Area_of_Improvement'                           =>  'required',
             'Time_Line'                                     =>  'required',
-            'emp_id'                                        =>  'required',
+            // Was 'required' only — any logged-in employee could target any
+            // other employee's id, in any resort (X-02a). Scoped to this
+            // resort so the create() below can't silently attach a check-in
+            // to an employee who isn't even here.
+            'emp_id'                                        =>  ['required', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
             'comment'                                       =>  'required',
            'learning_manager_id'                            =>  'required_with:tranining_id',
             ], [
@@ -241,6 +245,18 @@ class MonthlyCheckInController extends Controller
         if($validator->fails())
         {
             return response()->json(['success' => false,'errors' => $validator->errors()], 400);
+        }
+
+        // A monthly check-in is done by the employee's own manager, not by
+        // any logged-in employee (X-02a). Allow HR/GM-level access, the
+        // employee's reporting manager, or their department's HOD/EXCOM.
+        $actor        = $this->user->getEmployee;
+        $targetEmployee = Employee::where('resort_id', $this->resort_id)->find($request->emp_id);
+        $isManager    = $actor && $targetEmployee && (int) $targetEmployee->reporting_to === (int) $actor->id;
+        $isHod        = $actor && $targetEmployee && (int) $targetEmployee->Dept_id === (int) $actor->Dept_id
+                            && in_array((int) $actor->rank, [1, 2], true);
+        if (!$targetEmployee || (!Common::hasFullDataAccess($actor) && !$isManager && !$isHod)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
         }
 
         DB::beginTransaction();
@@ -284,7 +300,7 @@ class MonthlyCheckInController extends Controller
                 // training suggestion. This is what the L&D Manager's
                 // learning/manager-request-list queue needs a push for.
                 $trainingProgram                    =   LearningProgram::find($request->tranining_id);
-                $suggestedEmployee                  =   Employee::with('resortAdmin')->find($request->emp_id);
+                $suggestedEmployee                  =   $targetEmployee->loadMissing('resortAdmin');
                 $suggestedEmployeeName              =   $suggestedEmployee && $suggestedEmployee->resortAdmin
                                                             ? $suggestedEmployee->resortAdmin->full_name
                                                             : 'an employee';

@@ -677,6 +677,7 @@
     <script>
         var isHrDepartment = @json($isHrDepartment);
         var defaultApplicantPicture = "{{ url(config('settings.default_picture')) }}";
+        function escHtml(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
         $(document).ready(function() {
             datatablelist();
             // Grid is the default visible view now — #grid_main_view is
@@ -703,7 +704,7 @@
                     success: function (res) {
                         if (res && res.success) {
                             $body.html(
-                                '<div class="mb-2"><span class="fw-bold">' + (res.applicant || 'Applicant') + '</span>'
+                                '<div class="mb-2"><span class="fw-bold">' + escHtml(res.applicant || 'Applicant') + '</span>'
                                 + '<div class="text-muted small">Position: ' + (res.position || '—') + '</div></div>'
                                 + '<div style="font-size:48px;font-weight:700;line-height:1.1;" class="text-' + res.color + '">' + res.score + '%</div>'
                                 + '<div class="mb-2"><span class="badge bg-' + res.color + '">' + res.label + '</span></div>'
@@ -814,7 +815,7 @@
                                                     data-ApplicantStatus_id="${nrApplicantStatusId}"
                                                     class="btn ta-btn-attention btn-small SortlistedEmployee">Send Interview Invitation</a>`;
                                                 if (nr.InterviewStatus == 'Invitation Rejected') {
-                                                    nrStatusBadge = `<span class="badge bg-danger">Invitation Rejected</span>${nr.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${nr.interviewRejectionReason}</div>` : ''}`;
+                                                    nrStatusBadge = `<span class="badge bg-danger">Invitation Rejected</span>${nr.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${escHtml(nr.interviewRejectionReason)}</div>` : ''}`;
                                                 }
                                             } else if (nr.InterviewStatus == 'Invitation Sent') {
                                                 nrAction = `<span class="badge bg-info text-white">Invitation Sent - Awaiting Response</span>`;
@@ -939,7 +940,7 @@
                                                             <td>${response.data.Date}</td>
                                                             <td>${response.data.MalidivanTime}</td>
                                                             <td>${response.data.ApplicantTime}</td>
-                                                            <td>${response.data.InterviewStatus}${response.data.InterviewStatus == 'Invitation Rejected' && response.data.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${response.data.interviewRejectionReason}</div>` : ''}</td>
+                                                            <td>${response.data.InterviewStatus}${response.data.InterviewStatus == 'Invitation Rejected' && response.data.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${escHtml(response.data.interviewRejectionReason)}</div>` : ''}</td>
                                                             <td>
                                                                 ${newTag}
                                                             </td>
@@ -948,7 +949,7 @@
                                                     </table>
                                                     ${response.data.rejectionReason ? `<div class="mt-2 p-2" style="background:#fff3f3; border-left:3px solid #dc3545; border-radius:4px;">
                                                         <strong class="text-danger">${response.data.applicantStatusRaw == 'Offer Letter Rejected' ? 'Offer Letter' : 'Contract'} Declined</strong>
-                                                        <p class="mb-0 mt-1"><strong>Reason:</strong> ${response.data.rejectionReason}</p>
+                                                        <p class="mb-0 mt-1"><strong>Reason:</strong> ${escHtml(response.data.rejectionReason)}</p>
                                                     </div>` : ''}
                                                     @if($isHrDepartment)
                                                     ${response.data.applicantStatusRaw == 'Offer Letter Rejected' ? `<div class="mt-2">
@@ -1068,7 +1069,7 @@
                                                 data-ApplicantStatus_id="${nrApplicantStatusId}"
                                                 class="btn ta-btn-attention btn-small SortlistedEmployee">Send Interview Invitation</a>`;
                                             if (nr.InterviewStatus == 'Invitation Rejected') {
-                                                nrStatusBadge = `<span class="badge bg-danger">Invitation Rejected</span>${nr.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${nr.interviewRejectionReason}</div>` : ''}`;
+                                                nrStatusBadge = `<span class="badge bg-danger">Invitation Rejected</span>${nr.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${escHtml(nr.interviewRejectionReason)}</div>` : ''}`;
                                             }
                                         } else if (nr.InterviewStatus == 'Invitation Sent') {
                                             nrAction = `<span class="badge bg-info text-white">Invitation Sent - Awaiting Response</span>`;
@@ -1193,7 +1194,7 @@
                                                         <td>${response.data.Date}</td>
                                                         <td>${response.data.MalidivanTime}</td>
                                                         <td>${response.data.ApplicantTime}</td>
-                                                        <td>${response.data.InterviewStatus}${response.data.InterviewStatus == 'Invitation Rejected' && response.data.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${response.data.interviewRejectionReason}</div>` : ''}</td>
+                                                        <td>${response.data.InterviewStatus}${response.data.InterviewStatus == 'Invitation Rejected' && response.data.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${escHtml(response.data.interviewRejectionReason)}</div>` : ''}</td>
                                                         <td>
                                                             ${newTag}
                                                         </td>
@@ -1202,7 +1203,7 @@
                                                 </table>
                                                 ${response.data.rejectionReason ? `<div class="mt-2 p-2" style="background:#fff3f3; border-left:3px solid #dc3545; border-radius:4px;">
                                                     <strong class="text-danger">${response.data.applicantStatusRaw == 'Offer Letter Rejected' ? 'Offer Letter' : 'Contract'} Declined</strong>
-                                                    <p class="mb-0 mt-1"><strong>Reason:</strong> ${response.data.rejectionReason}</p>
+                                                    <p class="mb-0 mt-1"><strong>Reason:</strong> ${escHtml(response.data.rejectionReason)}</p>
                                                 </div>` : ''}
                                                 @if($isHrDepartment)
                                                 ${response.data.applicantStatusRaw == 'Offer Letter Rejected' ? `<div class="mt-2">
@@ -2132,7 +2133,7 @@
                         { data: 'first_name', name: 'first_name', render: function (data, type, row) {
                             return `<div class="tableUser-block">
                                 <div class="img-circle"><img src="${row.profileImg || defaultApplicantPicture}" alt="user"></div>
-                                <span class="userApplicants-btn" data-id="${row.applicant_id}">${row.name}</span>
+                                <span class="userApplicants-btn" data-id="${row.applicant_id}">${escHtml(row.name)}</span>
                             </div>`;
                         }},
                         { data: 'countryName', name: 'countryName' },

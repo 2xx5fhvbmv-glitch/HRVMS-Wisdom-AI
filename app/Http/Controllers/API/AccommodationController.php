@@ -694,6 +694,10 @@ class AccommodationController extends Controller
                     'id'               => $MaintanaceRequest->Assigned_To,
                     'name'             => ucfirst($assignedEmployee->first_name . ' ' . $assignedEmployee->last_name),
                     'profile_picture'  => Common::getResortUserPicture($assignedEmployee->Parent_id),
+                    'position_title'   => $assignedEmployee->position_title,
+                    'Emp_id'           => $assignedEmployee->Emp_id,
+                    'department_name'  => $assignedEmployee->department_name,
+                    'personal_phone'   => $assignedEmployee->personal_phone,
                 ] : null;
                 // **Check & Assign Image Path**
                 // Image can be a plain filename (web upload) or a
@@ -2024,7 +2028,7 @@ class AccommodationController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'emp_id'                                            =>    'required',
+            'emp_id'                                            =>    ['required', \Illuminate\Validation\Rule::in($this->underEmp_id)],
             'housekeeping_id'                                   =>    'required',
         ]);
 
@@ -2035,6 +2039,15 @@ class AccommodationController extends Controller
         try {
 
             DB::beginTransaction();
+            // Scoped to this resort — was an unscoped id lookup, letting a
+            // HOD of resort A write into a housekeeping schedule that
+            // belongs to resort B (X-02b). emp_id is scoped above to
+            // $this->underEmp_id (this HOD's own subordinates).
+            $housekeepingScheduleExists                     =   HousekeepingSchedules::where('resort_id', $this->resort_id)->where('id', $request->housekeeping_id)->exists();
+            if (!$housekeepingScheduleExists) {
+                return response()->json(['success' => false, 'message' => 'Housekeeping schedule not found.'], 404);
+            }
+
             $assignToHODExists                              =   ChildHouseKeepingSchedules::where("housekeeping_id", $request->housekeeping_id)->where('ApprovedBy', $request->emp_id)->exists();
 
             if ($assignToHODExists) {
@@ -2044,7 +2057,7 @@ class AccommodationController extends Controller
                 ], 200);
             }
 
-            $housekeepingSchedules                      =   HousekeepingSchedules::where("id", $request->housekeeping_id)->update(['Assigned_To' =>  $request->emp_id, 'Status' => 'Assigned']);
+            $housekeepingSchedules                      =   HousekeepingSchedules::where('resort_id', $this->resort_id)->where("id", $request->housekeeping_id)->update(['Assigned_To' =>  $request->emp_id, 'Status' => 'Assigned']);
             $assignToHOD                                =   ChildHouseKeepingSchedules::where("housekeeping_id", $request->housekeeping_id)->where('Status', '=', 'Pending')->update(['ApprovedBy' => $this->user->GetEmployee->id, 'Status' => 'Assigned']);
 
             if (!$assignToHOD) {
@@ -2931,7 +2944,7 @@ class AccommodationController extends Controller
         $validator = Validator::make($request->all(), [
             'request_id'                                    =>  'required',
             'status'                                        =>  'required',
-            'Image'                                         =>  'required',
+            'Image'                                         =>  'required|file|mimes:jpeg,png,jpg,heic,heif',
         ]);
 
         if ($validator->fails()) {
@@ -2944,7 +2957,7 @@ class AccommodationController extends Controller
             $employee_id                                    =   $this->user->GetEmployee->id;
             $employee                                       =   $this->user->GetEmployee;
             $requestId                                      =   $request->input('request_id');
-            $maintanance                                    =   MaintanaceRequest::find($requestId);
+            $maintanance                                    =   MaintanaceRequest::where('id', $requestId)->where('resort_id', $this->resort_id)->first();
 
             if (!$maintanance) {
                 return response()->json(['success' => false, 'message' => 'Maintenance request not found'], 200);
@@ -2954,10 +2967,14 @@ class AccommodationController extends Controller
 
                 if ($request->hasFile('Image')) {
                     $path                                   =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
-                    
+
                     $imageFile                                  =   $request->file('Image');
                     $imageName                                  =   time() . '_' . $imageFile->getClientOriginalName();
-                    $imageFile->move($path, $imageName);
+                    // Was UploadedFile::move() into a raw relative path (lands under
+                    // public/, the web root, on a standard request). Route through
+                    // StorageHelper at the same logical path so existing readers
+                    // (temporaryUrl($path.'/'.Completed_Image)) keep working unchanged.
+                    \App\Helpers\StorageHelper::put($path . '/' . $imageName, file_get_contents($imageFile->getRealPath()));
                     $maintanance->Completed_Image               =   $imageName;
                 }
             

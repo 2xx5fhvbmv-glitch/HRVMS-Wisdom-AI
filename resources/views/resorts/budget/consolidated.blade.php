@@ -223,7 +223,7 @@
                 <div class="cb-toolbar">
                     <button type="button" class="btn btn-sm wfp-btn-secondary" id="cbExpandAllBtn">Expand all</button>
                     <button type="button" class="btn btn-sm wfp-btn-secondary" id="cbCollapseAllBtn">Collapse all</button>
-                    <a href="{{ route('resort.budget.GetConsolidateFile') }}" class="btn btn-sm wfp-btn-primary">Export</a>
+                    <a href="{{ route('resort.budget.GetConsolidateFile') }}" id="cbExportBtn" class="btn btn-sm wfp-btn-primary">Export</a>
                 </div>
             </div>
             <div class="viewBudget-accordion" id="accordionViewBudget">
@@ -349,6 +349,11 @@
     function fetchConsolidatedBudget(selectedYear) {
 
         document.getElementById('SendToFinanceYear').value = selectedYear;
+        // Keep Export in sync with whichever year is on screen — the
+        // export always builds all 5 category sheets regardless of which
+        // tab is active, so category_view is deliberately not appended.
+        document.getElementById('cbExportBtn').href =
+            "{{ route('resort.budget.GetConsolidateFile') }}" + '?year=' + encodeURIComponent(selectedYear);
         const resortId = @json($resortId); // Ensure this is set correctly
         const url = "{{ route('resort.budget.viewconsolidated', ':resortId') }}".replace(':resortId', resortId);
 

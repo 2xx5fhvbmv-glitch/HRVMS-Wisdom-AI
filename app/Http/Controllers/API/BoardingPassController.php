@@ -22,6 +22,7 @@ use App\Notifications\AlternativeDateSuggestedNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Options;
 use Validator;
+use Illuminate\Validation\Rule;
 use Auth;
 use File;
 use DB;
@@ -1201,7 +1202,13 @@ class BoardingPassController extends Controller
             $comments                               =   $request->input('reason', null); // Optional comments
             $employee                               =   $this->user->GetEmployee;
             $currentApproverId                      =   $employee->id; // Assuming the logged-in user is the approver
-            $employeeTravelPasses                   =   EmployeeTravelPass::find($passId);
+            // L-05: no resort_id filter — the "all approvals completed" /
+            // not-your-turn branches below return
+            // Common::buildIslandPassApprovalFlow() (approver names, ranks,
+            // comments) before any authorization check runs, so any
+            // authenticated employee could read another resort's approval
+            // trail just by supplying its pass_id.
+            $employeeTravelPasses                   =   EmployeeTravelPass::where('resort_id', $this->resort_id)->find($passId);
 
             if (!$employeeTravelPasses) {
                 return response()->json([
@@ -1464,6 +1471,24 @@ class BoardingPassController extends Controller
 
             if($action == 'Cancel') {
 
+                // L-03: nothing gated who could call this — the status-row
+                // update above only touched rows where approver_id matched
+                // the caller (silently a no-op for anyone else), but the
+                // pass's own status was set to Cancel UNCONDITIONALLY right
+                // after, regardless of whether that update actually
+                // matched anything. Any employee in the resort could
+                // emergency-cancel any other employee's approved pass by
+                // guessing/incrementing pass_id.
+                $isOwnPass = (int) $employeeTravelPasses->employee_id === (int) $employee->id;
+                $isChainApprover = EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)
+                    ->where('approver_id', $employee->id)->exists();
+                if (!$isOwnPass && !$isChainApprover && !Common::hasFullDataAccess($employee)) {
+                    return response()->json([
+                        'success'                       =>  false,
+                        'message'                       =>  'You are not authorized to cancel this boarding pass.',
+                    ], 403);
+                }
+
                 EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)->where('approver_id', $employee->id)->update([
                     'emergency_cancel_status'           =>  $action,
                     'comments'                          =>  $comments, // Save comments if provided
@@ -1637,7 +1662,14 @@ class BoardingPassController extends Controller
             // (employee_id references employees.id) with a raw 500 instead
             // of a clean validation error.
             'employee_ids'                      => 'nullable|array',
-            'employee_ids.*'                    => 'nullable|integer|exists:employees,id',
+            // L-09: exists:employees,id only proved the id exists
+            // somewhere, never that it belongs to this resort — scoped it,
+            // same as the parallel task_delegation fix in this method's
+            // sibling flow.
+            'employee_ids.*'                    => [
+                'nullable', 'integer',
+                Rule::exists('employees', 'id')->where('resort_id', $this->resort_id),
+            ],
             'visitors'                          => 'array',
             'visitors.*'                        => 'string',
         ]);
@@ -1887,7 +1919,10 @@ class BoardingPassController extends Controller
         DB::beginTransaction();
         try {
 
-            $pass                                   = EmployeeTravelPass::findOrFail($request->pass_id);
+            // L-04: no resort_id filter — any HR/Security employee could
+            // edit any pass's arrival/departure time cross-tenant by
+            // supplying another resort's pass_id.
+            $pass                                   = EmployeeTravelPass::where('resort_id', $this->resort_id)->findOrFail($request->pass_id);
 
             // A confirmed/closed manifest is an archive record — its passes'
             // times must not change under it after the fact.
@@ -1947,6 +1982,9 @@ class BoardingPassController extends Controller
         $validator = Validator::make($request->all(), [
             'pass_id'                           => 'required',
             'employee_ids'                      => 'required|array',
+            // Was accepting any id — assignments (and the notification below)
+            // could target another resort's employees (X-02c).
+            'employee_ids.*'                    => ['integer', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
         ]);
 
         if ($validator->fails()) {
@@ -2029,6 +2067,9 @@ class BoardingPassController extends Controller
         $validator = Validator::make($request->all(), [
             'manifest_id'                       => 'required',
             'employee_ids'                      => 'required|array',
+            // Was accepting any id — the manifest/passes are resort-scoped
+            // above, but the employees being assigned weren't (X-02d).
+            'employee_ids.*'                    => ['integer', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
         ]);
 
         if ($validator->fails()) {

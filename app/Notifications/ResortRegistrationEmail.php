@@ -7,6 +7,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Auth\Notifications\ResetPassword as ResetPasswordNotification;
 use Illuminate\Support\Facades\Lang;
+use Illuminate\Support\Facades\Password;
 use App\Models\Admin;
 use App\Models\EmailTemplate;
 use App\Models\Settings;
@@ -49,7 +50,16 @@ class ResortRegistrationEmail extends ResetPasswordNotification
     $user_name = ucwords($this->resort_admin->first_name.' '.$this->resort_admin->last_name);
     $resort_name = ucwords($this->data->resort_name);
     $email = $this->resort_admin->email;
-    $password = $this->password;
+
+    // S8: no plaintext password over email anymore — a real reset token
+    // (same broker/table the Forgot Password flow uses) drives a
+    // set-your-password link instead. $this->password is kept only so
+    // existing callers (ResortsController::store(), EmployeeImport) don't
+    // need signature changes; it's no longer read here.
+    $resetToken = Password::broker('resort-admin')->createToken($resort_admin);
+    $resetUrl = url('/') . route('resort.password.reset', ['token' => $resetToken, 'email' => $email], false);
+    $setPasswordButton = '<a style="padding:5px 10px;background-color:#DA2128;color:#ffffff" href="'.$resetUrl.'">Set your password</a>';
+
     $login_route = route('resort.loginindex');
     $login_button = '<a style="padding:5px 10px;background-color:#DA2128;color:#ffffff" href="'.$login_route.'">Login here</a>';
 
@@ -64,11 +74,12 @@ class ResortRegistrationEmail extends ResetPasswordNotification
     $subjectLine = isset( $emailTemplate ) && $emailTemplate->subject != '' ? $emailTemplate->subject : 'Account Credentials | HRVMS-WisdomAI';
 
     $data['body'] = isset( $emailTemplate ) && $emailTemplate->body != '' ? $emailTemplate->body : "<p>Dear [User Name],</p>
-            <p>Welcome to [Resort Name]! Your account has been successfully registered. Below are your credentials to access your account:</p>
+            <p>Welcome to [Resort Name]! Your account has been successfully registered.</p>
             <p><strong>Employee ID:</strong> [Employee ID] <span style=\"color:#888;font-size:12px;\">(use this with the mobile app)</span></p>
             <p><strong>Email:</strong> [Email] <span style=\"color:#888;font-size:12px;\">(use this with the web portal)</span></p>
-            <p><strong>Password:</strong> [Password]</p>
-            <p>Please keep these credentials safe and do not share them with anyone. You can log in to your account using the following link:</p>
+            <p>Click below to set your password (this link expires in 60 minutes):</p>
+            <p>[Password]</p>
+            <p>Once set, you can log in to your account using the following link:</p>
 
             <p>[Login Url]</p>
 
@@ -90,7 +101,7 @@ class ResortRegistrationEmail extends ResetPasswordNotification
       $resort_name,
       $email,
       $employee_id,
-      $password,
+      $setPasswordButton,
       $login_button,
     ];
 

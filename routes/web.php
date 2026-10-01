@@ -11,7 +11,9 @@ use Illuminate\Support\Facades\Broadcast;
 // for the rest of this request, matching how the resort-admin session
 // middleware group already behaves elsewhere.
 Route::post('/broadcasting/auth', function (\Illuminate\Http\Request $request) {
-    if (Auth::guard('resort-admin')->check()) {
+    if (Auth::guard('admin')->check()) {
+        Auth::shouldUse('admin');
+    } elseif (Auth::guard('resort-admin')->check()) {
         Auth::shouldUse('resort-admin');
     }
     return Broadcast::auth($request);

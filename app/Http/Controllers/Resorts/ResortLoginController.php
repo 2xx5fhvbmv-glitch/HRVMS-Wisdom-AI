@@ -25,6 +25,7 @@ use Storage;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use App\Helpers\StorageHelper;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 class ResortLoginController extends Controller
 {
     public function logout()
@@ -49,6 +50,17 @@ class ResortLoginController extends Controller
                 ->whereNull('deleted_at')
                 ->first();
 
+            // S8 — account lockout: checked before the password hash so a
+            // locked account can't be brute-forced during its lockout window
+            // even if the attacker has the right password.
+            if ($resort_admin && Common::isAccountLocked($resort_admin)) {
+                Common::logLoginAttempt('resort', $request->email, false, $request);
+                return response()->json([
+                    'success' => false,
+                    'msg' => 'Too many failed login attempts. Please try again in a few minutes.',
+                ]);
+            }
+
             // Enumeration fix: account-state checks (resort inactive,
             // employee inactive, admin inactive) used to run BEFORE the
             // password check, so a wrong password on a real email still
@@ -63,6 +75,9 @@ class ResortLoginController extends Controller
             $passwordValid = Hash::check(is_string($request->password) ? $request->password : '', $resort_admin->password ?? self::INVALID_CREDENTIALS_HASH);
             if (!$resort_admin || !$passwordValid) {
                 Common::logLoginAttempt('resort', $request->email, false, $request);
+                if ($resort_admin) {
+                    Common::registerFailedLogin($resort_admin);
+                }
                 return response()->json([
                     'success' => false,
                     'msg' => 'Invalid email or password.'
@@ -87,8 +102,10 @@ class ResortLoginController extends Controller
                     }
                 }
             }
-            // 3. Employee account is inactive
-            if ($resort_admin->GetEmployee && $resort_admin->GetEmployee->status === 'Inactive') {
+            // 3. Employee account is not in an allowed status (allow-list,
+            // not a block-list — also blocks Terminated/Resigned/Suspended
+            // and any future status not explicitly allowed, S4-02).
+            if ($resort_admin->GetEmployee && !in_array($resort_admin->GetEmployee->status, \App\Models\Employee::LOGIN_ALLOWED_STATUSES, true)) {
                 return response()->json([
                     'success' => false,
                     'msg' => 'Your account is inactive. Please contact your administrator.'
@@ -121,6 +138,7 @@ class ResortLoginController extends Controller
             // 6. Successful login
             Auth::guard('resort-admin')->login($resort_admin, $request->remember);
             Common::logLoginAttempt('resort', $request->email, true, $request);
+            Common::registerSuccessfulLogin($resort_admin);
 
             // Security hardening (S4): a freshly-created account (via the
             // Add Employee wizard, bulk import, or a new resort) is flagged
@@ -562,25 +580,19 @@ class ResortLoginController extends Controller
     {
         $user = auth()->guard('resort-admin')->user(); // Adjust guard if needed
 
+        // Same policy as the web reset flow and the mobile change-password
+        // endpoint (S8): min 12, mixed case, numbers, checked against known
+        // breaches — this form was still on the old min:8 + regex rule.
         $validator = \Validator::make($request->all(), [
             'old_password' => ['required'],
             'password' => [
                 'required',
-                'string',
-                'min:8',
-                'max:16',
-                'different:old_password', // ✅ Ensure new password ≠ old password
-                'regex:/[a-z]/',           // at least one lowercase
-                'regex:/[A-Z]/',           // at least one uppercase
-                'regex:/[0-9]/',           // at least one number
-                'regex:/[@$!%*#?&]/',      // at least one special character
-                'not_in:password,password123,123456,admin123' // disallowed common passwords
+                'different:old_password',
+                PasswordRule::min(12)->mixedCase()->numbers()->uncompromised(),
             ],
             'confirmpassword' => ['required', 'same:password']
         ], [
             'password.different' => 'New password must be different from old password.',
-            'password.regex' => 'Password must include uppercase, lowercase, number, and special character.',
-            'password.not_in' => 'Please choose a stronger password, not a common one.',
             'confirmpassword.same' => 'Confirm password must match new password.',
         ]);
 
@@ -603,6 +615,14 @@ class ResortLoginController extends Controller
         $user->password = Hash::make($request->password);
         $user->must_change_password = false;
         $user->save();
+
+        // Revoke every live mobile token — the old password shouldn't keep
+        // working on the phone after it's changed here (S4-03).
+        try {
+            Common::revokeAllApiTokens($user);
+        } catch (\Exception $e) {
+            \Log::warning('revokeAllApiTokens failed on self-service password change: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,

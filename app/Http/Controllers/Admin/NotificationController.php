@@ -22,7 +22,6 @@ class NotificationController extends Controller
 
     public function index()
     {
-        // return view('admin.manufecturers.index');
         $data = new Notification;
         // dd($data);
         return view('admin.notifications.index',compact('data'));
