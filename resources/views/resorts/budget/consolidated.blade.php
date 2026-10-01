@@ -168,7 +168,7 @@
                 'nonpermanent' => 'Casual & Intern',
                 'all'          => 'All Combined',
             ] as $tabValue => $tabLabel)
-                <button type="button" class="btn btn-sm cb-tab-btn {{ $tabValue === 'permanent' ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}"
+                <button type="button" class="btn btn-sm cb-tab-btn {{ $tabValue === 'permanent' ? 'wfp-btn-accent' : 'wfp-btn-neutral' }}"
                         data-tab="{{ $tabValue }}" onclick="cbSwitchTab('{{ $tabValue }}', this)">{{ $tabLabel }}</button>
             @endforeach
             {{-- Casual/Intern sub-toggle — this page fetches its whole tree
@@ -179,7 +179,7 @@
                  pattern as View Budget's identical tab. --}}
             <div class="vb-sub-toggle d-none" id="cbSubToggle" style="display:flex;gap:4px;margin-left:8px;padding-left:8px;border-left:1px solid var(--line,#EEF2F2);">
                 @foreach (['Casual' => 'Casual', 'Intern' => 'Intern'] as $subValue => $subLabel)
-                    <button type="button" class="btn btn-xs cb-sub-btn {{ $subValue === 'Casual' ? 'wfp-btn-accent' : 'wfp-btn-secondary' }}"
+                    <button type="button" class="btn btn-xs cb-sub-btn {{ $subValue === 'Casual' ? 'wfp-btn-accent' : 'wfp-btn-neutral' }}"
                             data-sub="{{ $subValue }}" onclick="cbSwitchSub('{{ $subValue }}', this)">{{ $subLabel }}</button>
                 @endforeach
             </div>
@@ -295,11 +295,11 @@
     function cbSwitchTab(tab, btn) {
         cbTab = tab;
         document.querySelectorAll('.cb-tab-btn').forEach(b => {
-            b.classList.remove('wfp-btn-primary');
-            b.classList.add('wfp-btn-secondary');
+            b.classList.remove('wfp-btn-accent');
+            b.classList.add('wfp-btn-neutral');
         });
-        btn.classList.remove('wfp-btn-secondary');
-        btn.classList.add('wfp-btn-primary');
+        btn.classList.remove('wfp-btn-neutral');
+        btn.classList.add('wfp-btn-accent');
         document.getElementById('cbSubToggle').classList.toggle('d-none', tab !== 'nonpermanent');
         cbSyncEmploymentTypeField();
         fetchConsolidatedBudget(document.getElementById('year').value);
@@ -309,9 +309,9 @@
         cbSub = sub;
         document.querySelectorAll('.cb-sub-btn').forEach(b => {
             b.classList.remove('wfp-btn-accent');
-            b.classList.add('wfp-btn-secondary');
+            b.classList.add('wfp-btn-neutral');
         });
-        btn.classList.remove('wfp-btn-secondary');
+        btn.classList.remove('wfp-btn-neutral');
         btn.classList.add('wfp-btn-accent');
         cbSyncEmploymentTypeField();
         fetchConsolidatedBudget(document.getElementById('year').value);
