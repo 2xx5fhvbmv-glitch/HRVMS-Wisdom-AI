@@ -161,9 +161,21 @@ class SurveyReportController extends Controller
 
     private function dmy($d): string { return $d ? Carbon::parse($d)->format('d M Y') : 'N/A'; }
 
-    /** Per-participant base for a survey (employee name + dept + position). */
+    /**
+     * Per-participant base for a survey (employee name + dept + position).
+     *
+     * R-05: this is the only branch that names an individual participant
+     * (completion/attendance/reminder reports) — an Anonymous survey must
+     * never surface per-person name/status/date here (see the decided rule
+     * on the "Anonymous Survey Participation" report at anonymous()); the
+     * caller routes an Anonymous-survey request to anonymousAggregateOnly()
+     * instead. Also department-scoped like every other report module's
+     * employee-identifying data (unlike the survey-level reports above,
+     * which stay resort-wide since they carry no participant PII).
+     */
     private function participantBase($surveyId)
     {
+        $scopedDeptIds = Common::getScopedDepartmentIds();
         return DB::table('survey_employees as se')
             ->join('parent_surveys as s', 's.id', '=', 'se.Parent_survey_id')
             ->leftJoin('employees as e', 'e.id', '=', 'se.Emp_id')
@@ -171,8 +183,36 @@ class SurveyReportController extends Controller
             ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
             ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
             ->where('s.resort_id', $this->resort->resort_id)
+            ->where('s.survey_privacy_type', '<>', 'Anonymous')
             ->when($surveyId, fn($q) => $q->where('se.Parent_survey_id', $surveyId))
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('e.Dept_id', $scopedDeptIds))
             ->selectRaw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as employee_name, d.name as dept, p.position_title, se.emp_status, se.updated_at");
+    }
+
+    private function isAnonymousSurvey($surveyId): bool
+    {
+        return $surveyId && DB::table('parent_surveys')->where('id', $surveyId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->value('survey_privacy_type') === 'Anonymous';
+    }
+
+    /**
+     * R-05: totals-only substitute for a per-person participant report when
+     * the selected survey is Anonymous — same shape as the existing
+     * "Anonymous Survey Participation" report (anonymous()), no names, no
+     * per-person status or dates.
+     */
+    private function anonymousAggregateOnly($surveyId): array
+    {
+        $columns = ['Survey Name', 'Total Invitations', 'Total Responses', 'Participation Percentage'];
+        $r = $this->surveyBase()->where('s.id', $surveyId)->first();
+        if (!$r) return ['columns' => $columns, 'rows' => []];
+        return ['columns' => $columns, 'rows' => [[
+            'Survey Name'               => $r->Surevey_title ?? 'N/A',
+            'Total Invitations'         => (int) $r->invited,
+            'Total Responses'           => (int) $r->completed,
+            'Participation Percentage'  => $this->pct($r->completed, $r->invited),
+        ]]];
     }
 
     /* --------------------------------------------------------------- reports */
@@ -303,6 +343,9 @@ class SurveyReportController extends Controller
 
     public function completion(array $f): array
     {
+        if ($this->isAnonymousSurvey($f['survey'] ?? null)) {
+            return $this->anonymousAggregateOnly($f['survey']);
+        }
         $rows = $this->participantBase($f['survey'])
             ->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->orderBy('employee_name')->get()
             ->map(fn($r) => [
@@ -432,6 +475,9 @@ class SurveyReportController extends Controller
 
     public function attendance(array $f): array
     {
+        if ($this->isAnonymousSurvey($f['survey'] ?? null)) {
+            return $this->anonymousAggregateOnly($f['survey']);
+        }
         $rows = $this->participantBase($f['survey'])
             ->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->orderBy('employee_name')->get()
             ->map(fn($r) => [
@@ -445,6 +491,9 @@ class SurveyReportController extends Controller
 
     public function reminder(array $f): array
     {
+        if ($this->isAnonymousSurvey($f['survey'] ?? null)) {
+            return $this->anonymousAggregateOnly($f['survey']);
+        }
         $rid = $this->resort->resort_id;
         $rows = $this->participantBase($f['survey'])->where('se.emp_status', '<>', 'yes')
             ->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->orderBy('employee_name')->get()

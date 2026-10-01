@@ -291,7 +291,7 @@ class SalaryIncrementController extends Controller
                     return optional($row->employee)->Emp_id ?? '-';
                 })
                 ->addColumn('employee_name', function($row){
-                    return optional(optional($row->employee)->resortAdmin)->full_name ?? '-';
+                    return e(optional(optional($row->employee)->resortAdmin)->full_name ?? '-');
                 })
                 ->addColumn('position_title', function($row){
                     return optional(optional($row->employee)->position)->position_title ?? '-';
@@ -1195,7 +1195,7 @@ class SalaryIncrementController extends Controller
                             return optional($row->employee)->Emp_id ?? '-';
                         })
                         ->addColumn('employee_name', function($row){
-                            return optional(optional($row->employee)->resortAdmin)->full_name ?? '-';
+                            return e(optional(optional($row->employee)->resortAdmin)->full_name ?? '-');
                         })
                         ->addColumn('position_title', function($row){
                             return optional(optional($row->employee)->position)->position_title ?? '-';
@@ -2107,7 +2107,7 @@ class SalaryIncrementController extends Controller
                         return optional($row->employee)->Emp_id ?? '-';
                     })
                     ->addColumn('employee_name', function($row){
-                        return optional(optional($row->employee)->resortAdmin)->full_name ?? '-';
+                        return e(optional(optional($row->employee)->resortAdmin)->full_name ?? '-');
                     })
                     ->addColumn('position_title', function($row){
                         return optional(optional($row->employee)->position)->position_title ?? '-';

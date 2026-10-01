@@ -195,7 +195,13 @@ class IncidentController extends Controller
         try{
                 $incidentId              =   base64_decode($incidentId);
 
+                // IN-03: any employee in the resort could read another
+                // employee's incident's preventive measures by guessing an
+                // id — mirrors the reporter-only gate incidentDetails()
+                // already applies (~485-487) rather than leaving this one
+                // endpoint open to the whole resort.
                 $incident               = Incidents::where("resort_id", $this->resort_id)
+                                                    ->where('created_by', $this->user->id)
                                                     ->where('id', $incidentId)
                                                     ->select(['id', 'preventive_measures'])
                                                     ->first();

@@ -380,9 +380,11 @@ class FileManageController extends Controller
                 // upload on the owner's behalf.
                 if ($File_structure->Folder_Type === 'categorized') {
                     $actor = $this->resort->GetEmployee;
-                    $rank = (int) ($actor->rank ?? 0);
-                    $isPrivileged = in_array($rank, [3, 4, 8, 9], true)
-                        || (in_array($rank, [1, 2], true) && Common::isHRDepartment($actor->Dept_id ?? null));
+                    // FM-04: privileged set is now Common::isFileManagementPrivileged()
+                    // (HR dept HOD/EXCOM only) — single source of truth shared
+                    // with Common::FilePermissions() and this controller's own
+                    // visibleFolderIdsForCurrentUser()/canManageFolder().
+                    $isPrivileged = Common::isFileManagementPrivileged($actor);
                     $isOwner = $actor && $File_structure->Folder_Name === $actor->Emp_id;
                     if (!$isOwner && !$isPrivileged) {
                         return response()->json(['success' => false, 'message' => 'You do not have permission to upload into this folder.'], 403);
@@ -911,6 +913,12 @@ class FileManageController extends Controller
                                                     ->first();
                 if($File_structure)
                 {
+                    // FM-03: folder rename had no ownership/visibility check at
+                    // all — any resort user could rename any other employee's
+                    // categorized folder just by knowing its unique_id.
+                    if (!$this->canManageFolder($File_structure)) {
+                        return response()->json(['success' => false, 'message' => 'You do not have permission to rename this folder.'], 403);
+                    }
                     $File_structure->Folder_name = $renameFile;
                     $File_structure->save();
 
@@ -1022,6 +1030,14 @@ class FileManageController extends Controller
             if (!$this->canManageFile($File) && !$this->userHasReceivedShareForFile($File->id)) {
                 return response()->json(['success' => false, 'message' => 'You do not have permission to share this file.'], 403);
             }
+            // FM-01 item 4: a public share link needs no auth to open once
+            // handed out, so minting one is restricted further than normal
+            // view/manage access — only the FM-04 privileged group (HR
+            // dept HOD/EXCOM) may generate one, even for a file they can
+            // otherwise view (own folder, or a share received).
+            if (!Common::isFileManagementPrivileged($this->resort->GetEmployee ?? null)) {
+                return response()->json(['success' => false, 'message' => 'Only HR may generate a public share link for a file.'], 403);
+            }
             try {
                 $key = hash('sha256', env('ENCRYPTION_KEY'), true);
                 $encryptedData = StorageHelper::disk()->get($File->File_Path);
@@ -1051,8 +1067,8 @@ class FileManageController extends Controller
 
         /**
          * Folder ids the current resort-admin can see in the sidebar.
-         * Returns NULL for "unrestricted" (the privileged set: GM / HR /
-         * MGR / MD / HR-dept HOD-EXCOM / master admin) and an array of
+         * Returns NULL for "unrestricted" (the FM-04 privileged set: HR
+         * department's HOD/EXCOM, or master admin) and an array of
          * filemangement_systems.id otherwise. Non-privileged users see
          * only their own categorized folder (named after their Emp_id)
          * plus any folders explicitly shared with them.
@@ -1070,14 +1086,11 @@ class FileManageController extends Controller
             $emp = $user->GetEmployee ?? null;
             if (!$emp) return [];
 
-            $rank     = (int) ($emp->rank ?? 0);
-            $isHrDept = \App\Helpers\Common::isHRDepartment($emp->Dept_id ?? null);
-
-            // Privileged set mirrors Common::FilePermissions:
-            //   - rank 3 (HR), 4 (MGR), 8 (GM), 9 (MD) anywhere
-            //   - rank 1 (EXCOM), 2 (HOD) only if they're in the HR dept
-            $isPrivileged = in_array($rank, [3, 4, 8, 9], true)
-                || (in_array($rank, [1, 2], true) && $isHrDept);
+            // Privileged set (FM-04 decided rule): ONLY the HR department's
+            // HOD (rank 2) or EXCOM (rank 1) — Common::isFileManagementPrivileged()
+            // is the single source of truth, shared with Common::FilePermissions()
+            // so the two can't drift apart again.
+            $isPrivileged = \App\Helpers\Common::isFileManagementPrivileged($emp);
             if ($isPrivileged) return null;
 
             // Non-privileged: own folder (Emp_id) + shared folders.
@@ -1120,6 +1133,26 @@ class FileManageController extends Controller
             $accessFlag = $parentFolder->Folder_Type ?? 'categorized';
             $accessCheck = Common::FilePermissions($file->unique_id, $this->resort, $accessFlag);
             return is_array($accessCheck) && !empty($accessCheck['type']) && $accessCheck['type'] === true;
+        }
+
+        /**
+         * Folder-level version of canManageFile() (FM-03): a categorized
+         * folder is one employee's personal root, so only its owner or the
+         * FM-04 privileged group (HR dept HOD/EXCOM) may rename/move it or
+         * move items into it. Uncategorized folders are resort-shared admin
+         * folders — resort scoping is enough, same rule
+         * FileShareController::ownsShareable() already applies to folders.
+         * RenameFile()'s folder branch and MoveFolder() previously had no
+         * check here at all.
+         */
+        protected function canManageFolder(FilemangementSystem $folder): bool
+        {
+            if ($folder->Folder_Type !== 'categorized') {
+                return true;
+            }
+            $actor = $this->resort->GetEmployee;
+            return Common::isFileManagementPrivileged($actor)
+                || ($actor && $folder->Folder_Name === $actor->Emp_id);
         }
 
         protected function userHasReceivedShareForFile(int $fileId): bool
@@ -1931,7 +1964,14 @@ class FileManageController extends Controller
             if (!$parent) {
                 return response()->json(['success' => false, 'message' => 'Parent folder not found.'], 404);
             }
-        
+
+            // FM-03: destination folder had no ownership/visibility check —
+            // any resort user could move files/folders into any other
+            // employee's categorized folder, same gap as the upload endpoint.
+            if (!$this->canManageFolder($parent)) {
+                return response()->json(['success' => false, 'message' => 'You do not have permission to move items into this folder.'], 403);
+            }
+
             $main_folder = $this->resort->resort->resort_id;
             $newFolderPath = "{$main_folder}/public/{$parent->Folder_unique_id}/";
         
@@ -2050,6 +2090,13 @@ class FileManageController extends Controller
 
             if (!$folder) {
                 return response()->json(['success' => false, 'message' => 'File or folder not found. It may have been deleted.'], 404);
+            }
+
+            // FM-03: moving a whole folder had no ownership/visibility check
+            // — any resort user could relocate any other employee's
+            // categorized folder just by knowing its unique_id.
+            if (!$this->canManageFolder($folder)) {
+                return response()->json(['success' => false, 'message' => 'You do not have permission to move this folder.'], 403);
             }
 
             $oldParentFolder = FilemangementSystem::where("resort_id", $this->resort->resort_id)

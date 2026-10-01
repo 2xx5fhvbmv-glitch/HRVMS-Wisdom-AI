@@ -35,7 +35,7 @@ class PerformanceDashboardController extends Controller
     {
         // Was an empty stub — route (performance/admin-dashboard) resolved
         // to a real method but it returned nothing (blank page). HR_Dashobard()
-        // already scopes its data via Common::getPerformanceScopedEmpIds(),
+        // already scopes its data via Common::getPerformanceScopedEmpIds('performance'),
         // which reads the CURRENT authenticated user's own rank/department —
         // GM/HR-tier gets full visibility, everyone else gets scoped down
         // automatically — so delegating here (same pattern excom_dashboard()
@@ -47,7 +47,7 @@ class PerformanceDashboardController extends Controller
     {
         $page_title="Performance Dashboard";
         $resort_id = $this->globalUser->resort_id;
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
 
         // Year filter — dynamic from data + surrounding years
         $cycleYears = DB::table('performance_cycles')
@@ -402,7 +402,7 @@ class PerformanceDashboardController extends Controller
         // never actually adapted, so wiring this stub up to render them
         // would show the wrong module's data. HR_Dashobard() is the real,
         // already-correct Performance dashboard and already scopes itself
-        // per-viewer via Common::getPerformanceScopedEmpIds() (HOD/EXCOM
+        // per-viewer via Common::getPerformanceScopedEmpIds('performance') (HOD/EXCOM
         // get scoped down automatically, same helper HR/GM/Admin go
         // through) — delegating here is the same fix as excom_dashboard()
         // already applies to this exact method.
@@ -432,7 +432,7 @@ class PerformanceDashboardController extends Controller
             ->where('resort_id', $resort_id)
             ->where('status', '!=', 'Inactive');
 
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         if (is_array($scopedIds)) {
             $query->whereIn('id', $scopedIds);
         }
@@ -491,7 +491,7 @@ class PerformanceDashboardController extends Controller
             ->where('resort_id', $resort_id)
             ->where('status', '!=', 'Inactive');
 
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         if (is_array($scopedIds)) {
             $query->whereIn('id', $scopedIds);
         }
@@ -557,7 +557,7 @@ class PerformanceDashboardController extends Controller
         $resort_id  = $this->resort->resort_id;
         $empId      = base64_decode($id);
 
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         if (is_array($scopedIds) && !in_array((int) $empId, $scopedIds)) {
             abort(403, 'You do not have access to this employee.');
         }

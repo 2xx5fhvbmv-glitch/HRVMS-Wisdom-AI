@@ -35,9 +35,27 @@ class ConfigurationController extends Controller
             $this->underEmp_id = Common::getSubordinates($this->reporting_to);
         }
     }
+
+    /**
+     * LR-06 (security audit, product decision 2026-09-30): Learning settings
+     * (categories, mandatory/probationary rules, attendance parameters) are
+     * HR / L&D Manager full-access; GM may view but not edit; everyone else
+     * (HOD/EXCOM, other L&D staff, regular employees) has no access at all.
+     */
+    private function canViewLearningSettings(): bool
+    {
+        // hasFullDataAccess() = HR / L&D Manager / GM / HR-dept HOD-EXCOM —
+        // exactly "view" per the LR-06 decision (GM view-only is enforced by
+        // using canManageLearning(), not this, on every mutating action).
+        return Common::hasFullDataAccess();
+    }
+
     public function index()
     {
         if(Common::checkRouteWisePermission('learning.configration',config('settings.resort_permissions.view')) == false){
+            return abort(403, 'Unauthorized access');
+        }
+        if (!$this->canViewLearningSettings()) {
             return abort(403, 'Unauthorized access');
         }
         $resort_id = $this->resort->resort_id;
@@ -72,6 +90,9 @@ class ConfigurationController extends Controller
 
     public function saveCategories(Request $request)
     {
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and L&D Managers can manage Learning settings.'], 403);
+        }
         $resort_id = $this->resort->resort_id;
         // Validate the incoming data
         $validator = Validator::make($request->all(), [
@@ -107,7 +128,10 @@ class ConfigurationController extends Controller
 
     public function listCategories()
     {
-       
+        if (!$this->canViewLearningSettings()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         $categories = LearningCategory::where('resort_id', $this->resort->resort_id)->orderBy('id', 'desc')->get();
 
             return datatables()->of($categories)
@@ -145,6 +169,9 @@ class ConfigurationController extends Controller
     }
 
     public function inlineCategoryUpdate(Request $request, $id){
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and L&D Managers can manage Learning settings.'], 403);
+        }
         $categoryId = $id;
 
         $resort_id = $this->resort->resort_id;
@@ -198,6 +225,9 @@ class ConfigurationController extends Controller
 
     public function destroyCategory($id)
     {
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and L&D Managers can manage Learning settings.'], 403);
+        }
         DB::beginTransaction();
         try{
 
@@ -229,6 +259,9 @@ class ConfigurationController extends Controller
 
     public function getMandatoryPositions(Request $request)
     {
+        if (!$this->canViewLearningSettings()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
         $departmentId = $request->input('department_id');
 
         if (!$departmentId) {
@@ -247,6 +280,9 @@ class ConfigurationController extends Controller
     }
 
     public function save_mandatory_program(Request $request){
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and L&D Managers can manage Learning settings.'], 403);
+        }
         $validatedData = $request->validate([
             'programs' => 'required|array|min:1',
             'programs.*.mandatory_program' => 'required|exists:learning_programs,id',
@@ -281,6 +317,9 @@ class ConfigurationController extends Controller
     }
 
     public function get_mandatory_program(){
+        if (!$this->canViewLearningSettings()) {
+            return abort(403, 'Unauthorized access');
+        }
         $resort_id = $this->resort->resort_id;
         $page_title ='Mandatory Learning';
         $categories= LearningCategory::where('resort_id',$resort_id)->get();
@@ -291,6 +330,9 @@ class ConfigurationController extends Controller
     }
 
     public function list_mandatory_program(Request $request){
+        if (!$this->canViewLearningSettings()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
         try {
             $resort_id = $this->resort->resort_id;
     
@@ -346,6 +388,9 @@ class ConfigurationController extends Controller
     }
 
     public function get_probationary_program(){
+        if (!$this->canViewLearningSettings()) {
+            return abort(403, 'Unauthorized access');
+        }
         $resort_id = $this->resort->resort_id;
         $page_title ='Probationary Learning';
         $programs= LearningProgram::where('resort_id',$resort_id)->get();
@@ -353,6 +398,9 @@ class ConfigurationController extends Controller
     }
 
     public function list_probationary_program(Request $request){
+        if (!$this->canViewLearningSettings()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
         try {
             $resort_id = $this->resort->resort_id;
     
@@ -387,7 +435,10 @@ class ConfigurationController extends Controller
         }
     }
 
-    public function save_probationary_program(Request $request){    
+    public function save_probationary_program(Request $request){
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and L&D Managers can manage Learning settings.'], 403);
+        }
         try {
             ProbationaryLearningProgram::create([
                 'resort_id' => $this->resort->resort_id,
@@ -412,6 +463,9 @@ class ConfigurationController extends Controller
 
     public function saveAttendanceParameters(Request $request)
     {
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and L&D Managers can manage Learning settings.'], 403);
+        }
         $request->validate([
             'threshold_percentage' => 'nullable|integer|min:0|max:100',
             'auto_notifications' => 'nullable',

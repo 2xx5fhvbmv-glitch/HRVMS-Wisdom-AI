@@ -32,6 +32,14 @@ class ConfigurationController extends Controller
             $reporting_to = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id : 3;
             $this->underEmp_id = Common::getSubordinates($reporting_to);
         }
+        // PF-07: every route in this controller is Performance settings/config
+        // (review types, templates, meeting email content) — none of it had
+        // an access check, so any authenticated portal user of any rank could
+        // read or rewrite resort-wide review types/templates. Decided rule:
+        // HR has settings access, GM explicitly does not.
+        if (!Common::isHR()) {
+            abort(403, 'Only HR can manage Performance configuration.');
+        }
     }
     public function index(Request $request)
     {
@@ -174,10 +182,20 @@ class ConfigurationController extends Controller
         }
 
 
+        // PF-01: was where('id',$id)->where('resort_id',...)->update([...]) —
+        // already resort-scoped, but a cross-resort/nonexistent id matched
+        // zero rows and still returned a 200 "Updated Successfully". firstOrFail()
+        // makes a cross-resort id 404 instead of a silent no-op success. Kept
+        // outside the try/catch below so the ModelNotFoundException isn't
+        // swallowed by the generic catch and turned into a 500.
+        $reviewType = PerformanceReviewType::where('id', $id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->firstOrFail();
+
         DB::beginTransaction();
         try
         {
-            PerformanceReviewType::where('id',$id)->where('resort_id', $this->resort->resort_id)->update([
+            $reviewType->update([
                 'category_title'=>$request->category_title,
                 'category_weightage'=>$request->category_weightage
             ]);

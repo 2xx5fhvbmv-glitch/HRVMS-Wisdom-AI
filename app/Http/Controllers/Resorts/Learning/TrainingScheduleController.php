@@ -767,6 +767,10 @@ class TrainingScheduleController extends Controller
         if (!$this->resort) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
+        // LR-06: only HR / L&D Manager may assign forms to a schedule.
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and L&D Managers can assign forms.'], 403);
+        }
 
         $validator = Validator::make($request->all(), [
             'training_schedule_id'      => 'required',
@@ -853,6 +857,10 @@ class TrainingScheduleController extends Controller
     {
         if (!$this->resort) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        // LR-06: only HR / L&D Manager may assign forms to a schedule.
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and L&D Managers can assign forms.'], 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -993,6 +1001,27 @@ class TrainingScheduleController extends Controller
         }
 
         $trainingScheduleId = base64_decode($id);
+
+        // LR-01: neither this schedule lookup nor the response query below was
+        // resort-scoped — a guessed/enumerated id could return another
+        // resort's feedback responses. Resolve the schedule against this
+        // resort first.
+        $schedule = TrainingSchedule::with('learningProgram')
+            ->where('resort_id', $this->resort->resort_id)
+            ->find($trainingScheduleId);
+        if (!$schedule) {
+            return response()->json(['success' => false, 'message' => 'Training schedule not found.'], 404);
+        }
+
+        // LR-06: HR / L&D Manager / GM (view-only elsewhere) may open any
+        // schedule's responses; a trainer may only open their own session's.
+        $currentEmployee = $this->resort->GetEmployee ?? null;
+        $isTrainerOfSession = $currentEmployee && optional($schedule->learningProgram)->trainer
+            && (int) $schedule->learningProgram->trainer === (int) $currentEmployee->id;
+        if (!Common::hasFullDataAccess() && !$isTrainerOfSession) {
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+
         $formRow = TrainingFeedbackResponse::where('training_id', $trainingScheduleId)->first();
         $form = $formRow ? TrainingFeedbackForm::find($formRow->form_id) : null;
 
@@ -1016,6 +1045,24 @@ class TrainingScheduleController extends Controller
         }
 
         $trainingScheduleId = base64_decode($id);
+
+        // LR-01: same resort-scoping gap as feedbackResponses() above.
+        $schedule = TrainingSchedule::with('learningProgram')
+            ->where('resort_id', $this->resort->resort_id)
+            ->find($trainingScheduleId);
+        if (!$schedule) {
+            return response()->json(['success' => false, 'message' => 'Training schedule not found.'], 404);
+        }
+
+        // LR-06: HR / L&D Manager / GM (view-only elsewhere) may open any
+        // schedule's responses; a trainer may only open their own session's.
+        $currentEmployee = $this->resort->GetEmployee ?? null;
+        $isTrainerOfSession = $currentEmployee && optional($schedule->learningProgram)->trainer
+            && (int) $schedule->learningProgram->trainer === (int) $currentEmployee->id;
+        if (!Common::hasFullDataAccess() && !$isTrainerOfSession) {
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+
         $formRow = EvaluationFormResponse::where('training_id', $trainingScheduleId)->first();
         $form = $formRow ? EvaluationForm::find($formRow->form_id) : null;
 

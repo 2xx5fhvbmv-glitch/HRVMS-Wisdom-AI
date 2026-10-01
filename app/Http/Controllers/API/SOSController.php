@@ -736,9 +736,27 @@ class SOSController extends Controller
                                                                 // command; a regular HOD is already scoped to their own
                                                                 // subordinates above; everyone else (ordinary employee,
                                                                 // supervisor, etc.) only gets their own entry.
+                                                                // SO-01 correction: was scoping the HOD branch to
+                                                                // Common::getSubordinates() ($this->underEmp_id, direct
+                                                                // reports only) instead of the department-wide scope
+                                                                // every other dept-scoped controller uses (CLAUDE.md
+                                                                // dept-access invariant) — a HOD's own peers/other
+                                                                // reporting lines in the same department were invisible
+                                                                // during an emergency. Also: a responding team member
+                                                                // dispatched to THIS sos_id (not a HOD/SM/HR/GM) fell
+                                                                // into the "everyone else" branch and saw only their own
+                                                                // entry, not the people they were sent to check on —
+                                                                // the query is already hard-scoped to this one sos_id
+                                                                // above, so this never reopens resort-wide visibility.
+                                                                $isResponder = SosTeamMemberActivity::where('sos_history_id', $sosId)
+                                                                    ->where('emp_id', $this->user->id)
+                                                                    ->exists();
                                                                 if($isHOD) {
-                                                                    $sosHistoryEmployeeStatus->whereIn('e.id', $this->underEmp_id);
-                                                                } elseif (!$isSecurityManager && !Common::hasFullDataAccess($employee)) {
+                                                                    $deptIds = Common::getScopedDepartmentIds($employee);
+                                                                    if ($deptIds !== null) {
+                                                                        $sosHistoryEmployeeStatus->whereIn('e.Dept_id', $deptIds);
+                                                                    }
+                                                                } elseif (!$isSecurityManager && !$isResponder && !Common::hasFullDataAccess($employee)) {
                                                                     $sosHistoryEmployeeStatus->where('e.id', $employee->id);
                                                                 }
 

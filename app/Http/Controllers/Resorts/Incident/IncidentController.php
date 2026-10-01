@@ -474,6 +474,7 @@ class IncidentController extends Controller
         $available_rank = $rank[$current_rank] ?? '';
         $isHOD = ($available_rank === "HOD");
         $isHR = ($available_rank === "HR");
+        $isGM = ($available_rank === "GM");
 
         $request->validate([
             'priority' => 'nullable|string',
@@ -495,11 +496,23 @@ class IncidentController extends Controller
             'outcomeType' => 'nullable|integer',
             'pre_mea' => 'nullable|string',
             'action_taken' => 'nullable|integer',
-            'approval' => 'nullable|boolean',
             'status' => 'nullable|string',
         ]);
 
-        $incident_details = Incidents::where('resort_id', $this->resort->resort_id)->findOrFail($request->incident_id);
+        // IN-02: was loaded with a bare resort_id filter and no viewer gate
+        // at all — any resort-portal user could POST findings on any
+        // incident id in the resort. Gate through the same per-record check
+        // the investigation PAGE uses (canViewIncidentInvestigation), so
+        // "can I view the case file" and "can I write to it" never diverge:
+        // HR / HR-equivalent / GM / the reporter's own dept HOD-EXCOM /
+        // committee members assigned to THIS incident.
+        $incident_details = Incidents::where('resort_id', $this->resort->resort_id)->find($request->incident_id);
+        if (!$incident_details) {
+            abort(404, 'Incident not found.');
+        }
+        if (!Common::canViewIncidentInvestigation($incident_details)) {
+            abort(403, 'Only HR and committee members assigned to this incident can submit an investigation.');
+        }
 
         // Priority/Severity are only editable on the FIRST investigation
         // submission — an existing IncidentsInvestigation row means they've
@@ -516,10 +529,13 @@ class IncidentController extends Controller
         // IN-02: this wrote $request->status onto the SAME status column
         // approveOrReject() (GM/GM-delegate only) uses for the final
         // Approved/Rejected decision — any committee member submitting an
-        // investigation entry could set status to Approved directly,
-        // skipping GM approval entirely. Those two values are reserved for
-        // that endpoint; block them here regardless of what the caller is.
-        if (in_array(strtolower((string) $request->status), ['approved', 'rejected'], true)) {
+        // investigation entry could set status to Approved/Resolved
+        // directly, skipping GM approval entirely. Those values (and the
+        // `approval` flag, which the "forward to approvers" checkbox posts
+        // to the separate approve() endpoint — see investigation.blade.php)
+        // are reserved for that approval flow; block/drop them here
+        // regardless of what the caller is.
+        if (in_array(strtolower((string) $request->status), ['approved', 'rejected', 'resolved'], true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'This status can only be set via the GM approval decision.',
@@ -529,7 +545,6 @@ class IncidentController extends Controller
         $incident_details->outcome_type =  $request->outcomeType;
         $incident_details->preventive_measures =  $request->pre_mea;
         $incident_details->action_taken =  $request->action_taken;
-        $incident_details->approval = $request->approval;
         $incident_details->save();
 
         $incident = new IncidentsInvestigation();
@@ -559,19 +574,31 @@ class IncidentController extends Controller
             $incident->Ministry_notified = $request->Ministry_notified;
         }
 
-        if (!$isHR) {
+        if (!$isHR && !$isGM) {
+            // GM is allowed past canViewIncidentInvestigation() above (view
+            // all) but isn't necessarily a committee member — don't require
+            // committee assignment to also write findings.
             $employeeId = $loggedInEmployee->id;
-        
-            // Fetch the committee member row
-            $committeeMember = IncidentCommitteeMember::where('member_id', $employeeId)->first();
-        
+
+            // IN-02: was matching ANY committee the caller sits on, not
+            // necessarily one this incident was actually assigned to
+            // (assign() stores the assigned committee ids on
+            // incidents.assigned_to) — a member of committee A could post
+            // findings against an incident only ever assigned to committee B.
+            $assignedCommitteeIds = Common::incidentAssignedCommitteeIds($incident_details);
+            $committeeMember = empty($assignedCommitteeIds)
+                ? null
+                : IncidentCommitteeMember::where('member_id', $employeeId)
+                    ->whereIn('commitee_id', $assignedCommitteeIds)
+                    ->first();
+
             if ($committeeMember) {
                 $incident->committee_id = $committeeMember->commitee_id;
                 $incident->added_by_member_id = $committeeMember->id; // <-- Correct value here
             } else {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Committee membership not found for this user.'
+                    'message' => 'You are not on a committee assigned to this incident.'
                 ], 403);
             }
         }
@@ -603,10 +630,20 @@ class IncidentController extends Controller
             ],
         ]);
 
+        // IN-03: was resort-scoped only, no visibility/role check — any
+        // resort-portal user could trigger a statement request on any
+        // incident id in the resort. Gate it the same way the investigation
+        // page (where this action is launched from) is gated.
         $incident = Incidents::with(['witness.employee', 'witness.employee.resortAdmin'])
             ->where('resort_id', $this->resort->resort_id)
-            ->findOrFail($request->incident_id);
-    
+            ->find($request->incident_id);
+        if (!$incident) {
+            abort(404, 'Incident not found.');
+        }
+        if (!Common::canViewIncidentInvestigation($incident)) {
+            abort(403, 'Only HR and committee members assigned to this incident can request statements.');
+        }
+
         $userIds = collect();
         // dd($incident->involved_employees)
         // Involved employees (comma-separated IDs)

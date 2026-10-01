@@ -28,6 +28,11 @@ class InventoryController extends Controller
     protected $underEmp_id=[];
     public function __construct()
     {
+        // AC-03: inventory catalog/assignment writes are HR-only — no
+        // separate Accommodation-manager role exists (product decision).
+        // Was completely ungated.
+        $this->middleware('accommodation.hr')->only(['StoreInventory', 'Inventoryupdated', 'UnassignItem']);
+
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
         if(!$this->resort) return;
         if($this->resort->is_master_admin == 0){

@@ -9,17 +9,26 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
   Route::get('/reset-password/{token}', 'ForgotPasswordController@resetPassword')->name('admin.password.reset');
   Route::post('/reset-password-submit', 'ForgotPasswordController@resetPasswordSubmit')->middleware('throttle:admin-password-reset')->name('admin.password.reset-submit');
   Route::get('/permission-denied', 'LoginController@permissionDenied')->name('admin.permission.denied');
+  // MFA login step 2 (password already verified; session holds a short-lived pending marker).
+  Route::get('/two-factor', 'TwoFactorController@challenge')->name('admin.2fa.challenge');
+  Route::post('/two-factor', 'TwoFactorController@verify')->middleware('throttle:admin-login')->name('admin.2fa.verify');
 });
 
 /*** Admin Authenticated Routes ***/
-    Route::prefix('admin')->middleware(['auth:admin','forcePasswordChange:admin','revalidate'])->namespace('Admin')->group(function () {
+    Route::prefix('admin')->middleware(['auth:admin','forcePasswordChange:admin','admin.security','revalidate'])->namespace('Admin')->group(function () {
 
     /*** Logout ***/
     Route::get('/logout', 'LoginController@logout')->name('admin.logout');
 
+    /*** MFA enrolment + step-up re-auth ***/
+    Route::get('/two-factor/setup', 'TwoFactorController@setup')->name('admin.2fa.setup');
+    Route::post('/two-factor/setup', 'TwoFactorController@confirm')->middleware('throttle:admin-login')->name('admin.2fa.confirm');
+    Route::get('/confirm-identity', 'TwoFactorController@reauthForm')->name('admin.reauth');
+    Route::post('/confirm-identity', 'TwoFactorController@reauth')->middleware('throttle:admin-login')->name('admin.reauth.submit');
+
 
     /***** Start Admin to Resort Login ****/
-    Route::post('/admin-to-resort', 'LoginController@AdminToResort')->name('AdminToResort');
+    Route::post('/admin-to-resort', 'LoginController@AdminToResort')->middleware('admin.reauth')->name('AdminToResort');
     Route::get('/admin/end-impersonation','LoginController@endImpersonation')->name('endImpersonation');
 
     /**** End of Resort Direct Login ****/
@@ -30,18 +39,18 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
         /** Admin Module **/
         Route::get('/admins', 'AdminController@index')->name('admin.index');
         Route::get('/admins/create', 'AdminController@create')->name('admin.create');
-        Route::post('/admins/store', 'AdminController@store')->name('admin.store');
+        Route::post('/admins/store', 'AdminController@store')->middleware('admin.reauth')->name('admin.store');
         Route::get('/admins/list', 'AdminController@list')->name('admin.list');
         Route::get('/admins/edit/{id}', 'AdminController@edit')->name('admin.edit');
-        Route::post('/admins/update/{id}', 'AdminController@update')->name('admin.update');
-        Route::delete('/admins/destroy/{id}', 'AdminController@destroy')->name('admin.destroy');
-        Route::get('/admins/inactive/{id}', 'AdminController@block')->name('admin.inactive');
-        Route::get('/admins/active/{id}', 'AdminController@active')->name('admin.active');
-        Route::get('/admins/massremove', 'AdminController@massremove')->name('admin.massremove');
+        Route::post('/admins/update/{id}', 'AdminController@update')->middleware('admin.reauth')->name('admin.update');
+        Route::delete('/admins/destroy/{id}', 'AdminController@destroy')->middleware('admin.reauth')->name('admin.destroy');
+        Route::get('/admins/inactive/{id}', 'AdminController@block')->middleware('admin.reauth')->name('admin.inactive');
+        Route::get('/admins/active/{id}', 'AdminController@active')->middleware('admin.reauth')->name('admin.active');
+        Route::get('/admins/massremove', 'AdminController@massremove')->middleware('admin.reauth')->name('admin.massremove');
 
         Route::post('/admins/check-email-exists', 'AdminController@checkEmailExists')->name('admin.checkEmailExists');
-        Route::get('/admins/block/{id}', 'AdminController@block')->name('admin.block');
-        Route::get('/admins/active/{id}', 'AdminController@active')->name('admin.active');
+        Route::get('/admins/block/{id}', 'AdminController@block')->middleware('admin.reauth')->name('admin.block');
+        Route::get('/admins/active/{id}', 'AdminController@active')->middleware('admin.reauth')->name('admin.active');
 
         /*** Settings ***/
         Route::get('/settings/update', 'SettingsController@updateSettings')->name('settings.update');
@@ -65,12 +74,12 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
         Route::get('/roles', 'RolePermissionController@index')->name('admin.role.index');
         Route::get('/roles/list', 'RolePermissionController@list')->name('admin.role.list');
         Route::get('/roles/create', 'RolePermissionController@create')->name('admin.role.create');
-        Route::post('/roles/store', 'RolePermissionController@store')->name('admin.role.store');
+        Route::post('/roles/store', 'RolePermissionController@store')->middleware('admin.reauth')->name('admin.role.store');
         Route::get('/roles/edit/{id}', 'RolePermissionController@edit')->name('admin.role.edit');
-        Route::delete('/roles/destroy/{id}', 'RolePermissionController@destroy')->name('admin.role.destroy');
-        Route::post('/roles/update/{id}', 'RolePermissionController@update')->name('admin.role.update');
+        Route::delete('/roles/destroy/{id}', 'RolePermissionController@destroy')->middleware('admin.reauth')->name('admin.role.destroy');
+        Route::post('/roles/update/{id}', 'RolePermissionController@update')->middleware('admin.reauth')->name('admin.role.update');
         Route::get('/roles/edit-permissions/{id}', 'RolePermissionController@editRolePermissions')->name('admin.role.edit_role_permissions');
-        Route::post('/roles/update-permissions/{id}', 'RolePermissionController@updateRolePermissions')->name('admin.role.update_role_permissions');
+        Route::post('/roles/update-permissions/{id}', 'RolePermissionController@updateRolePermissions')->middleware('admin.reauth')->name('admin.role.update_role_permissions');
         Route::get('/roles/massremove', 'RolePermissionController@massremove')->name('admin.role.massremove');
         Route::get('/roles/block/{id}', 'RolePermissionController@block')->name('admin.role.block');
         Route::get('/roles/active/{id}', 'RolePermissionController@active')->name('admin.role.active');
@@ -85,8 +94,8 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
         Route::get('/resorts/archived-list', 'ResortsController@archivedlist')->name('admin.resorts.archivedList');
         Route::get('/resorts/edit/{id}', 'ResortsController@edit')->name('admin.resorts.edit');
         Route::post('/resorts/update/{id}', 'ResortsController@update')->name('admin.resorts.update');
-        Route::delete('/resorts/destroy/{id}', 'ResortsController@destroy')->name('admin.resorts.destroy');
-        Route::post('/resorts/restore/{id}', 'ResortsController@restore')->name('admin.resorts.restore');
+        Route::delete('/resorts/destroy/{id}', 'ResortsController@destroy')->middleware('admin.reauth')->name('admin.resorts.destroy');
+        Route::post('/resorts/restore/{id}', 'ResortsController@restore')->middleware('admin.reauth')->name('admin.resorts.restore');
         Route::get('/resorts/inactive/{id}', 'ResortsController@block')->name('admin.resorts.block');
         Route::get('/resorts/active/{id}', 'ResortsController@active')->name('admin.resorts.active');
         Route::get('/resorts/mass-remove', 'ResortsController@massremove')->name('admin.resorts.massremove');
@@ -97,7 +106,7 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
         Route::post('/resorts/check-email-exists', 'ResortsController@checkEmailExists')->name('admin.resorts.checkEmailExists');
         Route::get('/resort/login/{id}', 'ResortsController@loginAsResortAdmin')->name('admin.resorts.login');
         Route::get('/resort/edit-permissions/{id}', 'ResortsController@editPermissions')->name('admin.resorts.edit_permissions');
-        Route::post('/resort/update-permissions/{id}', 'ResortsController@updatePermissions')->name('admin.resorts.update_permissions');
+        Route::post('/resort/update-permissions/{id}', 'ResortsController@updatePermissions')->middleware('admin.reauth')->name('admin.resorts.update_permissions');
 
         // AJAX Route
         Route::get('/get-positions-by-department', 'ResortsController@getPositionsByDepartment');

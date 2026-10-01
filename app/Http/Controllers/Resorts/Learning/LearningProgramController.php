@@ -202,6 +202,12 @@ class LearningProgramController extends Controller
 
     public function save(Request $request)
     {
+        // LR-06: program creation had no access check — HR and L&D Managers
+        // only; GM can view but not create/edit.
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'msg' => 'Only HR and L&D Managers can create learning programs.'], 403);
+        }
+
         $resort_id = $this->resort->resort_id;
 
         // Older form caches can post the placeholder label ("Select Trainer")
@@ -328,7 +334,7 @@ class LearningProgramController extends Controller
     /**
      * Stream the trainer image for a Learning Program via StorageHelper so this
      * works the same on wasabi/S3 as it does locally (prod runs STORAGE_DRIVER=
-     * wasabi; the previous Storage::disk('local') read couldn't see a file the
+     * wasabi; reading straight off the local filesystem couldn't see a file the
      * default-disk upload had actually written to the cloud disk).
      */
     public function trainerImage($id)

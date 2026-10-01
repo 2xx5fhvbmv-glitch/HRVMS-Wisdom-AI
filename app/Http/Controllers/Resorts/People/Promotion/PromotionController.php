@@ -460,7 +460,7 @@ class PromotionController extends Controller
                             <div class="img-circle">
                                 <img src="' . $photo . '" alt="user">
                             </div>
-                            <span class="userApplicants-btn">' . $name . '</span>
+                            <span class="userApplicants-btn">' . e($name) . '</span>
                         </div>';
                 })
                 ->addColumn('current_department', fn($row) => optional($row->currentPosition->department)->name ?? '—')
@@ -572,7 +572,7 @@ class PromotionController extends Controller
                             <div class="img-circle">
                                 <img src="' . $photo . '" alt="user">
                             </div>
-                            <span class="userApplicants-btn">' . $name . '</span>
+                            <span class="userApplicants-btn">' . e($name) . '</span>
                         </div>';
                 })
                 ->addColumn('effective_date', function ($row) {
@@ -1360,6 +1360,12 @@ class PromotionController extends Controller
         if ($promotion->status !== 'Approved') {
             return response()->json(['message' => 'This promotion has not been approved yet and cannot be confirmed.'], 422);
         }
+        // PE-05: confirming twice silently re-wrote the employee's rank/
+        // department/position/salary a second time — nothing marked a
+        // promotion as already applied.
+        if ($promotion->applied_at) {
+            return response()->json(['message' => 'This promotion has already been applied.'], 422);
+        }
 
         $employee->Dept_id = $promotion->newPosition->department->id;
         $employee->Position_id = $promotion->newPosition->id;
@@ -1369,6 +1375,9 @@ class PromotionController extends Controller
         $employee->incremented_date = $promotion->effective_date;
         $employee->benefit_grid_level = $promotion->updated_benefit_grid;
         $employee->save();
+
+        $promotion->applied_at = now();
+        $promotion->save();
 
 
         // Send notification to employee
@@ -1417,6 +1426,16 @@ class PromotionController extends Controller
             if (!$promotion) {
                 return response()->json(['success' => false, 'message' => 'Promotion not found.'], 404);
             }
+
+            // PE-05: this had no status check at all — a promotion's new
+            // salary/position/effective date could be edited here even
+            // after it was fully Approved (and confirmPromotion() would
+            // then apply the edited figures with no re-approval). Decided:
+            // editable only while Pending and untouched by any approver.
+            if ($promotion->status !== 'Pending' || $promotion->approvals()->where('status', '!=', 'Pending')->exists()) {
+                return response()->json(['success' => false, 'message' => 'Promotion is under approval or already approved — reject it and raise a new one to change it.'], 422);
+            }
+
             $oldSalary = $promotion->current_salary;
             $newSalary = $request->new_salary;
 

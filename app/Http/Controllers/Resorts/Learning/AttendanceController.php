@@ -173,6 +173,14 @@ class AttendanceController extends Controller
         if (!$trainingSchedule) {
             return response()->json(['success' => false, 'message' => 'Training schedule not found.'], 404);
         }
+
+        // LR-06: HR / L&D Manager may mark attendance on any schedule; other
+        // L&D-dept staff and the schedule's own trainer only on this one.
+        $isAdmin = (($this->resort->type ?? null) === 'super') || ($this->resort->is_master_admin ?? 0);
+        if (!$isAdmin && !Common::canMarkLearningAttendance($this->resort->GetEmployee ?? null, $trainingSchedule)) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to mark attendance for this training.'], 403);
+        }
+
         // Backfill is allowed: no longer reject submissions whose current date sits
         // outside [start_date, end_date]. Persist against the schedule's start_date
         // so the record falls inside the training window for downstream reports.
@@ -254,6 +262,13 @@ class AttendanceController extends Controller
             'status' => 'required|in:Present,Absent,Late',
             'notes' => 'nullable|string|max:500',
         ]);
+
+        // LR-06: same attendance-marking gate as markAttendanceBulk() above.
+        $trainingSchedule = TrainingSchedule::find($request->training_schedule_id);
+        $isAdmin = (($this->resort->type ?? null) === 'super') || ($this->resort->is_master_admin ?? 0);
+        if (!$isAdmin && !Common::canMarkLearningAttendance($this->resort->GetEmployee ?? null, $trainingSchedule)) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to mark attendance for this training.'], 403);
+        }
 
         $attendance = TrainingAttendance::updateOrCreate(
             [

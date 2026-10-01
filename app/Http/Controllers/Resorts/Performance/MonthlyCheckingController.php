@@ -63,7 +63,7 @@ class MonthlyCheckingController extends Controller
             $date_discussion = $request->date_discussion;
             $searchTerm = $request->searchTerm;
 
-            $scopedIds = Common::getPerformanceScopedEmpIds();
+            $scopedIds = Common::getPerformanceScopedEmpIds('performance');
             $monthly = MonthlyCheckingModel::join("employees as t1", "t1.id", "=", "monthly_checking_models.emp_id")
             ->join("resort_admins as t2", "t2.id", "=", "t1.Admin_Parent_id")
             ->join("resort_positions as t3", "t3.id", "=", "t1.Position_id")
@@ -155,7 +155,7 @@ class MonthlyCheckingController extends Controller
                 return $row->employee_code ?: $row->Checkin_id;
             })
             ->addColumn('Name', function($row) {
-                return $row->first_name.' '.$row->last_name;
+                return e($row->first_name.' '.$row->last_name);
             })
             ->addColumn('Position', function($row) {
                 return $row->PositionName;
@@ -206,7 +206,7 @@ class MonthlyCheckingController extends Controller
             return abort(403, 'Unauthorized access');
         }
 
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         $Employee  = Employee::join("resort_admins as t1","t1.id","=","employees.Admin_Parent_id")
                                ->join("resort_positions as t2","t2.id","=","employees.Position_id")
                                ->where("employees.resort_id", $this->resort->resort_id)
@@ -239,7 +239,7 @@ class MonthlyCheckingController extends Controller
     {
 
         $search = $request->search;
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         $Employee = Employee::join("resort_admins as t1", "t1.id", "=", "employees.Admin_Parent_id")
                             ->join("resort_positions as t2", "t2.id", "=", "employees.Position_id")
                             ->where("employees.resort_id", $this->resort->resort_id)
@@ -342,6 +342,16 @@ class MonthlyCheckingController extends Controller
         }
 
         $e =Employee::where("resort_id",$this->resort->resort_id)->where("Emp_id",$request->emp_id)->first('id');
+        if (!$e) {
+            return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
+        }
+        // PF-07: same missing department-scope check as scheduleRequest()
+        // (the newer entry point for this same action) — a HOD/EXCOM could
+        // otherwise create a check-in for any employee, any department.
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
+        if (is_array($scopedIds) && !in_array((int) $e->id, $scopedIds, true)) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to schedule a check-in for this employee.'], 403);
+        }
         DB::beginTransaction();
         try
         {
@@ -413,7 +423,7 @@ class MonthlyCheckingController extends Controller
             return abort(403, 'Unauthorized access');
         }
         $id = base64_decode($id);
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         $monthly =  MonthlyCheckingModel::join("employees as t1", "t1.id", "=", "monthly_checking_models.emp_id")
                                         ->join("resort_admins as t2", "t2.id", "=", "t1.Admin_Parent_id")
                                         ->join("resort_positions as t3", "t3.id", "=", "t1.Position_id")
@@ -442,7 +452,7 @@ class MonthlyCheckingController extends Controller
             // (the other endpoint serving this same details page/record) — a
             // Finance EXCOM (or any HOD/EXCOM) could view another department's
             // check-in by id with no access check at all.
-            $scopedIds = Common::getPerformanceScopedEmpIds();
+            $scopedIds = Common::getPerformanceScopedEmpIds('performance');
             $monthlyDetails = MonthlyCheckingModel::join("employees as t1", "t1.id", "=", "monthly_checking_models.emp_id")
                                                     ->join("resort_admins as t2", "t2.id", "=", "t1.Admin_Parent_id")
                                                     ->join("resort_positions as t3", "t3.id", "=", "t1.Position_id")
@@ -552,6 +562,14 @@ class MonthlyCheckingController extends Controller
             return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
         }
 
+        // PF-07: was scoping every read of these check-ins by department but
+        // not the creation itself — any HOD/EXCOM could schedule a check-in
+        // for an employee outside their own department.
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
+        if (is_array($scopedIds) && !in_array((int) $e->id, $scopedIds, true)) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to schedule a check-in for this employee.'], 403);
+        }
+
         DB::beginTransaction();
         try {
             $checkin = MonthlyCheckingModel::create([
@@ -614,7 +632,7 @@ class MonthlyCheckingController extends Controller
         // controller applies (index(), GetMonthlyCheckInDetails()) — any
         // HOD/EXCOM from any department could see every other department's
         // approved check-ins here, regardless of rank/dept.
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         $rows = MonthlyCheckingModel::with('employee.resortAdmin', 'employee.position')
             ->where('resort_id', $this->resort->resort_id)
             ->where('approval_status', 'approved')
@@ -768,7 +786,7 @@ class MonthlyCheckingController extends Controller
         // Same department-scoping gap as approvedList()/MonltyCheckInDetailsPageList()
         // — this is the HR/HOD-facing finalize action, not employee self-service, so
         // it needs the access check, not an emp_id-equals-self check.
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         if (is_array($scopedIds) && !in_array($checkin->emp_id, $scopedIds, true)) {
             return response()->json(['success' => false, 'message' => 'You are not authorized to finalize this check-in.'], 403);
         }
@@ -863,7 +881,7 @@ class MonthlyCheckingController extends Controller
         if (!$checkin) {
             return response()->json(['success' => false, 'message' => 'Check-in not found'], 404);
         }
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         if (is_array($scopedIds) && !in_array($checkin->emp_id, $scopedIds, true)) {
             return response()->json(['success' => false, 'message' => 'You are not authorized to re-initiate this check-in.'], 403);
         }
@@ -922,7 +940,7 @@ class MonthlyCheckingController extends Controller
 
     public function historyData(Request $request)
     {
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         $query = MonthlyCheckingModel::with('employee.resortAdmin', 'employee.position')
             ->where('resort_id', $this->resort->resort_id)
             ->when(is_array($scopedIds), fn($q) => $q->whereIn('emp_id', $scopedIds))

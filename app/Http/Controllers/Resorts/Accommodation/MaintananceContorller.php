@@ -63,6 +63,18 @@ class MaintananceContorller extends Controller
 
     public function __construct()
     {
+        // AC-03: HR-only forward/reject/hold/assign actions on maintenance
+        // requests — no separate Accommodation-manager role exists (product
+        // decision). Was completely ungated. Engineering HOD's own app-side
+        // assign/complete flow (a separate set of endpoints) is untouched.
+        $this->middleware('accommodation.hr')->only([
+            'HrForwardToHODManitenanceRequest',
+            'HrRejeactedRequest',
+            'MainRequestOnHold',
+            'HoldMaintanaceRequest',
+            'HodAssignToEmp',
+        ]);
+
         $this->resort =  auth()->guard('resort-admin')->user();
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
         if(!$this->resort) return;
@@ -70,7 +82,7 @@ class MaintananceContorller extends Controller
             $reporting_to =(isset( $this->resort->GetEmployee)) ?  $this->resort->GetEmployee->id:3;
             $this->underEmp_id = Common::getSubordinates($reporting_to);
         }
-        
+
     }
 
     public function CreateMaintenance()

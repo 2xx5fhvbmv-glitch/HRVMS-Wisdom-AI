@@ -21,6 +21,9 @@
       </div>
       <div class="card-body">
         <p class="login-box-msg">Sign in to start your session</p>
+        @if ($errors->any())
+          <div class="alert alert-danger">{{ $errors->first() }}</div>
+        @endif
         <form name="formLogin" id="formLogin" method="post">
           @csrf
           <div class="form-group">

@@ -201,10 +201,10 @@ class ExitClearanceController extends Controller
                 ->addColumn('employee_name', function ($employeeResignation) {
                     $image = Common::getResortUserPicture($employeeResignation->employee->Admin_Parent_id ?? null);
                     $name = optional(@$employeeResignation->employee->resortAdmin)->full_name;
-                   
+
                     return '<div class="tableUser-block">
                                 <div class="img-circle"><img src="' . $image . '" alt="user"></div>
-                                <span class="userApplicants-btn">' . ($name ? ucwords($name) : 'N/A') . '</span>
+                                <span class="userApplicants-btn">' . ($name ? e(ucwords($name)) : 'N/A') . '</span>
                             </div>';
                 })
                 ->addColumn('position', function ($employeeResignation) {

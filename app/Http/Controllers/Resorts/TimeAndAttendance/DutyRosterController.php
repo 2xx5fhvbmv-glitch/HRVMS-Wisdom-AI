@@ -386,6 +386,20 @@ class DutyRosterController extends Controller
             ], 422); // HTTP 422 Unprocessable Entity
         }
 
+        // A-06 (decided 2026-09-27): rosters are HR-full-access, or the
+        // target employee's own HOD/EXCOM (never themselves, never GM —
+        // GM's T&A role is view-only). Had zero role check before — any
+        // resort-portal user could roster any employee in any department.
+        $callerEmployee = $this->resort->GetEmployee ?? null;
+        foreach ($Employees as $targetEmpId) {
+            if (!Common::canManageAttendanceFor($targetEmpId, $callerEmployee)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'You are not authorized to roster one or more of the selected employees.',
+                ], 403);
+            }
+        }
+
         DB::beginTransaction();
         try {
             $shitTime = ShiftSettings::where('id', $Shift)->where('resort_id', $resort_id)->first();
@@ -763,6 +777,15 @@ class DutyRosterController extends Controller
             if (!$ownedEntry) {
                 return response()->json(['success' => false, 'message' => 'Record not found.'], 404);
             }
+        }
+
+        // A-06 (decided 2026-09-27): same roster-write gate as StoreDutyRoster —
+        // HR, or the target's own HOD/EXCOM (never GM, never the target
+        // themselves). Had zero role check before.
+        $targetEmpIdForGate = $ownedEntry->Emp_id ?? $request->emp_id ?? null;
+        $callerEmployee = $this->resort->GetEmployee ?? null;
+        if ($targetEmpIdForGate && !Common::canManageAttendanceFor($targetEmpIdForGate, $callerEmployee)) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to roster this employee.'], 403);
         }
 
         try{

@@ -214,7 +214,7 @@
                                                     </span>
                                                 @endforeach
                                                 @if($request->attachments)
-                                                    <a href="{{ URL::asset($request->attachments) }}" target="_blank">
+                                                    <a href="{{ \App\Helpers\Common::resolveLeaveAttachmentUrl($request->attachments) }}" target="_blank">
                                                         <img src="{{ URL::asset('resorts_assets/images/pdf1.svg') }}" alt="icon">
                                                     </a>
                                                 @endif
@@ -269,7 +269,7 @@
                                             <div class="d-flex">
                                                 <span class="badge" style="color:{{ $request->color }}; background:{{ $request->color }}1F;">{{ $request->leave_type ?? 'N/A' }}</span>
                                                 @if($request->attachments)
-                                                    <a href="{{ URL::asset($request->attachments) }}" target="_blank">
+                                                    <a href="{{ \App\Helpers\Common::resolveLeaveAttachmentUrl($request->attachments) }}" target="_blank">
                                                         <img src="{{ URL::asset('resorts_assets/images/pdf1.svg') }}" alt="icon">
                                                     </a>
                                                 @endif

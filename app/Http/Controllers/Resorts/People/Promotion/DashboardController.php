@@ -137,7 +137,7 @@ class DashboardController extends Controller
                         <div class="img-circle">
                             <img src="' . Common::getResortUserPicture($row->employee->Admin_Parent_id ?? null) . '" alt="user">
                         </div>
-                        <span>' . $row->employee->resortAdmin->full_name . '</span>
+                        <span>' . e($row->employee->resortAdmin->full_name) . '</span>
                     </div>';
             })
             ->addColumn('current_position', fn($row) => optional($row->currentPosition)->position_title ?? '—')

@@ -34,6 +34,22 @@ class ConfigurationController extends Controller
         if(!$this->resort) return;
         // $reporting_to = $this->resort->GetEmployee->id;
         // $this->underEmp_id = Common::getSubordinates($reporting_to);
+
+        // SO-03: every action here (teams, responders, roles/permissions,
+        // emergency types + their default team, emergency contact numbers)
+        // had no role/permission check at all — any logged-in portal user
+        // could change SOS settings. Decided rule: Security Manager ONLY,
+        // not HR/GM. One constructor-level gate covers every method in this
+        // controller instead of repeating the check per action. Same
+        // recognition mechanism as EnsureSOSSecurityManagerAccess (mobile's
+        // sos.manager middleware) so web and app can't disagree on who
+        // counts as the Security Manager.
+        $isMasterAdmin = (int) ($this->resort->is_master_admin ?? 0) === 1;
+        $employee = $this->resort->GetEmployee ?? null;
+        $isSecurityManager = optional(optional($employee)->position)->position_title === 'Security Manager';
+        if (!$isMasterAdmin && !$isSecurityManager) {
+            abort(403, 'Unauthorized action.');
+        }
     }
     public function index()
     {

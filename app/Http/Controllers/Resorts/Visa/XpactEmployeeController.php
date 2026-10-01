@@ -1078,8 +1078,24 @@ class XpactEmployeeController extends Controller
     {
      
         $ChildFiles = ChildFileManagement::where("id",base64_decode($id))->where("resort_id"   ,$this->resort->resort_id)->first();
-        if (isset($ChildFiles) && StorageHelper::disk()->exists($ChildFiles->File_Path)) 
-        {   
+
+        // FM-01: this was resort-scoped only — any portal user of any rank
+        // could pull and decrypt any other employee's document (passport,
+        // contract, medical cert, ...) just by knowing/guessing its id.
+        // Same combined FilePermissions()-or-FileShare gate used by
+        // FileManageController::ShowthefolderWiseData()/canManageFile(),
+        // shared here via Common::canAccessFile() since this controller has
+        // no access to FileManageController's protected helpers.
+        if (isset($ChildFiles) && !Common::canAccessFile($ChildFiles, $this->resort)) {
+            // A real HTTP error (rather than the plain-array 200 responses
+            // this method otherwise returns) so the calling views' shared
+            // ajax `error` handler shows a toast instead of trying to read
+            // NewURLshow/mimeType off a denial response.
+            return response()->json(['success' => false, 'message' => 'You do not have permission to view this file.'], 403);
+        }
+
+        if (isset($ChildFiles) && StorageHelper::disk()->exists($ChildFiles->File_Path))
+        {
 
             $key = hash('sha256', env('ENCRYPTION_KEY'), true);
             $encryptedData = StorageHelper::disk()->get($ChildFiles->File_Path);

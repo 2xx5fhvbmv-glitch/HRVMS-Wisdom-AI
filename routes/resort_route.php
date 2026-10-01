@@ -2081,8 +2081,10 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
     // Employee live location
     Route::get('sos/employees-live-location/{id}', 'SOS\DashboardController@showMap')->name('sos.showMap');
     Route::post('sos/filter-map-employee-list/{id?}', 'SOS\DashboardController@filterMapEmployeeList')->name('sos.filterMapEmployeeList');
-    // API route for live employee locations (used for auto-refresh)
-    Route::get('sos/all-employee-locations/{id}', 'SOS\DashboardController@getLiveEmployeeLocations')->name('sos.employeeLiveLocations');
+    // SO-01: sos.employeeLiveLocations pointed at DashboardController@getLiveEmployeeLocations,
+    // a method that doesn't exist anywhere in the controller (would 500 if ever hit) and isn't
+    // referenced by any view/JS — dead route, removed rather than implemented (YAGNI). Live
+    // location auto-refresh is served by filterMapEmployeeList/showMap above.
 
 
     //SOS Module end

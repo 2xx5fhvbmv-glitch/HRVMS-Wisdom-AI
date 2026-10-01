@@ -385,7 +385,7 @@ class PaymentRequestController extends Controller
                 
                     return '<div class="tableUser-block">
                                 <div class="img-circle"><img src="'.$row->ProfilePic.'" alt="user"></div>
-                                <span class="userApplicants-btn">'.$row->Emp_name.'</span>
+                                <span class="userApplicants-btn">'.e($row->Emp_name).'</span>
                             </div>';
                 })
                 ->addColumn('Position', fn($row) => $row->Position_name)

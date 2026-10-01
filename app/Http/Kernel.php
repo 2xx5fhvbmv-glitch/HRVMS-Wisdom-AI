@@ -84,6 +84,8 @@ class Kernel extends HttpKernel
         'forcePasswordChange' => \App\Http\Middleware\ForcePasswordChange::class,
         'revalidate' => \App\Http\Middleware\RevalidateBackHistory::class,
         'hasModuleAccess' => \App\Http\Middleware\CheckAdminModuleAccess::class,
+        'admin.security' => \App\Http\Middleware\AdminSecurity::class,
+        'admin.reauth' => \App\Http\Middleware\AdminReauth::class,
         'redirectIfNotCorrect.dashboard' => \App\Http\Middleware\RedirectIfNotCorrectDashboard::class,
         'checkResortPermission' => \App\Http\Middleware\CheckResortPermission::class,
         'applyResortSmtp' => \App\Http\Middleware\ApplyResortSmtpConfig::class,
@@ -105,6 +107,7 @@ class Kernel extends HttpKernel
         'payroll.access' => \App\Http\Middleware\EnsurePayrollAccess::class,
         'visa.access' => \App\Http\Middleware\EnsureVisaAccess::class,
         'visa.write' => \App\Http\Middleware\EnsureVisaWriteAccess::class,
+        'accommodation.hr' => \App\Http\Middleware\EnsureAccommodationHRAccess::class,
 
 
 

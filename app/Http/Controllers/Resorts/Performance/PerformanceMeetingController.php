@@ -72,7 +72,7 @@ class PerformanceMeetingController extends Controller
 
     public function calendarData(Request $request)
     {
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         // Only show meetings that have at least one accepted participant
         $meetings = PeformanceMeeting::where('resort_id', $this->resort->resort_id)
             ->whereHas('participants', function($q) {
@@ -140,7 +140,7 @@ class PerformanceMeetingController extends Controller
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth = Carbon::now()->endOfMonth();
 
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         $meetings = PeformanceMeeting::where('resort_id', $this->resort->resort_id)
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->when(is_array($scopedIds), function ($q) use ($scopedIds) {
@@ -261,7 +261,7 @@ class PerformanceMeetingController extends Controller
 
     public function meetingsListData(Request $request)
     {
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         $meetings = PeformanceMeeting::where('resort_id', $this->resort->resort_id)
             ->when(is_array($scopedIds), function ($q) use ($scopedIds) {
                 $q->whereIn('id', function ($sub) use ($scopedIds) {
@@ -443,6 +443,10 @@ class PerformanceMeetingController extends Controller
             'status'         => 'accept',
         ]);
 
+        // PF-07: was unscoped — a HOD/EXCOM could schedule/invite an employee
+        // from any department, not just their own.
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
+
         foreach ($request->Emp_id as $encodedId) {
             // Was unscoped — any resort's employee id could be invited,
             // enrolled into this resort's calendar, and emailed a real
@@ -453,6 +457,7 @@ class PerformanceMeetingController extends Controller
                 ->first();
 
             if (!$employee || !$employee->resortAdmin) continue;
+            if (is_array($scopedIds) && !in_array((int) $employee->id, $scopedIds, true)) continue;
 
             // Create participant record with unique token
             $token = Str::random(48);

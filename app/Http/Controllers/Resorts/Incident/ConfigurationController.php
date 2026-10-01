@@ -104,6 +104,12 @@ class ConfigurationController extends Controller
 
     public function storeCategories(Request $request)
     {
+        // IN-03: no role check at all — any logged-in resort-portal user
+        // could add Incident categories.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $request->validate([
             'category_name.*' => 'required|string|max:255',
         ]);
@@ -134,6 +140,11 @@ class ConfigurationController extends Controller
 
     public function categoryInlineUpdate(Request $request,$id)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $Main_id = (int) base64_decode($request->Main_id);
 
         $resort_id = $this->resort->resort_id;
@@ -186,7 +197,20 @@ class ConfigurationController extends Controller
 
     public function categoryDestory($id)
     {
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $id = base64_decode($id);
+
+        // IN-01: return 404 (not a silent no-op) when the category doesn't
+        // belong to this resort, and do the ownership check BEFORE touching
+        // any child rows.
+        $category = IncidentCategory::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$category) {
+            abort(404, 'Category not found.');
+        }
+
         DB::beginTransaction();
         try
         {
@@ -195,7 +219,7 @@ class ConfigurationController extends Controller
             // resort_id, so scope both deletes directly rather than via a
             // subquery.
             IncidentSubCategory::where("category_id",$id)->where('resort_id', $this->resort->resort_id)->delete();
-            IncidentCategory::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
+            $category->delete();
 
             DB::commit();
             return response()->json([
@@ -215,6 +239,11 @@ class ConfigurationController extends Controller
 
     public function storeSubCategories(Request $request)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'category_id' => 'required|exists:incident_categories,id',
             'subcategory_name' => 'required|array|min:1',
@@ -317,6 +346,11 @@ class ConfigurationController extends Controller
 
     public function subcategoryinlineUpdate(Request $request, $id)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $Main_id = (int) base64_decode($request->Main_id);
 
         $resort_id = $this->resort->resort_id;
@@ -363,12 +397,24 @@ class ConfigurationController extends Controller
 
     public function subcategoryDestory($id)
     {
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $id = base64_decode($id);
+
+        // IN-01: return 404 (not a silent no-op) when it doesn't belong to
+        // this resort, rather than deleting-nothing and reporting success.
+        $subcategory = IncidentSubCategory::where("id",$id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$subcategory) {
+            abort(404, 'Sub-category not found.');
+        }
+
         DB::beginTransaction();
         try
         {
             // IN-01: unscoped — deleted another resort's subcategory by id.
-            IncidentSubCategory::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
+            $subcategory->delete();
 
             DB::commit();
             return response()->json([
@@ -388,6 +434,11 @@ class ConfigurationController extends Controller
 
     public function storeCommittees(Request $request)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'CommitteeName'  => [
                 'required',
@@ -507,14 +558,31 @@ class ConfigurationController extends Controller
 
     public function committeeDestory($id)
     {
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $id = base64_decode($id);
+
+        // IN-01: the name lookup was resort-scoped but the member/committee
+        // deletes below were NOT — incident_committee_members carries no
+        // resort_id of its own, so an unscoped where('commitee_id', $id)
+        // could wipe another resort's committee roster by guessing an id.
+        // Resolve (and 404 on) the scoped committee FIRST, before touching
+        // any child rows, then the child deletes are safe because $id is
+        // now proven to belong to this resort's committee.
+        $committee = IncidentCommittee::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$committee) {
+            abort(404, 'Committee not found.');
+        }
+        $removedCommitteeName = $committee->commitee_name;
+
         DB::beginTransaction();
         try
         {
-            $removedCommitteeName = IncidentCommittee::where('id', $id)->where('resort_id', $this->resort->resort_id)->value('commitee_name');
             $removedMemberIds = IncidentCommitteeMember::where("commitee_id",$id)->pluck('member_id')->all();
             IncidentCommitteeMember::where("commitee_id",$id)->delete();
-            IncidentCommittee::where("id",$id)->delete();
+            $committee->delete();
 
             DB::commit();
 
@@ -538,8 +606,13 @@ class ConfigurationController extends Controller
         }
     }
 
-    public function committeeInlineUpdate(Request $request, $id) 
+    public function committeeInlineUpdate(Request $request, $id)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $id = base64_decode($id); // Decode the ID
 
         // Validate input
@@ -617,6 +690,11 @@ class ConfigurationController extends Controller
     }
 
     public function storeResolutionTimeline(Request $request) {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            abort(403, 'Only HR can manage Incident settings.');
+        }
+
         $request->validate([
             'high_priority' => 'required|string|max:255',
             'medium_priority' => 'required|string|max:255',
@@ -643,6 +721,11 @@ class ConfigurationController extends Controller
 
     public function storeMeetingReminder(Request $request)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $request->validate([
             'reminder' => 'required|string',
         ]);
@@ -654,6 +737,11 @@ class ConfigurationController extends Controller
 
     public function saveSeverityLevels(Request $request)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $request->validate([
             'severity' => 'required|array',
             'severity.*' => 'string'
@@ -675,6 +763,11 @@ class ConfigurationController extends Controller
 
     public function saveStatus(Request $request)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $request->validate([
             'status' => 'required|array',
             'status.*' => 'string'
@@ -696,8 +789,13 @@ class ConfigurationController extends Controller
 
     public function storeFolloupActions(Request $request)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $resort_id = $this->resort->resort_id ?? null;
-    
+
         // Validate followup actions
         $validator = Validator::make($request->all(), [
             'followup_actions' => 'required|array|min:1',
@@ -778,6 +876,11 @@ class ConfigurationController extends Controller
 
     public function folloupActionsinlineUpdate(Request $request, $id)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $Main_id = (int) base64_decode($request->Main_id);
 
         $resort_id = $this->resort->resort_id;
@@ -817,12 +920,24 @@ class ConfigurationController extends Controller
 
     public function folloupActionsDestory($id)
     {
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $id = base64_decode($id);
+
+        // IN-01: return 404 (not a silent no-op) when it doesn't belong to
+        // this resort.
+        $action = IncidentFollowupActions::where("id",$id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$action) {
+            abort(404, 'Follow-up action not found.');
+        }
+
         DB::beginTransaction();
         try
         {
             // IN-01: unscoped — deleted another resort's follow-up action.
-            IncidentFollowupActions::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
+            $action->delete();
 
             DB::commit();
             return response()->json([
@@ -842,6 +957,11 @@ class ConfigurationController extends Controller
 
     public function storeActionTaken(Request $request)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'action_taken' => 'required|array|min:1',
             'action_taken.*' => 'required|string|max:100|distinct',
@@ -915,6 +1035,11 @@ class ConfigurationController extends Controller
 
     public function actionTakeninlineUpdate(Request $request, $id)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $Main_id = (int) base64_decode($request->Main_id);
 
         $resort_id = $this->resort->resort_id;
@@ -954,12 +1079,24 @@ class ConfigurationController extends Controller
 
     public function actionTakenDestory($id)
     {
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $id = base64_decode($id);
+
+        // IN-01: return 404 (not a silent no-op) when it doesn't belong to
+        // this resort.
+        $actionTaken = IncidentActionTaken::where("id",$id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$actionTaken) {
+            abort(404, 'Action Taken not found.');
+        }
+
         DB::beginTransaction();
         try
         {
             // IN-01: unscoped — deleted another resort's action-taken row.
-            IncidentActionTaken::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
+            $actionTaken->delete();
 
             DB::commit();
             return response()->json([
@@ -979,6 +1116,11 @@ class ConfigurationController extends Controller
 
     public function storeOutcomeType(Request $request)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'outcome_type' => 'required|array|min:1',
             'outcome_type.*' => 'required|string|max:100|distinct',
@@ -1052,6 +1194,11 @@ class ConfigurationController extends Controller
 
     public function outcomeTypeinlineUpdate(Request $request, $id)
     {
+        // IN-03: no role check at all.
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $Main_id = (int) base64_decode($request->Main_id);
 
         $resort_id = $this->resort->resort_id;
@@ -1091,12 +1238,24 @@ class ConfigurationController extends Controller
 
     public function outcomeTypeDestory($id)
     {
+        if (!Common::isIncidentHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can manage Incident settings.'], 403);
+        }
+
         $id = base64_decode($id);
+
+        // IN-01: return 404 (not a silent no-op) when it doesn't belong to
+        // this resort.
+        $outcomeType = IncidentOutcomeType::where("id",$id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$outcomeType) {
+            abort(404, 'Outcome Type not found.');
+        }
+
         DB::beginTransaction();
         try
         {
             // IN-01: unscoped — deleted another resort's outcome type.
-            IncidentOutcomeType::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
+            $outcomeType->delete();
 
             DB::commit();
             return response()->json([

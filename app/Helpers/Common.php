@@ -4555,6 +4555,33 @@ class Common
     }
 
     /**
+     * Incident settings access gate (security audit IN-03, same shape as
+     * Disciplinary's isDisciplinaryHR()/D-04): HR has full access to all
+     * Incident configuration (categories, sub-categories, committees,
+     * follow-up actions, actions taken, outcome types, resolution
+     * timelines, meeting reminders, severity levels, statuses). GM is
+     * deliberately excluded — per the decided access rules, GM's role on
+     * Incidents is view-all + approve/reject only (already correct via
+     * approve()/approveOrReject()), never settings. Was completely
+     * ungated: any resort-portal user of any rank could create/edit these.
+     */
+    public static function isIncidentHR($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        if ((int) $employee->rank === 3) return true; // HR
+        return in_array((int) $employee->rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null); // HR HOD/EXCOM
+    }
+
+    /**
      * Stricter per-record gate for the Incident Investigation page. The
      * listing scope (scopeIncidentsForViewer) lets a reporter's-dept user
      * see incidents on the index, but the investigation page contains the
@@ -4594,20 +4621,33 @@ class Common
         }
 
         // Committee members assigned to THIS incident.
-        $assignedCommitteeIds = [];
-        $raw = $incident->assigned_to ?? null;
-        if (is_string($raw)) {
-            $decoded = json_decode($raw, true);
-            if (is_array($decoded)) $assignedCommitteeIds = $decoded;
-        } elseif (is_array($raw)) {
-            $assignedCommitteeIds = $raw;
-        }
-        $assignedCommitteeIds = array_map('intval', $assignedCommitteeIds);
+        $assignedCommitteeIds = self::incidentAssignedCommitteeIds($incident);
         if (empty($assignedCommitteeIds)) return false;
 
         return \App\Models\IncidentCommitteeMember::where('member_id', $emp->id)
             ->whereIn('commitee_id', $assignedCommitteeIds)
             ->exists();
+    }
+
+    /**
+     * Decode incidents.assigned_to (JSON array of incident_committee ids,
+     * written by IncidentController::assign()) into a normalized int[].
+     * Shared by canViewIncidentInvestigation() above and
+     * IncidentController::storeInvestigation()'s write-gate (IN-02) so both
+     * "can view" and "can write findings" agree on what "assigned to this
+     * incident" means.
+     */
+    public static function incidentAssignedCommitteeIds($incident): array
+    {
+        $ids = [];
+        $raw = $incident->assigned_to ?? null;
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) $ids = $decoded;
+        } elseif (is_array($raw)) {
+            $ids = $raw;
+        }
+        return array_map('intval', $ids);
     }
 
     /**
@@ -4676,7 +4716,14 @@ class Common
         }
     }
 
-    public static function getPerformanceScopedEmpIds()
+    /**
+     * PF-07: $module lets a caller opt into tightened Performance-module rules
+     * without touching Learning/People/report callers that pass no $module
+     * (their behavior is byte-for-byte unchanged below). $area='pdp' is the
+     * one Performance sub-case that still needs L&D-leadership full access
+     * (training plans); everything else Performance-related does not.
+     */
+    public static function getPerformanceScopedEmpIds($module = null, $area = null)
     {
         $user = \Auth::guard('resort-admin')->user();
         if (!$user) return [];
@@ -4686,8 +4733,17 @@ class Common
             return null;
         }
 
+        $isPerformance = $module === 'performance';
+
         $emp = $user->GetEmployee ?? null;
-        if (!$emp) return null;
+        if (!$emp) {
+            // PF-07: a portal account with no employee record used to get
+            // resort-wide visibility via this unconditional `return null`.
+            // Performance callers (pass $module='performance') get no access
+            // instead; Learning/People/report callers (no $module) keep the
+            // old behavior.
+            return $isPerformance ? [] : null;
+        }
 
         $rank = (int) $emp->rank;
         $positionTitle = optional($emp->position)->position_title;
@@ -4697,20 +4753,38 @@ class Common
             return null;
         }
 
+        if ($isPerformance) {
+            // PF-07: L&D dept/leadership got unconditional resort-wide
+            // visibility below for every caller (shared with Learning). For
+            // Performance specifically: only the L&D Manager-equivalent
+            // titles may read PDP (training plans) — everyone else in L&D,
+            // including that same leadership outside the PDP area (review
+            // scores, GM review, KPI, meetings, check-ins), is scoped to
+            // their own record only.
+            $isLdLeadership = in_array($positionTitle, self::ldLeadershipTitles(), true);
+            $isLdStaff = $isLdLeadership || self::isLDDepartment($emp->Dept_id ?? null);
+            if ($isLdStaff && !($area === 'pdp' && $isLdLeadership)) {
+                return [(int) $emp->id];
+            }
+        }
+
         // Position titles that always get full resort-wide visibility for Learning /
         // Performance modules — L&D leadership, HR leadership, and General Manager
         // (covered by rank 8 too, kept here in case a record has the title without
-        // the rank set correctly).
+        // the rank set correctly). For Performance, the L&D-leadership branch above
+        // already intercepted the PDP carve-out, so reaching here with $isPerformance
+        // true means this is an HR/GM title (L&D titles were handled above).
         $fullAccessTitles = self::fullAccessPositionTitles();
         if (in_array($positionTitle, $fullAccessTitles, true)) {
             return null;
         }
 
-        // Anyone working in the L&D department gets full visibility for Learning /
-        // Performance modules — title is often misconfigured (e.g. "Club Floor Manager"
+        // Anyone working in the L&D department gets full visibility for Learning
+        // modules — title is often misconfigured (e.g. "Club Floor Manager"
         // assigned to the Learning and Development dept), so the dept itself is the
-        // reliable signal for L&D-team membership.
-        if (self::isLDDepartment($emp->Dept_id ?? null)) {
+        // reliable signal for L&D-team membership. Performance already handled L&D
+        // above, so this only applies to non-Performance ($isPerformance false) callers.
+        if (!$isPerformance && self::isLDDepartment($emp->Dept_id ?? null)) {
             return null;
         }
 
@@ -4736,6 +4810,178 @@ class Common
         if (!is_array($ids)) $ids = [];
         $ids[] = $emp->id;
         return array_values(array_unique($ids));
+    }
+
+    /**
+     * L&D leadership titles — the subset of fullAccessPositionTitles() that is
+     * L&D-specific (as opposed to HR/GM leadership). Used only by the
+     * Performance-module tightening in getPerformanceScopedEmpIds() above.
+     */
+    private static function ldLeadershipTitles()
+    {
+        return ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+    }
+
+    /**
+     * Strict "HR" check — HR generalist (rank 3) or HR-department HOD/EXCOM
+     * (rank 1/2 inside the HR department), or super/master admin. Unlike
+     * hasFullDataAccess(), this deliberately EXCLUDES the GM (rank 8) — for
+     * Performance settings/config surfaces where GM can read everything but
+     * has no settings access (PF-07 decided rules).
+     */
+    public static function isHR($employee = null)
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        $rank = (int) $employee->rank;
+        return $rank === 3 || (in_array($rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null));
+    }
+
+    /**
+     * File Management "sees everything" gate (security audit FM-04, decided
+     * rule): ONLY the HR department's HOD (rank 2) or EXCOM (rank 1), plus
+     * super/master admin. Deliberately narrower than isHR() above and the
+     * old File Management privileged set — this REMOVES blanket access for
+     * GM (rank 8), MD (rank 9), any MGR (rank 4) in any department, and
+     * rank-3 HR generalists who aren't the HR department's HOD/EXCOM.
+     * Single source of truth for every File Management privileged-group
+     * check (Common::FilePermissions(), FileManageController's
+     * visibleFolderIdsForCurrentUser()/StoreFolderFiles()/canManageFolder(),
+     * FileShareController's ownsShareable(), FilePermissionController) so
+     * they can't drift apart again (invariant #7).
+     */
+    public static function isFileManagementPrivileged($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        $rank = (int) ($employee->rank ?? 0);
+        return in_array($rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null);
+    }
+
+    /**
+     * FM-01: combined "can this portal user open this file" check — the
+     * same Common::FilePermissions() rank/ownership gate
+     * ShowthefolderWiseData()/canManageFile() already use, OR an explicit
+     * FileShare grant (mirrors FileManageController::userHasReceivedShareForFile()).
+     * Extracted here so XpactEmpFileDownload() (a different controller,
+     * without access to FileManageController's protected helpers) can reuse
+     * the exact same rule instead of re-deriving it.
+     */
+    public static function canAccessFile($file, $resort): bool
+    {
+        if (!$file || !$resort) return false;
+
+        $parentFolder = \App\Models\FilemangementSystem::where('id', $file->Parent_File_ID)
+            ->where('resort_id', $resort->resort_id)
+            ->first(['Folder_Type']);
+        $accessFlag = $parentFolder->Folder_Type ?? 'categorized';
+        $accessCheck = self::FilePermissions($file->unique_id, $resort, $accessFlag);
+        if (is_array($accessCheck) && !empty($accessCheck['type']) && $accessCheck['type'] === true) {
+            return true;
+        }
+
+        $emp = $resort->GetEmployee ?? null;
+        if (!$emp) return false;
+
+        $orgShare = \DB::table('file_shares')
+            ->where('shareable_type', 'file')
+            ->where('shareable_id', $file->id)
+            ->where('share_mode', 'internal')
+            ->where('scope_type', 'organization')
+            ->where('resort_id', $emp->resort_id)
+            ->exists();
+        if ($orgShare) return true;
+
+        $directHit = \DB::table('file_shares as fs')
+            ->join('file_share_employees as fse', 'fse.share_id', '=', 'fs.id')
+            ->where('fs.shareable_type', 'file')
+            ->where('fs.shareable_id', $file->id)
+            ->where('fse.employee_id', $emp->id)
+            ->exists();
+        if ($directHit) return true;
+
+        if ($emp->Dept_id) {
+            $deptHit = \DB::table('file_shares as fs')
+                ->join('file_share_departments as fsd', 'fsd.share_id', '=', 'fs.id')
+                ->where('fs.shareable_type', 'file')
+                ->where('fs.shareable_id', $file->id)
+                ->where('fsd.department_id', $emp->Dept_id)
+                ->exists();
+            if ($deptHit) return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Learning module "full access" gate (security audit LR-06, product
+     * decision 2026-09-30): HR and L&D Manager have full access to Learning
+     * settings/programs/forms/attendance. Deliberately EXCLUDES the GM
+     * (rank 8) — GM may view everything in the module but has no edit/
+     * settings access, same shape as isHR() for Performance.
+     */
+    public static function canManageLearning($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        $rank = (int) ($employee->rank ?? 0);
+        if ($rank === 3 || (in_array($rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null))) {
+            return true; // HR
+        }
+
+        $positionTitle = optional($employee->position)->position_title;
+        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        return in_array($positionTitle, $ldManagerTitles, true);
+    }
+
+    /**
+     * Learning attendance-marking gate (security audit LR-02/LR-06, product
+     * decision 2026-09-30): HR and L&D Manager (by title) may mark attendance
+     * on ANY training schedule. Other L&D-department staff and the session's
+     * own trainer (learning_programs.trainer) may only mark attendance for
+     * THAT specific schedule — the schema has no separate "assigned staff"
+     * table, so the program's trainer field is the closest real signal for
+     * "assigned to this session". Everyone else — including GM and HOD/EXCOM,
+     * who keep read-only request/progress visibility elsewhere in this
+     * module — is denied. Caller is responsible for any super/master-admin
+     * bypass (this only evaluates the employee record).
+     */
+    public static function canMarkLearningAttendance($employee, $trainingSchedule): bool
+    {
+        if (!$employee || !$trainingSchedule) return false;
+
+        if (self::canManageLearning($employee)) return true;
+
+        $learningProgram = $trainingSchedule->learningProgram
+            ?? \App\Models\LearningProgram::find($trainingSchedule->training_id);
+        $isTrainerOfSession = $learningProgram && (int) $learningProgram->trainer === (int) $employee->id;
+        $isLdDeptStaff = self::isLDDepartment($employee->Dept_id ?? null);
+
+        return $isTrainerOfSession || $isLdDeptStaff;
     }
 
     /**
@@ -4862,12 +5108,12 @@ class Common
      * resort_admins row (shared 'resort-admins' provider), so lockout state
      * lives here once and both call sites share this trio of helpers.
      */
-    public static function isAccountLocked(ResortAdmin $admin): bool
+    public static function isAccountLocked(ResortAdmin|Admin $admin): bool
     {
         return $admin->locked_until && Carbon::parse($admin->locked_until)->isFuture();
     }
 
-    public static function registerFailedLogin(ResortAdmin $admin): void
+    public static function registerFailedLogin(ResortAdmin|Admin $admin): void
     {
         $admin->failed_login_attempts = ($admin->failed_login_attempts ?? 0) + 1;
 
@@ -4882,7 +5128,7 @@ class Common
         $admin->save();
     }
 
-    public static function registerSuccessfulLogin(ResortAdmin $admin): void
+    public static function registerSuccessfulLogin(ResortAdmin|Admin $admin): void
     {
         if ($admin->failed_login_attempts || $admin->locked_until) {
             $admin->failed_login_attempts = 0;
@@ -4891,8 +5137,13 @@ class Common
         }
     }
 
-    private static function notifyAccountLocked(ResortAdmin $admin): void
+    private static function notifyAccountLocked(ResortAdmin|Admin $admin): void
     {
+        // Super-admin console: cross-tenant reach, so alert every owner too.
+        if ($admin instanceof Admin) {
+            self::alertSuperAdmins($admin, 'Super-admin account locked', 'The super-admin account ' . $admin->email . ' was locked for ' . self::LOGIN_LOCKOUT_MINUTES . ' minutes after ' . self::LOGIN_LOCKOUT_THRESHOLD . ' failed login attempts (last from IP ' . request()->ip() . '). If this wasn\'t you, treat it as an attack.');
+            return;
+        }
         try {
             $name = trim($admin->first_name . ' ' . $admin->last_name) ?: $admin->email;
             self::applyResortSmtpConfig($admin->resort_id);
@@ -4907,6 +5158,25 @@ class Common
             ));
         } catch (\Exception $e) {
             \Log::warning('Account-lock notification failed for ' . $admin->email . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Security alert for the super-admin console (advisory decision E2):
+     * emails the affected account plus every active `super` admin. Never
+     * throws — an alert failure must not break the login it reports on.
+     */
+    public static function alertSuperAdmins(Admin $subject, string $title, string $body): void
+    {
+        try {
+            $emails = Admin::where('type', 'super')->where('status', 'active')->pluck('email')
+                ->push($subject->email)->unique()->filter();
+            \Log::warning('[admin-security] ' . $title . ': ' . $body);
+            foreach ($emails as $email) {
+                Mail::to($email)->send(new \App\Mail\IncidentNotificationMail('Wisdom owner', $title, $body));
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Super-admin alert failed: ' . $e->getMessage());
         }
     }
 
@@ -5449,6 +5719,71 @@ class Common
             && self::isHousekeepingDepartment($employee->Dept_id ?? null);
     }
 
+    /**
+     * A-04: generic version of getResortHousekeepingHodXcomEmployeeIds()
+     * above — the HOD/EXCOM (rank 1/2) of a GIVEN department, not a
+     * hardcoded one. Used to route a geofence-review notification to the
+     * flagged employee's own department leadership.
+     */
+    public static function getDepartmentHodExcomEmployeeIds($resortId, $deptId)
+    {
+        if (!$deptId) {
+            return [];
+        }
+
+        return \App\Models\Employee::where('resort_id', $resortId)
+            ->where('Dept_id', $deptId)
+            ->whereIn('rank', [1, 2])
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->pluck('id')
+            ->map(fn($v) => (int) $v)
+            ->all();
+    }
+
+    /**
+     * A-04 (decided 2026-09-27): a punch outside the assigned geofence is
+     * allowed (never blocks check-in/out — GPS from a phone can be faked,
+     * so this is a signal, not proof) but flagged for the employee's own
+     * HOD/EXCOM (or HR, if the department has none) to confirm or reject.
+     * Shared by manualCheckIn()/manualCheckOut() — both compute a fresh
+     * geofence check per punch, so either can flag the same attendance day.
+     * ponytail: always re-flags to 'pending' on a new out-of-zone punch,
+     * even if a prior punch that day was already reviewed — re-review on
+     * every new breach is the safer default; a "don't re-flag an already-
+     * confirmed day" carve-out can be added if that turns out too noisy.
+     */
+    public static function flagGeofenceReviewIfNeeded($parentAttendance, $resortId, $employee, $withinGeofence)
+    {
+        if ($withinGeofence !== false || !$parentAttendance) {
+            return;
+        }
+
+        $parentAttendance->geofence_review_status = 'pending';
+        $parentAttendance->geofence_reviewed_by = null;
+        $parentAttendance->save();
+
+        $reviewerIds = self::getDepartmentHodExcomEmployeeIds($resortId, $employee->Dept_id ?? null);
+        if (empty($reviewerIds)) {
+            $reviewerIds = self::getResortHrEmployeeIds($resortId);
+        }
+        if (empty($reviewerIds)) {
+            return;
+        }
+
+        $employeeName = trim(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')) ?: 'An employee';
+        self::notifyEmployees(
+            $resortId,
+            $reviewerIds,
+            'Attendance Outside Geofence — Review Needed',
+            $employeeName . '\'s attendance for ' . ($parentAttendance->date ?? 'today') . ' was punched outside the assigned zone and needs your confirmation.',
+            'Attendance',
+            $parentAttendance->id,
+            'geofence-review'
+        );
+    }
+
     public static function getResortHousekeepingHodXcomEmployeeIds($resortId)
     {
         $hkDeptIds = \App\Models\ResortDepartment::where('resort_id', $resortId)
@@ -5802,6 +6137,73 @@ class Common
     }
 
     /**
+     * Accommodation settings/write gate (security audit AC-03, product
+     * decision): HR only — no separate Accommodation-manager role exists.
+     * Engineering HOD keeps their own existing app-side rank guard for
+     * assigning/completing maintenance jobs (untouched by this gate).
+     * HOD/EXCOM and GM are view-only for this module; everyone else is
+     * restricted to their own room/requests — neither gets this gate.
+     */
+    public static function canWriteAccommodation($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        return (int) $employee->rank === 3; // HR
+    }
+
+    /**
+     * Disciplinary access gate (security audit D-04, product decision
+     * 2026-09-27): HR full access (settings, create, edit, close, reports);
+     * GM read-only on cases/reports, never settings — canAccessDisciplinary()
+     * alone does not admit GM, unlike hasFullDataAccess(). HOD/EXCOM and
+     * committee-member visibility is case-specific (own department, own
+     * committee) and is checked per-row in DisciplinaryController, not here.
+     * Was completely ungated — resort_id scoping only, any portal user of
+     * any rank could open/create/close any case and edit every setting.
+     */
+    public static function isDisciplinaryHR($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        if ((int) $employee->rank === 3) return true; // HR
+        return in_array((int) $employee->rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null); // HR HOD/EXCOM
+    }
+
+    /**
+     * GM read-only slice of Disciplinary access — reports and any case,
+     * view only. Deliberately excludes master admin/HR (they already pass
+     * isDisciplinaryHR()) so callers can tell the two apart.
+     */
+    public static function isDisciplinaryGM($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if ($user->is_master_admin ?? 0) return false;
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        return (int) $employee->rank === 8;
+    }
+
+    /**
      * Manning & Budgeting access tiers (security audit W-03, product
      * decision 2026-09-26):
      *   - 'full'           HR / Finance / master admin — view all
@@ -5852,13 +6254,19 @@ class Common
     }
 
     /**
-     * A-01/A-02 (Time & Attendance audit): who may approve/edit another
-     * employee's attendance record (check-in/out, overtime approval).
-     * HR/GM/master admin (hasFullDataAccess) may act on anyone. Otherwise
-     * the caller must be a HOD/EXCOM of the TARGET employee's own
-     * department — and never the target themselves, even if they hold
-     * that rank in that department ("decided: never allowed", same rule
-     * already applied for PE-07/L-06 self-approval).
+     * A-01/A-02/A-06 (Time & Attendance audit): who may approve/edit another
+     * employee's attendance record (check-in/out, overtime approval,
+     * rosters). A-06's decision text, received later than A-01/A-02 but
+     * covering the whole T&A module, is explicit: "HR: ...attendance
+     * corrections and overtime approval for anyone except themselves. GM:
+     * view the whole resort; no settings, no edits. HOD/EXCOM/MGR: ...for
+     * their own department only, never for themselves." Every caller of
+     * this method (OT approval, attendance-history rewrite, duty rosters)
+     * is a T&A write path the decision covers, so GM is excluded uniformly
+     * — not just hasFullDataAccess()'s broader HR+GM bucket used before
+     * A-06's text arrived. Never the target themselves, even if they hold
+     * HOD/EXCOM rank in that department ("decided: never allowed", same
+     * rule already applied for PE-07/L-06 self-approval).
      */
     public static function canManageAttendanceFor($targetEmployeeId, $callerEmployee = null): bool
     {
@@ -5878,7 +6286,7 @@ class Common
         // Never self, regardless of rank.
         if ((int) $targetEmployeeId === (int) $callerEmployee->id) return false;
 
-        if (self::hasFullDataAccess($callerEmployee)) return true;
+        if (self::isHR($callerEmployee)) return true;
 
         $rankPosition = self::getEmployeeRankPosition($callerEmployee);
         if (!in_array($rankPosition['rank'] ?? null, ['HOD', 'EXCOM'], true)) return false;
@@ -5924,6 +6332,97 @@ class Common
         if (!$employee || !$employee->Dept_id) return [];
 
         return [(int) $employee->Dept_id];
+    }
+
+    /**
+     * R-01 (Reports security audit): report-builder/predefined-report access
+     * gate, keyed by the 'access' tag on a config/report_fields.php entity
+     * (or passed directly by a predefined report controller). Returns:
+     *   null  => unrestricted — may run/see the whole resort's data
+     *   array => allowed department ids — narrow the query to these
+     *   false => no report access to this data source at all
+     *
+     * Reuses each module's already-decided access rule instead of the
+     * generic hasFullDataAccess()/getScopedDepartmentIds() baseline, which
+     * wrongly admitted e.g. L&D managers to Payroll reports and gave every
+     * HOD their own department's data regardless of whether their
+     * department should see that module's reports at all:
+     *   - payroll: HR + Finance only (Common::canAccessPayroll()), whole
+     *     resort (not narrowed to their own department — payroll isn't
+     *     organised by the viewer's department). GM/HOD get no access.
+     *   - visa: HR full, Finance (money + read), GM (read-only) — the same
+     *     canAccessVisa() gate already decided for the module (V-02).
+     *     Read-only is moot for a report (reports never write), so GM gets
+     *     the same null as HR/Finance.
+     *   - budget: same 'full'/'approve' tiers as budgetAccessLevel() (W-03)
+     *     — HR/Finance/master admin and GM get whole-resort report access,
+     *     an 'own_department' HOD/EXCOM gets none (that tier exists for the
+     *     manning/budget screens, not reports).
+     *   - grievance / disciplinary / incident: no case-level "assigned
+     *     investigator" scope exists for these aggregate reports, so it's
+     *     HR/GM/master-admin (hasFullDataAccess()) or nothing — matching
+     *     what GrievanceReportController/IncidentReportController already
+     *     enforce in their constructors.
+     *   - everything else ('general', 'people', ...): no bespoke decision:
+     *     falls back to the resort-wide baseline (CLAUDE.md invariant #5) —
+     *     full for HR/GM/L&D/master admin, own department for HOD/EXCOM,
+     *     none otherwise.
+     */
+    public static function canRunReport(string $access)
+    {
+        return match ($access) {
+            'payroll' => self::canAccessPayroll() ? null : false,
+            'visa' => self::canAccessVisa() ? null : false,
+            'budget' => in_array(self::budgetAccessLevel(), ['full', 'approve'], true) ? null : false,
+            'grievance', 'disciplinary', 'incident' => self::hasFullDataAccess() ? null : false,
+            default => self::hasFullDataAccess() ? null : (self::getScopedDepartmentIds() ?: false),
+        };
+    }
+
+    /**
+     * R-04 item 3 (Reports security audit): strip PII/financial columns from
+     * report data before it is sent to the external AI-insights service —
+     * regardless of whether the viewer is entitled to see them on screen,
+     * bank/passport numbers have no business leaving the system for a
+     * narrative summary, and raw per-employee salary figures are withheld
+     * from below-HR-level viewers (e.g. Finance, who can see payroll
+     * reports on screen per canAccessPayroll() but aren't "HR-level" for
+     * this stricter external-sharing rule). Matched by report column label
+     * substring, case-insensitive. Returns [columns, rows] with the matched
+     * columns removed from both; aggregate reports with no such columns are
+     * returned unchanged.
+     */
+    public static function stripSensitiveReportColumnsForAi(array $columns, array $rows, $resortAdminUser = null): array
+    {
+        $user = $resortAdminUser ?? \Auth::guard('resort-admin')->user();
+        $isHRLevel = $user && (
+            ($user->type ?? null) === 'super'
+            || ($user->is_master_admin ?? 0)
+            || (int) (optional($user->GetEmployee ?? null)->rank) === 3
+        );
+
+        $patterns = ['passport', 'account number', 'account no', 'bank account', 'iban', 'swift'];
+        if (!$isHRLevel) {
+            $patterns = array_merge($patterns, ['salary', 'earnings', 'net pay', 'basic pay', 'kpi bonus', 'allowance', 'deduction']);
+        }
+
+        $drop = [];
+        foreach ($columns as $label) {
+            foreach ($patterns as $needle) {
+                if (stripos((string) $label, $needle) !== false) { $drop[$label] = true; break; }
+            }
+        }
+        if (empty($drop)) {
+            return [$columns, $rows];
+        }
+
+        $columns = array_values(array_filter($columns, fn ($c) => !isset($drop[$c])));
+        $rows = array_map(function ($row) use ($drop) {
+            foreach (array_keys($drop) as $label) { unset($row[$label]); }
+            return $row;
+        }, $rows);
+
+        return [$columns, $rows];
     }
 
     /**
@@ -8646,16 +9145,13 @@ class Common
         elseif($resort->type == "sub")
         {
 
-            // Privileged set: GM (8), HR (3), MGR (4), MD (9) anywhere; plus
-            // HR-department HOD (2) and EXCOM (1). Other-dept rank-1/2 fall
-            // through to the per-employee folder check below — the previous
-            // list let any EXCOM (rank 1) view every file regardless of dept,
-            // which contradicted the standing access-control spec, and
-            // dropped HR-dept HOD entirely (rank 2 was missing).
-            $rank = (int) $resort->GetEmployee->rank;
-            $isHrDept = self::isHRDepartment($resort->GetEmployee->Dept_id ?? null);
-            $isPrivileged = in_array($rank, [3, 4, 8, 9], true)
-                || (in_array($rank, [1, 2], true) && $isHrDept);
+            // Privileged set (FM-04 decided rule): ONLY the HR department's
+            // HOD (rank 2) or EXCOM (rank 1) — see
+            // Common::isFileManagementPrivileged() for the single source of
+            // truth this now defers to. Previously also included GM (8),
+            // HR-rank-3 anywhere, and MGR (4) anywhere; that blanket access
+            // was removed per the FM-04 audit decision.
+            $isPrivileged = self::isFileManagementPrivileged($resort->GetEmployee ?? null);
             if ($isPrivileged)
             {
 
@@ -9432,6 +9928,53 @@ class Common
             if ($fullImagePath && file_exists($fullImagePath)) @unlink($fullImagePath);
             if ($tempPdfPath && file_exists($tempPdfPath)) @unlink($tempPdfPath);
         }
+    }
+
+    /**
+     * Turn whatever is stored in employees_leaves.attachments into a URL the
+     * caller can open. Historical rows hold three shapes: a plain relative
+     * path (old public_path()/->move() writes, web and mobile both used
+     * this before L-07), a json_encode()d path string, or the StorageHelper
+     * shape {"Filename":...,"Child_id":...} both sides write today.
+     * Shared by web and mobile (L-07) — was API\LeaveController-only.
+     */
+    public static function resolveLeaveAttachmentUrl($raw)
+    {
+        if (empty($raw)) {
+            return '';
+        }
+
+        $value   = trim((string) $raw);
+        $decoded = json_decode($value, true);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            if (is_string($decoded)) {
+                $value = $decoded;
+            } elseif (is_array($decoded)) {
+                $childId = $decoded['Child_id'] ?? null;
+                if ($childId) {
+                    $fileRecord = \App\Models\ChildFileManagement::find($childId);
+                    if ($fileRecord && $fileRecord->File_Path) {
+                        try {
+                            return \App\Helpers\StorageHelper::temporaryUrl($fileRecord->File_Path);
+                        } catch (\Exception $e) {
+                            \Log::error('resolveLeaveAttachmentUrl: ' . $e->getMessage());
+                        }
+                    }
+                }
+                return '';
+            }
+        }
+
+        // Defensive: strip any stray quotes left by older double-encoded rows.
+        $value = trim($value, "\"' \t");
+        if ($value === '') {
+            return '';
+        }
+        if (preg_match('#^https?://#i', $value)) {
+            return $value;
+        }
+
+        return url('/') . '/' . ltrim($value, '/');
     }
 
     public static function GetAWSFile($id, $resort_id, $is_secure = null)

@@ -368,9 +368,9 @@ class PaymentDepositRequestController extends Controller
                     {
                         return $row->Emp_id;
                     })
-                    ->editColumn('Name', function ($row) 
+                    ->editColumn('Name', function ($row)
                     {
-                        return $row->employee_name;
+                        return e($row->employee_name);
                     })
                     ->editColumn('Nationality', function ($row) 
                     {

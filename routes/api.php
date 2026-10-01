@@ -232,8 +232,6 @@ use Illuminate\Support\Facades\Route;
 			Route::get('accommodation/hr-maintenance-req-dashboard', [App\Http\Controllers\API\AccommodationController::class, 'hrMaintenanceRequestDashboard']);
 			Route::get('accommodation/hr-bed-assign/{emp_id}', [App\Http\Controllers\API\AccommodationController::class, 'hrBedAssign']);
 			Route::post('accommodation/hr-room-info', [App\Http\Controllers\API\AccommodationController::class, 'hrRoomInfo']);
-			Route::post('accommodation/assign-accommodation-to-emp', [App\Http\Controllers\API\AccommodationController::class, 'assignAccommodationToEmp']);
-			Route::post('accommodation/move-accommodation-for-emp', [App\Http\Controllers\API\AccommodationController::class, 'moveAccommodationForEmp']);
 			Route::post('accommodation/emp-list-with-available-bed', [App\Http\Controllers\API\AccommodationController::class, 'empListWithAvailableBed']);
 			Route::post('accommodation/housekeeping-add-schedules', [App\Http\Controllers\API\AccommodationController::class, 'houseKeepingAddSchedules']);
 			Route::post('accommodation/hr-housekeeping-dashboard', [App\Http\Controllers\API\AccommodationController::class, 'hrHouseKeepingDashboard']);
@@ -261,6 +259,15 @@ use Illuminate\Support\Facades\Route;
 
 			//Boarding Pass
 			Route::get('boarding/boarding-hr-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'boardingHRDashboard']);
+		});
+
+		// AC-03: bed assign/move is HR-only (product decision — no separate
+		// Accommodation-manager role exists). Was open to HR, GM, HOD, EXCOM
+		// alike; split out of the shared HR/GM/HOD/EXCOM group above, which
+		// stays as-is for its other (view) endpoints.
+		Route::middleware(['auth:api', 'check.rank:HR'])->group(function () {
+			Route::post('accommodation/assign-accommodation-to-emp', [App\Http\Controllers\API\AccommodationController::class, 'assignAccommodationToEmp']);
+			Route::post('accommodation/move-accommodation-for-emp', [App\Http\Controllers\API\AccommodationController::class, 'moveAccommodationForEmp']);
 		});
 
 		// Was check.rank:MGR ("MGR Middleware for SecurityManager") — no
@@ -299,6 +306,8 @@ use Illuminate\Support\Facades\Route;
 		Route::post('timeandattendance/manual-check-in', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'manualCheckIn']);
 		Route::post('timeandattendance/break-check-in-out', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'breakCheckInCheckOut']);
 		Route::post('timeandattendance/manual-check-out', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'manualCheckOut']);
+		// A-04: HOD/EXCOM (or HR) confirms/rejects a geofence-flagged attendance day.
+		Route::post('timeandattendance/review-geofence-flag', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'reviewGeofenceFlag']);
 		// Called by the app's background geofence monitoring on zone
 		// enter/exit (native OS geofencing, not a manual button tap).
 		Route::post('timeandattendance/geofence-event', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'geofenceEvent']);
@@ -387,7 +396,6 @@ use Illuminate\Support\Facades\Route;
 			Route::post('learning/manager-training-calendar', [App\Http\Controllers\API\LearningController::class, 'managerTrainingCalendar']);
 			Route::get('learning/training-list', [App\Http\Controllers\API\LearningController::class, 'trainingList']);
 			Route::get('learning/training-based-participant/{schedule_id}', [App\Http\Controllers\API\LearningController::class, 'trainingBasedParticipant']);
-			Route::post('learning/mark-attendance', [App\Http\Controllers\API\LearningController::class, 'markAttendance']);
 			Route::post('learning/participant-feedback-from-list', [App\Http\Controllers\API\LearningController::class, 'participantFeedbackFromList']);
 			Route::get('learning/feedback-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'feedbackFormResView']);
 			Route::post('learning/participant-evaluation-from-list', [App\Http\Controllers\API\LearningController::class, 'participantEvaluationFromList']);
@@ -396,6 +404,12 @@ use Illuminate\Support\Facades\Route;
 		});
 
 		//Learning(L&D)
+		// LR-06: moved out of the check.rank:EXCOM group above — attendance
+		// marking is HR / L&D Manager / assigned L&D staff / the session's own
+		// trainer only, per canMarkLearningAttendance(); a bare EXCOM/HOD rank
+		// alone no longer qualifies. The finer-grained check now lives in the
+		// controller (LearningController::markAttendance).
+		Route::post('learning/mark-attendance', [App\Http\Controllers\API\LearningController::class, 'markAttendance']);
 		Route::get('learning/training-details/{schedule_id}', [App\Http\Controllers\API\LearningController::class, 'trainingDetails']);
 		Route::post('learning/employee-training-calendar', [App\Http\Controllers\API\LearningController::class, 'employeeTrainingCalendar']);
 		Route::get('learning/employee-learning-dashboard', [App\Http\Controllers\API\LearningController::class, 'employeeLearningDashbaord']);

@@ -509,8 +509,13 @@ class StaffAccommodationController extends Controller
             }
 
             if (!empty($maintanaceRequest->Completed_Image )) {
-                $path                              =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
-                $maintanaceRequest->Completed_Image     =   \App\Helpers\StorageHelper::temporaryUrl($path . '/' . $maintanaceRequest->Completed_Image);
+                // Completed_Image is now written via AWSEmployeeFileUpload()
+                // (see engDepartmentStaffMaintenanceReqComplete's AC-01 fix), so
+                // it's the same json_encode(['Filename'=>..,'Child_id'=>..])
+                // shape as Image above — resolve it the same way instead of a
+                // raw temporaryUrl() concatenation, which only ever worked for
+                // the old flat-filename value.
+                $maintanaceRequest->Completed_Image     =   Common::resolveMaintenanceAttachmentUrl($maintanaceRequest->Completed_Image, Auth::guard('api')->user()->resort->resort_id);
             }
                                                                                                             
             $displayedStatuses = ['data' => []];
@@ -609,7 +614,12 @@ class StaffAccommodationController extends Controller
             $employee                                       =   $this->user->GetEmployee;
             $requestId                                      =   $request->input('request_id');
            
-            $maintanaceRequest = MaintanaceRequest::where('id',$requestId)->where('resort_id', $this->resort_id)->where('Status','Resolvedawaiting')->first();
+            // Was scoped to resort_id + Status only — any employee in the resort
+            // could close a colleague's request by guessing/incrementing the id.
+            // This is the requester's own self-service confirm-complete, so it
+            // must be scoped to the requester too (same gap as viewMaintenanceRequest/
+            // editMaintenanceRequests above).
+            $maintanaceRequest = MaintanaceRequest::where('id',$requestId)->where('resort_id', $this->resort_id)->where('Raised_By', $employee->id)->where('Status','Resolvedawaiting')->first();
 
                 if (!$maintanaceRequest) {
                     return response()->json(['success' => false, 'message' => 'Already complete the task'], 200);
@@ -620,7 +630,7 @@ class StaffAccommodationController extends Controller
                 // with the update()'s int return value.
                 $assignedEngineerId                         =   $maintanaceRequest->Assigned_To;
 
-                $maintanaceRequest                          =   MaintanaceRequest::where('id',$requestId)->where('resort_id', $this->resort_id)->where('Status','Resolvedawaiting')->update([
+                $maintanaceRequest                          =   MaintanaceRequest::where('id',$requestId)->where('resort_id', $this->resort_id)->where('Raised_By', $employee->id)->where('Status','Resolvedawaiting')->update([
                                                                     'Status'     => "Closed",
                                                                 ]);
                 ChildMaintananceRequest::create([
@@ -704,8 +714,7 @@ class StaffAccommodationController extends Controller
             // bool", not a clean validation error.
             $parsedDate                                 =   $request->filled('date') ? DateTime::createFromFormat('d/m/Y', $request->date) : false;
             $date                                       =   $parsedDate ? $parsedDate->format('Y-m-d') : date('Y-m-d');
-            $path_path                                  =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
-            
+
             // Was scoped to resort_id only — any employee in the resort could
             // edit a colleague's maintenance request. This endpoint is the
             // requester's own self-service edit (Eng-dept actions go through
@@ -726,15 +735,20 @@ class StaffAccommodationController extends Controller
              
             if ($request->hasFile('Image')) {
                 $imageFile                              =   $request->file('Image');
-                $imageName                              =   time() . '_' . $imageFile->getClientOriginalName();
-                // Was UploadedFile::move() into a raw relative path, which lands
-                // under public/ (the web root) on a standard request — any file
-                // type was accepted, so a crafted filename was a code-execution
-                // path. Route through StorageHelper (disk-agnostic, never the web
-                // root) at the exact same logical path so existing readers
-                // (temporaryUrl($path_path.'/'.Image)) keep working unchanged.
-                \App\Helpers\StorageHelper::put($path_path . '/' . $imageName, file_get_contents($imageFile->getRealPath()));
-                $maintanaceRequestEdit->Image           =   $imageName;
+                // Was UploadedFile::move() into a raw relative path (web root,
+                // guessable time()+originalname filename), then briefly routed
+                // through a raw StorageHelper::put() at that same guessable
+                // path. Use the same AWSEmployeeFileUpload() call
+                // createMaintenanceRequests() uses for this exact field, so
+                // the stored value is the same {Filename, Child_id} JSON shape
+                // resolveMaintenanceAttachmentUrl() already expects.
+                $uploadStatus                           =   Common::AWSEmployeeFileUpload($this->resort_id, $imageFile, $this->user->GetEmployee->Emp_id, 'MaintanceRequest', true);
+                if ($uploadStatus['status'] == true && !empty($uploadStatus['Chil_file_id'])) {
+                    $maintanaceRequestEdit->Image        =   json_encode(['Filename' => $imageFile->getClientOriginalName(), 'Child_id' => $uploadStatus['Chil_file_id']]);
+                } else {
+                    DB::rollBack();
+                    return response()->json(['success' => false, 'message' => $uploadStatus['msg'] ?? 'Attachment upload failed.'], 200);
+                }
             }
 
             $maintanaceRequestEdit->save();

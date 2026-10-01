@@ -223,6 +223,18 @@ class IncidentMeetingController extends Controller
             'attachments.*' => 'file|max:51200', // 50 MB
         ]);
 
+        // IN-03: the create() PAGE checks incident visibility before
+        // rendering the form, but store() itself didn't — a direct POST
+        // could schedule a meeting on an incident the caller can't even
+        // see. Same gate as create() (scopeIncidentsForViewer), so a
+        // bypassed request is held to the same rule as the form.
+        $incidentForMeeting = Common::scopeIncidentsForViewer(Incidents::query())
+            ->where('id', $request->incidentId)
+            ->first();
+        if (!$incidentForMeeting) {
+            return response()->json(['status' => 'error', 'message' => 'You are not allowed to create a meeting for this incident.'], 403);
+        }
+
         try {
             $employee = $this->resort->getEmployee;
         

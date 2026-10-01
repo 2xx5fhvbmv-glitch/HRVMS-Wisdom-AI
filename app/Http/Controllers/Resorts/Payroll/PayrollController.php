@@ -3668,10 +3668,10 @@ class PayrollController extends Controller
     
         $datatable = datatables()->of($logs)
             ->addColumn('employee', function ($log) {
-                return $log->employee_first_name . ' ' . $log->employee_last_name;
+                return e($log->employee_first_name . ' ' . $log->employee_last_name);
             })
             ->addColumn('updated_by', function ($log) {
-                return $log->updated_by_first_name . ' ' . $log->updated_by_last_name;
+                return e($log->updated_by_first_name . ' ' . $log->updated_by_last_name);
             })
             ->addColumn('updated_at', function ($log) {
                 return \Carbon\Carbon::parse($log->updated_at)->format('d M Y, H:i'); // Format updated_at

@@ -695,7 +695,7 @@ class ComplianceController extends Controller
                          if (!$compliance->employee) {
                               return '<span class="text-danger">-</span>';
                          }
-                         $name = $compliance->employee->resortAdmin->full_name ?? 'N/A';
+                         $name = e($compliance->employee->resortAdmin->full_name ?? 'N/A');
 
                          // Real profile photo when the employee has one;
                          // initials avatar as the fallback rather than a

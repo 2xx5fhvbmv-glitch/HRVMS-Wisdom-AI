@@ -152,7 +152,7 @@ class BoardingPassController extends Controller
             }
             return datatables()->of($query)
                 ->addColumn('EmpId', fn($row) => $row->EmpId)
-                ->addColumn('EmployeeName', fn($row) => $row->EmployeeName)
+                ->addColumn('EmployeeName', fn($row) => e($row->EmployeeName))
                 ->addColumn('Transportation', fn($row) => $row->Transportation)
                 ->addColumn('ArrivalDate', fn($row) => $row->arrival_date)
                 ->addColumn('ArrivalTime', fn($row) => $row->arrival_time1)

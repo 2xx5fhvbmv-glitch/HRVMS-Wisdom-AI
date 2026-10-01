@@ -25,6 +25,10 @@ class EvaluationFormController extends Controller
         $this->rank=  $this->resort->GetEmployee->rank ?? '';
     }
     public function index(){
+        // LR-06: forms management is HR / L&D Manager (full) or GM (view-only).
+        if (!Common::hasFullDataAccess()) {
+            return abort(403, 'Unauthorized access');
+        }
         $page_title="Evaluation Form";
         $trainings = TrainingSchedule::where('status','Completed')->where('resort_id',$this->resort->resort_id)->get();
 
@@ -33,6 +37,9 @@ class EvaluationFormController extends Controller
 
     public function list(Request $request)
     {
+        if (!Common::hasFullDataAccess()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
         $searchTerm = $request->get('searchTerm');
     
         $forms = EvaluationForm::where('resort_id', $this->resort->resort_id)
@@ -62,6 +69,10 @@ class EvaluationFormController extends Controller
     
     public function create(Request $request)
     {
+        // LR-06: only HR / L&D Manager may create/edit/delete evaluation forms.
+        if (!Common::canManageLearning()) {
+            return abort(403, 'Unauthorized access');
+        }
         $resort_id = $this->resort->resort_id;
         $page_title = 'Create Evaluation Form';
         $trainings = TrainingSchedule::with(['learningProgram', 'participants.employee.resortAdmin'])
@@ -75,6 +86,9 @@ class EvaluationFormController extends Controller
     }
     public function store(Request $request)
     {
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and L&D Managers can manage evaluation forms.'], 403);
+        }
         // dd($request->input('position'));
         $resortId = $this->resort->resort_id;
 
@@ -91,6 +105,9 @@ class EvaluationFormController extends Controller
 
     public function edit($id)
     {
+        if (!Common::canManageLearning()) {
+            return abort(403, 'Unauthorized access');
+        }
         $page_title = 'Edit Evaluation Form';
         $resortId = $this->resort->resort_id;
         $form = EvaluationForm::where('resort_id', $resortId)->find($id);
@@ -103,6 +120,9 @@ class EvaluationFormController extends Controller
 
     public function preview($id)
     {
+        if (!Common::hasFullDataAccess()) {
+            return abort(403, 'Unauthorized access');
+        }
         $page_title = 'Preview Evaluation Form';
         $form = EvaluationForm::where('resort_id', $this->resort->resort_id)->findOrFail($id);
         $structure = json_decode($form->form_structure, true);
@@ -113,6 +133,9 @@ class EvaluationFormController extends Controller
 
     public function update(Request $request, $id)
     {
+        if (!Common::canManageLearning()) {
+            return abort(403, 'Unauthorized access');
+        }
         $form = EvaluationForm::where('resort_id', $this->resort->resort_id)->find($id);
         if (!$form) {
             abort(404, 'Evaluation form not found.');
@@ -133,6 +156,9 @@ class EvaluationFormController extends Controller
 
     public function delete($id)
     {
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and L&D Managers can manage evaluation forms.'], 403);
+        }
         $form = EvaluationForm::where('resort_id', $this->resort->resort_id)->find($id);
         if (!$form) {
             return response()->json(['success' => false, 'message' => 'Form not found.'], 404);
@@ -193,40 +219,9 @@ class EvaluationFormController extends Controller
         }
     }
 
-    public function viewResponse($formId, $responseId)
-    {
-        try {
-            $page_title = 'View Evaluation Response';
-            $formId = base64_decode($formId);
-            $responseId = base64_decode($responseId);
-            // LR-01: 'interviewer'/'interviewee' aren't real relations on
-            // EvaluationFormResponse (it has training()/participant()) and
-            // InterviewAssessmentForm is a TalentAcquisition model with no
-            // resort check — this had no tenant scoping at all. Use the
-            // model's own real relations, scoped via the form's resort_id.
-            $response = EvaluationFormResponse::with(['training', 'participant', 'form'])
-                ->where('id', $responseId)
-                ->where('form_id', $formId)
-                ->whereHas('form', function ($q) {
-                    $q->where('resort_id', $this->resort->resort_id);
-                })
-                ->firstOrFail();
-
-            $responses = $response->responses;
-
-            $form = $response->form;
-            $formStructure = json_decode($form->form_structure, true);
-
-            // No blade view was ever built for this (the prior code used
-            // the wrong model classes and would have fataled on every
-            // call) — return the data rather than inventing a new view
-            // template, which is feature work beyond this security fix.
-            return response()->json(compact('response', 'responses', 'formStructure', 'page_title'));
-        } catch (\Exception $e) {
-            \Log::error('Error loading evaluation response: ' . $e->getMessage());
-            return redirect()->back()->withErrors(['error' => 'Failed to load the response.']);
-        }
-    }
+    // LR-01: viewResponse() removed — it had no live route (no
+    // evaluation-form.viewResponse entry in routes/resort_route.php, unlike
+    // its feedback-form counterpart), so it was unreachable dead code.
 
 
 }

@@ -26,7 +26,14 @@ class Admin extends Authenticatable
   ];
 
   protected $hidden = [
-    'password', 'remember_token',
+    'password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes',
+  ];
+
+  protected $casts = [
+    'two_factor_secret' => 'encrypted',
+    'two_factor_recovery_codes' => 'encrypted:array',
+    'two_factor_confirmed_at' => 'datetime',
+    'locked_until' => 'datetime',
   ];
 
   protected $dates = ['created_at','updated_at','deleted_at'];

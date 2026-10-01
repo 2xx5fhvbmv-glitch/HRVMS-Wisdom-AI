@@ -1720,7 +1720,7 @@ class LeaveController extends Controller
                     $leaveDetail->transportation_details    =   json_decode($leaveDetail->transportation_details, true);
 
                     $baseUrl = url('/');
-                    $leaveDetail->attachments               =   self::resolveLeaveAttachmentUrl($leaveDetail->attachments);
+                    $leaveDetail->attachments               =   Common::resolveLeaveAttachmentUrl($leaveDetail->attachments);
 
                     // Give the approver context in one call instead of
                     // requiring a second lookup for the leave this one
@@ -2052,14 +2052,14 @@ class LeaveController extends Controller
                         if ($leaveDetail->leave_data) {
                             foreach ($leaveDetail->leave_data as $leaveData) {
                                 $leaveData->employee_profile_picture    = Common::getResortUserPicture($leaveData->admin_parent_id);
-                                $leaveData->attachments                 = self::resolveLeaveAttachmentUrl($leaveData->attachments);
+                                $leaveData->attachments                 = Common::resolveLeaveAttachmentUrl($leaveData->attachments);
                             }
                         }
 
                         // Update profile picture dynamically — getResortUserPicture()
                         // needs resort_admins.id, not the employee display code.
                         $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->admin_parent_id);
-                        $leaveDetail->attachments               = self::resolveLeaveAttachmentUrl($leaveDetail->attachments);
+                        $leaveDetail->attachments               = Common::resolveLeaveAttachmentUrl($leaveDetail->attachments);
                     }
                 }
 
@@ -2224,7 +2224,7 @@ class LeaveController extends Controller
                 $response['message']                = 'Leave Details';
                 $response['leave_request']          = $combineLeaveDetails;
                 $response['total_leave']            = $totalLeave;
-                $response['attachments']            = self::resolveLeaveAttachmentUrl($combineLeaveDetails[0]->attachments);
+                $response['attachments']            = Common::resolveLeaveAttachmentUrl($combineLeaveDetails[0]->attachments);
 
                 return response()->json($response);
             }
@@ -3497,7 +3497,7 @@ class LeaveController extends Controller
                     // display CODE (e.g. "DR-20"), never a real id, so this
                     // always missed and fell back to the default picture.
                     $base->employee_profile_picture     = Common::getResortUserPicture($base->admin_parent_id);
-                    $base->attachments                  = self::resolveLeaveAttachmentUrl($base->attachments);
+                    $base->attachments                  = Common::resolveLeaveAttachmentUrl($base->attachments);
                     // Clear duplicate fields in the base record
                     unset($base->approver_rank, $base->approver_id);
 
@@ -3720,7 +3720,7 @@ class LeaveController extends Controller
                     $leaveDetail->transportation_details    = $transportationDetails;
                     // $leaveDetail->island_pass               = json_decode($leaveDetail->island_pass, true);
                     $baseUrl                                = url('/');
-                    $leaveDetail->attachments               = self::resolveLeaveAttachmentUrl($leaveDetail->attachments);
+                    $leaveDetail->attachments               = Common::resolveLeaveAttachmentUrl($leaveDetail->attachments);
 
                     // Give the approver context in one call instead of
                     // requiring a second lookup for the leave this one
@@ -4602,48 +4602,7 @@ class LeaveController extends Controller
         })->values();
     }
 
-    /**
-     * Turn whatever is stored in employees_leaves.attachments into a URL the
-     * app can open. Historical rows hold three shapes: a plain relative path,
-     * a json_encode()d path string (with literal quotes that used to corrupt
-     * the URL), or the S3 shape {"Filename":...,"Child_id":...}.
-     */
-    public static function resolveLeaveAttachmentUrl($raw)
-    {
-        if (empty($raw)) {
-            return '';
-        }
-
-        $value   = trim((string) $raw);
-        $decoded = json_decode($value, true);
-        if (json_last_error() === JSON_ERROR_NONE) {
-            if (is_string($decoded)) {
-                $value = $decoded;
-            } elseif (is_array($decoded)) {
-                $childId = $decoded['Child_id'] ?? null;
-                if ($childId) {
-                    $fileRecord = \App\Models\ChildFileManagement::find($childId);
-                    if ($fileRecord && $fileRecord->File_Path) {
-                        try {
-                            return \App\Helpers\StorageHelper::temporaryUrl($fileRecord->File_Path);
-                        } catch (\Exception $e) {
-                            \Log::error('resolveLeaveAttachmentUrl: ' . $e->getMessage());
-                        }
-                    }
-                }
-                return '';
-            }
-        }
-
-        // Defensive: strip any stray quotes left by older double-encoded rows.
-        $value = trim($value, "\"' \t");
-        if ($value === '') {
-            return '';
-        }
-        if (preg_match('#^https?://#i', $value)) {
-            return $value;
-        }
-
-        return url('/') . '/' . ltrim($value, '/');
-    }
+    // resolveLeaveAttachmentUrl() moved to Common.php (L-07) — web
+    // LeaveController needs the same logic now that both sides write the
+    // StorageHelper-backed {Filename,Child_id} shape.
 }

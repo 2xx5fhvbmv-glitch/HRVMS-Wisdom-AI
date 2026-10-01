@@ -1686,6 +1686,11 @@ class TimeAndAttendanceController extends Controller
             }
             $timeAttendance['parent_attendance_data']   =   $ParentAttendance;
             $timeAttendance['child_attendance_data']    =   $childAttendace;
+
+            // A-04: geofence never blocks the punch — just flags it for the
+            // employee's HOD/EXCOM to review.
+            Common::flagGeofenceReviewIfNeeded($ParentAttendance, $user->resort_id, $targetEmployee, $inTimeGeofence['within']);
+
             DB::commit(); // Commit transaction
 
             // Only the target employee's own self-check-in skips this —
@@ -2103,6 +2108,10 @@ class TimeAndAttendanceController extends Controller
             $timeAttendance['parent_attendance_data']       =   $ParentAttendance;
             $timeAttendance['child_attendance_data']        =   $childAttendace;
 
+            // A-04: geofence never blocks the punch — just flags it for the
+            // employee's HOD/EXCOM to review.
+            Common::flagGeofenceReviewIfNeeded($ParentAttendance, $user->resort_id, $targetEmployee, $outTimeGeofence['within']);
+
             DB::commit(); // Commit transaction
 
             // Only the target employee's own self-check-out skips this —
@@ -2130,6 +2139,65 @@ class TimeAndAttendanceController extends Controller
             \Log::error($e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
+    }
+
+    /**
+     * A-04 (decided 2026-09-27): confirm or reject a geofence-flagged
+     * attendance day. Gated with the same Common::canManageAttendanceFor()
+     * used by A-01/A-02 (HR/GM, or the employee's own HOD/EXCOM — never the
+     * employee themselves). Confirmed = stays paid (Status untouched,
+     * already 'Present'); rejected flips Status to 'Absent' so payroll's
+     * existing Status-based pay calculation picks it up with no separate
+     * payroll change needed.
+     */
+    public function reviewGeofenceFlag(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'attendance_id' => 'required|integer',
+            'decision'      => 'required|in:confirmed,rejected',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $user     = Auth::guard('api')->user();
+        $employee = $user->GetEmployee;
+
+        $attendance = ParentAttendace::where('id', $request->attendance_id)
+            ->where('resort_id', $user->resort_id)
+            ->first();
+        if (!$attendance) {
+            return response()->json(['success' => false, 'message' => 'Attendance record not found'], 404);
+        }
+        if ($attendance->geofence_review_status !== 'pending') {
+            return response()->json(['success' => false, 'message' => 'This attendance day is not awaiting geofence review.'], 422);
+        }
+        if (!Common::canManageAttendanceFor($attendance->Emp_id, $employee)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+
+        $attendance->geofence_review_status = $request->decision;
+        $attendance->geofence_reviewed_by = $employee->id;
+        if ($request->decision === 'rejected') {
+            $attendance->Status = 'Absent';
+        }
+        $attendance->save();
+
+        Common::notifyEmployees(
+            $user->resort_id,
+            [$attendance->Emp_id],
+            'Geofence Attendance Review',
+            'Your attendance for ' . $attendance->date . ' was ' . $request->decision . ' after geofence review.',
+            'Attendance',
+            $attendance->id,
+            'geofence-review'
+        );
+
+        return response()->json(['success' => true, 'message' => 'Attendance ' . $request->decision . '.']);
     }
 
     /**

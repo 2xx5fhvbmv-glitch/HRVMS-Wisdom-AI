@@ -16,6 +16,10 @@
 |       'employee_fk' => 'employee_id'|null,    // base column referencing employees.id
 |                                                // (null when the base table IS employees)
 |       'fields'      => [ 'Business Label' => <definition> ],
+|       'access'      => 'general'|'payroll'|'visa'|'budget'|'grievance'|'disciplinary'|'incident',
+|                                                // R-01: which module access rule
+|                                                // Common::canRunReport() applies —
+|                                                // see that function's docblock.
 |   ]
 |
 | Field definition (exactly one source key):
@@ -43,6 +47,7 @@ return [
 
         'Employees' => [
             'table'       => 'employees',
+            'access'      => 'general',
             'employee_fk' => null, // base table IS the employee
             'fields' => [
                 'Employee ID'        => ['employee_col' => 'Emp_id'],
@@ -71,6 +76,7 @@ return [
 
         'Transfers' => [
             'table'       => 'employee_transfers',
+            'access'      => 'general',
             'employee_fk' => 'employee_id',
             'fields' => [
                 'Employee ID'        => ['employee_col' => 'Emp_id'],
@@ -89,6 +95,7 @@ return [
 
         'Promotions' => [
             'table'       => 'employee_promotions',
+            'access'      => 'general',
             'employee_fk' => 'employee_id',
             'fields' => [
                 'Employee ID'       => ['employee_col' => 'Emp_id'],
@@ -106,6 +113,7 @@ return [
 
         'Resignations' => [
             'table'       => 'employee_resignation',
+            'access'      => 'general',
             'employee_fk' => 'employee_id',
             'fields' => [
                 'Employee ID'      => ['employee_col' => 'Emp_id'],
@@ -125,6 +133,7 @@ return [
 
         'Leave Requests' => [
             'table'       => 'employees_leaves',
+            'access'      => 'general',
             'employee_fk' => 'emp_id',
             'fields' => [
                 'Employee ID'   => ['employee_col' => 'Emp_id'],
@@ -145,6 +154,7 @@ return [
 
         'Payroll Runs' => [
             'table'       => 'payroll',
+            'access'      => 'payroll',
             'employee_fk' => null,
             'fields' => [
                 'Start Date'      => ['col' => 'start_date', 'cast' => 'date'],
@@ -158,6 +168,7 @@ return [
 
         'Payslips' => [
             'table'       => 'payroll_reviews',
+            'access'      => 'payroll',
             'employee_fk' => 'employee_id',
             'fields' => [
                 'Employee ID'      => ['employee_col' => 'Emp_id'],
@@ -180,6 +191,7 @@ return [
 
         'Visa Renewals' => [
             'table'       => 'visa_renewals',
+            'access'      => 'visa',
             'employee_fk' => 'employee_id',
             'fields' => [
                 'Employee ID'    => ['employee_col' => 'Emp_id'],
@@ -196,6 +208,7 @@ return [
 
         'Work Permits' => [
             'table'       => 'work_permits',
+            'access'      => 'visa',
             'employee_fk' => 'employee_id',
             'fields' => [
                 'Employee ID'        => ['employee_col' => 'Emp_id'],
@@ -213,6 +226,7 @@ return [
 
         'Quota Slots' => [
             'table'       => 'quota_slot_renewals',
+            'access'      => 'visa',
             'employee_fk' => 'employee_id',
             'fields' => [
                 'Employee ID'  => ['employee_col' => 'Emp_id'],
@@ -233,6 +247,7 @@ return [
 
         'Applicants' => [
             'table'       => 'applicant_form_data',
+            'access'      => 'general',
             'employee_fk' => null,
             'fields' => [
                 'First Name'         => ['col' => 'first_name'],
@@ -253,6 +268,7 @@ return [
 
         'Vacancies' => [
             'table'       => 'vacancies',
+            'access'      => 'general',
             'employee_fk' => null,
             'fields' => [
                 'Position'           => ['lookup' => 'resort_positions',   'fk' => 'position',   'name' => 'position_title'],
@@ -270,6 +286,7 @@ return [
 
         'Offers & Contracts' => [
             'table'       => 'applicant_offer_contracts',
+            'access'      => 'general',
             'employee_fk' => null,
             'fields' => [
                 'Applicant'        => ['lookup' => 'applicant_form_data', 'fk' => 'applicant_id', 'name' => 'first_name'],
@@ -286,6 +303,7 @@ return [
 
         'Learning Programs' => [
             'table'       => 'learning_programs',
+            'access'      => 'general',
             'employee_fk' => null,
             'fields' => [
                 'Name'                    => ['col' => 'name'],
@@ -301,6 +319,7 @@ return [
 
         'Learning Requests' => [
             'table'       => 'learning_requests',
+            'access'      => 'general',
             'employee_fk' => null,
             'fields' => [
                 'Learning Program' => ['lookup' => 'learning_programs', 'fk' => 'learning_id', 'name' => 'name'],
@@ -313,6 +332,7 @@ return [
 
         'Training Schedules' => [
             'table'       => 'training_schedules',
+            'access'      => 'general',
             'employee_fk' => null,
             'fields' => [
                 'Venue'       => ['col' => 'venue'],
@@ -331,6 +351,7 @@ return [
 
         'Attendance' => [
             'table'       => 'parent_attendaces',
+            'access'      => 'general',
             'employee_fk' => 'Emp_id',
             'fields' => [
                 'Employee ID'   => ['employee_col' => 'Emp_id'],
@@ -352,6 +373,7 @@ return [
 
         'Budget Costs' => [
             'table'       => 'resort_budget_costs',
+            'access'      => 'budget',
             'employee_fk' => null,
             'fields' => [
                 'Cost Title'  => ['col' => 'cost_title'],
@@ -366,6 +388,7 @@ return [
 
         'Employee Budget' => [
             'table'       => 'resort_employee_budget_cost_configurations',
+            'access'      => 'budget',
             'employee_fk' => 'employee_id',
             'fields' => [
                 'Employee ID'    => ['employee_col' => 'Emp_id'],
@@ -387,6 +410,7 @@ return [
 
         'Bed Assignments' => [
             'table'       => 'assing_accommodations',
+            'access'      => 'general',
             'employee_fk' => 'emp_id',
             'fields' => [
                 'Employee ID'   => ['employee_col' => 'Emp_id'],
@@ -399,6 +423,7 @@ return [
 
         'Maintenance Requests' => [
             'table'       => 'maintanace_requests',
+            'access'      => 'general',
             'employee_fk' => 'Raised_By',
             'fields' => [
                 'Raised By' => ['employee_name' => true],
@@ -418,6 +443,7 @@ return [
 
         'Incidents' => [
             'table'       => 'incidents',
+            'access'      => 'incident',
             'employee_fk' => 'reporter_id',
             'fields' => [
                 'Incident ID'   => ['col' => 'incident_id'],
@@ -440,6 +466,7 @@ return [
 
         'Grievances' => [
             'table'       => 'grivance_submission_models',
+            'access'      => 'grievance',
             'employee_fk' => 'Employee_id',
             'fields' => [
                 'Grievance ID'  => ['col' => 'Grivance_id'],
@@ -456,6 +483,7 @@ return [
 
         'Disciplinary Cases' => [
             'table'       => 'disciplinary_submits',
+            'access'      => 'disciplinary',
             'employee_fk' => 'Employee_id',
             'fields' => [
                 'Disciplinary ID' => ['col' => 'Disciplinary_id'],
@@ -473,6 +501,7 @@ return [
 
         'Surveys' => [
             'table'       => 'parent_surveys',
+            'access'      => 'general',
             'employee_fk' => null,
             'fields' => [
                 'Survey Title' => ['col' => 'Surevey_title'],

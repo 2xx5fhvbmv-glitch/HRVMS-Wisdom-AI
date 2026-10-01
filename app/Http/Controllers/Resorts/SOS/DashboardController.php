@@ -62,9 +62,29 @@ class DashboardController extends Controller
         return $isSecurityManager || Common::hasFullDataAccess($employee);
     }
 
-    private function requireHrAccess()
+    /**
+     * SO-02 correction: destroy()/updateStatus()/updateMassInstruction() were
+     * gated with hasSosHistoryAccess() (Security Manager OR HR/GM via
+     * Common::hasFullDataAccess()) — but per the decided role rules, HR/GM
+     * may only view the live dashboard + history; deciding drill-vs-real,
+     * deleting an SOS record, or broadcasting a mass instruction to every
+     * employee is Security-Manager-only, live-event territory (same as the
+     * mobile app's 'sos.manager' middleware group). Reuses the exact same
+     * recognition mechanism as EnsureSOSSecurityManagerAccess (mobile) so
+     * web and app can't disagree on who counts as the Security Manager.
+     */
+    private function isSosManager(): bool
     {
-        if (!$this->hasSosHistoryAccess()) {
+        if ((int) (optional($this->resort)->is_master_admin ?? 0) === 1) {
+            return true;
+        }
+        $employee = optional($this->resort)->GetEmployee;
+        return optional(optional($employee)->position)->position_title === 'Security Manager';
+    }
+
+    private function requireSosManagerAccess()
+    {
+        if (!$this->isSosManager()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
         }
         return null;
@@ -220,7 +240,7 @@ class DashboardController extends Controller
 
     public function destroy($id)
     {
-      if ($guard = $this->requireHrAccess()) return $guard;
+      if ($guard = $this->requireSosManagerAccess()) return $guard;
       try {
           $data = SOSHistoryModel::where('resort_id', $this->resort->resort_id)->whereId($id)->first();
           if(!$data){
@@ -246,7 +266,7 @@ class DashboardController extends Controller
 
     public function updateStatus(Request $request)
     {
-        if ($guard = $this->requireHrAccess()) return $guard;
+        if ($guard = $this->requireSosManagerAccess()) return $guard;
         $request->validate([
             'type' => 'required|in:Drilled,Real',
         ]);
@@ -468,7 +488,7 @@ class DashboardController extends Controller
 
     public function updateMassInstruction(Request $request)
     {
-        if ($guard = $this->requireHrAccess()) return $guard;
+        if ($guard = $this->requireSosManagerAccess()) return $guard;
         $request->validate([
             'sos_history_id' => ['required', Rule::exists('sos_history', 'id')->where('resort_id', $this->resort->resort_id)],
             'mass_instruction' => 'required|string|max:255',
