@@ -30,6 +30,22 @@ class ConfigrationController extends Controller
     {
         $this->resort = Auth::guard('resort-admin')->user();
     }
+
+    /**
+     * A-06 (decided 2026-09-27): T&A settings (shifts, geofence zones,
+     * holidays, color themes, attendance export) are HR-only — GM's T&A
+     * role is view-only, HOD/EXCOM/MGR get rosters/corrections/OT approval
+     * for their own department only, not settings. These actions had zero
+     * role check before (resort-portal-login only).
+     */
+    private function requireHrAccess()
+    {
+        if (!Common::isHR()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+        return null;
+    }
+
     public function index()
     {
             $page_title = 'Configuration';
@@ -46,6 +62,7 @@ class ConfigrationController extends Controller
     }
     public function ShiftStore(Request $request)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
 
         $ShiftName = $request->ShiftName;
         $StartTime = $request->StartTime;
@@ -134,6 +151,8 @@ class ConfigrationController extends Controller
     }
     public function removeshift(Request $request)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         try
         {
             DB::beginTransaction();
@@ -222,6 +241,8 @@ class ConfigrationController extends Controller
 
     public function geofenceStore(Request $request)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'color' => 'required|string|max:20',
@@ -267,6 +288,8 @@ class ConfigrationController extends Controller
 
     public function geofenceUpdate(Request $request, $id)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         $zone = ResortGeofence::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
         if (!$zone) {
             return response()->json(['success' => false, 'message' => 'Zone not found.'], 404);
@@ -315,6 +338,8 @@ class ConfigrationController extends Controller
 
     public function geofenceDelete(Request $request, $id)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         $zone = ResortGeofence::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
         if (!$zone) {
             return response()->json(['success' => false, 'message' => 'Zone not found.'], 404);
@@ -342,6 +367,8 @@ class ConfigrationController extends Controller
 
     public function geofenceToggle(Request $request, $id)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         $zone = ResortGeofence::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
         if (!$zone) {
             return response()->json(['success' => false, 'message' => 'Zone not found.'], 404);
@@ -408,6 +435,8 @@ class ConfigrationController extends Controller
     }
     public function ResortHoliday(Request $request)
     {
+            if ($deny = $this->requireHrAccess()) return $deny;
+
             // Was $request->resort_id — fully client-controlled. It's used
             // both to stamp new holidays AND, further down, to scope the
             // update-by-id query, so an attacker could create holidays under
@@ -507,6 +536,7 @@ class ConfigrationController extends Controller
     }
     public function ResortHolidaydelete(Request $request)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
 
         try
         {
@@ -537,6 +567,8 @@ class ConfigrationController extends Controller
     }
     public function ResortHolidayUpdate(Request $request)
     {
+            if ($deny = $this->requireHrAccess()) return $deny;
+
             // Was $request->resort_id (twice) — fully client-controlled;
             // always use the caller's own resort.
             $resort_id = $this->resort->resort_id;
@@ -608,6 +640,8 @@ class ConfigrationController extends Controller
     }
     public function HolidayfileUpload(Request $request)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         $file= $request->file('fileUpload')->getClientOriginalName();
         $ResortLocation =  $this->resort->resort->resort_id;
 
@@ -657,6 +691,8 @@ class ConfigrationController extends Controller
     //color theme
     public function saveColorThemes(Request $request)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         $resort_id = $this->resort->resort_id;
 
         // Validate the request data
@@ -704,6 +740,8 @@ class ConfigrationController extends Controller
     }
     public function delete(Request $request)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         $themeId = $request->input('theme_id');
         // dd($themeId);
         // Check if theme exists and delete it — was ColorTheme::find($themeId)
@@ -720,6 +758,7 @@ class ConfigrationController extends Controller
     }
     public function exportAttendance(Request $request)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
 
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');

@@ -28,6 +28,8 @@ class ParentAttendace extends Model
        'CheckInCheckOut_Type',
        'OTStatus',
        'OTApproved_By',
+       'geofence_review_status',
+       'geofence_reviewed_by',
        'created_by',
        'modified_by',
     ];

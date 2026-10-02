@@ -58,6 +58,12 @@ trait PredefinedReportActions
             return '';
         }
 
+        // R-04 item 3: never forward bank/passport numbers or (for a
+        // below-HR-level viewer) raw salary figures to the external AI
+        // service, regardless of what the viewer is entitled to see on
+        // screen.
+        [$columns, $rows] = \App\Helpers\Common::stripSensitiveReportColumnsForAi($columns, $rows, $this->resort ?? null);
+
         $reportInfo = [
             'name'        => $name,
             'resort_id'   => optional($this->resort)->resort_id,

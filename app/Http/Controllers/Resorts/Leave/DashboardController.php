@@ -972,6 +972,10 @@ class DashboardController extends Controller
             $leaveRequest->from_date = Carbon::parse($leaveRequest->from_date)->format('d M');
             $leaveRequest->to_date = Carbon::parse($leaveRequest->to_date)->format('d M');
             $leaveRequest->profile_picture = Common::getResortUserPicture($leaveRequest->Admin_Parent_id);
+            // L-07: raw attachments column used to be handed straight to the
+            // grid, which built a public-disk URL client-side — now resolved
+            // to a signed StorageHelper URL (or empty) server-side.
+            $leaveRequest->attachments = Common::resolveLeaveAttachmentUrl($leaveRequest->attachments);
 
             // `flag` holds the PAIRED category's leave_category_id, not this
             // row's own id — see Common::findCombinedSibling() for the flag

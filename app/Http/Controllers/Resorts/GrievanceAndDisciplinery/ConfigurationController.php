@@ -61,6 +61,24 @@ class ConfigurationController extends Controller
             $this->underEmp_id = Common::getSubordinates($reporting_to);
         }
     }
+
+    /**
+     * D-04: the Disciplinary-settings endpoints below (categories, offences,
+     * actions, severities, code of conduct, approval role, letter/email
+     * templates, committees, hearing templates, delegation rules, appeals,
+     * follow-up actions, key personnel, right-to-be-accompanied) had zero
+     * permission checks. Decided: HR only. Not applied to index() (the
+     * shared Grievance+Disciplinary config page shell) or to any
+     * Grievance-prefixed method — out of this finding's scope.
+     */
+    private function requireDisciplinaryHr()
+    {
+        if (!Common::isDisciplinaryHR(optional($this->resort)->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+        return null;
+    }
+
     public function index()
     {
         $page_title = "Configuration";
@@ -113,6 +131,7 @@ class ConfigurationController extends Controller
 
     public function FollowUpActionList(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $rows = \App\Models\DisciplinaryFollowUpAction::where('resort_id', $this->resort->resort_id)
             ->orderByDesc('id')
             ->get();
@@ -134,6 +153,7 @@ class ConfigurationController extends Controller
 
     public function FollowUpActionStore(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $resort_id = $this->resort->resort_id;
         $validator = Validator::make($request->all(), [
             'name' => [
@@ -159,6 +179,7 @@ class ConfigurationController extends Controller
 
     public function FollowUpActionInlineUpdate(Request $request, $id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $rid       = (int) base64_decode($id);
         $resort_id = $this->resort->resort_id;
         $validator = Validator::make($request->all(), [
@@ -184,6 +205,7 @@ class ConfigurationController extends Controller
 
     public function FollowUpActionDestroy($id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $rid = (int) base64_decode($id);
         \App\Models\DisciplinaryFollowUpAction::where('resort_id', $this->resort->resort_id)
             ->where('id', $rid)
@@ -192,6 +214,7 @@ class ConfigurationController extends Controller
     }
     public function IndexDisciplineryCategory(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $page_title="Discriplinery Category ";
         if($request->ajax())
@@ -217,6 +240,7 @@ class ConfigurationController extends Controller
     }
     public function StoreDisciplineryCategory(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $resort_id = $this->resort->resort_id;
         $validator = Validator::make($request->all(), [
@@ -262,6 +286,7 @@ class ConfigurationController extends Controller
     }
     public function DisciplineryCategoryinlineUpdate(Request $request,$id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $Main_id = (int) base64_decode($request->Main_id);
 
@@ -315,6 +340,7 @@ class ConfigurationController extends Controller
     }
     public function DisciplineryCategoryDestory($id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($id);
         DB::beginTransaction();
         try
@@ -338,6 +364,7 @@ class ConfigurationController extends Controller
     }
     public function IndexOffenses(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $page_title="Discriplinery Offenses";
         if($request->ajax())
@@ -370,6 +397,7 @@ class ConfigurationController extends Controller
     }
     public function StoreOffenses(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $resort_id = $this->resort->resort_id;
         $validator = Validator::make($request->all(), [
             'OffensesName' => [
@@ -424,6 +452,7 @@ class ConfigurationController extends Controller
     }
     public function OffensesinlineUpdate(Request $request,$id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $Main_id = (int) base64_decode($request->Main_id);
 
         $resort_id = $this->resort->resort_id;
@@ -484,6 +513,7 @@ class ConfigurationController extends Controller
     }
     public function OffensesDestory($id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($id);
         DB::beginTransaction();
         try
@@ -509,6 +539,7 @@ class ConfigurationController extends Controller
     // ActionStore
     public function IndexAction(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $page_title="Action";
         if($request->ajax())
@@ -534,6 +565,7 @@ class ConfigurationController extends Controller
     }
     public function ActionStore(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $resort_id = $this->resort->resort_id;
 
@@ -581,6 +613,7 @@ class ConfigurationController extends Controller
 
     public function ActioninlineUpdate(Request $request,$id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $Main_id = (int) base64_decode($request->Main_id);
 
@@ -636,6 +669,7 @@ class ConfigurationController extends Controller
     }
     public function ActionDestory($id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
 
         $id = base64_decode($id);
@@ -663,6 +697,7 @@ class ConfigurationController extends Controller
 
     public function IndexSeverity(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $page_title="Severity";
         if($request->ajax())
@@ -688,6 +723,7 @@ class ConfigurationController extends Controller
     }
     public function SeverityStore(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $resort_id = $this->resort->resort_id;
 
@@ -732,6 +768,7 @@ class ConfigurationController extends Controller
     }
     public function SeverityInlineUpdate(Request $request,$id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $Main_id = (int) base64_decode($request->Main_id);
         $resort_id = $this->resort->resort_id;
         $validator = Validator::make($request->all(), [
@@ -782,6 +819,7 @@ class ConfigurationController extends Controller
     }
     public function SeverityDestory($id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = (int) base64_decode($id);
 
         // Refuse the delete if the severity is referenced by any Code-of-Conduct
@@ -821,6 +859,7 @@ class ConfigurationController extends Controller
     }
     public function GetCategoryOffenses(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         try
         {
             $id = base64_decode($request->id);
@@ -843,6 +882,7 @@ class ConfigurationController extends Controller
 
     public function CodeOfCounduct(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $validator = Validator::make($request->all(), [
             'Deciplinery_cat_id' => 'required|array|min:1',
             'Deciplinery_cat_id.*' => 'required|string',
@@ -922,6 +962,7 @@ class ConfigurationController extends Controller
     }
     public function IndexCodeOfCounduct(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $page_title="Code Of Counduct";
 
@@ -980,6 +1021,7 @@ class ConfigurationController extends Controller
     }
     public function CodeOfCounductUpdate(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $Self_id = base64_decode($request->Self_id);
         $validator = Validator::make($request->all(), [
             'Deciplinery_cat_id' => 'required|array|min:1',
@@ -1062,6 +1104,7 @@ class ConfigurationController extends Controller
 
     public function CodeOfConductDestory($id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($id);
         DB::beginTransaction();
         try
@@ -1086,6 +1129,7 @@ class ConfigurationController extends Controller
     // Disciplinary Approval Role
     public function DiscriplineryApprovalRole(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
 
         DB::beginTransaction();
@@ -1110,6 +1154,7 @@ class ConfigurationController extends Controller
 
     public function LatterTemletestore(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         if($request->Templete_id == 0)
         {
@@ -1202,6 +1247,7 @@ class ConfigurationController extends Controller
     }
     public function IndexLatterTemplete(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $page_title="Code Of Counduct";
 
@@ -1240,6 +1286,7 @@ class ConfigurationController extends Controller
     }
     public function LatterTempleteEdit($id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = (int)base64_decode($id);
         // D-01: was ::find($id) with no resort filter — leaked another
         // resort's letter-template content (form structure).
@@ -1258,6 +1305,7 @@ class ConfigurationController extends Controller
 
     public function LatterTempleteDestory($id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($id);
         DB::beginTransaction();
         try
@@ -1282,6 +1330,7 @@ class ConfigurationController extends Controller
     // Disciplinary Committees and Assigned Members
     public function DisciplinaryCommittees(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         // $request->merge([
         //     'MemberIds' => collect($request->MemberIds)->flatten()->toArray()
         // ]);
@@ -1375,6 +1424,7 @@ class ConfigurationController extends Controller
 
     public function IndexDisciplinaryCommittees(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $page_title="Disciplinary Committees";
 
@@ -1438,6 +1488,7 @@ class ConfigurationController extends Controller
 
     public function CommitteeinlineUpdate(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($request->Main_id);
         $CommitteeName = $request->CommitteeName;
         $assign_members= $request->assign_members;
@@ -1532,6 +1583,7 @@ class ConfigurationController extends Controller
     }
     public function DisciplinaryCommitteesDestory($id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($id);
         DB::beginTransaction();
         try
@@ -1571,6 +1623,7 @@ class ConfigurationController extends Controller
 
     public function InvestingHearingTempleteStore(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $Hearing_Temp_name = $request->Hearing_Temp_name;
         $Hearing_Temp_Structure = $request->Hearing_Temp_Structure;
@@ -1634,6 +1687,7 @@ class ConfigurationController extends Controller
 
     public function DelegationRulesStore(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
 
         $validator = Validator::make($request->all(), [
@@ -1724,6 +1778,7 @@ class ConfigurationController extends Controller
 
     public function KeyPersonnel(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $resortId = $this->resort->resort_id;
         $ids = array_values(array_unique((array) $request->KeyPersonnel));
 
@@ -1767,6 +1822,7 @@ class ConfigurationController extends Controller
     // DisciplinaryDelegationRule
     public function IndexDisciplinaryDelegationRule(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $page_title="Disciplinary Delegation Rule";
 
@@ -1805,6 +1861,7 @@ class ConfigurationController extends Controller
 
     public function DisciplineryDeletgationRuleinlineUpdate(Request $request,$id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $Main_id = (int) base64_decode($request->Main_id);
         $resort_id = $this->resort->resort_id;
@@ -1885,6 +1942,7 @@ class ConfigurationController extends Controller
 
     public function DisciplineryDeletegationRuleDestory($id)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($id);
         DB::beginTransaction();
         try
@@ -1911,6 +1969,7 @@ class ConfigurationController extends Controller
 
     public function DisciplinaryAppealStore(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
        $AppealDeadLine          = $request->AppealDeadLine;
        $Appeal_Type             = $request->Appeal_Type;
        $MemberId_or_CommitteeId = $request->MemberId_or_CommitteeId;
@@ -1959,6 +2018,7 @@ class ConfigurationController extends Controller
     }
     public function DisciplineryAppealTypeWiseData(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $Committee='';
         $OtherMembers='';
 
@@ -1984,6 +2044,7 @@ class ConfigurationController extends Controller
 
     public function RightToBeAccompanied(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
        DB::beginTransaction();
        try
        {
@@ -3585,12 +3646,14 @@ class ConfigurationController extends Controller
 
     public function CodeOfConduct()
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         return Excel::download(new DisciplineryCodeOfConduct, 'ResortCodeOfConductList.xlsx');
 
     }
 
     public function DisciplineryEmailTamplate(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $MailTemplete  = $request->content;
         $MailSubject  = $request->subject;
         $Action_id  = base64_decode($request->Action_id);
@@ -3705,6 +3768,7 @@ class ConfigurationController extends Controller
 
     public function DisciplineryEmailTamplateIndex(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         if($request->ajax())
         {
             $DisciplinaryEmailmodel= DisciplinaryEmailmodel::join("action_stores as t1","t1.id","=","disciplinary_emailmodels.Action_id")
@@ -3738,6 +3802,7 @@ class ConfigurationController extends Controller
     }
     public function GetEmailTamplate(Request $request)
     {
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id=  base64_decode($request->id);
         $DisciplinaryEmailmodel= DisciplinaryEmailmodel::join("action_stores as t1","t1.id","=","disciplinary_emailmodels.Action_id")
                                                             ->where('disciplinary_emailmodels.resort_id',$this->resort->resort_id)

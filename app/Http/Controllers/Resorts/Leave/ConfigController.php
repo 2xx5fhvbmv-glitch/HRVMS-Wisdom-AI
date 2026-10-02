@@ -15,6 +15,7 @@ use App\Models\ResortBenifitGridChild;
 use App\Models\ResortBenefitGradeLevelRank;
 use App\Models\ResortBenefitGradeLevel;
 use App\Jobs\ImportLeavesJob;
+use App\Helpers\Common;
 use Auth;
 use Config;
 use DB;
@@ -27,6 +28,21 @@ class ConfigController extends Controller
     {
         $this->resort = Auth::guard('resort-admin')->user();
         if(!$this->resort) return;
+    }
+
+    /**
+     * L-08 (decided 2026-09-27): leave settings/categories/transport options/
+     * import/export/template are HR-only — deliberately excludes GM (whose
+     * Leave role is view-all + approve only, no settings), unlike the
+     * hasFullDataAccess() gate used elsewhere. These actions had zero role
+     * check before (resort-portal-login only).
+     */
+    private function requireHrAccess()
+    {
+        if (!Common::isHR()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+        return null;
     }
 
     public function index()
@@ -48,6 +64,8 @@ class ConfigController extends Controller
 
     public function store_leaves_category(Request $request)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         // Validate input fields with conditional rules
         $resort_id = $this->resort->resort_id;
         $validatedData = $request->validate([
@@ -145,6 +163,8 @@ class ConfigController extends Controller
 
     public function update_leaves_category(Request $request, $id)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         // dd($request);
         $validatedData = $request->validate([
             'leave_type' => 'required|string|max:255',
@@ -213,6 +233,8 @@ class ConfigController extends Controller
 
     public function delete_leaves_category($id)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         DB::beginTransaction();
         try {
             $resort_id = $this->resort->resort_id;
@@ -312,6 +334,8 @@ class ConfigController extends Controller
 
     public function submitTransportationOptions(Request $request)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         $resort_id = $this->resort->resort_id;
         $transportationOptions = $request->input('transportation_options');
 
@@ -370,6 +394,8 @@ class ConfigController extends Controller
 
     public function exportLeave(Request $request)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         $request->validate([
             'start_date' => 'required|string|regex:/^\d{2}-\d{2}-\d{4}$/',
             'end_date'   => 'required|string|regex:/^\d{2}-\d{2}-\d{4}$/',
@@ -396,6 +422,8 @@ class ConfigController extends Controller
 
     public function downloadLeaveTemplate()
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         $resort_id = $this->resort->resort_id;
         return Excel::download(
             new EmployeeLeaveExport($resort_id, null, null, null, null, null, null),
@@ -405,6 +433,8 @@ class ConfigController extends Controller
 
     public function ImportLeave(Request $request)
     {
+        if ($deny = $this->requireHrAccess()) return $deny;
+
         $validator = \Validator::make($request->all(), [
             'UploadImportleave' => [
                 'required',

@@ -492,7 +492,7 @@ class ReviewController extends Controller
 
         $currentEmpId = $this->resort->GetEmployee->id ?? null;
         $participantId = Common::resolveEmpMainIdToNumeric($childCycle->Emp_main_id, $this->resort->resort_id);
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         $isAuthorized = ($currentEmpId == $participantId)
             || ($currentEmpId == $childCycle->Manager_id)
             || $scopedIds === null

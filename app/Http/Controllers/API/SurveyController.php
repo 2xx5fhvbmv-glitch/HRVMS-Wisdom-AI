@@ -305,12 +305,24 @@ class SurveyController extends Controller
             return response()->json(['success' => false, 'message' => 'Array lengths do not match'], 200);
         }
 
+        // SV-02: every entry must reference the same survey the expiry check
+        // above validated (parent_survey_id[0]) — otherwise a request could
+        // smuggle writes against a different, closed/expired survey past
+        // that check via any index other than 0.
+        $firstSurveyId = (int) $request->parent_survey_id[0];
+        foreach ($request->parent_survey_id as $parentSurveyId) {
+            if ((int) $parentSurveyId !== $firstSurveyId) {
+                return response()->json(['success' => false, 'message' => 'All answers must belong to the same survey.'], 422);
+            }
+        }
+
         // SV-02: survey_emp_ta_id was trusted straight from the client and
         // used as the write key below — an employee who supplied a
         // colleague's survey_employees id (e.g. a nearby sequential id)
         // overwrote that colleague's SurveyResult rows. Verify every
         // (parent_survey_id, survey_emp_ta_id) pair actually belongs to the
-        // calling employee before writing any of them.
+        // calling employee, and every question_id actually belongs to that
+        // survey, before writing any of them.
         foreach ($request->parent_survey_id as $index => $parentSurveyId) {
             $ownsRow = SurveyEmployee::where('id', (int) $request->survey_emp_ta_id[$index])
                 ->where('Parent_survey_id', (int) $parentSurveyId)
@@ -318,6 +330,13 @@ class SurveyController extends Controller
                 ->exists();
             if (!$ownsRow) {
                 return response()->json(['success' => false, 'message' => 'Unauthorized survey participant reference.'], 403);
+            }
+
+            $questionBelongsToSurvey = SurveyQuestion::where('id', (int) $request->question_id[$index])
+                ->where('Parent_survey_id', (int) $parentSurveyId)
+                ->exists();
+            if (!$questionBelongsToSurvey) {
+                return response()->json(['success' => false, 'message' => 'Invalid question reference.'], 422);
             }
         }
 

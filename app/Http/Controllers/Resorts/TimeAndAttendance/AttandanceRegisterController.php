@@ -485,6 +485,11 @@ class AttandanceRegisterController extends Controller
         if (!$employee) {
             return response()->json(['success' => false, 'message' => 'Employee not found in this resort.'], 404);
         }
+        // A-06 (decided 2026-09-27): same roster-write gate as
+        // DutyRosterController::StoreDutyRoster/UpdateDutyRoster.
+        if (!Common::canManageAttendanceFor($empId, $this->resort->GetEmployee ?? null)) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to roster this employee.'], 403);
+        }
         if (Common::manningCategory($employee->employment_type) === 'Permanent') {
             return response()->json(['success' => false, 'message' => 'This action is for Casual/Intern staff only — Permanent rosters are managed via the Duty Roster module.'], 422);
         }
@@ -885,8 +890,12 @@ class AttandanceRegisterController extends Controller
 
     public function ImportAttandance(Request $request)
     {
-
-
+        // A-06 (decided 2026-09-27): importing past attendance is HR-only —
+        // had zero role check before (any resort-portal user could create
+        // attendance rows, with any status, for anyone).
+        if (!Common::isHR()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
 
         $UploadImportattandance = $request->UploadImportattandance;
 
@@ -916,6 +925,9 @@ class AttandanceRegisterController extends Controller
 
     public function downloadTemplate()
     {
+        if (!Common::isHR()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         return Excel::download(new AttendanceTemplateExport, 'attendance_import_template.xlsx');
     }
 }

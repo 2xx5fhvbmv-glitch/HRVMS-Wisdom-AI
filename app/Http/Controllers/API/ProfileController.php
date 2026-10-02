@@ -220,15 +220,18 @@ class ProfileController extends Controller
   {
 
     $validator = Validator::make($request->all(), [
-      'first_name'                                  => 'required|string|max:255',
+      // PE-04 defence in depth: a name never needs <, >, or quote
+      // characters — reject them here rather than relying only on every
+      // rawColumn that later prints the name escaping it correctly.
+      'first_name'                                  => ['required', 'string', 'max:255', 'regex:/^[^<>"\']+$/'],
       // middle_name isn't collected by the mobile app's Personal Info
       // screen today — the approval flow (InfoUpdateController) already
       // supports it end-to-end (routes it to ResortAdmin, shows it in the
       // Request Approval diff) if it's ever present in the payload, so
       // accepting it here (once the app starts sending it) needs no
       // further backend change.
-      'middle_name'                                  => 'nullable|string|max:255',
-      'last_name'                                   => 'required|string|max:255',
+      'middle_name'                                  => ['nullable', 'string', 'max:255', 'regex:/^[^<>"\']+$/'],
+      'last_name'                                   => ['required', 'string', 'max:255', 'regex:/^[^<>"\']+$/'],
       'personal_phone'                              => 'required',
     ]);
 

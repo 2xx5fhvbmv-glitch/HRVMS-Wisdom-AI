@@ -311,7 +311,9 @@
                     if (!md) {
                         $('#plInsights').html('<p class="text-muted">No insights available (the WAI service may be offline).</p>');
                     } else {
-                        var html = (typeof marked !== 'undefined') ? (marked.parse ? marked.parse(md) : marked(md)) : $('<div>').text(md).html();
+                        // R-03: escape HTML before marked.parse() — same fix as resorts.reports.show.
+                        var escapedMd = $('<div>').text(md).html();
+                        var html = (typeof marked !== 'undefined') ? (marked.parse ? marked.parse(escapedMd) : marked(escapedMd)) : escapedMd;
                         $('#plInsights').html(html);
                     }
                     $('#plResults').hide();

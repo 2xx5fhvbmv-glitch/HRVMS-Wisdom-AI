@@ -26,7 +26,18 @@ class ReportController extends Controller
         if($request->ajax())
         {
             $dateFormat = Common::getDateFormateFromSettings();
-            $reports = ResortReports::where('resort_id', $r->resort_id)->orderBy("created_at","desc")->get();
+            // R-01: hide saved reports the current user can no longer run
+            // (their role/department changed, or a colleague built it
+            // against a module — e.g. Payroll — they don't have access to).
+            // Legacy reports with no resolvable module/entity are left
+            // visible as before; runReport() already returns empty data
+            // for those.
+            $reports = ResortReports::where('resort_id', $r->resort_id)->orderBy("created_at","desc")->get()
+                ->filter(function ($report) {
+                    $params = $report->query_params ?? [];
+                    $def = $this->findEntityDef($params['module'] ?? null, $params['entity'] ?? null);
+                    return !$def || $this->canAccessEntity($def);
+                })->values();
 
             return datatables()->of($reports)
             ->addColumn('action', function ($row)
@@ -82,12 +93,19 @@ class ReportController extends Controller
         foreach ((array) config('report_fields', []) as $module => $entities) {
             foreach ((array) $entities as $entity => $def) {
                 $table = $def['table'] ?? null;
-                if ($table && Schema::hasTable($table)) {
-                    $catalog[$module][$entity] = [
-                        'table'  => $table,
-                        'fields' => array_keys($def['fields'] ?? []),
-                    ];
+                if (!$table || !Schema::hasTable($table)) {
+                    continue;
                 }
+                // R-01: don't offer a module/entity in the picker the caller
+                // can't actually run a report against — store() would reject
+                // it anyway, but showing it first just invites a 403.
+                if (!$this->canAccessEntity($def)) {
+                    continue;
+                }
+                $catalog[$module][$entity] = [
+                    'table'  => $table,
+                    'fields' => array_keys($def['fields'] ?? []),
+                ];
             }
         }
         return $catalog;
@@ -109,27 +127,55 @@ class ReportController extends Controller
     /**
      * R-01: the builder let anyone holding the single generic "Reports"
      * permission pick ANY module as a data source — including Payroll
-     * (bank accounts/salaries) and Budget — regardless of whether they
-     * have access to that module itself (e.g. an L&D manager, who
+     * (bank accounts/salaries) and Visa — regardless of whether they have
+     * access to that module itself (e.g. an L&D manager, who
      * Common::hasFullDataAccess() legitimately admits for general
      * reporting, could still pick "Payroll" and read every salary).
-     * Reuses each module's own established access rule where one exists;
-     * everything else falls back to the general HR/GM/master-admin gate,
-     * which is a strict tightening from "anyone with Reports access"
-     * either way.
+     * Driven by the 'access' tag on the entity's config/report_fields.php
+     * definition, resolved via Common::canRunReport() — which reuses each
+     * module's own already-decided access rule (payroll, visa, budget,
+     * grievance/disciplinary/incident) and falls back to the general
+     * HR/GM/master-admin baseline for everything else.
+     *
+     * Returns null (whole resort), an array of allowed department ids, or
+     * false (no access at all) — see Common::canRunReport().
      */
-    private function moduleAccessAllowed(string $module): bool
+    private function reportAccessScope(array $def)
     {
-        return match ($module) {
-            'Payroll' => Common::canAccessPayroll(),
-            'Budget' => in_array(Common::budgetAccessLevel(), ['full', 'approve'], true),
-            'Visa' => Common::canAccessVisa(),
-            default => Common::hasFullDataAccess(),
-        };
+        return Common::canRunReport($def['access'] ?? 'general');
+    }
+
+    private function canAccessEntity(array $def): bool
+    {
+        return $this->reportAccessScope($def) !== false;
+    }
+
+    /**
+     * R-01 item 3: explicit 403 for run/export/insights when the caller no
+     * longer has access to the module a saved report was built against.
+     * runReport() also refuses defensively (returns empty data) for the
+     * same case, but this makes the failure visible instead of silently
+     * blank. Legacy reports with no resolvable module/entity are left
+     * alone (same as index()'s listing filter).
+     */
+    private function assertReportAccessible(ResortReports $report): void
+    {
+        $params = $report->query_params ?? [];
+        $def = $this->findEntityDef($params['module'] ?? null, $params['entity'] ?? null);
+        if ($def && !$this->canAccessEntity($def)) {
+            abort(403, 'You do not have access to that module.');
+        }
     }
 
     public function store(Request $request)
     {
+        // R-01 item 5: this only ever ran behind the middleware's blanket
+        // 'view' permission check — anyone who could see the Reports page
+        // could save a new report, regardless of whether they hold the
+        // "create" level for it (same gap edit()/destroy() had).
+        if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.create')) == false) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -150,7 +196,7 @@ class ReportController extends Controller
 
         // R-01: don't let a report be created against a module the caller
         // doesn't actually have access to.
-        if (!$this->moduleAccessAllowed($validated['module'])) {
+        if (!$this->canAccessEntity($def)) {
             return response()->json(['success' => false, 'message' => 'You do not have access to that module.'], 403);
         }
 
@@ -204,6 +250,7 @@ class ReportController extends Controller
     
         $page_title = 'Report Details';
         $report = ResortReports::where('resort_id', $this->resort->resort_id)->findOrFail(base64_decode($id));
+        $this->assertReportAccessible($report);
         $form_date =  $report->from_date ? Carbon::parse($report->from_date)->format('d/m/Y') : '';
         $to_date =  $report->to_date ? Carbon::parse($report->to_date)->format('d/m/Y') : '';
         return view('resorts.reports.show',compact('report','form_date','to_date','page_title'));
@@ -212,6 +259,7 @@ class ReportController extends Controller
     {
 
         $report = ResortReports::where('resort_id', $this->resort->resort_id)->findOrFail($request->report_id);
+        $this->assertReportAccessible($report);
         $result  = $this->runReport($request->report_id, $request->todate, $request->formdate);
         $columns = $result['columns'];
         $data    = $result['rows'];
@@ -248,8 +296,11 @@ class ReportController extends Controller
         // the caller's role/department changed since — returns nothing
         // rather than the underlying module's data. Single choke point:
         // every data-returning caller (FetchReportData/export/AiInsideReport)
-        // goes through runReport().
-        if (!$this->moduleAccessAllowed($params['module'] ?? '')) {
+        // goes through runReport(). $scope is null (whole resort), an array
+        // of allowed department ids, or false (no access) — see
+        // Common::canRunReport().
+        $scope = $this->reportAccessScope($def);
+        if ($scope === false) {
             return ['columns' => [], 'rows' => []];
         }
 
@@ -269,23 +320,19 @@ class ReportController extends Controller
             $query->where("$table.resort_id", $this->resort->resort_id);
         }
 
-        $scopedDeptIds = Common::getScopedDepartmentIds();
-        $scopedEmpIds  = Common::getPerformanceScopedEmpIds();
-        if (is_array($scopedDeptIds)) {
+        if (is_array($scope)) {
             if (Schema::hasColumn($table, 'Dept_id')) {
-                $query->whereIn("$table.Dept_id", $scopedDeptIds);
+                $query->whereIn("$table.Dept_id", $scope);
             } elseif (Schema::hasColumn($table, 'department_id')) {
-                $query->whereIn("$table.department_id", $scopedDeptIds);
-            } elseif (is_array($scopedEmpIds)) {
-                if (Schema::hasColumn($table, 'Emp_main_id')) {
-                    $query->whereIn("$table.Emp_main_id", $scopedEmpIds);
-                } elseif (Schema::hasColumn($table, 'emp_id')) {
-                    $query->whereIn("$table.emp_id", $scopedEmpIds);
-                } elseif (Schema::hasColumn($table, 'employee_id')) {
-                    $query->whereIn("$table.employee_id", $scopedEmpIds);
-                } elseif ($table === 'employees' && Schema::hasColumn($table, 'id')) {
-                    $query->whereIn("$table.id", $scopedEmpIds);
-                }
+                $query->whereIn("$table.department_id", $scope);
+            } else {
+                // R-01 item 4: no department column to scope by, and the
+                // caller isn't whole-resort for this module — refuse rather
+                // than silently falling back to a different module's
+                // (Performance/L&D) employee-scoping rule, which is what
+                // used to let e.g. L&D staff read full Payroll data through
+                // payroll_reviews here.
+                return ['columns' => $labels, 'rows' => []];
             }
         }
 
@@ -459,103 +506,11 @@ class ReportController extends Controller
 
         return ['columns' => $labels, 'rows' => $rows];
     }
-    public function getTableColumns(Request $request)
-    {
-        $tableName = $request->input('table');
-        // Only expose columns for tables in the curated catalog allow-list.
-        if (!in_array($tableName, $this->allowedReportTables(), true)) {
-            return response()->json(['data' => ['parent_columns' => [], 'related_tables' => []]]);
-        }
-        $columns = collect(DB::getSchemaBuilder()->getColumnListing($tableName))->sort()->values();
-        $foreignKeys = $this->getTableForeignKeys($tableName);
-        
-        $resortName = $this->resort->resort->resort_name;
-        $Prefix = implode('', array_map(fn($word) => strtoupper($word[0]), explode(' ', $resortName)));
-        
-        $Parent_table = [];
-        $Child_table = [];
-        
-        foreach($columns as $c)
-        {
-            if ($this->isVarcharOrEnum($tableName, $c)) 
-            {
-                $Parent_table[] = [
-                    'original' => $c,
-                    'formatted' => $Prefix.'-'.ucfirst(str_replace('_', ' ', $c))
-                ];
-            }
-            if(isset($foreignKeys[$c]))
-            {
-                $foreignTableName = $foreignKeys[$c];
-                $foreignTableColumns = collect(DB::getSchemaBuilder()->getColumnListing($foreignTableName))
-                    ->sort()
-                    ->values();
-                $foreignVarcharEnumColumns = [];
-                foreach ($foreignTableColumns as $foreignColumn) 
-                {
-                    if ($this->isVarcharOrEnum($foreignTableName, $foreignColumn)) 
-                    {
-                        $foreignVarcharEnumColumns[]=['original' => $foreignColumn,'formatted' => $Prefix.'-'.ucfirst(str_replace('_', ' ', $foreignColumn))];
-                    }
-                }
-                $Child_table[] = [
-                    'original_foreign_key' => $c, 
-                    'formatted_foreign_key' => $Prefix.'-'. ucfirst(str_replace('_', ' ', $c)),
-                    'referenced_table' => $foreignTableName,
-                    'formatted_table_name' => $Prefix.'-'. ucfirst(str_replace('_', ' ', $foreignTableName)),
-                    'columns' => $foreignVarcharEnumColumns
-                ];
-            }
-        }
-            return response()->json(['data' => ['parent_columns' => $Parent_table,'related_tables' => $Child_table]]);
-    }
-    private function getTableForeignKeys($tableName)
-    {
-        $database = DB::getDatabaseName();
-        
-        $foreignKeys = DB::table('information_schema.KEY_COLUMN_USAGE')
-            ->select('COLUMN_NAME', 'REFERENCED_TABLE_NAME')
-            ->where('TABLE_SCHEMA', $database)
-            ->where('TABLE_NAME', $tableName)
-            ->whereNotNull('REFERENCED_TABLE_NAME')
-            ->get();
-        
-        $result = [];
-        
-        foreach ($foreignKeys as $fk) {
-            $result[$fk->COLUMN_NAME] = $fk->REFERENCED_TABLE_NAME;
-        }
-        
-        return $result;
-    }
-    private function isVarcharOrEnum($tableName, $columnName)
-    {
-        $database = DB::getDatabaseName();
-        $columnInfo = DB::table('information_schema.COLUMNS')->select('DATA_TYPE', 'COLUMN_TYPE')->where('TABLE_SCHEMA', $database)->where('TABLE_NAME', $tableName)->where('COLUMN_NAME', $columnName)->first();
-        
-        if (!$columnInfo) 
-        {
-            return false;
-        }
-        
-        // Check if data_type is varchar or if column_type starts with 'enum'
-        return true;
-    }
-    private function columnExistsInTable($tableName, $columnName)
-    {
-        $columns = DB::getSchemaBuilder()->getColumnListing($tableName);
-        return in_array($columnName, $columns);
-    }
-    private function isTableName($tableName)
-    {
-        $tables = DB::select('SHOW TABLES');
-        $tables = array_map('current', json_decode(json_encode($tables), true));
-        return in_array($tableName, $tables);
-    }
     public function export(Request $request)
     {
         
         $report = ResortReports::where('resort_id', $this->resort->resort_id)->findOrFail(base64_decode($request->report_id));
+        $this->assertReportAccessible($report);
         $result = $this->runReport(base64_decode($request->report_id),$request->Form_todate,$request->Form_formdate);
         return $this->exportReport($result, $report, $request->format);
     }
@@ -624,6 +579,12 @@ class ReportController extends Controller
         if ($analysisText !== '') {
             return $analysisText;
         }
+
+        // R-04 item 3: never forward bank/passport numbers or (for a
+        // below-HR-level viewer) raw salary figures to the external AI
+        // service, regardless of what the viewer is entitled to see on
+        // screen.
+        [$columns, $rows] = Common::stripSensitiveReportColumnsForAi($columns, $rows, $this->resort);
 
         $reportInfo = [
             "name"        => $report->name,
@@ -723,8 +684,16 @@ class ReportController extends Controller
     }
     public function edit($id)
     {
+        // R-01 item 5: this only ever ran behind the middleware's blanket
+        // 'view' permission check — anyone who could see a report could
+        // edit it, regardless of whether they hold the "edit" level.
+        if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.edit')) == false) {
+            return abort(403, 'Unauthorized access');
+        }
+
         $page_title = 'Edit Report';
         $report = ResortReports::where('resort_id', $this->resort->resort_id)->findOrFail(base64_decode($id));
+        $this->assertReportAccessible($report);
         // Same curated vocabulary as create — never expose raw tables/columns.
         $catalog = $this->reportFieldCatalog();
         $params  = $report->query_params ?? [];
@@ -738,6 +707,13 @@ class ReportController extends Controller
 
     public function destroy($id)
     {
+        // R-01 item 5: this only ever ran behind the middleware's blanket
+        // 'view' permission check — anyone who could see a report could
+        // delete it, regardless of whether they hold the "delete" level.
+        if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.delete')) == false) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
+
         $decoded = is_numeric($id) ? (int) $id : base64_decode($id);
         $report = ResortReports::where('resort_id', $this->resort->resort_id)->find($decoded);
         if (!$report) {
@@ -753,6 +729,7 @@ class ReportController extends Controller
         $todate     = $request->todate;
         $formdate   = $request->formdate;
         $report = ResortReports::where('resort_id', $this->resort->resort_id)->findOrFail($report_id);
+        $this->assertReportAccessible($report);
 
         // Data is already resolved to business labels -> display values.
         $result  = $this->runReport($report_id, $todate, $formdate);

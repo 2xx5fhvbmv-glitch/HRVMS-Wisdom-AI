@@ -441,12 +441,31 @@ class LearningController extends Controller
             // Ensure training is within the valid date range
             if ($currentDate < $trainingSchedule->start_date || $currentDate > $trainingSchedule->end_date) {
                  return response()->json([
-                    'success' => false, 
+                    'success' => false,
                     'message' => 'Attendance can only be marked during the training period'
                 ], 200);
 
             }
-         
+
+            // LR-02/LR-06: route-level middleware only checked rank (EXCOM),
+            // not whether this caller is actually the trainer/L&D staff
+            // running THIS session, nor that the submitted employees are
+            // even participants of it. HR / L&D Manager may mark any
+            // schedule; other L&D-dept staff and the schedule's own trainer
+            // only this one; everyone else (including a bare EXCOM/HOD) is
+            // denied.
+            $employee = $this->user->GetEmployee ?? null;
+            if (!Common::canMarkLearningAttendance($employee, $trainingSchedule)) {
+                return response()->json(['success' => false, 'message' => 'Forbidden: you are not authorized to mark attendance for this training.'], 403);
+            }
+
+            $participantIds = TrainingParticipant::where('training_schedule_id', $trainingSchedule->id)
+                ->pluck('employee_id')->all();
+            $requestedIds = collect($request->employees)->pluck('employee_id')->all();
+            if (!empty(array_diff($requestedIds, $participantIds))) {
+                return response()->json(['success' => false, 'message' => 'One or more employees are not participants of this training schedule.'], 422);
+            }
+
             $absentEmployeeIds = [];
             foreach ($request->employees as $employeeData) {
                 TrainingAttendance::updateOrCreate(
@@ -883,15 +902,21 @@ class LearningController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        try {   
-                                                            
+        // LR-01: an empty/falsy $formResId made the when() a no-op, so the
+        // query returned the FIRST row in the whole table (any resort).
+        if (empty($formResId)) {
+            return response()->json(['success' => false, 'message' => 'formResId is required'], 422);
+        }
+
+        try {
+
             $trainingFeedbackResponse                   =   TrainingFeedbackResponse::join('training_feedback_form as tff','tff.id','training_feedback_responses.form_id')
-                                                                ->when($formResId, function ($query, $formResId) {
-                                                                    return $query->where('training_feedback_responses.id', $formResId);
-                                                                })
+                                                                ->where('training_feedback_responses.id', $formResId)
+                                                                // LR-01: resort-scope via the owning form — was readable cross-tenant.
+                                                                ->where('tff.resort_id', $this->resort_id)
                                                                 ->select(
                                                                     'training_feedback_responses.*',
-                                                                   'tff.form_name', 
+                                                                   'tff.form_name',
                                                                    'tff.form_structure',
                                                                 )->first();
 
@@ -1145,11 +1170,17 @@ class LearningController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
+        // LR-01: an empty/falsy $formResId made the when() a no-op, so the
+        // query returned the FIRST row in the whole table (any resort).
+        if (empty($formResId)) {
+            return response()->json(['success' => false, 'message' => 'formResId is required'], 422);
+        }
+
         try {
             $evaluationResponse                         =   EvaluationFormResponse::join('evaluation_form as ef','ef.id','evaluation_form_responses.form_id')
-                                                                ->when($formResId, function ($query, $formResId) {
-                                                                    return $query->where('evaluation_form_responses.id', $formResId);
-                                                                })
+                                                                ->where('evaluation_form_responses.id', $formResId)
+                                                                // LR-01: resort-scope via the owning form — was readable cross-tenant.
+                                                                ->where('ef.resort_id', $this->resort_id)
                                                                 ->select(
                                                                     'evaluation_form_responses.*',
                                                                    'ef.form_name',

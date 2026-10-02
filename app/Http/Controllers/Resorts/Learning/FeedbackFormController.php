@@ -25,6 +25,10 @@ class FeedbackFormController extends Controller
         $this->rank=  $this->resort->GetEmployee->rank ?? '';
     }
     public function index(){
+        // LR-06: forms management is HR / L&D Manager (full) or GM (view-only).
+        if (!Common::hasFullDataAccess()) {
+            return abort(403, 'Unauthorized access');
+        }
         $page_title="Feedback Form";
         $trainings = TrainingSchedule::where('status','Completed')->where('resort_id',$this->resort->resort_id)->get();
 
@@ -33,6 +37,9 @@ class FeedbackFormController extends Controller
 
     public function list(Request $request)
     {
+        if (!Common::hasFullDataAccess()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
         $searchTerm = $request->get('searchTerm');
     
         $forms = TrainingFeedbackForm::where('resort_id', $this->resort->resort_id)
@@ -62,6 +69,10 @@ class FeedbackFormController extends Controller
     
     public function create(Request $request)
     {
+        // LR-06: only HR / L&D Manager may create/edit/delete feedback forms.
+        if (!Common::canManageLearning()) {
+            return abort(403, 'Unauthorized access');
+        }
         $page_title = "Create Feedback Form";
         $resort_id = $this->resort->resort_id;
         $trainings = TrainingSchedule::with(['learningProgram', 'participants.employee.resortAdmin'])
@@ -75,6 +86,9 @@ class FeedbackFormController extends Controller
     }
     public function store(Request $request)
     {
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and L&D Managers can manage feedback forms.'], 403);
+        }
         // dd($request->input('position'));
         $resortId = $this->resort->resort_id;
 
@@ -91,6 +105,9 @@ class FeedbackFormController extends Controller
 
     public function edit($id)
     {
+        if (!Common::canManageLearning()) {
+            return abort(403, 'Unauthorized access');
+        }
         $page_title = "Edit Feedback Form";
         $resortId = $this->resort->resort_id;
         $form = TrainingFeedbackForm::where('resort_id', $resortId)->find($id);
@@ -103,6 +120,9 @@ class FeedbackFormController extends Controller
 
     public function preview($id)
     {
+        if (!Common::hasFullDataAccess()) {
+            return abort(403, 'Unauthorized access');
+        }
         $page_title = "Preview Feedback Form";
         $form = TrainingFeedbackForm::where('resort_id', $this->resort->resort_id)->findOrFail($id);
         $structure = json_decode($form->form_structure, true);
@@ -113,6 +133,9 @@ class FeedbackFormController extends Controller
 
     public function update(Request $request, $id)
     {
+        if (!Common::canManageLearning()) {
+            return abort(403, 'Unauthorized access');
+        }
         $form = TrainingFeedbackForm::where('resort_id', $this->resort->resort_id)->find($id);
         if (!$form) {
             abort(404, 'Feedback form not found.');
@@ -133,6 +156,9 @@ class FeedbackFormController extends Controller
 
     public function delete($id)
     {
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and L&D Managers can manage feedback forms.'], 403);
+        }
         $form = TrainingFeedbackForm::where('resort_id', $this->resort->resort_id)->find($id);
         if (!$form) {
             return response()->json(['success' => false, 'message' => 'Form not found.'], 404);

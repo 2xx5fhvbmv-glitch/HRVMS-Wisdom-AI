@@ -107,6 +107,18 @@
       }
     });
 
+    // Super-admin security: step-up re-auth (AdminReauth), MFA enrolment and
+    // idle/deactivation sign-out (AdminSecurity) answer AJAX with JSON; send
+    // the browser where the server says instead of leaving a silent failure.
+    $(document).ajaxError(function (event, xhr) {
+      var res = xhr.responseJSON || {};
+      if (xhr.status === 403 && res.redirect_url) {
+        window.location.href = res.redirect_url;
+      } else if (xhr.status === 401) {
+        window.location.href = "{{ route('admin.loginindex') }}";
+      }
+    });
+
     bsCustomFileInput.init();
   });
 

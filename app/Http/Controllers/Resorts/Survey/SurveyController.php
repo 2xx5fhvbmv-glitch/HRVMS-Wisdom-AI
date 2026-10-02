@@ -74,6 +74,49 @@ class SurveyController extends Controller
         if ($privacy === 'Confidential') return $this->isPrivilegedSurveyViewer();
         return true; // Neutral or anything unrecognised defaults to visible.
     }
+
+    /**
+     * SV-04: create/edit/publish/close/delete/notify actions are HR-only.
+     * Deliberately narrower than isPrivilegedSurveyViewer() (HR + GM), which
+     * gates *viewing* results — the decided role rules have GM able to see
+     * results (including Confidential names) but never able to
+     * create/edit/delete/publish a survey.
+     */
+    private function isSurveyManager(): bool
+    {
+        if (!$this->resort) return false;
+        if (($this->resort->type ?? null) === 'super' || ($this->resort->is_master_admin ?? 0)) {
+            return true;
+        }
+        $emp = $this->resort->GetEmployee ?? null;
+        if (!$emp) return false;
+
+        return (int) ($emp->rank ?? 0) === 3; // Rank 3 = HR only.
+    }
+
+    /**
+     * SV-01: deterministic, invite-order-independent ordinal assignment for
+     * masked respondent labels. Sorts by a hash of (survey id, respondent
+     * key, app key) so a given respondent's "#N" has no relation to invite/
+     * insertion order, but — unlike a plain shuffle() — stays the same
+     * across repeated views/exports of the same survey.
+     */
+    private function stableMaskOrdinals($surveyId, $keys): array
+    {
+        $secret = config('app.key');
+        $sorted = collect($keys)->values()->unique()->sort(function ($a, $b) use ($surveyId, $secret) {
+            return strcmp(
+                hash('sha256', $surveyId . '|' . $a . '|' . $secret),
+                hash('sha256', $surveyId . '|' . $b . '|' . $secret)
+            );
+        })->values();
+
+        $map = [];
+        foreach ($sorted as $ordinal => $key) {
+            $map[$key] = $ordinal + 1;
+        }
+        return $map;
+    }
     public function index()
     {
         $emp = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
@@ -196,6 +239,15 @@ class SurveyController extends Controller
      */
     public function UpdateSurvey(Request $request, $id)
     {
+        // SV-04: create/edit/publish is HR-only.
+        if (!$this->isSurveyManager()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
+
+        $request->validate([
+            'survey_privacy_type' => 'required|in:Neutral,Confidential,Anonymous',
+        ]);
+
         $rawId = base64_decode($id);
 
         DB::beginTransaction();
@@ -401,7 +453,15 @@ class SurveyController extends Controller
 
     public function SaveSurvey(Request $request)
     {
-        
+        // SV-04: create/edit/publish is HR-only.
+        if (!$this->isSurveyManager()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
+
+        $request->validate([
+            'survey_privacy_type' => 'required|in:Neutral,Confidential,Anonymous',
+        ]);
+
         DB::beginTransaction();
         try
         {
@@ -673,7 +733,7 @@ class SurveyController extends Controller
                 return  '<a href="javascript:void(0)" class="a-link showTotalapplicant" data-id="'.$id.'">'.$count.'</a>';
             })
             ->addColumn('Privacy', function ($row) {
-                return $row->survey_privacy_type;
+                return e($row->survey_privacy_type);
             })
            
             ->addColumn('StartDate', function ($row) {
@@ -737,6 +797,11 @@ class SurveyController extends Controller
 
     public function SurveyDestory($id)
     {
+        // SV-04: delete is HR-only.
+        if (!$this->isSurveyManager()) {
+            return response()->json(['error' => 'Unauthorized access'], 403);
+        }
+
         $id = base64_decode($id);
          DB::beginTransaction();
         try
@@ -782,6 +847,10 @@ class SurveyController extends Controller
 
     public function changeStatus(Request $request)
     {
+        // SV-04: publish/close is HR-only.
+        if (!$this->isSurveyManager()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
 
         $id = base64_decode($request->id);
         $status = $request->status;
@@ -831,45 +900,39 @@ class SurveyController extends Controller
 
     public function TotalApplicant($id)
     {
+        // SV-04: results/participant-list access is HR + GM only.
+        if (!$this->isPrivilegedSurveyViewer()) {
+            return abort(403, 'Unauthorized access');
+        }
 
         $surveyId = base64_decode($id);
         $privacy = ParentSurvey::where('id', $surveyId)->where('resort_id', $this->resort->resort_id)->value('survey_privacy_type');
         $showRespondentIdentity = $this->canSeeRespondentIdentity($privacy);
 
-        $parentRows = ParentSurvey::join('survey_employees as t1',"t1.Parent_survey_id","=","parent_surveys.id")
+        // SV-01: Anonymous surveys must never reveal who did/didn't respond
+        // — not even to a privileged HR/GM viewer once identity is masked
+        // (Confidential is only masked here for a non-privileged caller,
+        // who is already blocked above, so this only fires for Anonymous).
+        // Counts only: no names, no per-person status, no completion dates.
+        if (!$showRespondentIdentity) {
+            $total = SurveyEmployee::where('Parent_survey_id', $surveyId)->count();
+            $responded = SurveyEmployee::where('Parent_survey_id', $surveyId)->where('emp_status', 'yes')->count();
+            $pending = $total - $responded;
+
+            return '<div class="col-sm-12"><div class="employee-name-box">Total Participants: ' . $total . '</div></div>'
+                 . '<div class="col-sm-12"><div class="employee-name-box">Responded: ' . $responded . '</div></div>'
+                 . '<div class="col-sm-12"><div class="employee-name-box">Pending: ' . $pending . '</div></div>';
+        }
+
+        $parent = ParentSurvey::join('survey_employees as t1',"t1.Parent_survey_id","=","parent_surveys.id")
                     ->join('employees as t2',"t2.id","=","t1.Emp_id")
                     ->join('resort_admins as t3',"t3.id","=","t2.Admin_Parent_id")
                     ->where("parent_surveys.id",$surveyId)
                     ->where('parent_surveys.resort_id',$this->resort->resort_id)
-
                     ->get(['t3.id as Parentid','t3.first_name','t3.last_name','t1.Emp_id','t1.emp_status'])
-                    ->values();
-
-        // SV-01: the ordinal used to be $idx+1 — this row's position in the
-        // invite-order query result, which is stable and reconstructable
-        // (the create-survey participant list preserves the same order), so
-        // "#N" could be mapped straight back to a named employee. Assign
-        // shuffled ordinals to just the masked rows instead.
-        $maskedKeys = $parentRows->filter(fn($ak) => $ak->emp_status === 'yes' && !$showRespondentIdentity)->keys();
-        $ordinalByKey = Common::shuffledMaskOrdinals($maskedKeys);
-
-        $parent = $parentRows->map(function($ak, $idx) use ($showRespondentIdentity, $privacy, $ordinalByKey){
-
-                        // Same masking as GetSurveyResults()/Result.blade —
-                        // was showing every assigned employee's real name
-                        // unconditionally, defeating Anonymous/Confidential
-                        // privacy for anyone who had already submitted.
-                        // Pending (not-yet-responded) participants still
-                        // show real names — chasing non-responders is a
-                        // legitimate need and doesn't leak who answered.
-                        if ($ak->emp_status === 'yes' && !$showRespondentIdentity) {
-                            $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
-                            $ak->EmployeeName = $label . ' #' . $ordinalByKey[$idx];
-                            $ak->profileImg = asset('resorts_assets/images/user.svg');
-                        } else {
-                            $ak->EmployeeName = ucfirst($ak->first_name . ' ' . $ak->last_name);
-                            $ak->profileImg = Common::getResortUserPicture($ak->Parentid);
-                        }
+                    ->map(function($ak){
+                        $ak->EmployeeName = ucfirst($ak->first_name . ' ' . $ak->last_name);
+                        $ak->profileImg = Common::getResortUserPicture($ak->Parentid);
                         return $ak;
                     });
 
@@ -956,7 +1019,7 @@ class SurveyController extends Controller
                 return  '<a href="javascript:void(0)" class="a-link showTotalapplicant" data-id="'.$id.'">'.$count.'</a>';
             })
             ->addColumn('Privacy', function ($row) {
-                return $row->survey_privacy_type;
+                return e($row->survey_privacy_type);
             })
            
             ->addColumn('StartDate', function ($row) {
@@ -1051,7 +1114,7 @@ class SurveyController extends Controller
                 return  '<a href="javascript:void(0)" class="a-link showTotalapplicant" data-id="'.$id.'">'.$count.'</a>';
             })
             ->addColumn('Privacy', function ($row) {
-                return $row->survey_privacy_type;
+                return e($row->survey_privacy_type);
             })
            
             ->addColumn('StartDate', function ($row) {
@@ -1092,6 +1155,11 @@ class SurveyController extends Controller
 
     public function NotifyToParticipants(Request $request)
     {
+        // SV-04: sending reminders is HR-only.
+        if (!$this->isSurveyManager()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
+
         $id = base64_decode($request->id);
 
             $ParentSurvey = ParentSurvey::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
@@ -1135,7 +1203,24 @@ class SurveyController extends Controller
     }
     public function GetPendingParticipants(Request $request)
     {
+        // SV-04: results/participant-list access is HR + GM only.
+        if (!$this->isPrivilegedSurveyViewer()) {
+            return abort(403, 'Unauthorized access');
+        }
+
         $id= base64_decode($request->id);
+
+        $privacy = ParentSurvey::where('id', $id)->where('resort_id', $this->resort->resort_id)->value('survey_privacy_type');
+        $showRespondentIdentity = $this->canSeeRespondentIdentity($privacy);
+
+        // SV-01: naming everyone who HASN'T answered — with no cap on the
+        // total — reveals by elimination who HAS, breaking the R-05 rule
+        // for an Anonymous survey. Counts only when identity is masked.
+        if (!$showRespondentIdentity) {
+            $pending = SurveyEmployee::where('Parent_survey_id', $id)->where('emp_status', 'no')->count();
+            return '<div class="col-sm-12"><div class="employee-name-box">Pending Participants: ' . $pending . '</div></div>';
+        }
+
         $parent = ParentSurvey::join('survey_employees as t1',"t1.Parent_survey_id","=","parent_surveys.id")
         ->join('employees as t2',"t2.id","=","t1.Emp_id")
         ->join('resort_admins as t3',"t3.id","=","t2.Admin_Parent_id")
@@ -1149,7 +1234,7 @@ class SurveyController extends Controller
             $ak->profileImg = Common::getResortUserPicture($ak->Parentid);
             return $ak;
         });
-         $row='';    
+         $row='';
         if($parent->isNotEmpty())
         {
             foreach($parent as $p)
@@ -1273,7 +1358,7 @@ class SurveyController extends Controller
                 return  '<a href="javascript:void(0)" id="PendingParticipants" class="a-link " data-id="'. $id.'">View Pending Participants</a>';
             })
             ->addColumn('Privacy', function ($row) {
-                return $row->survey_privacy_type;
+                return e($row->survey_privacy_type);
             })
            
             ->addColumn('StartDate', function ($row) {
@@ -1293,6 +1378,10 @@ class SurveyController extends Controller
     public function GetSurveyResults($id)
     {
         if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false){
+            return abort(403, 'Unauthorized access');
+        }
+        // SV-04: results access is HR + GM only.
+        if (!$this->isPrivilegedSurveyViewer()) {
             return abort(403, 'Unauthorized access');
         }
         $id = base64_decode($id);
@@ -1350,11 +1439,13 @@ class SurveyController extends Controller
                                         ->where('survey_employees.emp_status','yes')
                                         ->get(['t1.id as emp_id','t2.first_name','t2.last_name','t2.id as ParentId'] )
                                         ->values();
-        // SV-01: ($idx+1) was this row's position in invite/insertion order
-        // — the respondent *set* is itself derivable from the full invite
-        // list (elsewhere showing real names for non-respondents), so which
-        // invite-position landed at which ordinal here still deanonymized.
-        $ordinalByKey = $showRespondentIdentity ? [] : Common::shuffledMaskOrdinals($ResponedEmpRows->keys());
+        // SV-01: ordinal used to be $idx+1 — this row's position in
+        // invite/insertion order, which is stable and reconstructable, so
+        // which invite-position landed at which ordinal here still
+        // deanonymized. Use a deterministic hash of the real employee id
+        // instead of the positional index/a random shuffle — stable across
+        // repeated views/exports, but unrelated to invite order.
+        $ordinalByKey = $showRespondentIdentity ? [] : $this->stableMaskOrdinals($id, $ResponedEmpRows->pluck('emp_id'));
         $ResponedEmp = $ResponedEmpRows->map(function($i, $idx) use ($showRespondentIdentity, $privacy, $ordinalByKey) {
                                             if ($showRespondentIdentity) {
                                                 $i->emp_id  = base64_encode($i->emp_id);
@@ -1363,8 +1454,9 @@ class SurveyController extends Controller
                                             } else {
                                                 // Mask: stable per-row label, no real ID surfaced to the client.
                                                 $label = $privacy === 'Anonymous' ? 'Anonymous' : 'Confidential';
+                                                $ordinal = $ordinalByKey[$i->emp_id];
                                                 $i->emp_id  = base64_encode('All'); // disable per-respondent export
-                                                $i->EmployeeName = $ordinalByKey[$idx] . ' ' . $label;
+                                                $i->EmployeeName = $ordinal . ' ' . $label;
                                                 $i->profileImg = asset('resorts_assets/images/user.svg');
                                                 $i->first_name = $label;
                                                 $i->last_name = '';
@@ -1389,9 +1481,9 @@ class SurveyController extends Controller
             ->get();
 
         // SV-01: $maskedSeq used to increment in `orderBy('t2.id')` (invite)
-        // order — stable and reconstructable. Shuffle the ordinal assigned
-        // to each distinct respondent instead.
-        $ordinalByEmpTaId = $showRespondentIdentity ? [] : Common::shuffledMaskOrdinals($fetchAllQA->pluck('Emp_id')->unique());
+        // order — stable and reconstructable. Deterministic hash-based
+        // ordinal instead, stable across repeated views.
+        $ordinalByEmpTaId = $showRespondentIdentity ? [] : $this->stableMaskOrdinals($id, $fetchAllQA->pluck('Emp_id')->unique());
 
         $respondentAnswers = [];
         $maskedLabelByEmpTaId = [];
@@ -1463,6 +1555,11 @@ class SurveyController extends Controller
 
     public function SurveyReultExport(Request $request)
     {
+        // SV-04: results export is HR + GM only.
+        if (!$this->isPrivilegedSurveyViewer()) {
+            return abort(403, 'Unauthorized access');
+        }
+
         $survey_id  = base64_decode($request->id);
         $respondent_id  = base64_decode($request->respondent);
 
@@ -1562,8 +1659,9 @@ class SurveyController extends Controller
         // a stable pseudonym across all their answers.
         $maskedLabelByEmpTaId = [];
         // SV-01: $maskedSeq incremented in orderBy('t2.id') (invite) order —
-        // stable and reconstructable. Shuffled instead.
-        $ordinalByEmpTaId = $showRespondentIdentity ? [] : Common::shuffledMaskOrdinals($fetchQuestions->pluck('Emp_id')->unique());
+        // stable and reconstructable. Deterministic hash-based ordinal
+        // instead, stable across repeated exports of the same survey.
+        $ordinalByEmpTaId = $showRespondentIdentity ? [] : $this->stableMaskOrdinals($survey_id, $fetchQuestions->pluck('Emp_id')->unique());
 
         foreach ($fetchQuestions as $q) {
             // Check if the employee has answered the question
@@ -1606,6 +1704,10 @@ class SurveyController extends Controller
         if (Common::checkRouteWisePermission('Survey.Surveylist', config('settings.resort_permissions.view')) == false) {
             return abort(403, 'Unauthorized access');
         }
+        // SV-04: results download is HR + GM only.
+        if (!$this->isPrivilegedSurveyViewer()) {
+            return abort(403, 'Unauthorized access');
+        }
 
         $decodedId = base64_decode($id);
         $parent = ParentSurvey::join('resort_admins as t2', 't2.id', '=', 'parent_surveys.created_by')
@@ -1627,17 +1729,19 @@ class SurveyController extends Controller
         $participantEmpRows = SurveyEmployee::join('employees as t1', 't1.id', '=', 'survey_employees.Emp_id')
             ->join('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
             ->where('survey_employees.Parent_survey_id', $decodedId)
-            ->get(['t2.first_name', 't2.last_name', 't2.id as ParentId'])
+            ->get(['t1.id as EmpKey', 't2.first_name', 't2.last_name', 't2.id as ParentId'])
             ->values();
         // SV-01: ($idx+1) was invite-order position, stable/reconstructable.
-        $ordinalByKey = $showRespondentIdentity ? [] : Common::shuffledMaskOrdinals($participantEmpRows->keys());
+        // Deterministic hash of the real employee id instead — stable
+        // across repeated downloads of the same survey.
+        $ordinalByKey = $showRespondentIdentity ? [] : $this->stableMaskOrdinals($decodedId, $participantEmpRows->pluck('EmpKey'));
         $participantEmp = $participantEmpRows->map(function ($i, $idx) use ($showRespondentIdentity, $privacy, $ordinalByKey) {
                 if ($showRespondentIdentity) {
                     $i->EmployeeName = ucfirst($i->first_name . ' ' . $i->last_name);
                     $i->profileImg = Common::getResortUserPicture($i->ParentId);
                 } else {
                     $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
-                    $i->EmployeeName = $label . ' #' . $ordinalByKey[$idx];
+                    $i->EmployeeName = $label . ' #' . $ordinalByKey[$i->EmpKey];
                     $i->profileImg = asset('resorts_assets/images/user.svg');
                 }
                 return $i;

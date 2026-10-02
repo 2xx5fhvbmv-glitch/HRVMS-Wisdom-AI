@@ -41,7 +41,29 @@ class DisciplinaryController extends Controller
             $this->underEmp_id = Common::getSubordinates( $this->reporting_to);
         }
     }
-    
+
+    /**
+     * D-04: a case is viewable by HR, GM (read-only), whoever created it,
+     * or a member of its assigned committee. Was resort_id scoping only —
+     * any portal user of any rank could open any case in the resort.
+     */
+    private function canAccessCase($case): bool
+    {
+        $employee = optional($this->resort)->GetEmployee;
+        if (Common::isDisciplinaryHR($employee) || Common::isDisciplinaryGM($employee)) {
+            return true;
+        }
+        if ($case->created_by && (int) $case->created_by === (int) optional($this->resort)->id) {
+            return true;
+        }
+        if ($case->Committee_id && $employee) {
+            return DisciplineryCommitteeMembers::where('Parent_committee_id', $case->Committee_id)
+                ->where('MemberId', $employee->id)
+                ->exists();
+        }
+        return false;
+    }
+
     public function DisciplinaryIndex(Request $request)
     {
 
@@ -154,11 +176,12 @@ class DisciplinaryController extends Controller
             {
                 return ucfirst($row->Offence->OffensesName);
             })
-            ->addColumn('EmployeeName', function ($row) 
+            ->addColumn('EmployeeName', function ($row)
             {
-              
-                // return $row->GetEmployee;
-                return $row->GetEmployee->resortAdmin->first_name.' '.$row->GetEmployee->resortAdmin->last_name;
+                // PE-04: employee names are self-editable via the mobile
+                // info-update request and were glued into this rawColumn
+                // unescaped.
+                return e($row->GetEmployee->resortAdmin->first_name.' '.$row->GetEmployee->resortAdmin->last_name);
             })
             ->addColumn('Status', function ($row)
             {
@@ -304,8 +327,21 @@ class DisciplinaryController extends Controller
         // resort-scoped lookup of this same id even ran, and that lookup's
         // failure only broke notification code, never blocked the write —
         // an id from another resort saved successfully either way.
-        if (!Employee::where('id', $Employee_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+        $accused = Employee::where('id', $Employee_id)->where('resort_id', $this->resort->resort_id)->first(['id', 'Dept_id']);
+        if (!$accused) {
             return response()->json(['success' => false, 'message' => 'Invalid employee.'], 422);
+        }
+        // D-04: no role check existed at all — any portal user could raise a
+        // case against any employee. Decided: HR full; HOD/EXCOM only
+        // against their own department's employees.
+        $caller = optional($this->resort)->GetEmployee;
+        if (!Common::isDisciplinaryHR($caller)) {
+            $callerRank = (int) optional($caller)->rank;
+            $isOwnDeptHodOrExcom = $caller && in_array($callerRank, [1, 2], true)
+                && (int) $accused->Dept_id === (int) $caller->Dept_id;
+            if (!$isOwnDeptHodOrExcom) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+            }
         }
         $witnessIds = [];
         if (!empty($request->select_witness)) {
@@ -543,6 +579,12 @@ class DisciplinaryController extends Controller
         ->where('disciplinary_submits.Employee_id',base64_decode($request->Employee_id))
         ->where('disciplinary_submits.resort_id',$this->resort->resort_id) //show all and history of all the committe members
         ->get(['t1.ActionName','disciplinary_submits.*']);
+
+        // D-04: same "open any case" gap as DisciplineryInvestigation() — this
+        // feeds the same investigation page's Active Offences panel, so it's
+        // gated by the same per-case visibility rule rather than left open.
+        $DisciplinarySubmissionModel = $DisciplinarySubmissionModel->filter(fn($row) => $this->canAccessCase($row))->values();
+
         if($request->ajax())
         {
             return datatables()->of($DisciplinarySubmissionModel)
@@ -599,7 +641,14 @@ class DisciplinaryController extends Controller
                                                     ->where("disciplinary_submits.id",$id)
                                                     ->whereIn('disciplinary_submits.status',['In_Review','Acknowledged'])
                                                     ->first(['t8.ActionName','t7.DisciplinaryCategoryName as  CatName','t6.OffensesName','t2.personal_phone','t2.email as employee_email','t2.id as Parentid','t2.first_name','t2.last_name','t2.profile_picture','t1.Emp_id as employee_code','t9.CommitteeName','disciplinary_submits.*','t3.name as DepartmentName','t4.position_title as PositiontName','t11.first_name as SupervisorFirstName','t11.last_name as SupervisorLastName']);
-       
+
+        // D-04: only HR, GM (read-only), the case's creator or a member of
+        // its assigned committee may open it — was resort_id scoping only,
+        // so any portal user could open any case in the resort.
+        if (!$Disciplinary_parent || !$this->canAccessCase($Disciplinary_parent)) {
+            abort(403, 'Unauthorized access');
+        }
+
         $page_title ="Disciplinary Investigation";
         $path = config('settings.DisciplinaryAttachments');
         $Path = $path."/".$this->resort->resort->resort_id."/".$Disciplinary_parent->Disciplinary_id;
@@ -684,11 +733,20 @@ class DisciplinaryController extends Controller
                 return response()->json(['success' => false, 'message' => 'Disciplinary case not found.'], 404);
             }
             $callerEmployeeId = optional($this->resort->GetEmployee)->id;
-            $isCommitteeMember = $callerEmployeeId && $case->Committee_id && DisciplineryCommitteeMembers::where('Parent_committee_id', $case->Committee_id)
+            $isHr = Common::isDisciplinaryHR($this->resort->GetEmployee ?? null);
+            $isCommitteeMember = $isHr || ($callerEmployeeId && $case->Committee_id && DisciplineryCommitteeMembers::where('Parent_committee_id', $case->Committee_id)
                 ->where('MemberId', $callerEmployeeId)
-                ->exists();
+                ->exists());
             if (!$isCommitteeMember) {
                 return response()->json(['success' => false, 'message' => 'You are not a member of the committee assigned to this case.'], 403);
+            }
+            // D-04: closing/delivering to HR is reserved for HR — the
+            // decided rule is "committee chair or HR", but no chair concept
+            // exists anywhere in the committee schema (just a flat member
+            // list), so until that's added the safe reading is HR only.
+            $wantsToClose = ($request->outcome_type == 'DeliverToHr') || ($request->STATUS == 'resolved');
+            if ($wantsToClose && !$isHr) {
+                return response()->json(['success' => false, 'message' => 'Only HR can close or deliver this case to HR.'], 403);
             }
             // Never trust the client's claimed identity for whose entry
             // this is — always the caller's own employee id.
@@ -860,6 +918,11 @@ class DisciplinaryController extends Controller
         $case = disciplinarySubmit::with(['category', 'offence', 'action', 'GetEmployee.resortAdmin'])
             ->where('resort_id', $this->resort->resort_id)
             ->findOrFail($id);
+
+        // D-04: same case-visibility rule as DisciplineryInvestigation().
+        if (!$this->canAccessCase($case)) {
+            abort(403, 'Unauthorized access');
+        }
 
         if ($case->status !== 'resolved') {
             abort(403, 'The disciplinary case is not yet resolved.');

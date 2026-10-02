@@ -32,14 +32,26 @@ class PipPdpController extends Controller
      * PIP/PDP or archive/restore any plan. renderPlanView/storePlanResponse
      * already gate via canAccessPlan()/canManagePlan(); this reuses the same
      * scoping model pipIndex()/pdpIndex() already apply to their own
-     * listings (Common::getPerformanceScopedEmpIds() — null for GM/HR/L&D
-     * leadership, else the caller's own department or subordinates+self),
+     * listings (Common::getPerformanceScopedEmpIds('performance', ...) — null
+     * for GM/HR, else the caller's own department or subordinates+self),
      * rather than a flat HR-only gate that would block a legitimate HOD from
      * managing their own team.
+     *
+     * $area='pdp' opts a PDP caller into the PF-07 L&D-leadership PDP
+     * carve-out (see Common::getPerformanceScopedEmpIds()). $blockSelf
+     * enforces PF-03's "caller != the employee themselves" rule — only
+     * needed at plan-creation time (pipStore/pdpStore); archive/restore
+     * don't create a new assignment so they don't block self.
      */
-    private function assertEmployeeInPerformanceScope($employeeId)
+    private function assertEmployeeInPerformanceScope($employeeId, $area = null, $blockSelf = false)
     {
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        if ($blockSelf) {
+            $currentEmpId = optional($this->resort->GetEmployee)->id;
+            if ($currentEmpId && (int) $currentEmpId === (int) $employeeId) {
+                return response()->json(['success' => false, 'message' => 'You cannot assign a PIP/PDP to yourself.'], 403);
+            }
+        }
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance', $area);
         if (is_array($scopedIds) && !in_array((int) $employeeId, $scopedIds, true)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
         }
@@ -52,7 +64,7 @@ class PipPdpController extends Controller
     {
         $archivedView = (bool) $request->boolean('archived');
         $page_title = $archivedView ? 'PIP Archive' : 'Performance Improvement Plan';
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
 
         $employees = Employee::with('resortAdmin', 'position')
             ->where('resort_id', $this->resort->resort_id)
@@ -87,7 +99,7 @@ class PipPdpController extends Controller
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
-        if ($guard = $this->assertEmployeeInPerformanceScope($request->employee_id)) return $guard;
+        if ($guard = $this->assertEmployeeInPerformanceScope($request->employee_id, null, true)) return $guard;
 
         $plan = EmployeePipPlan::create([
             'resort_id' => $this->resort->resort_id,
@@ -161,7 +173,7 @@ class PipPdpController extends Controller
     {
         $archivedView = (bool) $request->boolean('archived');
         $page_title = $archivedView ? 'PDP Archive' : 'Professional Development Plan';
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance', 'pdp');
 
         $employees = Employee::with('resortAdmin', 'position')
             ->where('resort_id', $this->resort->resort_id)
@@ -196,7 +208,7 @@ class PipPdpController extends Controller
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
-        if ($guard = $this->assertEmployeeInPerformanceScope($request->employee_id)) return $guard;
+        if ($guard = $this->assertEmployeeInPerformanceScope($request->employee_id, 'pdp', true)) return $guard;
 
         $plan = EmployeePdpPlan::create([
             'resort_id' => $this->resort->resort_id,
@@ -226,7 +238,7 @@ class PipPdpController extends Controller
         if (!$plan) {
             return response()->json(['success' => false, 'message' => 'Plan not found'], 404);
         }
-        if ($guard = $this->assertEmployeeInPerformanceScope($plan->employee_id)) return $guard;
+        if ($guard = $this->assertEmployeeInPerformanceScope($plan->employee_id, 'pdp')) return $guard;
         $plan->update(['status' => 'archived']);
         $this->notifyPlanStatusChange('pdp', $plan, 'archived');
         return response()->json(['success' => true, 'message' => 'PDP plan archived']);
@@ -238,7 +250,7 @@ class PipPdpController extends Controller
         if (!$plan) {
             return response()->json(['success' => false, 'message' => 'Plan not found'], 404);
         }
-        if ($guard = $this->assertEmployeeInPerformanceScope($plan->employee_id)) return $guard;
+        if ($guard = $this->assertEmployeeInPerformanceScope($plan->employee_id, 'pdp')) return $guard;
         $plan->update(['status' => 'active']);
         $this->notifyPlanStatusChange('pdp', $plan, 'restored');
         return response()->json(['success' => true, 'message' => 'PDP plan restored']);
@@ -285,7 +297,7 @@ class PipPdpController extends Controller
 
         if (!$plan) abort(404, ucfirst($kind) . ' plan not found.');
 
-        if (!$this->canAccessPlan($plan)) {
+        if (!$this->canAccessPlan($plan, $kind)) {
             abort(403, 'You are not authorized to view this plan.');
         }
 
@@ -301,7 +313,7 @@ class PipPdpController extends Controller
 
         $currentEmpId = optional($this->resort->GetEmployee)->id;
         $canEdit = !$plan->submitted_at
-            && ($currentEmpId == $plan->employee_id || $this->canManagePlan($plan));
+            && ($currentEmpId == $plan->employee_id || $this->canManagePlan($plan, $kind));
 
         $page_title = strtoupper($kind) . ' Form — ' . optional(optional($plan->employee)->resortAdmin)->full_name;
 
@@ -322,7 +334,7 @@ class PipPdpController extends Controller
             ->find($id);
 
         if (!$plan) abort(404, ucfirst($kind) . ' plan not found.');
-        if (!$this->canAccessPlan($plan)) {
+        if (!$this->canAccessPlan($plan, $kind)) {
             abort(403, 'You are not authorized to view this plan.');
         }
         if (!$plan->submitted_at) {
@@ -383,7 +395,7 @@ class PipPdpController extends Controller
 
         $currentEmpId = optional($this->resort->GetEmployee)->id;
         $isOwnPlan = $currentEmpId && $currentEmpId == $plan->employee_id;
-        if (!$isOwnPlan && !$this->canManagePlan($plan)) {
+        if (!$isOwnPlan && !$this->canManagePlan($plan, $kind)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized to submit this plan.'], 403);
         }
 
@@ -471,13 +483,13 @@ class PipPdpController extends Controller
      * Can the logged-in user view this plan? Assigned employee, their reporting
      * manager, or any user whose performance scope includes the employee.
      */
-    private function canAccessPlan($plan)
+    private function canAccessPlan($plan, $kind = null)
     {
         $currentEmpId = optional($this->resort->GetEmployee)->id;
         if ($currentEmpId && $currentEmpId == $plan->employee_id) return true;
-        if ($this->canManagePlan($plan)) return true;
+        if ($this->canManagePlan($plan, $kind)) return true;
 
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance', $kind === 'pdp' ? 'pdp' : null);
         if (is_null($scopedIds)) return true; // full access
         return in_array((int) $plan->employee_id, (array) $scopedIds);
     }
@@ -486,14 +498,14 @@ class PipPdpController extends Controller
      * Can the logged-in user submit on behalf of the employee? Reporting manager,
      * HR/HOD within scope, or GM / master admin.
      */
-    private function canManagePlan($plan)
+    private function canManagePlan($plan, $kind = null)
     {
         $currentEmpId = optional($this->resort->GetEmployee)->id;
         if (!$currentEmpId) return false;
         // Reporting manager
         if ($plan->employee && (int) $plan->employee->reporting_to === (int) $currentEmpId) return true;
         // Scope check (HR / HOD / EXCOM / GM cover)
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance', $kind === 'pdp' ? 'pdp' : null);
         if (is_null($scopedIds)) return true;
         return in_array((int) $plan->employee_id, (array) $scopedIds) && $currentEmpId != $plan->employee_id;
     }
@@ -532,7 +544,7 @@ class PipPdpController extends Controller
         $plan = $model::where('resort_id', $this->resort->resort_id)->find($id);
         if (!$plan) abort(404, ucfirst($kind) . ' plan not found.');
 
-        if (!$this->canAccessPlan($plan)) {
+        if (!$this->canAccessPlan($plan, $kind)) {
             abort(403, 'You do not have access to this file.');
         }
 

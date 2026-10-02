@@ -35,6 +35,12 @@ class ConfigrationController extends Controller
     protected $underEmp_id=[];
     public function __construct()
     {
+        // AC-03: Accommodation settings (buildings/floors/rooms/beds/
+        // accommodation types/inventory categories/thresholds/escalation
+        // days/bulk import) are HR-only — no separate Accommodation-manager
+        // role exists (product decision). Was completely ungated.
+        $this->middleware('accommodation.hr');
+
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
         if(!$this->resort) return;
         if($this->resort->is_master_admin == 0){

@@ -60,7 +60,7 @@ class CycleController extends Controller
         }
 
         // Department scoping — limit cycles to ones containing at least one scoped employee
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         if (is_array($scopedIds)) {
             $query->whereIn('id', function ($sub) use ($scopedIds) {
                 $sub->from('performa_child_cycles')
@@ -634,7 +634,7 @@ class CycleController extends Controller
             abort(404, 'Cycle not found');
         }
 
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         $childQuery = PerformaChildCycle::where('Parent_cycle_id', $id);
         if (is_array($scopedIds)) {
             $childQuery->whereIn('Emp_main_id', $scopedIds);
@@ -722,7 +722,7 @@ class CycleController extends Controller
 
         if (!$cycle) abort(404, 'Cycle not found');
 
-        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $scopedIds = Common::getPerformanceScopedEmpIds('performance');
         $childQ = PerformaChildCycle::where('Parent_cycle_id', $id);
         if (is_array($scopedIds)) {
             $childQ->whereIn('Emp_main_id', $scopedIds);

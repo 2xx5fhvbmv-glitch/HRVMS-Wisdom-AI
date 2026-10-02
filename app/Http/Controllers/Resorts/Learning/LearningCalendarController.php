@@ -56,10 +56,17 @@ class LearningCalendarController extends Controller
 
     public function store(Request $request)
     {
+        // LR-06: scheduling a learning session had no access check — HR and
+        // L&D Managers only.
+        if (!Common::canManageLearning()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and L&D Managers can schedule a learning session.'], 403);
+        }
         // dd($request->all());
         $resort_id = $this->resort->resort_id;
         $request->validate([
-            'title' => 'required|exists:learning_programs,id',
+            // LR-03: was resort-unscoped — any learning_programs id (including
+            // another resort's) could be scheduled here.
+            'title' => ['required', Rule::exists('learning_programs', 'id')->where('resort_id', $resort_id)],
             'session_date' => 'required|date',
             'session_time' => 'nullable',
             'venue' => 'nullable|string|max:255',

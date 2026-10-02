@@ -26,9 +26,10 @@ class LoginController extends Controller
    */
   private const INVALID_CREDENTIALS_HASH = '$2y$10$wJ8k1Qm5X0aG5s3fV1jvbeYyq3H2W1rY7Z9nQxT4uK6oL2mN8pS1e';
 
-  public function logout()
+  public function logout(Request $request)
   {
     Auth::guard('admin')->logout();
+    $request->session()->forget(['admin_last_activity', 'admin_reauth_at', 'admin_2fa_pending']);
     return redirect()->route('admin.loginindex');
   }
 
@@ -48,8 +49,22 @@ class LoginController extends Controller
       // short-circuits on null $x, so the dummy hash above was never
       // actually reached and timing kept leaking which branch ran.
       $passwordValid = Hash::check(is_string($request->password) ? $request->password : '', $admin->password ?? self::INVALID_CREDENTIALS_HASH);
+
+      // Lockout (S8 helpers shared with the resort portal): a locked account
+      // is refused even with the right password. Same generic message as a
+      // wrong password so the lock doesn't confirm the email exists — the
+      // owner learns about the lock from the alert email instead.
+      if ($admin && Common::isAccountLocked($admin)) {
+        Common::logLoginAttempt('admin', $request->email, false, $request);
+        $response['success'] = false;
+        $response['msg'] = 'Invalid email or password.';
+        return response()->json($response);
+      }
       if (!$admin || !$passwordValid) {
         Common::logLoginAttempt('admin', $request->email, false, $request);
+        if ($admin) {
+          Common::registerFailedLogin($admin);
+        }
         $response['success'] = false;
         $response['msg'] = 'Invalid email or password.';
         return response()->json($response);
@@ -62,8 +77,20 @@ class LoginController extends Controller
         return response()->json($response);
       }
 
-      Auth::guard('admin')->login( $admin, isset( $request->remember ) );
-      Common::logLoginAttempt('admin', $request->email, true, $request);
+      Common::registerSuccessfulLogin($admin);
+
+      // MFA (decision A1): an enrolled account only gets a pending marker
+      // here — the guard login happens after TwoFactorController::verify().
+      if ($admin->two_factor_confirmed_at) {
+        $request->session()->regenerate();
+        $request->session()->put('admin_2fa_pending', ['id' => $admin->id, 'at' => time()]);
+        $response['success'] = true;
+        $response['msg'] = 'Enter your authenticator code.';
+        $response['redirect_url'] = route('admin.2fa.challenge');
+        return response()->json($response);
+      }
+
+      self::completeLogin($request, $admin);
 
       // Security hardening (S4): a freshly-created admin account is
       // flagged must_change_password — the credential email sent that
@@ -76,6 +103,7 @@ class LoginController extends Controller
         return response()->json($response);
       }
 
+      // Not enrolled yet: AdminSecurity middleware forces enrolment next.
       $response['success'] = true;
       $response['msg'] = 'Logged in';
       $response['redirect_url'] = route('admin.dashboard');
@@ -88,6 +116,27 @@ class LoginController extends Controller
       $response['success'] = false;
       $response['msg'] = 'An error occurred. Please try again later.';
       return response()->json($response);
+    }
+  }
+
+  /**
+   * Final step of every admin sign-in (password-only for not-yet-enrolled
+   * accounts, or after the MFA challenge). Remember-me is deliberately never
+   * set for this guard — a long-lived cookie would outlive the idle timeout.
+   */
+  public static function completeLogin(Request $request, Admin $admin): void
+  {
+    Auth::guard('admin')->login($admin, false);
+    $request->session()->regenerate();
+    $request->session()->put('admin_last_activity', time());
+
+    // Decision E2: alert when this account signs in from an IP it has never
+    // successfully used before. Checked before logging this attempt.
+    $knownIp = DB::table('login_attempts')->where('portal', 'admin')->where('identifier', $admin->email)
+      ->where('successful', true)->where('ip_address', $request->ip())->exists();
+    Common::logLoginAttempt('admin', $admin->email, true, $request);
+    if (!$knownIp) {
+      Common::alertSuperAdmins($admin, 'Super-admin login from a new IP', $admin->email . ' signed in to the super-admin console from a new IP address: ' . $request->ip() . ' (' . substr((string) $request->userAgent(), 0, 150) . ') at ' . now()->toDateTimeString() . ' (' . config('app.timezone') . '). If this wasn\'t you, deactivate the account and rotate its password and MFA immediately.');
     }
   }
 
@@ -133,7 +182,7 @@ class LoginController extends Controller
           if (Auth::guard('resort-admin')->check())
           {
             // Store original admin ID as the impersonator
-            session(['impersonated_by' => Auth::id()]);
+            session(['impersonated_by' => Auth::guard('admin')->id()]);
             // Determine redirect URL based on the impersonated user's role
             $role = $resortAdmin->GetEmployee->rank ?? null;
             $rankConfig = config('settings.Position_Rank');

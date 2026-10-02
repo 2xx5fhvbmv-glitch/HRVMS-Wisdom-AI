@@ -31,7 +31,7 @@ class ReadQueryGuard
         'migrations', 'sessions', 'cache', 'cache_locks',
         'jobs', 'job_batches', 'failed_jobs',
         'password_resets', 'password_reset_tokens', 'personal_access_tokens',
-        'users', 'admins', 'shopkeepers',
+        'users', 'admins', 'shopkeepers', 'resort_admins',
     ];
 
     /** Table name prefixes that are always denied. */

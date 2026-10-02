@@ -129,6 +129,13 @@ class LearningController extends Controller
         ]);
 
         $employeeIds = json_decode($request->employee_ids, true);
+        // LR-03: employee_ids was only validated as 'json' — any employee id
+        // from any resort could be added to a learning request. Keep only
+        // ids that actually belong to this resort.
+        $employeeIds = Employee::whereIn('id', (array) $employeeIds)
+            ->where('resort_id', $this->resort->resort_id)
+            ->pluck('id')
+            ->all();
         $learningManagerId = $request->learning_manager;
 
         if (empty($employeeIds)) {

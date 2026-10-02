@@ -136,7 +136,7 @@ class SupportController extends Controller
                     : 'N/A';
                 return '<div class="tableUser-block">
                             <div class="img-circle"><img src="'.$image.'" alt="user"></div>
-                            <span class="userApplicants-btn">'.$name.'</span>
+                            <span class="userApplicants-btn">'.e($name).'</span>
                         </div>';
             })
 

@@ -109,7 +109,7 @@ class AnnouncementController extends Controller
                                 <div class="img-circle">
                                     <img src="' . $image . '" alt="user">
                                 </div>
-                                <span class="userApplicants-btn">' . $empName . '</span>
+                                <span class="userApplicants-btn">' . e($empName) . '</span>
                             </div>';
                 })    
                 ->addColumn('employee_id', function ($row) {

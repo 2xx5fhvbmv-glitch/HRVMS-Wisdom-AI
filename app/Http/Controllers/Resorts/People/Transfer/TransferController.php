@@ -564,7 +564,7 @@ class TransferController extends Controller
                             <div class="img-circle">
                                 <img src="' . $photo . '" alt="user">
                             </div>
-                            <span class="userApplicants-btn">' . $name . '</span>
+                            <span class="userApplicants-btn">' . e($name) . '</span>
                         </div>';
                 })
                 ->addColumn('current_position', fn($row) => optional($row->currentPosition)->position_title ?? '—')
@@ -708,7 +708,7 @@ class TransferController extends Controller
                             <div class="img-circle">
                                 <img src="' . $photo . '" alt="user">
                             </div>
-                            <span class="userApplicants-btn">' . $name . '</span>
+                            <span class="userApplicants-btn">' . e($name) . '</span>
                         </div>';
                 })
                 ->addColumn('current_position', fn($row) => optional($row->currentPosition)->position_title ?? '—')

@@ -717,9 +717,14 @@ class AccommodationController extends Controller
                 }
 
                 // **Check & Assign Image Path**
+                // Completed_Image is now written via AWSEmployeeFileUpload()
+                // (see engDepartmentStaffMaintenanceReqComplete's AC-01 fix), so
+                // it's the same json_encode(['Filename'=>..,'Child_id'=>..])
+                // shape as Image above — resolve it the same way instead of a
+                // raw temporaryUrl() concatenation, which only ever worked for
+                // the old flat-filename value.
                 if (!empty($MaintanaceRequest->Completed_Image )) {
-                    $path_path                              =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
-                    $MaintanaceRequest->Completed_Image     =   \App\Helpers\StorageHelper::temporaryUrl($path_path . '/' . $MaintanaceRequest->Completed_Image);
+                    $MaintanaceRequest->Completed_Image     =   Common::resolveMaintenanceAttachmentUrl($MaintanaceRequest->Completed_Image, $this->resort_id);
                 }
 
                 $MaintanaceRequest->BuilidngData;
@@ -950,6 +955,11 @@ class AccommodationController extends Controller
             return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
         }
 
+        // AC-03: nobody, including HR, may assign themselves a bed.
+        if (isset($this->user->GetEmployee) && (int) $emp_id === (int) $this->user->GetEmployee->id) {
+            return response()->json(['success' => false, 'message' => 'You cannot assign accommodation to yourself.'], 403);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -1098,6 +1108,11 @@ class AccommodationController extends Controller
         }
         if (!Employee::where('id', $emp_id)->where('resort_id', $this->resort_id)->exists()) {
             return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
+        }
+
+        // AC-03: nobody, including HR, may move themselves to another bed.
+        if (isset($this->user->GetEmployee) && (int) $emp_id === (int) $this->user->GetEmployee->id) {
+            return response()->json(['success' => false, 'message' => 'You cannot move your own accommodation.'], 403);
         }
 
         // The whole point of "move" vs "assign": the employee must already
@@ -2965,19 +2980,41 @@ class AccommodationController extends Controller
 
             if ($request->status == 'Completed') {
 
-                if ($request->hasFile('Image')) {
-                    $path                                   =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
-
-                    $imageFile                                  =   $request->file('Image');
-                    $imageName                                  =   time() . '_' . $imageFile->getClientOriginalName();
-                    // Was UploadedFile::move() into a raw relative path (lands under
-                    // public/, the web root, on a standard request). Route through
-                    // StorageHelper at the same logical path so existing readers
-                    // (temporaryUrl($path.'/'.Completed_Image)) keep working unchanged.
-                    \App\Helpers\StorageHelper::put($path . '/' . $imageName, file_get_contents($imageFile->getRealPath()));
-                    $maintanance->Completed_Image               =   $imageName;
+                // Was checked only via the ApprovedBy-scoped update() further down,
+                // AFTER the uploaded photo was already saved — any authenticated
+                // employee could POST any other resort employee's pending
+                // request_id and have their file written/stored (and, before the
+                // resort_id scope above, even a request from another resort's
+                // Completed_Image field overwritten). Verify the caller actually
+                // holds this request's pending assignment BEFORE touching the file.
+                $assignedChildRequest                           =   ChildMaintananceRequest::where('maintanance_request_id', $maintanance->id)
+                                                                    ->where('ApprovedBy', $employee_id)
+                                                                    ->where('Status', 'pending')
+                                                                    ->where('resort_id', $this->resort_id)
+                                                                    ->first();
+                if (!$assignedChildRequest) {
+                    return response()->json(['success' => false, 'message' => 'You are not assigned to this maintenance request'], 200);
                 }
-            
+
+                if ($request->hasFile('Image')) {
+                    $imageFile                                  =   $request->file('Image');
+                    // Was UploadedFile::move() into a raw relative path, which lands
+                    // under public/ (the web root) on a standard request with a
+                    // guessable time()+originalname filename — any file type was
+                    // accepted, so a crafted filename was a code-execution path.
+                    // Use the same AWSEmployeeFileUpload() call createMaintenanceRequests()
+                    // uses for this request's own Image field, so Completed_Image is
+                    // the same {Filename, Child_id} JSON shape resolveMaintenanceAttachmentUrl()
+                    // already expects.
+                    $uploadStatus                               =   Common::AWSEmployeeFileUpload($this->resort_id, $imageFile, $employee->Emp_id, 'MaintanceRequest', true);
+                    if ($uploadStatus['status'] == true && !empty($uploadStatus['Chil_file_id'])) {
+                        $maintanance->Completed_Image           =   json_encode(['Filename' => $imageFile->getClientOriginalName(), 'Child_id' => $uploadStatus['Chil_file_id']]);
+                    } else {
+                        DB::rollBack();
+                        return response()->json(['success' => false, 'message' => $uploadStatus['msg'] ?? 'Attachment upload failed.'], 200);
+                    }
+                }
+
                 $maintanance->save();
 
                 // Check if Maintenance Request is already in progress

@@ -148,7 +148,7 @@
                             @csrf
                             <div class="mb-3">
                                 <label class="form-label fw-500">Email Template</label>
-                                <textarea class="form-control ScheduleMeetingEmail" rows="7" name="ScheduleMeetingEmail" id="ScheduleMeetingEmail">{!! isset($PerformanceMeetingContent->content) ? $PerformanceMeetingContent->content : ''  !!}</textarea>
+                                <textarea class="form-control ScheduleMeetingEmail" rows="7" name="ScheduleMeetingEmail" id="ScheduleMeetingEmail">{{ isset($PerformanceMeetingContent->content) ? $PerformanceMeetingContent->content : ''  }}</textarea>
                             </div>
 
                             <div class="placeholders-box">

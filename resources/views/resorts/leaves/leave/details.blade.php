@@ -168,7 +168,7 @@
                                 <div class="detail-item rounded-2 p-3 h-100">
                                     <div class="detail-label">Attachment</div>
                                     @if ($leaveDetail->attachments)
-                                        <a href="{{ URL::asset($leaveDetail->attachments) }}" target="_blank" class="detail-value d-inline-flex align-items-center gap-2">
+                                        <a href="{{ \App\Helpers\Common::resolveLeaveAttachmentUrl($leaveDetail->attachments) }}" target="_blank" class="detail-value d-inline-flex align-items-center gap-2">
                                             <img src="{{ URL::asset('resorts_assets/images/pdf1.svg') }}" alt="" width="20">
                                             <span class="a-link">View attachment</span>
                                         </a>

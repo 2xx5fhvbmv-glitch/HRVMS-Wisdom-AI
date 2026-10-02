@@ -31,6 +31,16 @@ class FilePermissionController extends Controller
         if(Common::checkRouteWisePermission('FileManage.Permission',config('settings.resort_permissions.create')) == false){
             return abort(403, 'Unauthorized action.');
         }
+        // FM-03: this page's module_pages row is intentionally commented out
+        // (menu hidden — see 2026_05_10_225514_hide_file_manage_permission_submenu),
+        // which also makes it an "unmapped route" to checkRouteWisePermission()
+        // above — with config('route_permissions.enforce_unmapped') still
+        // false, that check silently allows everyone through. Add the real
+        // gate directly: only the FM-04 privileged group (HR dept HOD/EXCOM)
+        // may view or change which department/position can see which files.
+        if (!Common::isFileManagementPrivileged($this->resort->GetEmployee ?? null)) {
+            return abort(403, 'Unauthorized action.');
+        }
         $FolderList = FilemangementSystem::where('resort_id', $this->resort->resort_id)
         // ->where('UnderON', 0)
         ->where("Folder_Type","uncategorized")
@@ -43,6 +53,11 @@ class FilePermissionController extends Controller
     }
     public function GetPermissionfile(Request $request)
     {
+        // FM-03: AJAX sibling of index() populating the same restricted grid
+        // (invariant #7) — must carry the same gate, not just the page load.
+        if (!Common::isFileManagementPrivileged($this->resort->GetEmployee ?? null)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $folder_id = $request->folder_id;
         $position =  $request->position;
         $department =  $request->department;
@@ -108,6 +123,12 @@ class FilePermissionController extends Controller
         if (Common::checkRouteWisePermission('FileManage.Permission', config('settings.resort_permissions.create')) == false) {
             return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
         }
+        // FM-03/FM-04: same real gate as index() above — checkRouteWisePermission()
+        // is a no-op for this unmapped, menu-hidden route, so enforce the
+        // privileged group directly.
+        if (!Common::isFileManagementPrivileged($this->resort->GetEmployee ?? null)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $department = $request->department;
         if (isset($request->position)) {
             $positions = $request->position;
@@ -163,7 +184,10 @@ class FilePermissionController extends Controller
 
     public function SearchPermissionfile(Request $request)
     {
-      
+        // FM-03: AJAX sibling of index()/GetPermissionfile() — same gate.
+        if (!Common::isFileManagementPrivileged($this->resort->GetEmployee ?? null)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
 
         $searchTerm = $request->filename; // Single input for Filename, LastModified, or FileSize
         $position = $request->position;

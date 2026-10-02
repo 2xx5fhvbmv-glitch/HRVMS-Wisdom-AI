@@ -51,7 +51,12 @@ class FileShareController extends Controller
             'shareable_unique_id'  => 'nullable|string',
             'scope_type'           => 'required|in:employees,departments,organization',
             'employee_ids'         => 'required_if:scope_type,employees|array',
-            'employee_ids.*'       => 'integer',
+            // FM-02: 'integer' only proved the id was numeric, not that it
+            // was a real employee — same gap department_ids.* already had.
+            'employee_ids.*'       => [
+                'integer',
+                Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id),
+            ],
             'department_ids'       => 'required_if:scope_type,departments|array',
             // Validation-only gap: 'integer' only proves the id is
             // numeric, not that the department belongs to the sharer's
@@ -92,6 +97,17 @@ class FileShareController extends Controller
         }
 
         $scopeType = $request->scope_type;
+
+        // FM-02: sharing with a whole department or the entire organization
+        // was open to any resort user who owned/could-manage a single item —
+        // restrict those two broad scopes to the FM-04 privileged group (HR
+        // dept HOD/EXCOM). Sharing with specific colleagues (scope_type =
+        // employees) stays open to everyone, per the audit's own "sharing
+        // their own file with one colleague works" verification line.
+        if (in_array($scopeType, ['organization', 'departments'], true)
+            && !Common::isFileManagementPrivileged($this->resort->GetEmployee ?? null)) {
+            return response()->json(['success' => false, 'message' => 'Only HR may share with a department or the whole organization.'], 403);
+        }
 
         try {
             DB::beginTransaction();
@@ -565,9 +581,10 @@ class FileShareController extends Controller
                 return true; // uncategorized/shared folders — resort scoping is enough
             }
             $actor = $this->resort->GetEmployee;
-            $rank = (int) ($actor->rank ?? 0);
-            $isPrivileged = in_array($rank, [3, 4, 8, 9], true)
-                || (in_array($rank, [1, 2], true) && Common::isHRDepartment($actor->Dept_id ?? null));
+            // FM-04: privileged set is now Common::isFileManagementPrivileged()
+            // (HR dept HOD/EXCOM only) — single source of truth shared with
+            // Common::FilePermissions() and FileManageController.
+            $isPrivileged = Common::isFileManagementPrivileged($actor);
             return $isPrivileged || ($actor && $folder->Folder_Name === $actor->Emp_id);
         }
         return false;

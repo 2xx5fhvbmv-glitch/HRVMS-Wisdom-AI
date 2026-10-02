@@ -54,6 +54,15 @@ class SalaryIncrementController extends Controller
     public function saveSalaryIncrement(Request $request)
     {
         try {
+            // PE-08: this endpoint writes employees.proposed_salary (and the
+            // manning budget line) directly, with no approval and no role
+            // check at all — any portal user, any rank, could change any
+            // employee's proposed salary figures. Decided: HR / Finance
+            // only (budgetAccessLevel()'s 'full' tier).
+            if (Common::budgetAccessLevel(optional(Auth::guard('resort-admin')->user())->GetEmployee) !== 'full') {
+                return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+            }
+
             // Validate request
             $resortId = Auth::guard('resort-admin')->user()->resort_id;
 
@@ -140,6 +149,12 @@ class SalaryIncrementController extends Controller
     public function saveBulkSalaryIncrement(Request $request)
     {
         // try {
+            // PE-08: same gap as saveSalaryIncrement() — a whole department's
+            // proposed_salary could be bulk-rewritten with no role check.
+            if (Common::budgetAccessLevel(optional(Auth::guard('resort-admin')->user())->GetEmployee) !== 'full') {
+                return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+            }
+
             // Force resort_id to the caller's own resort — this was trusting
             // a raw client-supplied resort_id to pick which resort's whole
             // department got a bulk salary increment applied.

@@ -156,7 +156,12 @@
                 url: INSIGHTS_URL, type: 'POST', data: $.extend({ _token: TOKEN }, currentFilters()),
                 success: function (res) {
                     var md = (res && res.data) || '';
-                    $('#modInsights').html(md ? ((typeof marked !== 'undefined') ? (marked.parse ? marked.parse(md) : marked(md)) : $('<div>').text(md).html()) : '<p class="text-muted">No insights available (the WAI service may be offline).</p>');
+                    // R-03: escape HTML before marked.parse() so a raw
+                    // <script>/<img onerror> embedded in the AI's response
+                    // text can't execute once inserted via .html() — same
+                    // fix as resorts.reports.show.
+                    var escapedMd = $('<div>').text(md).html();
+                    $('#modInsights').html(md ? ((typeof marked !== 'undefined') ? (marked.parse ? marked.parse(escapedMd) : marked(escapedMd)) : escapedMd) : '<p class="text-muted">No insights available (the WAI service may be offline).</p>');
                     $('#modResults').hide(); $('#modInsights').removeClass('d-none'); $('#modBackToData').removeClass('d-none');
                 },
                 error: function () { $('#modInsights').html('<p class="text-danger">Failed to load insights.</p>').removeClass('d-none'); $('#modResults').hide(); $('#modBackToData').removeClass('d-none'); },

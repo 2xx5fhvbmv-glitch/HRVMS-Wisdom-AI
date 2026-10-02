@@ -215,7 +215,9 @@
                 url: INSIGHTS_URL, type: 'POST', data: $.extend({ _token: TOKEN }, currentFilters()),
                 success: function (res) {
                     var md = (res && res.data) || '';
-                    $('#vsInsights').html(md ? ((typeof marked !== 'undefined') ? (marked.parse ? marked.parse(md) : marked(md)) : $('<div>').text(md).html()) : '<p class="text-muted">No insights available (the WAI service may be offline).</p>');
+                    // R-03: escape HTML before marked.parse() — same fix as resorts.reports.show.
+                    var escapedMd = $('<div>').text(md).html();
+                    $('#vsInsights').html(md ? ((typeof marked !== 'undefined') ? (marked.parse ? marked.parse(escapedMd) : marked(escapedMd)) : escapedMd) : '<p class="text-muted">No insights available (the WAI service may be offline).</p>');
                     $('#vsResults').hide(); $('#vsInsights').removeClass('d-none'); $('#vsBackToData').removeClass('d-none');
                 },
                 error: function () { $('#vsInsights').html('<p class="text-danger">Failed to load insights.</p>').removeClass('d-none'); $('#vsResults').hide(); $('#vsBackToData').removeClass('d-none'); },

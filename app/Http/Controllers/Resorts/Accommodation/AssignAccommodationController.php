@@ -23,6 +23,10 @@ class AssignAccommodationController extends Controller
     protected $underEmp_id=[];
     public function __construct()
     {
+        // AC-03: bed assign/move is HR-only — no separate Accommodation-manager
+        // role exists (product decision). Was completely ungated.
+        $this->middleware('accommodation.hr')->only(['AssignAccommodationToEmp', 'MoveToNext']);
+
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
         if(!$this->resort) return;
         if($this->resort->is_master_admin == 0){
@@ -290,6 +294,11 @@ class AssignAccommodationController extends Controller
             return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
         }
 
+        // AC-03: nobody, including HR, may assign themselves a bed.
+        if (isset($this->resort->GetEmployee) && (int) $emp_id === (int) $this->resort->GetEmployee->id) {
+            return response()->json(['success' => false, 'message' => 'You cannot assign accommodation to yourself'], 403);
+        }
+
         DB::beginTransaction();
         try
         {
@@ -484,6 +493,10 @@ class AssignAccommodationController extends Controller
             }
             if (!Employee::where('id', $emp_id)->where('resort_id', $this->resort->resort_id)->exists()) {
                 return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
+            }
+            // AC-03: nobody, including HR, may move themselves to another bed.
+            if (isset($this->resort->GetEmployee) && (int) $emp_id === (int) $this->resort->GetEmployee->id) {
+                return response()->json(['success' => false, 'message' => 'You cannot move your own accommodation'], 403);
             }
             // assignId/ChildBedId were unscoped below, letting any resort's
             // bed be vacated/assigned by id — validate ownership up front.

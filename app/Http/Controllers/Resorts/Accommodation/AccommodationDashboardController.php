@@ -8,7 +8,6 @@ use URL;
 use Auth;
 use Carbon\Carbon;
 use App\Helpers\Common;
-use App\Helpers\StorageHelper;
 use App\Models\Employee;
 use Carbon\CarbonInterval;
 use Illuminate\Http\Request;
@@ -1121,7 +1120,7 @@ class AccommodationDashboardController extends Controller
                                                     return   '<div class="tableUser-block">
                                                                 <div class="img-circle"><img src="'.$row->profileImg.'" alt="user">
                                                                 </div>
-                                                                <span class="userApplicants-btn">'.$row->RequestedForMaintance.'</span>
+                                                                <span class="userApplicants-btn">'.e($row->RequestedForMaintance).'</span>
                                                             </div>';
                                                 })         
                                                 ->editColumn('EffectedAmenity', function ($row) {
@@ -1200,9 +1199,14 @@ class AccommodationDashboardController extends Controller
         // Image specifically can also be a json_encode(['Filename'=>..,
         // 'Child_id'=>..]) value from the mobile "raise request" upload —
         // resolveMaintenanceAttachmentUrl() handles both formats.
-        $path_path = config('settings.MaintanceRequest') . '/' . $this->resort->resort_id;
         $row->Image           = Common::resolveMaintenanceAttachmentUrl($row->Image, $this->resort->resort_id);
-        $row->Completed_Image = $row->Completed_Image ? StorageHelper::temporaryUrl($path_path . '/' . $row->Completed_Image) : null;
+        // Completed_Image is now written via AWSEmployeeFileUpload() (see
+        // AccommodationController::engDepartmentStaffMaintenanceReqComplete's
+        // AC-01 fix), so it's the same json_encode(['Filename'=>..,
+        // 'Child_id'=>..]) shape as Image above — resolve it the same way
+        // instead of a raw temporaryUrl() concatenation, which only ever
+        // worked for the old flat-filename value.
+        $row->Completed_Image = Common::resolveMaintenanceAttachmentUrl($row->Completed_Image, $this->resort->resort_id);
         // **Get Inventory Item Name**
         $row->EffectedAmenity                               =   ucfirst($inventoryItems[$row->item_id] ?? 'N/A');
 
@@ -1307,7 +1311,7 @@ class AccommodationDashboardController extends Controller
                 {
                     return  '<div class="tableUser-block">
                                 <div class="img-circle"><img src="'.$row->profileImg.'" alt="user"></div>
-                                <span class="userApplicants-btn">'.$row->EmployeeName.'</span>
+                                <span class="userApplicants-btn">'.e($row->EmployeeName).'</span>
                             </div>';
                 }
                 else

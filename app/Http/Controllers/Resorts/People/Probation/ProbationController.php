@@ -175,7 +175,7 @@ class ProbationController extends Controller
                         <div class="img-circle">
                             <img src="'.Common::getResortUserPicture($row->Admin_Parent_id ?? null).'" alt="user">
                         </div>
-                        <span class="userApplicants-btn">'.$row->resortAdmin->full_name.'</span>
+                        <span class="userApplicants-btn">'.e($row->resortAdmin->full_name).'</span>
                     </div>')
                 ->addColumn('position', fn($row) => optional($row->position)->position_title)
                 ->addColumn('department', fn($row) => optional($row->department)->name)

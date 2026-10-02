@@ -142,6 +142,21 @@ class InfoUpdateController extends Controller
                // (rank, Dept_id, basic_salary, status, ...) through here.
                $allowedPersonalInfoFields = ['first_name', 'middle_name', 'last_name', 'personal_phone', 'dob', 'address_line_1', 'address_line_2'];
                $payload = array_intersect_key((array) $employeeinfoUpdateRequest->info_payload, array_flip($allowedPersonalInfoFields));
+
+               // PE-04 defence in depth: a name never needs <, >, or quote
+               // characters. Reject here even though every rawColumn that
+               // prints a name is now escaped — this is the one place a
+               // self-submitted name change becomes a permanent employee
+               // record, so a second layer costs nothing.
+               foreach (['first_name', 'middle_name', 'last_name'] as $nameField) {
+                    if (isset($payload[$nameField]) && preg_match('/[<>"\']/', (string) $payload[$nameField])) {
+                         return response()->json([
+                              'success' => false,
+                              'message' => 'Name fields cannot contain <, >, or quote characters.',
+                         ], 422);
+                    }
+               }
+
                $employees = Employee::where('id',$employeeinfoUpdateRequest->employee_id)->first();
 
                // This whole approve action previously ran with no

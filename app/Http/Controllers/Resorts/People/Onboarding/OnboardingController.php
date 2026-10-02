@@ -1729,7 +1729,7 @@ class OnboardingController extends Controller
 
                     return '<div class="tableUser-block">
                                 <div class="img-circle"><img src="' . $image . '" alt="user"></div>
-                                <span class="userApplicants-btn">' . $name . '</span>
+                                <span class="userApplicants-btn">' . e($name) . '</span>
                             </div>';
                 })
                 ->addColumn('arrival_date', function ($row) {
@@ -2128,9 +2128,11 @@ class OnboardingController extends Controller
 
     private function handleMeetings($request, $itinerary)
     {
-        // Handle deleted meetings
+        // Handle deleted meetings — was Meeting::whereIn() (undefined class,
+        // always crashed) with no itinerary scope; both fixed by scoping
+        // through the itinerary's own relation.
         if ($request->has('deleted_meetings')) {
-            Meeting::whereIn('id', $request->deleted_meetings)->delete();
+            $itinerary->meetings()->whereIn('id', $request->deleted_meetings)->delete();
         }
 
         // Update or create meetings
@@ -2145,8 +2147,10 @@ class OnboardingController extends Controller
                 ];
 
                 if (!empty($request->meeting_id[$index])) {
-                    // Update existing meeting
-                    $meeting = EmployeeItinerariesMeeting::find($request->meeting_id[$index]);
+                    // Update existing meeting — was EmployeeItinerariesMeeting::find()
+                    // with no check the meeting belongs to this itinerary, letting
+                    // another resort's onboarding meeting be overwritten.
+                    $meeting = $itinerary->meetings()->whereKey($request->meeting_id[$index])->first();
                     if ($meeting) {
                         $meeting->update($meetingData);
                     }

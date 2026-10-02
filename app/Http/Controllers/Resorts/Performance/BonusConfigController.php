@@ -53,6 +53,13 @@ class BonusConfigController extends Controller
 
     public function update(Request $request)
     {
+        // PF-07: bonus percentage is Performance "settings" — HR only, GM
+        // explicitly excluded. Was completely ungated (any authenticated
+        // portal user could rewrite any rank's bonus percentage).
+        if (!Common::isHR()) {
+            return response()->json(['success' => false, 'message' => 'Only HR can update bonus configuration.'], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'rank'             => 'required|integer',
             'bonus_percentage' => 'nullable|numeric|min:0|max:1000',

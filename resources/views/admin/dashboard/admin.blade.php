@@ -14,6 +14,18 @@
 			<div class="row mb-2">
 				<div class="col-sm-6">
 					<h1 class="m-0">Dashboard</h1>
+					@php
+						// Decision E3: previous sign-in (the latest success is this session) + failures since.
+						$adminEmail = Auth::guard('admin')->user()->email;
+						$prevLogin = DB::table('login_attempts')->where('portal', 'admin')->where('identifier', $adminEmail)
+							->where('successful', true)->orderByDesc('id')->skip(1)->first();
+						$failedSince = DB::table('login_attempts')->where('portal', 'admin')->where('identifier', $adminEmail)
+							->where('successful', false)->when($prevLogin, fn ($q) => $q->where('id', '>', $prevLogin->id))->count();
+					@endphp
+					<small class="text-muted">
+						Last sign-in: {{ $prevLogin ? \Carbon\Carbon::parse($prevLogin->created_at)->toDayDateTimeString() . ' from ' . $prevLogin->ip_address : 'none recorded' }}
+						@if ($failedSince) · <span class="text-danger">{{ $failedSince }} failed attempt(s) since</span> @endif
+					</small>
 				</div>
 				<div class="col-sm-6">
 					<ol class="breadcrumb float-sm-right">

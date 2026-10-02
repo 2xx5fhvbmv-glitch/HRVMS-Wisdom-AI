@@ -859,7 +859,7 @@ class JobDescriptionController extends Controller
 
         return datatables()->of($records)
             ->addColumn('EmployeeName', function ($row) {
-                return $row->employee_full_name . ' <span class="badge badge-themeLight">' . htmlspecialchars(optional($row->employee)->Emp_id, ENT_QUOTES, 'UTF-8') . '</span>';
+                return e($row->employee_full_name) . ' <span class="badge badge-themeLight">' . htmlspecialchars(optional($row->employee)->Emp_id, ENT_QUOTES, 'UTF-8') . '</span>';
             })
             ->addColumn('Status', function ($row) {
                 $map = [

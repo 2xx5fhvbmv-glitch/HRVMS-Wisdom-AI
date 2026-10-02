@@ -1452,6 +1452,8 @@ class LeaveController extends Controller
 
             $leave->from_date_formatted = $leave->from_date ? Carbon::parse($leave->from_date)->format('d M Y') : '—';
             $leave->to_date_formatted = $leave->to_date ? Carbon::parse($leave->to_date)->format('d M Y') : '—';
+            // L-07: raw attachments column -> signed StorageHelper URL (or empty).
+            $leave->attachments = Common::resolveLeaveAttachmentUrl($leave->attachments);
             $leave->status_label = $leave->status ?? 'Pending';
 
             $departurePass = DB::table('employee_travel_passes as etp')
@@ -1579,14 +1581,10 @@ class LeaveController extends Controller
         if ($rules['destination'] !== 'hidden') {
             $validatorRules['destination'] = 'nullable|string|max:255';
         }
-        // L-07 (part): SVG can carry an embedded <script>/onload payload and
-        // this file is served straight out of public/ with no auth —
-        // opening it directly in a browser (or an <img>/<a> pointing at
-        // its URL elsewhere in the app) would execute it. Dropped from the
-        // allowed types; the storage-location half of this finding
-        // (public_path()/->move() instead of StorageHelper, and every
-        // dashboard variant's read side that assumes a public URL) is
-        // flagged, not fixed here — see SECURITY_AUDIT_REMAINING.md.
+        // L-07: SVG can carry an embedded <script>/onload payload; dropped
+        // from the allowed types. Storage is now StorageHelper-backed (see
+        // the AWSEmployeeFileUpload() call below), so this is no longer
+        // served from an unauthenticated public URL either.
         $validatorRules['attachments'] = ($rules['attachment'] === 'mandatory') ? 'required|file|mimes:pdf,doc,docx,jpeg,jpg,png,gif,webp,heic,heif|max:5120' : 'nullable|file|mimes:pdf,doc,docx,jpeg,jpg,png,gif,webp,heic,heif|max:5120';
         // Opt-in to use accumulated Day Off credit against this leave —
         // system-generated split, not a manual category combine.
@@ -1611,22 +1609,24 @@ class LeaveController extends Controller
 
         DB::beginTransaction();
         try {
-            // Define leave attachment path. The file is served from /public,
-            // so the dir must live there — Storage::makeDirectory used to
-            // write into storage/app/ instead, which was dead code.
-            $leave_attachment = config('settings.leave_attachments');
-            $dynamic_path = $leave_attachment . '/' . $emp_id;
-            $absolutePath = public_path($dynamic_path);
-            if (!is_dir($absolutePath)) {
-                @mkdir($absolutePath, 0755, true);
-            }
-
-            // Handle file upload
+            // L-07: was public_path()/->move() — served with no auth, and
+            // silently breaks in prod (STORAGE_DRIVER=wasabi). Same
+            // AWSEmployeeFileUpload()/{Filename,Child_id} shape the API side
+            // already uses (API/LeaveController.php:202); resolveLeaveAttachmentUrl()
+            // already understands both shapes so old rows keep working.
             $filePath = null;
             if ($request->hasFile('attachments')) {
-                $fileName = uniqid('attachment_', true) . '.' . $request->attachments->getClientOriginalExtension();
-                $filePath = $dynamic_path . '/' . $fileName;
-                $request->attachments->move($absolutePath, $fileName);
+                $file = $request->attachments;
+                $status = Common::AWSEmployeeFileUpload($resort_id, $file, $applicantEmployeeRecord->Emp_id, 'LeaveAttachments', true);
+                if ($status['status'] == false) {
+                    DB::rollBack();
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'File upload failed: ' . ($status['msg'] ?? 'Unknown error'),
+                    ], 400);
+                } elseif (!empty($status['Chil_file_id'])) {
+                    $filePath = ['Filename' => $file->getClientOriginalName(), 'Child_id' => $status['Chil_file_id']];
+                }
             }
 
             // Day Off opt-in split (only for a plain single-category
@@ -1874,7 +1874,7 @@ class LeaveController extends Controller
                     'flag' =>  $currentFlag,
                     'task_delegation' => $request->task_delegation,
                     'destination' => $request->destination,
-                    'attachments' => $filePath,
+                    'attachments' => $filePath ? json_encode($filePath) : null,
                     'status' => "Pending",
                     'is_paid_override' => $targetIsCasualOrIntern ? $request->is_paid_override : null,
                 ]);
@@ -3060,6 +3060,21 @@ class LeaveController extends Controller
             ], 404);
         }
 
+        // L-08 (decided 2026-09-27): suggesting alternative dates is only for
+        // an approver in THIS leave's chain — same $isApprover shape as the
+        // L-01 view gate (any row, not status-filtered) — or HR.
+        $callerId = $this->resort->getEmployee->id ?? null;
+        $isApprover = $callerId && DB::table('employees_leaves_status')
+            ->where('leave_request_id', $leaveId)
+            ->where('approver_id', $callerId)
+            ->exists();
+        if (!$isApprover && !Common::isHR()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'You are not authorized to suggest alternative dates for this leave.',
+            ], 403);
+        }
+
         // Log the recommendation in a table (e.g., LeaveRecommendations)
         $leaveRecommend = LeaveRecommendation::create([
             'leave_id' => $leaveId,
@@ -3082,6 +3097,12 @@ class LeaveController extends Controller
 
     public function sendEmailToTravelPartner(Request $request)
     {
+        // L-08 (decided 2026-09-27): emailing travel partners with a leave's
+        // details is HR-only — was open to any resort-portal user.
+        if (!Common::isHR()) {
+            return redirect()->back()->with('error', 'Unauthorized action.');
+        }
+
         $travel_partners = TicketAgent::where('resort_id', $this->resort->resort_id)->get();
 
         if ($travel_partners->isEmpty()) {
