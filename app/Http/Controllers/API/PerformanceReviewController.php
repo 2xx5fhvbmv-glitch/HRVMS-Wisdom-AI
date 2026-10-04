@@ -214,6 +214,10 @@ class PerformanceReviewController extends Controller
         $realChild->self_review_data = json_encode(array_merge($existing, $payload));
         $realChild->self_review_status = 'completed';
         $realChild->Self_review_date = now()->format('Y-m-d');
+        $selfSignature = Common::snapshotSignature($this->user->id, 'performance-self-review', $realChild->id);
+        $realChild->self_signature_img = $selfSignature['signature_img'] ?? null;
+        $realChild->self_signature_name = $selfSignature['name'] ?? null;
+        $realChild->self_signed_at = $selfSignature['timestamp'] ?? null;
         $realChild->save();
 
         try {
@@ -272,6 +276,10 @@ class PerformanceReviewController extends Controller
         $realChild->manager_review_data = json_encode(array_merge($existing, $payload));
         $realChild->manager_review_status = 'completed';
         $realChild->Manager_review_date = now()->format('Y-m-d');
+        $managerSignature = Common::snapshotSignature($this->user->id, 'performance-manager-review', $realChild->id);
+        $realChild->manager_signature_img = $managerSignature['signature_img'] ?? null;
+        $realChild->manager_signature_name = $managerSignature['name'] ?? null;
+        $realChild->manager_signed_at = $managerSignature['timestamp'] ?? null;
         $realChild->save();
 
         try {

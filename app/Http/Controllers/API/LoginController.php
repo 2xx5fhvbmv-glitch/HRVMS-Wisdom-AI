@@ -168,6 +168,7 @@ class Logincontroller extends Controller
                 'success'                           =>  true,
                 'message'                           =>  'User Login Successfully',
                 'token'                             =>  $token,
+                'must_change_password'              =>  (bool) $resortAdmin->must_change_password,
                 'redirect_url'                      =>  route('resort.workforceplan.dashboard'),
             ]);
 
