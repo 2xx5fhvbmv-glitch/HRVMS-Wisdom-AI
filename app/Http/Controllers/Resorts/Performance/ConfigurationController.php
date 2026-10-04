@@ -17,6 +17,7 @@ use App\Http\Controllers\Controller;
  use App\Models\PerformanceTemplateForm;
 use App\Models\PerformanceMeetingContent;
 use App\Models\Professionalform;
+use Mews\Purifier\Facades\Purifier;
 class ConfigurationController extends Controller
 {
 
@@ -605,7 +606,12 @@ class ConfigurationController extends Controller
                 ['resort_id' => $this->resort->resort_id], // Condition to check existing record
                 [
                     'resort_id' => $this->resort->resort_id, // Ensure resort_id is set
-                    'content' => $request->ScheduleMeetingEmail
+                    // PF-06: this is sent as real HTML in the meeting-invite
+                    // email (PerformanceMeetingController::$emailTemplate) —
+                    // plain escaping would break the formatting HR composes
+                    // via CKEditor, so sanitize instead (strips
+                    // script/on*/javascript:, keeps the 'richtext' allow-list).
+                    'content' => Purifier::clean($request->ScheduleMeetingEmail, 'richtext'),
                 ]
             );
                         DB::commit();

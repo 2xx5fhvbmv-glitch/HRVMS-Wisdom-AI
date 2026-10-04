@@ -29,9 +29,27 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
 
     }
 
+    /**
+     * Repayment tracker is an HR/Finance ops tool — no GM approval stage
+     * lives here (unlike AdvanceSalaryController's HR->Finance->GM chain),
+     * so Common::canAccessPayroll() (HR/Finance/master admin) is the right
+     * fit. Every method here had zero role check before — resort-scoped
+     * writes were still open to any portal user of any rank.
+     */
+    private function requireHrFinanceAccess()
+    {
+        if (!Common::canAccessPayroll($this->resort->GetEmployee ?? null)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+        return null;
+    }
+
     public function index()
-    {   
-       
+    {
+        if (!Common::canAccessPayroll($this->resort->GetEmployee ?? null)) {
+            abort(403, 'Unauthorized access');
+        }
+
         $page_title ='Loan & Salary Advance Repayment Tracker';
         $resort_id = $this->resort->resort_id;
         $resort = $this->resort;
@@ -44,6 +62,8 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
 
     public function list(Request $request)
     {
+        if ($deny = $this->requireHrFinanceAccess()) return $deny;
+
         if($request->ajax())
         {
             $resort_id = $this->resort->resort_id;
@@ -131,6 +151,11 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
         if(Common::checkRouteWisePermission('people.advance-salary-repayment-tracker.index',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized access');
         }
+        // Was: only the generic view-permission tick above, not restricted
+        // to HR/Finance specifically — same gap as AdvanceSalaryController::show().
+        if (!Common::canAccessPayroll($this->resort->GetEmployee ?? null)) {
+            abort(403, 'Unauthorized access');
+        }
         $id = base64_decode($id);
         $resort_id = $this->resort->resort_id;
         $page_title ='Salary Advance/Loan Request Approval';
@@ -147,6 +172,7 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
     // and the advance-salary show page's Repayment Schedule table (same
     // PayrollRecoverySchedule rows, same edit rules).
     public function update(Request $request){
+        if ($deny = $this->requireHrFinanceAccess()) return $deny;
 
         // Tenant-scope the lookup — schedule_id is a raw row id with no
         // other check, so without this any resort-admin could edit another
@@ -219,6 +245,8 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
     }
 
     public function addNote(Request $request){
+        if ($deny = $this->requireHrFinanceAccess()) return $deny;
+
         // Was unscoped — contrasts with update() right above, which
         // explicitly tenant-scopes via whereHas('employee', resort_id).
         $recovery_schedule = PayrollRecoverySchedule::where('id', $request->schedule_id)
@@ -257,6 +285,8 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
     }
 
     public function markAsComplete(Request $request,$id){
+        if ($deny = $this->requireHrFinanceAccess()) return $deny;
+
         $id = base64_decode($id);
         // Was unscoped.
         $payrollAdvance = PayrollAdvance::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
@@ -290,6 +320,10 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
 
      public function downloadPdf($id)
     {
+        if (!Common::canAccessPayroll($this->resort->GetEmployee ?? null)) {
+            abort(403, 'Unauthorized access');
+        }
+
         $id = base64_decode($id);
         // Was unscoped — downloaded another resort's employee loan details
         // as a PDF.

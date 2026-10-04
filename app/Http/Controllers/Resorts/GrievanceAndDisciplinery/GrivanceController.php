@@ -736,7 +736,11 @@ class GrivanceController extends Controller
                     'investigation_p_id' => $investigation_id, 
                     'follow_up_action' => $request->follow_up_action[$key],
                     'follow_up_description' => $request->follow_up_description[$key],
-                    'inves_find_recommendations' => $value,
+                    // S2-04/PF-06: genuinely CKEditor rich text — sanitize
+                    // instead of escaping so formatting survives while
+                    // script/on*/javascript: payloads don't. Same fix as
+                    // DisciplinaryController's sibling save path (invariant #7).
+                    'inves_find_recommendations' => \Mews\Purifier\Facades\Purifier::clean($value, 'richtext'),
                     'investigation_stage' => $request->investigation_stage[$key],
                     'Committee_member_id' => $assinged_id,
                     'resolution_note' => $request->resolution_note[$key],

@@ -4846,6 +4846,51 @@ class Common
     }
 
     /**
+     * SV-04 (decided): survey results/participant-list are HR + GM only —
+     * narrower than hasFullDataAccess() (which also admits HR-dept HOD/EXCOM
+     * and L&D leadership). Was SurveyController::isPrivilegedSurveyViewer()
+     * (private); promoted here now that R-01's SurveyReportController needs
+     * the identical rule, so the two can't drift apart (invariant #7).
+     */
+    public static function canAccessSurveyResults($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        return in_array((int) ($employee->rank ?? 0), [3, 8], true);
+    }
+
+    /**
+     * SOS dashboard/history/report view access: the Security Manager
+     * (by position title, same recognition mechanism as the mobile app's
+     * EnsureSOSSecurityManagerAccess) OR HR/GM via hasFullDataAccess(). Was
+     * SOS\DashboardController::hasSosHistoryAccess() (private); promoted
+     * here now that R-01's SosReportController needs the identical rule.
+     */
+    public static function canAccessSOS($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        $isSecurityManager = optional(optional($employee)->position)->position_title === 'Security Manager';
+        return $isSecurityManager || self::hasFullDataAccess($employee);
+    }
+
+    /**
      * File Management "sees everything" gate (security audit FM-04, decided
      * rule): ONLY the HR department's HOD (rank 2) or EXCOM (rank 1), plus
      * super/master admin. Deliberately narrower than isHR() above and the

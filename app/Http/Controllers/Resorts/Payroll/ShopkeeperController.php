@@ -77,6 +77,14 @@ class ShopkeeperController extends Controller
 
     public function list(Request $request)
     {
+        // Was ungated — only index()/create() (the page loaders) checked the
+        // 'shopkeepers.create' view tick; this ajax endpoint behind them did
+        // not, so any portal user could still browse every shopkeeper by
+        // hitting it directly.
+        if (Common::checkRouteWisePermission('shopkeepers.create', config('settings.resort_permissions.view')) == false) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+
         if ($request->ajax()) {
             $resort_id = $this->resort->resort_id;
             $query = Shopkeeper::where('resort_id', $resort_id)
@@ -126,8 +134,14 @@ class ShopkeeperController extends Controller
 
     public function store(Request $request)
     {
+        // Was ungated — any portal user could register a new shopkeeper
+        // (with a generated login) regardless of the create() page's own tick.
+        if (Common::checkRouteWisePermission('shopkeepers.create', config('settings.resort_permissions.create')) == false) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+
         $resort_id = $this->resort->resort_id;
-        $validator = Validator::make($request->all(), 
+        $validator = Validator::make($request->all(),
         [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255',
@@ -186,6 +200,13 @@ class ShopkeeperController extends Controller
 
     public function inlineUpdate(Request $request, $id)
     {
+        // Was ungated — list()'s edit button is hidden client-side without
+        // the edit tick, but this endpoint itself accepted the call from
+        // anyone regardless.
+        if (Common::checkRouteWisePermission('shopkeepers.create', config('settings.resort_permissions.edit')) == false) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.']);
+        }
+
         // Find the division by ID
         $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
 
@@ -226,6 +247,12 @@ class ShopkeeperController extends Controller
 
     public function destroy($id)
     {
+        // Was ungated — same gap as inlineUpdate() above, matched to the
+        // delete tick list()'s own delete button already checks client-side.
+        if (Common::checkRouteWisePermission('shopkeepers.create', config('settings.resort_permissions.delete')) == false) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.']);
+        }
+
         try {
             $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $this->resort->resort_id)->firstOrFail();
             $shopkeeper->delete();  // Soft delete if you're using soft deletes, otherwise use forceDelete()
@@ -238,6 +265,12 @@ class ShopkeeperController extends Controller
 
     public function payments($id)
     {
+        // Was ungated — any portal user could open any shopkeeper's full
+        // payment history by id.
+        if (Common::checkRouteWisePermission('shopkeepers.create', config('settings.resort_permissions.view')) == false) {
+            abort(403, 'Unauthorized access');
+        }
+
         $resort_id = $this->resort->resort_id;
         $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $resort_id)->firstOrFail();
         $page_title = 'Payments - ' . $shopkeeper->name;
@@ -249,6 +282,11 @@ class ShopkeeperController extends Controller
     {
         if (!$request->ajax()) {
             return redirect()->route('shopkeepers.index');
+        }
+        // Was ungated — same gap as payments() above, this is the ajax
+        // behind that page.
+        if (Common::checkRouteWisePermission('shopkeepers.create', config('settings.resort_permissions.view')) == false) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
         }
         $resort_id = $this->resort->resort_id;
         $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $resort_id)->firstOrFail();
@@ -379,6 +417,12 @@ class ShopkeeperController extends Controller
 
     public function paymentsExport(Request $request, $id)
     {
+        // Was ungated — any portal user could download a shopkeeper's full
+        // payment-history spreadsheet.
+        if (Common::checkRouteWisePermission('shopkeepers.create', config('settings.resort_permissions.view')) == false) {
+            abort(403, 'Unauthorized access');
+        }
+
         $resort_id = $this->resort->resort_id;
         $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $resort_id)->firstOrFail();
 

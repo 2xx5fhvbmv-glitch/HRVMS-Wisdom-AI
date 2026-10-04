@@ -38,6 +38,14 @@ class SosReportController extends Controller
     public function __construct()
     {
         $this->resort = auth()->guard('resort-admin')->user();
+
+        // R-01: use the same rule SOS\DashboardController's own history/
+        // dashboard view uses (Common::canAccessSOS() — Security Manager OR
+        // HR/GM), not the broader hasFullDataAccess() default, so this
+        // report can't be read by anyone the module's own view page blocks.
+        if ($this->resort && !Common::canAccessSOS($this->resort->GetEmployee ?? null)) {
+            abort(403, 'Unauthorized access');
+        }
     }
 
     private function registry(): array

@@ -16,16 +16,18 @@ class ImportAttandanceJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     protected $file;
+    protected $resortId;
     protected $departmentId;
     protected $positionId;
 
-    public function __construct( $file)
+    public function __construct($file, $resortId)
     {
         $this->file = $file;
+        $this->resortId = $resortId;
     }
 
     public function handle()
     {
-        Excel::import(new ImportAttandance(), $this->file);
+        Excel::import(new ImportAttandance($this->resortId), $this->file);
     }
 }

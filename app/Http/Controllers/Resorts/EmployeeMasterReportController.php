@@ -28,6 +28,14 @@ class EmployeeMasterReportController extends Controller
     public function __construct()
     {
         $this->resort = auth()->guard('resort-admin')->user();
+
+        // R-01: this controller had no access gate of its own, relying only
+        // on the generic 'Reports' permission tick, so anyone HR granted
+        // basic Reports access to could read this module's data regardless
+        // of whether they have access to the module itself.
+        if ($this->resort && !Common::hasFullDataAccess()) {
+            abort(403, 'Unauthorized access');
+        }
     }
 
     private function registry(): array

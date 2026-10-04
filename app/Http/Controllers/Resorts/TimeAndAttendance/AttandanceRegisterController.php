@@ -914,7 +914,12 @@ class AttandanceRegisterController extends Controller
 
             $filePath = $request->file('UploadImportattandance')->store('imports');
 
-            $check =  ImportAttandanceJob::dispatch($filePath,);
+            // Was dispatched with no resort_id — the importer used to derive
+            // it from Auth::guard('resort-admin')->user(), which is null on
+            // the queue worker (QUEUE_CONNECTION=database, a separate
+            // process with no HTTP session), so the job fatal-errored on
+            // every real run. Same pattern as ImportLeavesJob below.
+            $check =  ImportAttandanceJob::dispatch($filePath, $this->resort->resort_id);
 
                 $response['success'] = true;
 

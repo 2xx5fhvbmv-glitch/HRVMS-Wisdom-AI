@@ -31,8 +31,25 @@ class AdvanceSalaryController extends Controller
     }
 
     public function index()
-    {   
-      
+    {
+        // Was ungated — any portal user of any rank could open this page
+        // (the list() ajax it feeds is now gated too, but the page itself
+        // loaded with no check at all beforehand).
+        $rank = config('settings.Position_Rank');
+        $current_rank = $this->resort->getEmployee->rank ?? null;
+        $Dept_id = $this->resort->getEmployee->Dept_id ?? null;
+        if (!in_array($current_rank, [3, 7, 8], true)) {
+            if (Common::isHRDepartment($Dept_id)) {
+                $current_rank = 3;
+            } elseif (Common::isFinanceDepartment($Dept_id)) {
+                $current_rank = 7;
+            }
+        }
+        $available_rank = $rank[$current_rank] ?? '';
+        if (!in_array($available_rank, ['HR', 'Finance', 'GM'], true)) {
+            abort(403, 'Unauthorized access');
+        }
+
         $page_title ='Salary Advance/Loan Request';
         $resort_id = $this->resort->resort_id;
         $employees = Employee::with(['resortAdmin','position','department'])->where('resort_id',$resort_id)->get();
@@ -66,6 +83,18 @@ class AdvanceSalaryController extends Controller
             $isHR = ($available_rank === "HR");
             $isFinance = ($available_rank === "Finance");
             $isGM = ($available_rank === "GM");
+
+            // Was: no gate at all. The comment below ("HR / master / other
+            // authorised roles see the full resort list") describes intent
+            // that was never enforced — an ordinary employee computing
+            // $isHR=$isFinance=$isGM=false fell through to the SAME
+            // unrestricted resort-wide query as HR, just without the
+            // Finance/GM stage filter. Every employee's advance/loan amount,
+            // approval stage and guarantor chain was readable by anyone with
+            // a portal login.
+            if (!$isHR && !$isFinance && !$isGM) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+            }
 
             // dd($available_rank);
             // Base resort-scoped query — always defined so the variable can't be
@@ -207,6 +236,14 @@ class AdvanceSalaryController extends Controller
         $isHR = ($available_rank === "HR");
         $isFinance = ($available_rank === "Finance");
         $isGM = ($available_rank === "GM");
+
+        // Was: only the generic 'people.advance-salary.index' view-permission
+        // tick above — not restricted to HR/Finance/GM specifically, so
+        // anyone granted that tick (which can be assigned broadly) could
+        // open any employee's advance/loan request by id, same gap as list().
+        if (!$isHR && !$isFinance && !$isGM) {
+            abort(403, 'Unauthorized access');
+        }
 
         // Was unscoped — cross-tenant read of another resort's loan/advance
         // request (amount, guarantors, recovery schedule).

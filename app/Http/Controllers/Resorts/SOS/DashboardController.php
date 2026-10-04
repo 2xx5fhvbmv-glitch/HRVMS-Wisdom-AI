@@ -55,11 +55,11 @@ class DashboardController extends Controller
      * destructive routes; both AND with the permission tick, neither
      * replaces it.
      */
+    // Moved to Common::canAccessSOS() (R-01) — SosReportController needs the
+    // identical rule now; delegates so both can't drift apart.
     private function hasSosHistoryAccess(): bool
     {
-        $employee = optional($this->resort)->GetEmployee;
-        $isSecurityManager = optional(optional($employee)->position)->position_title === 'Security Manager';
-        return $isSecurityManager || Common::hasFullDataAccess($employee);
+        return Common::canAccessSOS(optional($this->resort)->GetEmployee);
     }
 
     /**

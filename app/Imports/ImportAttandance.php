@@ -30,13 +30,17 @@ class ImportAttandance implements  ToModel, WithHeadingRow
 
     protected $departmentId;
     protected $positionId;
-    protected $resort;
+    protected $resortId;
 
-    public function __construct()
+    // Was: Auth::guard('resort-admin')->user() — this importer runs inside
+    // ImportAttandanceJob on the queue worker (QUEUE_CONNECTION=database),
+    // a separate process with no HTTP session, so the guard always
+    // resolved null and every row's resort_id lookup fatal-errored. The
+    // resort_id is now passed in explicitly from the dispatching request,
+    // same pattern as ImportLeavesJob/ImportLeaves.
+    public function __construct($resortId)
     {
-        // $this->departmentId = $departmentId;
-        // $this->positionId = $positionId;
-        $this->resort= Auth::guard('resort-admin')->user();
+        $this->resortId = $resortId;
     }
 
     public function model(array $row): Model|array|null
@@ -85,13 +89,13 @@ class ImportAttandance implements  ToModel, WithHeadingRow
 
 
         $employee = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
-                        ->where('t1.resort_id',$this->resort->resort_id)
+                        ->where('t1.resort_id',$this->resortId)
                         ->where('employees.Emp_id',$row['employee_id'])
                         ->first(['employees.id']);
 
 
 
-                        $shiftdata = ShiftSettings::where('resort_id',$this->resort->resort_id)
+                        $shiftdata = ShiftSettings::where('resort_id',$this->resortId)
                         ->where("ShiftName",$row['shift'])
                         ->first(['id','TotalHours']);
 
@@ -134,11 +138,11 @@ class ImportAttandance implements  ToModel, WithHeadingRow
 
             $DutyRoster = DutyRoster::updateOrCreate([
                     "ShiftDate"=>      $newdate,
-                    "resort_id"=>$this->resort->resort_id,
+                    "resort_id"=>$this->resortId,
                     "Shift_id"=>$shiftdata->id,
                     "Emp_id"=>$employee->id
                 ],[
-                "resort_id"=>$this->resort->resort_id,
+                "resort_id"=>$this->resortId,
                 "Shift_id"=>$shiftdata->id,
                 "Emp_id"=>$employee->id,
                 "ShiftDate"=> $date."-".$date,
@@ -154,7 +158,7 @@ class ImportAttandance implements  ToModel, WithHeadingRow
                     'shift_id' => $shiftdata->id],
                     [
                     'roster_id'=>$DutyRoster->id,
-                    'resort_id'=>$this->resort->resort_id,
+                    'resort_id'=>$this->resortId,
                     'Emp_id'=>$employee->id,
                     'CheckingTime'=>isset($check_in_time)?$check_in_time:"00:00",
                     'CheckingOutTime'=>isset($check_out_time) ?  $check_out_time :  "00:00",

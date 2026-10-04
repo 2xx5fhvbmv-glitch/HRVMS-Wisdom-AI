@@ -22,6 +22,7 @@
         "lbuchs/webauthn": "^2.2",
         "league/flysystem-aws-s3-v3": "^3.0",
         "maatwebsite/excel": "^4.0.3",
+        "mews/purifier": "^3.4",
         "milon/barcode": "^13.0",
         "phpoffice/phpword": "^1.4",
         "picqer/php-barcode-generator": "^2.4",

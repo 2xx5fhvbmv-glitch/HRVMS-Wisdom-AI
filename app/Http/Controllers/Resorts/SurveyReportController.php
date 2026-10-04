@@ -25,6 +25,15 @@ class SurveyReportController extends Controller
     public function __construct()
     {
         $this->resort = auth()->guard('resort-admin')->user();
+
+        // R-01: was previously skipped deliberately pending SV-04's
+        // decision text (now received and implemented in SurveyController
+        // via Common::canAccessSurveyResults() — HR + GM only, narrower
+        // than hasFullDataAccess()). Use the same rule here so results
+        // reports can't be read by anyone Survey's own results page blocks.
+        if ($this->resort && !Common::canAccessSurveyResults($this->resort->GetEmployee ?? null)) {
+            abort(403, 'Unauthorized access');
+        }
     }
 
     private function registry(): array

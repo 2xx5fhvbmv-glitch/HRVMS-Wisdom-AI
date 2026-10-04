@@ -8,4 +8,5 @@ $baseDir = dirname($vendorDir);
 return array(
     'Sentry\\Laravel\\' => array($vendorDir . '/sentry/sentry-laravel/src'),
     'Milon\\Barcode' => array($vendorDir . '/milon/barcode/src'),
+    'HTMLPurifier' => array($vendorDir . '/ezyang/htmlpurifier/library'),
 );

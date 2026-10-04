@@ -48,18 +48,14 @@ class SurveyController extends Controller
      * it, and the backend now matches.
      * Anonymous surveys are NEVER de-masked, even for privileged viewers.
      */
+    // Moved to Common::canAccessSurveyResults() (R-01) — SurveyReportController
+    // needs the identical rule now; delegates so both can't drift apart.
     private function isPrivilegedSurveyViewer(): bool
     {
         if (!$this->resort) return false;
-        if (($this->resort->type ?? null) === 'super' || ($this->resort->is_master_admin ?? 0)) {
-            return true;
-        }
-        $emp = $this->resort->GetEmployee ?? null;
-        if (!$emp) return false;
-
-        $rank = (int) ($emp->rank ?? 0);
-        // Rank 3 = HR, Rank 8 = GM (config/settings.php Position_Rank).
-        return in_array($rank, [3, 8], true);
+        return Common::canAccessSurveyResults($this->resort->GetEmployee ?? null)
+            || ($this->resort->type ?? null) === 'super'
+            || ($this->resort->is_master_admin ?? 0);
     }
 
     /**

@@ -845,12 +845,17 @@ class DisciplinaryController extends Controller
             if($disciplinary_investigation->id) 
             {
 
-             foreach($request->inves_find_recommendations as $key => $value) 
+             foreach($request->inves_find_recommendations as $key => $value)
              {
 
                         DisciplinaryInvestigationChild::create([
                             'Disciplinary_P_id' => $disciplinary_investigation->id,
-                            'inves_find_recommendations' => $value,
+                            // S2-04/PF-06: genuinely CKEditor rich text, not
+                            // plain text — sanitize instead of escaping so the
+                            // formatting survives while script/on*/javascript:
+                            // payloads don't (this renders as real HTML
+                            // wherever a committee member later views it).
+                            'inves_find_recommendations' => \Mews\Purifier\Facades\Purifier::clean($value, 'richtext'),
                             'follow_up_action' => $request->follow_up_action[$key],
                             'follow_up_description' => $request->follow_up_description[$key],
                             'investigation_stage' => $request->investigation_stage[$key],
