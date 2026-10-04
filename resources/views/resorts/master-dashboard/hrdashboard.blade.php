@@ -8,6 +8,69 @@
 @endif
 
 @section('content')
+@php
+    // Presentation helpers only — every figure below comes from variables MasterDashboardController::hr_dashboard() already passes.
+    $initials = fn ($name) => collect(explode(' ', trim((string) $name)))->filter()->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->take(2)->implode('') ?: '?';
+    $plural   = fn ($n, $one, $many = null) => $n . ' ' . ($n == 1 ? $one : ($many ?? $one . 's'));
+    $pctOf    = fn ($n) => $total_employees > 0 ? round($n / $total_employees * 100, 1) : 0;
+    $defaultPic = url(config('settings.default_picture'));
+
+    // To do — recruitment items (T&A items are appended client-side from the Time & Attendance to-do endpoint).
+    $todoRows = collect(isset($TodoData) && $TodoData->isNotEmpty() ? $TodoData : []);
+    $todoPics = \App\Helpers\Common::getResortUserPicturesBatch($todoRows->pluck('user_id')->all());
+
+    // Calendar events — this month's public holidays + upcoming birthdays (one eager load, no per-row queries).
+    $birthdayRows = $upcommingBirthdays->take(6)->loadMissing(['resortAdmin', 'department', 'position']);
+    $birthdayPics = \App\Helpers\Common::getResortUserPicturesBatch($birthdayRows->pluck('Admin_Parent_id')->all());
+    $events = [];
+    foreach ($upcommingPublicHoliday as $h) {
+        $d = \Carbon\Carbon::parse($h->holiday_date);
+        $events[] = ['date' => $d->toDateString(), 'title' => $h->name, 'sub' => 'Public holiday', 'people' => []];
+    }
+    foreach ($birthdayRows as $b) {
+        $name = $b->resortAdmin->full_name ?? '';
+        $d = \Carbon\Carbon::parse($b->dob)->year(now()->year);
+        $pic = $birthdayPics[$b->Admin_Parent_id] ?? $defaultPic;
+        $events[] = [
+            'date' => $d->toDateString(),
+            'title' => 'Birthday · ' . $name,
+            'sub' => trim(($b->position->position_title ?? '') . ' · ' . ($b->department->name ?? ''), ' ·'),
+            'people' => [['name' => $name, 'photo' => $pic === $defaultPic ? '' : $pic]],
+        ];
+    }
+    usort($events, fn ($a, $b) => strcmp($a['date'], $b['date']));
+
+    // WAI Insights — built from this page's own counts; each links to the module it concerns.
+    $insights = [];
+    $absentPct = $pctOf($absent_employee_counts);
+    if ($absent_employee_counts > 0) {
+        $insights[] = ['module' => 'Attendance', 'sev' => $absentPct >= 10 ? 'high' : 'watch', 'title' => 'Absent today', 'html' => '<b>' . $plural($absent_employee_counts, 'employee') . '</b> absent today (' . $absentPct . '% of the workforce).', 'url' => route('resort.timeandattendance.dashboard')];
+    }
+    if (($open_grivance_count ?? 0) > 0) {
+        $insights[] = ['module' => 'People Relations', 'sev' => 'high', 'title' => 'Open grievances', 'html' => '<b>' . $plural((int) $open_grivance_count, 'grievance case') . '</b> open and awaiting action.', 'url' => route('GrievanceAndDisciplinery.Hrdashboard')];
+    }
+    if (($open_disciplinary_count ?? 0) > 0) {
+        $insights[] = ['module' => 'People Relations', 'sev' => 'high', 'title' => 'Open disciplinary cases', 'html' => '<b>' . $plural((int) $open_disciplinary_count, 'disciplinary case') . '</b> open and awaiting action.', 'url' => route('GrievanceAndDisciplinery.Hrdashboard')];
+    }
+    if (($openIncidentCounts ?? 0) > 0) {
+        $insights[] = ['module' => 'Incidents', 'sev' => 'high', 'title' => 'Open incidents', 'html' => '<b>' . $plural((int) $openIncidentCounts, 'incident') . '</b> still open.', 'url' => route('incident.hr.dashboard')];
+    }
+    if (isset($pendingPayrollApprovals) && $pendingPayrollApprovals->count() > 0) {
+        $insights[] = ['module' => 'Payroll', 'sev' => 'high', 'title' => 'Payroll approval pending', 'html' => '<b>' . $plural($pendingPayrollApprovals->count(), 'payroll run') . '</b> waiting for your approval.', 'url' => route('payroll.dashboard')];
+    }
+    if ($leaveRequests->count() > 0) {
+        $insights[] = ['module' => 'Leave', 'sev' => 'watch', 'title' => 'Leave requests pending', 'html' => '<b>' . $plural($leaveRequests->count(), 'leave request') . '</b> pending approval.', 'url' => route('leave.dashboard')];
+    }
+    if (($total_application_for_job_in_review ?? 0) > 0) {
+        $insights[] = ['module' => 'Recruitment', 'sev' => 'watch', 'title' => 'Applications in review', 'html' => '<b>' . $plural((int) $total_application_for_job_in_review, 'application') . '</b> in review.', 'url' => route('resort.recruitement.hrdashboard')];
+    }
+    if (($pending_trainings_count ?? 0) > 0) {
+        $insights[] = ['module' => 'Learning', 'sev' => 'watch', 'title' => 'Training requests pending', 'html' => '<b>' . $plural((int) $pending_trainings_count, 'training request') . '</b> pending approval.', 'url' => route('learning.hr.dashboard')];
+    }
+    if (($UnassignedDocumentsCounts ?? 0) > 0) {
+        $insights[] = ['module' => 'File Management', 'sev' => 'watch', 'title' => 'Unassigned documents', 'html' => '<b>' . $plural((int) $UnassignedDocumentsCounts, 'document') . '</b> not yet assigned to an employee.', 'url' => route('FileManagment.hr.dashboard')];
+    }
+@endphp
 <div class="body-wrapper pb-5">
         <div class="container-fluid">
             <div class="page-hedding">
@@ -20,4031 +83,945 @@
                     </div>
                 </div>
             </div>
-            <div class="row g-3 g-xxl-4 card-heigth">
-                <div class="col-xl-9 col-lg-12">
-                    <div class="card card-talentAcqDivisions">
-                        <div class="row g-xxl-4 g-3">
-                            <div class="col-md-4 col-sm-6">
-                                <div class="bg-themeGrayLight">
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <div>
-                                            <p class="mb-0  fw-500">Divisions</p>
-                                            <strong>{{$resort_divisions_count}}</strong>
-                                        </div>
-                                        <a href="javascript:void(0);">
-                                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4 col-sm-6">
-                                <div class="bg-themeGrayLight">
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <div>                                            <p class="mb-0  fw-500">Departments</p>
-                                            <strong>{{$resort_departments_count}}</strong>
-                                        </div>
-                                        <a href="javascript:void(0);">
-                                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="bg-themeGrayLight">
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <div>
-                                            <p class="mb-0 fw-500">Positions</p>
-                                            <strong>{{$resort_positions_count}}</strong>
-                                        </div>
-                                        <a href="javascript:void(0);">
-                                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-12">
-                                <div class="bg-themeGrayLight full">
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <p class="mb-0 fw-500">Total Employees</p>
-                                        <strong>{{$total_employees}}</strong>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4 col-sm-6">
-                                <div class="bg-themeGrayLight">
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <div>
-                                            <p class="mb-0 fw-500">Total Present</p>
-                                            <strong>{{$present_employee_counts}}</strong>
-                                        </div>
-                                        <a href="#">
-                                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4 col-sm-6">
-                                <div class="bg-themeGrayLight">
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <div>
-                                            <p class="mb-0 fw-500">On Leave</p>
-                                            <strong>{{$leave_employee_counts}}</strong>
-                                        </div>
-                                        <a href="#">
-                                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="bg-themeGrayLight">
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <div>
-                                            <p class="mb-0  fw-500">Absent</p>
-                                            <strong>{{$absent_employee_counts}}</strong>
-                                        </div>
-                                        <a href="#">
-                                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-lg-4 col-sm-6">
-                                <div class="row g-xxl-4 g-3">
-                                    <div class="col-12">
-                                        <div class="bg-themeGrayLight ">
-                                            <div class="card-title">
-                                                <h3>Talent Acquisition</h3>
-                                            </div>
-                                            <div class="table-responsive">
-                                                <table class="table-lableNew  w-100">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td>Total Applications</td>
-                                                            <th>{{$total_application_for_job_in_review}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Interviews</td>
-                                                            <th>{{$total_selected_applications_with_interviews}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Hired</td>
-                                                            <th>{{$total_hired_candidates}}</th>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <div class="bg-themeGrayLight ">
-                                            <div class="card-title">
-                                                <h3>People Relation</h3>
-                                            </div>
-                                            <div class="table-responsive">
-                                                <table class="table-lableNew  w-100">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td>Open Cases (Grievance)</td>
-                                                            <th>{{$open_grivance_count}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Pending Cases (Grievance)</td>
-                                                            <th>{{$pending_grivance_count}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Closed Cases (Grievance)</td>
-                                                            <th>{{$resolve_grivance_count}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Open Cases (Disciplinary)</td>
-                                                            <th>{{$open_disciplinary_count}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Pending Cases (Disciplinary)</td>
-                                                            <th>{{$pending_disciplinary_count}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Closed Cases (Disciplinary)</td>
-                                                            <th>{{$resolve_disciplinary_count}}</th>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <div class="bg-themeGrayLight ">
-                                            <div class="card-title">
-                                                <h3>File Management</h3>
-                                            </div>
-                                            <div class="table-responsive">
-                                                <table class="table-lableNew  w-100">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td>Total Documents</td>
-                                                            <th>{{$TotalDocument}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Unassigned Documents</td>
-                                                            <th>{{$UnassignedDocumentsCounts}}</th>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-lg-4 col-sm-6">
-                                <div class="row g-xxl-4 g-3">
-                                    <div class="col-12">
-                                        <div class="bg-themeGrayLight ">
-                                            <div class="card-title">
-                                                <h3>Performance *</h3>
-                                            </div>
-                                            <div class="table-responsive">
-                                                <table class="table-lableNew  w-100">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td>Appraisal Pending</td>
-                                                            <th>12</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Employees In PIP</td>
-                                                            <th>64</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Employees In PDP</td>
-                                                            <th>25</th>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <div class="bg-themeGrayLight ">
-                                            <div class="card-title">
-                                                <h3>Learning and Development</h3>
-                                            </div>
-                                            <div class="table-responsive">
-                                                <table class="table-lableNew  w-100">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td>Ongoing Training Programs</td>
-                                                            <th>{{$pending_trainings_count}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Completed Training Programs</td>
-                                                            <th>{{$completed_trainings_count}}</th>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <div class="bg-themeGrayLight ">
-                                            <div class="card-title">
-                                                <h3>Visa Management</h3>
-                                            </div>
-                                            <div class="table-responsive">
-                                                <table class="table-lableNew  w-100">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td>Withdrawn</td>
-                                                            <th>MVR {{ $visa_withdraw_total }}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Deposited</td>
-                                                            <th>MVR {{ $visa_deposited_total }}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Reserved</td>
-                                                            <th>MVR {{ $visa_reserved_total }}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Available</td>
-                                                            <th>MVR {{ $visa_available_total }}</th>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <div class="bg-themeGrayLight ">
-                                            <div class="card-title">
-                                                <h3>Leave</h3>
-                                            </div>
-                                            <div class="table-responsive">
-                                                <table class="table-lableNew  w-100">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td>Total Applied Leaves</td>
-                                                            <th>{{$total_applied_leave}}</th>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-lg-4 col-sm-12">
-                                <div class="row g-xxl-4 g-3">
-                                    <div class="col-lg-12 col-sm-6">
-                                        <div class="bg-themeGrayLight ">
-                                            <div class="card-title">
-                                                <h3>Accommodation</h3>
-                                            </div>
-                                            <div class="table-responsive">
-                                                <table class="table-lableNew  w-100">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td>Total Bed</td>
-                                                            <th>{{$total_beds}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Occupied Bed</td>
-                                                            <th>{{$OccupiedBed}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Available Accommodation</td>
-                                                            <th>{{$total_available_beds}}</th>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-12 col-sm-6">
-                                        <div class="bg-themeGrayLight ">
-                                            <div class="card-title">
-                                                <h3>Survey</h3>
-                                            </div>
-                                            <div class="table-responsive">
-                                                <table class="table-lableNew  w-100">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td>Total Surveys</td>
-                                                            <th>{{$total_survey_count}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Open Surveys</td>
-                                                            <th>{{$open_survey_count}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Pending Surveys</td>
-                                                            <th>{{$pending_survey_count}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Complete Surveys</td>
-                                                            <th>{{$complete_survey_count}}</th>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-12 col-sm-6">
-                                        <div class="bg-themeGrayLight ">
-                                            <div class="card-title">
-                                                <h3>Incident</h3>
-                                            </div>
-                                            <div class="table-responsive">
-                                                <table class="table-lableNew  w-100">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td>Total Incidents</td>
-                                                            <th>{{$totalIncidentCounts}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Open Incidents</td>
-                                                            <th>{{$openIncidentCounts}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Under Investigation</td>
-                                                            <th>{{$underInvestigationIncidentCounts}}</th>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-12 col-sm-6">
-                                        <div class="bg-themeGrayLight ">
-                                            <div class="card-title">
-                                                <h3>People</h3>
-                                            </div>
-                                            <div class="table-responsive">
-                                                <table class="table-lableNew  w-100">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td>Total Active Employee</td>
-                                                            <th>{{$total_employees}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Total New Hires</td>
-                                                            <th>{{$new_joining}}</th>
-                                                        </tr>
-                                                        <tr>
-                                                            <td>Expected Employees*</td>
-                                                            <th>21</th>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="col-xl-3 col-lg-12">
-                    <div class="row g-xxl-4 g-3">
-                        <div class="col-xl-12 col-md-6">
-                            <div class="card h-auto">
-                                <div class="mb-4 overflow-hidden">
-                                    <div id="calendar"></div>
-                                </div>
-                                <div class="card-title">
-                                    <div class="row justify-content-between align-items-center g-3">
-                                        <div class="col">
-                                            <h3>Upcoming Interviews</h3>
-                                        </div>
+<div id="hrmd">
+  <div class="cols">
 
-                                    </div>
-                                </div>
-                                <div id="upinterviews">
-
-
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-12 col-md-6">
-                            <div class="card card-talentAcqCompliances">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">Compliance</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{route('people.compliance.index')}}" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-12 col-md-6">
-                            <div class="card card-talentAcqCompliances">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">Calendar</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{route('people.compliance.Calendar')}}" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                @if(isset($pendingPayrollApprovals) && $pendingPayrollApprovals->isNotEmpty())
-                <div class="col-lg-12">
-                    <div class="card mb-3" style="border: 1px solid #0d6efd; border-radius: 8px;">
-                        <div class="card-title px-3 pt-3 pb-0 mb-0">
-                            <h3><i class="fa-solid fa-file-invoice-dollar me-1 text-primary"></i> Payroll Approval Requests</h3>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Period</th>
-                                        <th>Employees</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($pendingPayrollApprovals as $index => $approval)
-                                        @if($approval->payroll)
-                                        <tr>
-                                            <td>{{ $index + 1 }}</td>
-                                            <td>{{ \Carbon\Carbon::parse($approval->payroll->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($approval->payroll->end_date)->format('d M Y') }}</td>
-                                            <td>{{ $approval->payroll->total_employees ?? '-' }}</td>
-                                            <td><span class="badge badge-themeWarning">Pending Your Approval</span></td>
-                                            <td>
-                                                <a href="{{ route('payroll.run') }}?resume={{ $approval->payroll_id }}&viewonly=1"
-                                                   class="btn btn-sm btn-themeBlue"
-                                                   onclick="localStorage.setItem('payroll_id','{{ $approval->payroll_id }}');localStorage.setItem('currentStep','7');">
-                                                    <i class="fa-solid fa-eye me-1"></i> Review & Approve
-                                                </a>
-                                            </td>
-                                        </tr>
-                                        @endif
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-                @endif
-
-                <div class="col-lg-6">
-                    <div class="card">
-                        <div class="card-title">
-                            <div class="row g-md-2 g-1 align-items-center">
-                                <div class="col">
-                                    <h3 class="text-nowrap">Requests *</h3>
-                                </div>
-                                <div class="col-auto">
-                                    <a href="#" class="a-link">View All</a>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table-lableNew table-talentAcqRequests w-100">
-                                <thead>
-                                    <tr>
-                                        <th>Request Type</th>
-                                        <th>Requested By</th>
-                                        <th>Date</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>#14521</td>
-                                        <td>
-                                            <div class="tableUser-block">
-                                                <div class="img-circle"><img src="assets/images/user-2.svg" alt="user">
-                                                </div>
-                                                <span class="userApplicants-btn">John Doe</span>
-                                            </div>
-                                        </td>
-                                        <td>15 Mar 2025</td>
-                                        <td><span class="badge badge-themeSuccess">Approved</span></td>
-                                        <td>
-                                            <a href="#" class="eye-btn skyBlue"><i class="fa-regular fa-eye"></i></a>
-                                            <a href="#" class="close-btn"><i class="fa-solid fa-xmark"></i></a>
-                                        </td>
-                                    </tr>
-                                    
-                                    <tr>
-                                        <td>#14521</td>
-                                        <td>
-                                            <div class="tableUser-block">
-                                                <div class="img-circle"><img src="assets/images/user-2.svg" alt="user">
-                                                </div>
-                                                <span class="userApplicants-btn">John Doe</span>
-                                            </div>
-                                        </td>
-                                        <td>15 Mar 2025</td>
-                                        <td><span class="badge badge-themeYellow">Pending</span></td>
-                                        <td>
-                                            <a href="#" class="eye-btn skyBlue"><i class="fa-regular fa-eye"></i></a>
-                                            <a href="#" class="correct-btn"><i class="fa-solid fa-check"></i></a>
-                                            <a href="#" class="close-btn"><i class="fa-solid fa-xmark"></i></a>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6">
-                    <div class="card card-talentAcqRecentActivity">
-                        <div class="card-title">
-                            <div class="row g-md-2 g-1 align-items-center">
-                                <div class="col">
-                                    <h3 class="text-nowrap">Recent Activity *</h3>
-                                </div>
-                                <div class="col-auto">
-                                    <a href="#" class="a-link">View All</a>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="border-bottom">
-                            <h6 class="fw-600">Leave Request REQ-003 Rejected</h6>
-                            <p>2-week vacation request for Mike Johnson denied</p>
-                            <span>15 mins ago</span>
-                        </div>
-                        <div class="border-bottom">
-                            <h6 class="fw-600">New Position Posted</h6>
-                            <p>Senior Manager role opened in management Team</p>
-                            <span>15 mins ago</span>
-                        </div>
-                        <div class="border-bottom">
-                            <h6 class="fw-600">Leave Request REQ-003 Rejected</h6>
-                            <p>2-week vacation request for Mike Johnson denied</p>
-                            <span>15 mins ago</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-6">
-                    <div class="row g-3 g-xxl-4">
-                        <div class="col-12">
-                            <div class="card card-theme card-talentAcqWorkPlan">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">WORKFORCE PLANNING</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{route('resort.workforceplan.dashboard')}}" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row g-xxl-3 g-2">
-                                        <div class="col-sm-4">
-                                            <div class="bg-themeGrayLight d-flex">
-                                                <p>Total Budgeted Employees:</p>
-                                                <strong> {{ $manning_response->TotalBudgtedemp ?? '0' }}</strong>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-4 col-6">
-                                            <div class="bg-themeGrayLight d-flex">
-                                                <p>Filled Positions</p>
-                                                <strong>{{ $manning_response->total_filled_positions_count ?? '0'}}</strong>
-                                                <div class="progress progress-custom progress-themeBlue">
-                                               
-                                                    @php
-                                                        $total_budgeted = $manning_response->total_budgeted_employees ?? 0;
-                                                        $filled_positions = $manning_response->total_filled_positions_count ?? 0;
-                                                        $filled_percentage = $total_budgeted > 0 ? ($filled_positions / $total_budgeted) * 100 : 0;
-                                                    @endphp
-                                                    <div class="progress-bar" role="progressbar" style="width: {{ $filled_percentage }}%"
-                                                        aria-valuenow="{{ $filled_percentage }}" aria-valuemin="0" aria-valuemax="100">
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-4 col-6">
-                                            <div class="bg-themeGrayLight d-flex">
-                                                <p>Vacant</p>
-                                                <strong class="fw-bold">{{ $manning_response->total_vacant_count ?? '0' }}</strong>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="bg-themeGrayLight">
-                                                <div class="card  mb-30">
-                                                    <div class="card-title d-flex justify-content-between">
-                                                        <h3>Budget</h3>
-
-                                                        <div class="form-group">
-                                                            <select class="form-select form-select-sm " aria-label="Default select example">
-                                                                <option value="1">2009-2012</option>
-                                                                <option value="2">2013-2016</option>
-                                                                <option value="3">2017-2020</option>
-                                                                <option value="4" selected>2021-2024</option>
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <canvas id="myBarChart"  width="273" height="206"  class="mb-2"></canvas>
-                                                        <div class="row g-2 justify-content-center">
-                                                            <div class="col-auto">
-                                                                <div class="doughnut-label">
-                                                                    <span class="bg-theme"></span>Budgeted
-                                                                </div>
-                                                            </div>
-                                                            <div class="col-auto">
-                                                                <div class="doughnut-label">
-                                                                    <span class="bg-themeLightBlue"></span>Actual
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="bg-themeGrayLight">
-                                               <div class="card  mb-30">
-                                                    <div class="card-title d-flex justify-content-between">
-                                                        <h3>Occupancy</h3>
-                                                        <a href="#add-occupancymodal" data-bs-toggle="modal" class="btn-icon bg-green">
-                                                            <i class="fa-solid fa-plus"></i>
-                                                        </a>
-                                                    </div>
-                                                    <div class="text-center" id="occupancy-chart-slider">
-                                                        @if($occupancies->isNotEmpty())
-                                                            @foreach ($occupancies as $oc)
-                                                                <div>
-                                                                    <div>                                                                        <div class="d-flex justify-content-center date-slider">
-                                                                            <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" title="Tooltip on right">{{ date('d M Y',strtotime($oc->occupancydate))}}</a>
-                                                                        </div>
-                                                                        <div class="pie my-3" style="--p:{{ $oc->occupancyinPer}};--green:var(--teal);--border:10px" data-bs-toggle="tooltip"
-                                                                            data-bs-placement="right" title="{{ $oc->occupancyinPer}}% Occupancy">
-                                                                            <div>
-                                                                                <strong class="d-block"> {{ $oc->occupancyinPer}}%</strong>
-                                                                                <span>Occupancy</span>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="card-fotter d-flex justify-content-between">
-                                                                        <h4>Rooms Available:</h4>
-                                                                        <?php 
-                                                                            $availableRooms = $oc->occupancytotalRooms - $oc->occupancyOccupiedRooms; 
-                                                                        ?>
-                                                                        <label>{{ ($availableRooms)?  $availableRooms : 0 }}</label>
-                                                                    </div>
-
-                                                                </div>
-                                                            @endforeach
-                                                        @else
-                                                            <div>
-                                                                <div>                                                                    <div class="d-flex justify-content-center date-slider">
-                                                                        <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" title="Tooltip on right">{{ date('d M Y')}}</a>
-                                                                    </div>
-                                                                    <div class="pie my-3" style="--p:0;--green:var(--teal);--border:10px" data-bs-toggle="tooltip"
-                                                                        data-bs-placement="right" title="0% Occupancy">
-                                                                        <div>
-                                                                            <strong class="d-block">0%</strong>
-                                                                            <span>Occupancy</span>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="card-fotter d-flex justify-content-between">
-                                                                    <h4>Rooms Available:</h4>
-                                                                    <label>0</label>
-                                                                </div>
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-12 col-lg-6 ">
-                            <div class="card card-theme ">
-                                <div class="card-title">
-                                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                        <div class="col">
-                                            <h3>Attendance</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <div class="form-group">
-                                                <select class="form-select YearWiseAttandance" aria-label="Default select example">
-                                                    <?php
-                                                        $currentYear = date('Y');
-
-                                                        for ($i = 0; $i < 3; $i++) {
-                                                            $startYear = $currentYear - $i;
-                                                            $endYear = $startYear + 1;
-
-                                                            echo "<option value=\"$startYear\"";
-
-                                                            if ($i == 0)
-                                                            {
-                                                                echo " selected";
-                                                            }
-
-                                                            echo ">Jan $startYear - Dec $startYear</option>";
-                                                        }
-                                                    ?>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <canvas id="myAttendance"></canvas>
-                            </div>
-                        </div>
-                        <div class="col-xl-12 col-lg-6 ">
-                            <div class="card card-theme card-accomStati">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">ACCOMMODATION</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="#" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="card-title">
-                                        <h3>Accommodation Statistics</h3>
-                                    </div>
-                                    <div class="permissions-accordion" id="accordionPermissions">
-                                        @foreach ($buildings as $ak => $b)
-
-                                            @php
-                                                $sanitizedGroupName = str_replace(' ', '', $ak);
-                                                $isFirst = $loop->first;
-                                            @endphp
-
-                                            <div class="accordion-item">
-                                                <h2 class="accordion-header" id="headingOne{{ $sanitizedGroupName }}">
-                                                    <button class="accordion-button {{ $isFirst ? '' : 'collapsed' }}"
-                                                            type="button"
-                                                            data-bs-toggle="collapse"
-                                                            data-bs-target="#collapseOne{{ $sanitizedGroupName }}"
-                                                            aria-expanded="{{ $isFirst ? 'true' : 'false' }}"
-                                                            aria-controls="collapseOne{{ $sanitizedGroupName }}">
-                                                        {{ $ak }}
-                                                    </button>
-                                                </h2>
-
-                                                <div id="collapseOne{{ $sanitizedGroupName }}"
-                                                    class="accordion-collapse collapse {{ $isFirst ? 'show' : '' }}"
-                                                    aria-labelledby="headingOne{{ $sanitizedGroupName }}"
-                                                    data-bs-parent="#accordionPermissions">
-                                                    <div class="accordion-body">
-                                                        @if(array_key_exists(0,$b))
-                                                        @foreach ($b[0] as $name => $d)
-                                                            @php
-                                                                $sanitizedName = str_replace(' ', '', $name);
-                                                                $parts = explode('/', $d);
-                                                                $numerator = (int) $parts[0];
-                                                                $denominator = (int) $parts[1];
-                                                                $percentage = $denominator > 0 ? ($numerator / $denominator) * 100 : 0; 
-                                                            @endphp
-
-                                                            <div class="d-flex mb-3">
-                                                                <div class="flex-grow-1">
-                                                                    <span>{{ $name }}</span>
-                                                                    <div class="progress progress-custom progress-themeskyblue">
-                                                                        <div class="progress-bar" role="progressbar" style="width: {{ $percentage }}%;"
-                                                                            aria-valuenow="{{ $percentage }}" aria-valuemin="0" aria-valuemax="100">
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div>{{ $numerator }}/{{ $denominator }}</div>
-                                                            </div>
-                                                        @endforeach
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="card card-theme card-talentAcqPayroll">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">PAYROLL</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="#" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row g-xxl-3 g-2">
-                                        <div class="col-xxl-5 col-xl-12 col-md-5">
-                                            <div class="bg-themeGrayLight">
-                                                 
-                                                <div class=" card-title">
-                                                    <div class="row justify-content-between align-items-center g-md-2 g-1">
-                                                        <div class="col">
-                                                            <h3 class="text-nowrap">Payroll Expenses</h3>
-                                                        </div>
-                                                        <div class="col-auto">
-                                                            <div class="form-group">
-                                                                <select class="form-select YearWisePayrollExpense" id="yearFilter" aria-label="Default select example">
-                                                                    <?php
-                                                                    $currentYear = date('Y');
-                                                                    for ($i = 0; $i < 3; $i++) {
-                                                                        $startYear = $currentYear - $i;
-                                                                        $endYear = $startYear + 1;
-                                                                        echo "<option value=\"$startYear\"";
-                                                                        if ($i == 0)
-                                                                        {
-                                                                            echo " selected";
-                                                                        }
-                                                                        echo ">Jan $startYear - Dec $startYear</option>";
-                                                                    }
-                                                                    ?>
-                                                                </select>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <canvas id="myStackedBarChart" width="363" height="309" class="mb-3"></canvas>
-                                                <div class="row g-2 ">
-                                                    <div class="col-auto">
-                                                        <div class="doughnut-label">
-                                                            <span class="bg-theme"></span>Payroll Cost
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-auto">
-                                                        <div class="doughnut-label">
-                                                            <span class="bg-themeSkyblue"></span>OT Cost
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-auto">
-                                                        <div class="doughnut-label">
-                                                            <span class="bg-themeWarning"></span>Service Charge
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                
-                                            </div>
-                                        </div>
-                                        <div class="col-xxl-7 col-xl-12 col-md-7">
-                                            <div class="bg-themeGrayLight">
-                                                <div class=" card-title">
-                                                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                                        <div class="col">
-                                                            <h3 class="text-nowrap">Service Charges</h3>
-                                                        </div>
-                                                        <div class="col-auto">
-                                                            <div class="form-group">
-                                                                <select class="form-select YearWiseServichCharges" aria-label="Default select example">
-                                                                    <?php
-                                                                    $currentYear = date('Y');
-                                                                    for ($i = 0; $i < 3; $i++) {
-                                                                        $startYear = $currentYear - $i;
-                                                                        $endYear = $startYear + 1;
-                                                                        echo "<option value=\"$startYear\"";
-                                                                        if ($i == 0)
-                                                                        {
-                                                                            echo " selected";
-                                                                        }
-                                                                        echo ">Jan $startYear - Dec $startYear</option>";
-                                                                    }
-                                                                    ?>
-                                                                </select>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="row g-4 align-items-center">
-                                                    <div class="col-md-6">
-                                                        <canvas id="myDoughnutChartService"></canvas>
-                                                    </div>
-                                                    <div class="col-md-6">
-                                                        <div class="row g-2" id="myDoughnutChartServiceLabel"></div>
-                                                    </div>
-                                                </div>
-                                                
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-12 col-lg-6">
-                            <div class="card card-theme ">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">LEARNING AND DEVELOPMENT *</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="#" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="card-title">
-                                        <div class="row g-md-2 g-1 align-items-center">
-                                            <div class="col">
-                                                <h3 class="text-nowrap">Onboarding Training</h3>
-                                            </div>
-                                            <div class="col-auto">
-                                                <select class="form-select form-select-sm"
-                                                    aria-label="Default select example">
-                                                    <option selected="">Percentage completion</option>
-                                                    <option value="1">AAA</option>
-                                                    <option value="2">AAA</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-auto">
-                                                <select class="form-select form-select-sm"
-                                                    aria-label="Default select example">
-                                                    <option selected="">Department-wise</option>
-                                                    <option value="1">AAA</option>
-                                                    <option value="2">AAA</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row g-md-2 g-2 align-items-center">
-                                        <div class="col-md-9"> <canvas id="onboardTrainChart" width="mb-2 w-100" height="293"
-                                                class="mb-2"></canvas></div>
-                                        <div class="col-md-3">
-                                            <div class="row g-2 justify-content-center">
-                                                <div class="col-lg-12 col-auto">
-                                                    <div class="doughnut-label">
-                                                        <span class="bg-theme"></span>Department 1
-                                                    </div>
-                                                </div>
-                                                <div class="col-lg-12 col-auto">
-                                                    <div class="doughnut-label">
-                                                        <span class="bg-themeLightBlue"></span>Department 2
-                                                    </div>
-                                                </div>
-                                                <div class="col-lg-12 col-auto">
-                                                    <div class="doughnut-label">
-                                                        <span class="bg-themeWarning"></span>Department 3
-                                                    </div>
-                                                </div>
-                                                <div class="col-lg-12 col-auto">
-                                                    <div class="doughnut-label">
-                                                        <span class="bg-themeSkyblueLightNew"></span>Department 4
-                                                    </div>
-                                                </div>
-                                                <div class="col-lg-12 col-auto">
-                                                    <div class="doughnut-label">
-                                                        <span class="bg-themeGray"></span>Department 5
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-12 col-lg-6">
-                            <div class="card card-theme card-talentAcqIncident">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">INCIDENT</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="#" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="card-title">
-                                        <h3>Survey Status</h3>
-                                    </div>
-                                    <div class="row g-xxl-3 g-2 mb-3">
-                                        <div class="col-sm-4">
-                                            <div class="bg-themeGrayLight d-flex">
-                                                <p>Minor</p>
-                                                <strong>{{$severityCounts['Minor'] ?? 0}}</strong>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-4 col-6">
-                                            <div class="bg-themeGrayLight d-flex">
-                                                <p>Moderate</p>
-                                                <strong>{{$severityCounts['Moderate'] ?? 0}}</strong>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-4 col-6">
-                                            <div class="bg-themeGrayLight d-flex">
-                                                <p>Severe</p>
-                                                <strong>{{$severityCounts['Severe'] ?? 0}}</strong>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="card-title">
-                                        <div class="row align-items-center g-2">
-                                            <div class="col">
-                                                <h3>Upcoming Meetings</h3>
-                                            </div>
-                                            <div class="col-auto"><a href="{{route('incident.meeting')}}" class="a-link">View All</a></div>
-                                        </div>
-                                    </div>
-                                    <div class="leaveUser-main" id="upcoming-meetings"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-xl-12 col-lg-6">
-                            <div class="card card-theme card-talentAcqSurvey">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">SURVEY</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{route('Survey.Surveylist')}}" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="card-title">
-                                        <h3>Survey Status</h3>
-                                    </div>
-                                    @foreach($OngoingSurvey as $survey)
-                                        @php
-                                            $progress = ($survey->total_count > 0) ? round(($survey->completed_count / $survey->total_count) * 100) : 0;
-                                        @endphp
-                                        <div class="surveyStatus-block bg-themeGrayLight">
-                                            <div class="head">
-                                                <div>
-                                                    <h6>{{ $survey->title }}</h6>
-                                                    <p>Creation Date: {{ \Carbon\Carbon::parse($survey->Start_date)->format('d M Y') }} | 
-                                                        Closing Date: {{ \Carbon\Carbon::parse($survey->End_date)->format('d M Y') }}</p>                                </div>
-                                                <span class="badge badge-green">
-                                                    {{ $survey->Status }}
-                                                </span>
-                                            </div>
-                                            <div class="body">
-                                                <div class="d-flex">
-                                                    <span>Participation Rate</span>
-                                                    <div class="progress progress-custom progress-themeskyblue">
-                                                        <div class="progress-bar" role="progressbar"   style="width: {{ $progress }}%;" 
-                                                        aria-valuenow="{{ $progress }}"  aria-valuemin="0" aria-valuemax="100"></div>
-                                                    </div>
-                                                    <div>{{ $progress }}%</div>
-                                                </div>
-                                                @php
-                                                    $id = base64_encode($survey->id);
-                                                    $view = route('Survey.view',$id);
-                                                @endphp     
-                                                <div class="d-flex align-items-center">
-                                                    <a target="_blank" href="{{ $view}}" class="btn-tableIcon btnIcon-skyblue"><i
-                                                            class="fa-regular fa-eye"></i></a>
-                                                    <a href="javascript:void(0)" data-id="{{$id}}" class="SendNotifcation btn-tableIcon btnIcon-yellow"><i
-                                                            class="fa-regular fa-bell"></i></a>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-xl-12 col-lg-6">
-                            <div class="card card-theme">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">FILE MANAGEMENT *</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="#" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="card-title">
-                                        <h3>Documents Expiring Soon</h3>
-                                    </div>
-                                    <div class="table-responsive">
-                                        <table class="table-lableNew table-talentAcqDocExp w-100">
-                                            <thead>
-                                                <tr>
-                                                    <th>Document Type</th>
-                                                    <th>No. Of Document</th>
-                                                    <th>Employee Name</th>
-                                                    <th>Expiry Date</th>
-                                                    <th>Days Left</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr>
-                                                    <td>Visa</td>
-                                                    <td>10</td>
-                                                    <td>
-                                                        <div class="user-ovImg user-ovImgTable">
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-2.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-3.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-4.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-5.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-2.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-3.svg" alt="image">
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td>15 Mar 2025</td>
-                                                    <td>68 Days</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Passport</td>
-                                                    <td>8</td>
-                                                    <td>
-                                                        <div class="user-ovImg user-ovImgTable">
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-2.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-3.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-4.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-5.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-2.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-3.svg" alt="image">
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td>10 Feb 2025</td>
-                                                    <td>32 Days</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Contract</td>
-                                                    <td>12</td>
-                                                    <td>
-                                                        <div class="user-ovImg user-ovImgTable">
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-2.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-3.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-4.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-5.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-2.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-3.svg" alt="image">
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td>20 Jan 2025</td>
-                                                    <td>11 Days</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Work Permit</td>
-                                                    <td>15</td>
-                                                    <td>
-                                                        <div class="user-ovImg user-ovImgTable">
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-2.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-3.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-4.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-5.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-2.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-3.svg" alt="image">
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td>05 Apr 2025</td>
-                                                    <td>86 Days</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Visa</td>
-                                                    <td>15</td>
-                                                    <td>
-                                                        <div class="user-ovImg user-ovImgTable">
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-2.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-3.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-4.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-5.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-2.svg" alt="image">
-                                                            </div>
-                                                            <div class="img-circle">
-                                                                <img src="assets/images/user-3.svg" alt="image">
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td>15 Mar 2025</td>
-                                                    <td>68 Days</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="card card-theme">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">VISA MANAGEMENT *</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="#" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body pt-0">
-                                    <div class="tab-theme visaManagtalentAcq-tab">
-                                        <ul class="nav nav-tabs" id="myTab" role="tablist">
-                                            <li class="nav-item" role="presentation">
-                                                <button class="nav-link active" id="tab1" data-bs-toggle="tab"
-                                                    data-bs-target="#tabPane1" type="button" role="tab"
-                                                    aria-controls="tabPane1" aria-selected="true">Quota Slot
-                                                    Fee</button>
-                                            </li>
-                                            <li class="nav-item" role="presentation">
-                                                <button class="nav-link" id="#tab2" data-bs-toggle="tab"
-                                                    data-bs-target="#tabPane2" type="button" role="tab"
-                                                    aria-controls="tabPane2" aria-selected="false">Work Permit
-                                                    Fee</button>
-                                            </li>
-                                            <li class="nav-item" role="presentation">
-                                                <button class="nav-link" id="tab3" data-bs-toggle="tab"
-                                                    data-bs-target="#tabPane3" type="button" role="tab"
-                                                    aria-controls="tabPane3" aria-selected="false">Insurance</button>
-                                            </li>
-                                            <li class="nav-item" role="presentation">
-                                                <button class="nav-link" id="tab4" data-bs-toggle="tab"
-                                                    data-bs-target="#tabPane4" type="button" role="tab"
-                                                    aria-controls="tabPane4" aria-selected="true">Work Permit Medical
-                                                    Fee</button>
-                                            </li>
-                                        </ul>
-                                        <div class="tab-content" id="myTabContent">
-                                            <div class="tab-pane fade show active" id="tabPane1" role="tabpanel"
-                                                aria-labelledby="tab1" tabindex="0">
-                                                <div class="row g-xl-4 g-md-3 g-2 mb-2 align-items-center ">
-                                                    <div class="col"><input type="text"
-                                                            class="form-control form-control-small datepicker"
-                                                            placeholder="Select Duration"></div>
-                                                    <div class="col-auto"><a href="#" class="a-link">View all</a></div>
-                                                </div>
-                                                <div class="row  g-md-4 g-3 mb-md-4 mb-3">
-                                                    <div class="col-md-5">
-                                                        <div class="talentAcqVisaTotal-box">
-                                                            <div
-                                                                class="d-flex justify-content-between align-items-center">
-                                                                <label>Total Xpats:</label>
-                                                                <span>142</span>
-                                                            </div>
-                                                            <div
-                                                                class="d-flex justify-content-between align-items-center">
-                                                                <label>Total Paid:</label>
-                                                                <span>{{ Common::GetResortCurrencySymbol() }} 150,000</span>
-                                                            </div>
-                                                            <div
-                                                                class="d-flex justify-content-between align-items-center">
-                                                                <label>Today:</label>
-                                                                <span>{{ Common::GetResortCurrencySymbol() }} 5,000</span>
-                                                            </div>
-                                                            <div
-                                                                class="d-flex justify-content-between align-items-center">
-                                                                <label>This Week:</label>
-                                                                <span>{{ Common::GetResortCurrencySymbol() }} 15,000</span>
-                                                            </div>
-                                                            <div
-                                                                class="d-flex justify-content-between align-items-center">
-                                                                <label>This Month:</label>
-                                                                <span>{{ Common::GetResortCurrencySymbol() }} 45,000</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-7">
-                                                        <div class="bg-themeGrayLight   h-100">
-                                                            <h6 class="mb-2">Overdue Alerts</h6>
-                                                            <div
-                                                                class="user-block block-danger  mb-1 d-flex align-items-center">
-                                                                <div class="img-circle">
-                                                                    <img src="assets/images/user-2.svg" alt="image">
-                                                                </div>
-                                                                <div
-                                                                    class="w-100 d-xxl-flex d-xl-inline d-sm-flex align-items-center justify-content-between">
-                                                                    <div>
-                                                                        <h6>Elina Willson<span>#34523</span></h6>
-                                                                        <p>F&amp;B - Sheaf</p>
-                                                                    </div>
-                                                                    <div
-                                                                        class="overdue-text text-end mt-xxl-0 mt-xl-1 mt-sm-0 mt-2">
-                                                                        5
-                                                                        days overdue</div>
-                                                                </div>
-                                                            </div>
-                                                            <div
-                                                                class="user-block block-danger  d-flex align-items-center">
-                                                                <div class="img-circle">
-                                                                    <img src="assets/images/user-3.svg" alt="image">
-                                                                </div>
-                                                                <div
-                                                                    class="w-100 d-xxl-flex d-xl-inline d-sm-flex align-items-center justify-content-between">
-                                                                    <div>
-                                                                        <h6>Sean Sen<span>#34524</span></h6>
-                                                                        <p>F&amp;B - Sheaf</p>
-
-                                                                    </div>
-
-                                                                    <div
-                                                                        class="overdue-text text-end mt-xxl-0 mt-xl-1 mt-sm-0 mt-2">
-                                                                        5
-                                                                        days overdue</div>
-
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="bg-themeGrayLight mb-3">
-                                                    <div class="card-title">
-                                                        <h3>Expiry Dates Overview</h3>
-                                                    </div>
-                                                    <h6 class="mb-2">Work Permit</h6>
-                                                    <div class="user-block d-flex align-items-center mb-2">
-                                                        <div class="img-circle">
-                                                            <img src="assets/images/user-2.svg" alt="image">
-                                                        </div>
-                                                        <div
-                                                            class="w-100 d-flex align-items-center justify-content-between flex-wrap gap-1">
-                                                            <div>
-                                                                <h6>Addey Willson<span>#34523</span></h6>
-                                                                <p>F&amp;B - Sheaf</p>
-                                                            </div>
-                                                            <div class="overdue-text">Expires: 15 March 2025</div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="user-block d-flex align-items-center mb-3">
-                                                        <div class="img-circle">
-                                                            <img src="assets/images/user-5.svg" alt="image">
-                                                        </div>
-                                                        <div
-                                                            class="w-100 d-flex align-items-center justify-content-between flex-wrap gap-1">
-                                                            <div>
-                                                                <h6>Addey Willson<span>#34523</span></h6>
-                                                                <p>F&amp;B - Sheaf</p>
-                                                            </div>
-                                                            <div class="overdue-text">Expires: 15 March 2025</div>
-                                                        </div>
-                                                    </div>
-                                                    <h6 class="mb-2">insurance</h6>
-                                                    <div class="user-block    d-flex align-items-center">
-                                                        <div class="img-circle">
-                                                            <img src="assets/images/user-5.svg" alt="image">
-                                                        </div>
-                                                        <div
-                                                            class="w-100 d-flex align-items-center justify-content-between flex-wrap gap-1">
-                                                            <div>
-                                                                <h6>Addey Willson<span>#34523</span></h6>
-                                                                <p>F&amp;B - Sheaf</p>
-                                                            </div>
-                                                            <div class="overdue-text">Expires: 15 March 2025</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="card-title">
-                                                    <div class="row g-2 align-items-center">
-                                                        <div class="col">
-                                                            <h3 class="text-nowrap">Deposit Refund Requests</h3>
-                                                        </div>
-                                                        {{-- <div class="col-auto"><select class="form-select"
-                                                                aria-label="Default select example">
-                                                                <option selected="">Select Position</option>
-                                                                <option value="1">AAA</option>
-                                                                <option value="2">AAA</option>
-                                                            </select></div>
-                                                        <div class="col-auto"><select class="form-select"
-                                                                aria-label="Default select example">
-                                                                <option selected="">Select Dates</option>
-                                                                <option value="1">AAA</option>
-                                                                <option value="2">AAA</option>
-                                                            </select></div> --}}
-                                                    </div>
-                                                </div>
-                                                <div class="table-responsive">
-                                                    <table id="" class="table table-talentAcqDepositRefundReq  w-100 ">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>ID</th>
-                                                                <th>Employee Name</th>
-                                                                <th>Nationality</th>
-                                                                <th>Deposit Amount</th>
-                                                                {{-- <th>Current Wallet</th> --}}
-
-                                                                <th>Status</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            <tr>
-                                                                <td>#6787</td>
-                                                                <td>
-                                                                    <div class="tableUser-block">
-                                                                        <div class="img-circle "><img
-                                                                                src="assets/images/user-2.svg"
-                                                                                alt="user">
-                                                                        </div>
-                                                                        <span class="userApplicants-btn">John Doe</span>
-                                                                    </div>
-                                                                </td>
-                                                                <td>Indian</td>
-                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                                {{-- <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td> --}}
-
-                                                                <td><span class="badge badge-themeBlue">Requested</span>
-                                                                </td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td>#451258</td>
-                                                                <td>
-                                                                    <div class="tableUser-block">
-                                                                        <div class="img-circle "><img
-                                                                                src="assets/images/user-2.svg"
-                                                                                alt="user">
-                                                                        </div>
-                                                                        <span class="userApplicants-btn">Christian
-                                                                            Slater</span>
-                                                                    </div>
-                                                                </td>
-                                                                <td>Filipino</td>
-                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                                {{-- <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td> --}}
-
-                                                                <td><span class="badge badge-themeSkyblue">Not
-                                                                        Requested</span></td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td>#745125</td>
-                                                                <td>
-                                                                    <div class="tableUser-block">
-                                                                        <div class="img-circle "><img
-                                                                                src="assets/images/user-2.svg"
-                                                                                alt="user">
-                                                                        </div>
-                                                                        <span class="userApplicants-btn">Brijesh
-                                                                            Pandey</span>
-                                                                    </div>
-                                                                </td>
-                                                                <td>Indian</td>
-                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                                {{-- <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td> --}}
-
-                                                                <td><span class="badge badge-themeBlue">Requested</span>
-                                                                </td>
-
-                                                            </tr>
-                                                            <tr>
-                                                                <td>#784512</td>
-                                                                <td>
-                                                                    <div class="tableUser-block">
-                                                                        <div class="img-circle "><img
-                                                                                src="assets/images/user-2.svg"
-                                                                                alt="user">
-                                                                        </div>
-                                                                        <span class="userApplicants-btn">Seerish
-                                                                            Yadav</span>
-                                                                    </div>
-                                                                </td>
-                                                                <td>Indian</td>
-                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                                {{-- <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td> --}}
-
-                                                                <td><span class="badge badge-themeSkyblue">Not
-                                                                        Requested</span></td>
-
-                                                            </tr>
-                                                            <tr>
-                                                                <td>#784525</td>
-                                                                <td>
-                                                                    <div class="tableUser-block">
-                                                                        <div class="img-circle "><img
-                                                                                src="assets/images/user-2.svg"
-                                                                                alt="user">
-                                                                        </div>
-                                                                        <span class="userApplicants-btn">John Doe</span>
-                                                                    </div>
-                                                                </td>
-                                                                <td>Filipino</td>
-                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                                {{-- <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td> --}}
-
-                                                                <td><span class="badge badge-themeBlue">Requested</span>
-                                                                </td>
-
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-
-                                            </div>
-                                            <div class="tab-pane fade" id="tabPane2" role="tabpanel"
-                                                aria-labelledby="#tab2" tabindex="0">
-                                                Work Permit Fee
-                                            </div>
-                                            <div class="tab-pane fade" id="tabPane3" role="tabpanel"
-                                                aria-labelledby="tab3" tabindex="0">
-                                                Insurance
-                                            </div>
-                                            <div class="tab-pane fade" id="tabPane4" role="tabpanel"
-                                                aria-labelledby="tab4" tabindex="0">
-                                                Work Permit Medical Fee
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-6">
-                    <div class="row g-3 g-xxl-4">
-                        <div class="col-12">
-                            <div class="card card-theme card-talentAcqTalentAcq">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">TALENT ACQUISITION</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{ route('resort.recruitement.hrdashboard') }}" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row g-md-3 g-2">
-                                        <div class="col-12">
-                                            <div class="bg-themeGrayLight">
-                                                <div class="card-title">
-                                                    <div class="row g-md-2 g-1 align-items-center">
-                                                        <div class="col">
-                                                            <h3 class="text-nowrap">Vacancies</h3>
-                                                        </div>
-                                                        <div class="col-auto">
-                                                            <a href="{{route('resort.vacancies.FreshApplicant')}}" class="a-link">View all</a>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="table-responsive">
-                                                    <table class="table table-collapse table-vacRec">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>Positions</th>
-                                                                <th>Department</th>
-                                                                <th>No. of Vacancy</th>
-                                                                <th>No. of Applicant</th>
-                                                                <th>Action</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            @if(isset($NewVacancies) && $NewVacancies->isNotEmpty())
-                                                                @foreach ($NewVacancies as $vac)
-                                                                    <tr>
-                                                                        <td> {{ $vac->positionTitle }}
-                                                                            <span class="badge badge-themeLight"> {{ $vac->PositonCode }} </span>
-                                                                        </td>
-                                                                        <td> {{ $vac->Department }} <span class="badge badge-themeLight"> {{ $vac->DepartmentCode }}</span></td>
-                                                                        <td>{{ $vac->NoOfVacnacy }}</td>
-                                                                        <td>{{ $vac->NoOfApplication }}</td>
-                                                                        <td><a href="{{ route("resort.ta.Applicants",    base64_encode($vac->vacancy_id)) }}" class="eye-btn"><i class="fa-regular fa-eye"></i></a>
-                                                                        </td>
-                                                                    </tr>
-                                                                @endforeach
-                                                            @endif
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <div class="bg-themeGrayLight">
-                                                <div class="card-title">
-                                                    <h3>To Do List</h3>
-                                                </div>
-                                                <div class="todoList-main">
-
-                                                @if(isset($TodoData) && $TodoData->isNotEmpty())
-
-                                                    @foreach ($TodoData as $t)
-
-                                                        <div class="todoList-block">
-                                                            @if(!isset($t->ApplicantID) )
-                                                                <div class="img-circle">
-                                                                    <img src="{{ Common::getResortUserPicture($t->user_id)}}" alt="image">
-                                                                </div>
-                                                                <div>
-
-                                                                    <p>{{ $t->rank_name }} approved the vacancy for {{ $t->Position ?? '' }} </p>
-                                                                    @if($t->LinkShareOrNot =="No")
-                                                                        <a  href="{{route('resort.ta.add.Questionnaire')}}"
-                                                                        target="_blank"
-                                                                        class="a-link">Before you create a job advertisement, you must first add a questionnaire</a>
-
-
-                                                                    @else
-                                                                    <a  href="javascript:void(0)"
-                                                                        data-Resort_id="{{ $t->Resort_id }}"
-                                                                        data-ta_childid="{{ $t->ta_childid }}"
-                                                                        data-ExpiryDate ="{{ $t->ExpiryDate}}" data-jobadvertisement="{{$t->JobAdvertisement}}" data-link="{{$t->adv_link}}"  data-applicationUrlshow="{{$t->applicationUrlshow}}" data-applicant_link="{{$t->applicant_link}}"
-                                                                        data-source_links="{{ json_encode($t->source_links) }}" data-bs-toggle="modal" class="a-link jobAD-modal">Create Job Advertisement</a>
-
-                                                                    @endif
-                                                                    </div>
-                                                                {{-- elseif($t->InterviewLinkStatus=="Active"  ||  $t->ApplicationStatus=="Sortlisted" || $t->As_ApprovedBy == 3 ) --}}
-
-                                                                @elseif( $t->ApplicationStatus=="Sortlisted" &&  $t->As_ApprovedBy != 0  &&  $t->InterviewLinkStatus == null )
-                                                                    <div class="img-circle">
-                                                                        <img src="{{ $t->profileImg}}" alt="image">
-                                                                    </div>
-                                                                    <div>
-                                                                        <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} is shortlisted for {{ $t->Position ?? '' }} </p>
-                                                                        <a
-                                                                        href="javascript:void(0)"
-                                                                        data-Resort_id="{{$t->Resort_id}}"
-                                                                        data-ApplicantID="{{base64_encode($t->ApplicantID)}}"
-                                                                        data-ApplicantStatus_id="{{base64_encode($t->ApplicantStatus_id)}}"
-                                                                        class="a-link SortlistedEmployee">Send Interview Request </a>
-                                                                    </div>
-
-                                                                @elseif( $t->ApplicationStatus == "Complete" && isset($t->ApplicantID) )
-                                                                    @php
-                                                                        $roundsForPos = \App\Helpers\Common::getInterviewRoundsForPosition($t->vacancy_rank ?? null);
-                                                                        $rkList = array_keys($roundsForPos);
-                                                                        $rkIndex = array_search((int)$t->As_ApprovedBy, $rkList);
-                                                                        $isLast = ($rkIndex === count($rkList) - 1);
-                                                                        $nxtRound = '';
-                                                                        if (!$isLast && $rkIndex !== false) {
-                                                                            $nxtRound = $roundsForPos[$rkList[$rkIndex + 1]] ?? '';
-                                                                        }
-                                                                        $doneRound = config('settings.Position_Rank')[$t->As_ApprovedBy] ?? 'Unknown';
-                                                                    @endphp
-                                                                    <div class="img-circle">
-                                                                        <img src="{{ $t->profileImg}}" alt="image">
-                                                                    </div>
-                                                                    <div>
-                                                                        @if($isLast)
-                                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} - {{ $doneRound }} Round Completed for {{ $t->Position ?? '' }}, Ready for Selection</p>
-                                                                        @else
-                                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} - {{ $doneRound }} Round Completed for {{ $t->Position ?? '' }}, Ready for {{ $nxtRound }} Round</p>
-                                                                        @endif
-                                                                        <a href="{{ route('resort.ta.Applicants', base64_encode($t->V_id)) }}" class="a-link">View Applicant</a>
-                                                                    </div>
-
-                                                            @endif
-                                                        </div>
-                                                    @endforeach
-                                                @else
-                                                    <div>
-                                                        <p>No Data Reacord</p>
-
-                                                    </div>
-                                                @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <div class="bg-themeGrayLight">
-                                                <div class="card-title">
-                                                    <h3>New Hire Requests</h3>
-                                                </div>
-                                                <div class="hireReq-main"  id="FreshHiringRequest">
-                                                    @if(isset($Vacancies) &&  $Vacancies->count() > 0)
-                                                        @foreach ($Vacancies as $vacancy)
-                                                            <div class="hireReq-block">
-                                                                <div class="img-circle">
-                                                                    <img src="{{ Common::getResortUserPicture($vacancy->resort_id)}}" alt="image">
-                                                                </div>
-                                                                <div>
-                                                                    <h6>{{ $vacancy->Department }} ({{ $vacancy->rank_name }})  </h6>
-                                                                    <p>Requested to Hire {{ $vacancy->NoOfVacnacy }} {{ $vacancy->Position ?? 'Position' }}</p>
-                                                                    {{-- <a href="#" class="a-link">Send Interview Request  {{ $vacancy->ta_id }}</a> --}}
-                                                                </div>
-                                                                <div class="icon">
-                                                                    <a href="javascript:void(0)" class="respondOfFreshmodal"
-                                                                            data-images="{{ Common::getResortUserPicture($vacancy->resort_id) }}"
-                                                                            data-ta_id="{{ $vacancy->ta_id }}"
-                                                                            data-departmentName="{{ $vacancy->Department }}"
-                                                                            data-rank="{{ $vacancy->rank_name }}"
-                                                                            data-position="{{ $vacancy->Position }}"
-                                                                            data-NoOfVacnacy="{{ $vacancy->NoOfVacnacy }}"
-                                                                            data-Child_ta_id ="{{ $vacancy->Child_ta_id }}">
-                                                                            Respond
-                                                                    </a>
-
-                                                                </div>
-                                                            </div>
-                                                        @endforeach
-                                                    @else
-                                                        <p>No new hire requests available.</p>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="card card-theme card-talentAcqLeave">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">LEAVE</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="#" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row g-md-3 g-2">
-                                        <div class="col-sm-6">
-                                            <div class="bg-themeGrayLight">
-                                                <div class="card-title">
-                                                    <div class="row g-md-2 g-1 align-items-center">
-                                                        <div class="col">
-                                                            <h3 class="text-nowrap">Who's On Leave</h3>
-                                                        </div>
-                                                        <div class="col-auto">
-                                                            <p>Today</p>
-                                                            {{-- <select class="form-select form-select-sm"
-                                                                aria-label="Default select example">
-                                                                <option selected="">Today</option>
-
-                                                            </select> --}}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="leaveUser-main">
-                                                    @foreach($todayleaveUsers as $leaveUser)
-                                                        <div class="leaveUser-block">
-                                                            <div class="img-circle">
-                                                                <img src="{{App\Helpers\Common::getResortUserPicture($leaveUser->employee->Admin_Parent_id)}}" alt="image">
-                                                            </div>
-                                                            <div>
-                                                                <h6>{{$leaveUser->employee->resortAdmin->full_name}}</h6>
-                                                                <p>{{ $leaveUser->employee->department->name ?? 'N/A' }} - {{ $leaveUser->employee->position->position_title ?? 'N/A' }}</p>
-                                                            </div>
-                                                            <div><span class="badge badge-themeGray ">{{$leaveUser->reason}}</span>
-                                                            </div>
-                                                        </div>
-                                                    @endforeach
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <div class="bg-themeGrayLight">
-                                                <div class="card-title">
-                                                    <div class="row g-md-2 g-1 align-items-center">
-                                                        <div class="col">
-                                                            <h3 class="text-nowrap">Upcoming Leaves</h3>
-                                                        </div>
-                                                        <div class="col-auto">
-                                                            {{-- <select class="form-select form-select-sm"
-                                                                aria-label="Default select example">
-                                                                <option selected="">Today</option>
-                                                                <option value="1">AAA</option>
-                                                                <option value="2">AAA</option>
-                                                            </select> --}}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="leaveUser-main">
-                                                    @foreach($upcomingLeaveUsers as $leaveUser)
-
-                                                        <div class="leaveUser-block">
-                                                            <div class="img-circle">
-                                                                <img src="{{App\Helpers\Common::getResortUserPicture($leaveUser->employee->Admin_Parent_id)}}" alt="image">
-                                                            </div>
-                                                            <div>
-                                                                <h6>{{$leaveUser->employee->resortAdmin->full_name}}</h6>
-                                                                <p>{{ $leaveUser->employee->department->name ?? 'N/A' }} - {{ $leaveUser->employee->position->position_title ?? 'N/A' }}</p>
-                                                                <span class="badge badge-themeNew1"><i
-                                                                        class="fa-regular fa-calendar"></i> {{ Carbon\Carbon::parse($leaveUser->from_date)->format('d-M') }} To
-                                                                    {{ Carbon\Carbon::parse($leaveUser->to_date)->format('d-M') }}</span>
-                                                            </div>
-                                                            <div><span class="badge badge-themeGray ">{{$leaveUser->reason}}</span>
-                                                                <span class="fw-500">Total: {{$leaveUser->total_days}}</span>
-                                                            </div>
-                                                        </div>
-                                                    @endforeach
-
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <div class="bg-themeGrayLight card-talentAcqLeaveUpcoming">
-                                                <div class="card-title">
-                                                    <h3>Upcoming Public Holidays</h3>
-                                                </div>
-                                                <div class="leaveUser-main">
-                                                    @foreach($upcommingPublicHoliday as $holiday)
-                                                        <div class="leaveUser-bgBlock bg-white">
-                                                            <h6>{{ $holiday->name }}</h6>
-                                                            <p>{{ Carbon\Carbon::parse($holiday->holiday_date)->format('d M, D') }}</p>
-                                                        </div>
-                                                   @endforeach
-                                                    
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <div class="bg-themeGrayLight card-upcomingBirthLeve ">
-                                                <div class="card-title">
-                                                    <h3>Upcoming Birthdays</h3>
-                                                </div>
-                                                <div class="leaveUser-main">
-                                                    @if($todayBirthdays->count() >0)
-                                                        <div class="leaveUser-bgBlock">
-                                                            <h6>Today</h6>
-                                                        </div>
-                                                        @foreach($todayBirthdays as $birthdayEmployee) 
-                                                        {{-- Birthday is employee data --}}
-                                                            <div class="leaveUser-block">
-                                                                <div class="img-circle">
-                                                                    <img src="{{App\Helpers\Common::getResortUserPicture($birthdayEmployee->Admin_Parent_id)}}" alt="image">
-                                                                </div>
-                                                                <div>
-                                                                    <h6>{{$birthdayEmployee->resortAdmin->full_name}}</h6>
-                                                                    <p>{{ $birthdayEmployee->department->name ?? 'N/A' }} - {{ $birthdayEmployee->position->position_title ?? 'N/A' }}</p>
-                                                                    <div class="d-flex">
-                                                                        <a href="#" class="a-linkTheme">Send Message</a>
-                                                                        <a href="{{route('resort.recruitement.send.birthday-notification',$birthdayEmployee->id)}}" class="a-link">Notify All Employees</a>
-                                                                    </div>
-                                                                    <span class="badge badge-themeNew1"><i class="fa-regular fa-cake-candles"></i> {{ Carbon\Carbon::parse($birthdayEmployee->dob)->format('d-M') }}</span>
-                                                                </div>
-                                                            </div>
-                                                        @endforeach
-                                                    @endif
-                                                    @if($upcommingBirthdays->count() > 0)
-                                                        <div class="leaveUser-bgBlock">
-                                                            <h6>Tomorrow</h6>
-                                                        </div>
-                                                        @foreach($upcommingBirthdays as $birthdayEmployee)
-                                                            <div class="leaveUser-block">
-                                                                <div class="img-circle">
-                                                                    <img src="{{App\Helpers\Common::getResortUserPicture($birthdayEmployee->Admin_Parent_id)}}" alt="image">
-                                                                </div>
-                                                                <div>
-                                                                    <h6>{{$birthdayEmployee->resortAdmin->full_name}}</h6>
-                                                                    <p>{{ $birthdayEmployee->department->name ?? 'N/A' }} - {{ $birthdayEmployee->position->position_title ?? 'N/A' }}</p>
-                                                                    <span class="badge badge-themeNew1"><i class="fa-regular fa-cake-candles"></i> {{ Carbon\Carbon::parse($birthdayEmployee->dob)->format('d-M') }}</span>
-                                                                </div>
-                                                            </div>
-                                                        @endforeach
-                                                    @endif
-                                                </div>
-                                                
-                                            </div>
-                                        </div>
-                                        <div class="col-12">
-                                            <div class="bg-themeGrayLight">
-                                                <div class="card-title">
-                                                    <div class="row g-xl-3 g-md-2 g-1 align-items-center">
-                                                        <div class="col">
-                                                            <h3 class="text-nowrap">Leave Requests</h3>
-                                                        </div>
-                                                        <div class="col-auto">
-                                                            <select id="department-filter" class="form-select select2t-none" aria-label="Default select example">
-                                                                <option value="">All Departments</option>
-                                                                @if($resort_departments)
-                                                                    @foreach($resort_departments as $dept)
-                                                                        <option value="{{$dept->id}}">{{$dept->name}}</option>
-                                                                    @endforeach
-                                                                @endif
-                                                            </select>
-                                                        </div>
-                                                        <div class="col-auto"><a href="{{ route('leave.dashboard')}}" class="a-link">View All</a>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div class="table-responsive">
-                                                    <table id="leave-request-table" class="table table-leaveReq w-100 mb-1">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>Employee ID</th>
-                                                                <th>Employee Name</th>
-                                                                <th>Total Days</th>
-                                                                <th>Status</th>
-                                                                <th>Action</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-12 col-lg-6 order-lg-0 order-xl-0">
-                            <div class="card card-theme">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">PEOPLE RELATION</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{route('GrievanceAndDisciplinery.Hrdashboard')}}" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="card-title">
-                                        <div class="row g-md-2 g-1 align-items-center">
-                                            <div class="col">
-                                                <h3 class="text-nowrap">Grievances</h3>
-                                            </div>
-                                            <div class="col-auto">
-                                                <a href="{{route('GrievanceAndDisciplinery.grivance.GrivanceIndex')}}" class="a-link">View All</a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row g-md-4 g-2">
-                                        @foreach($grivanceSubmissionModel as $grievance)
-                                            <div class="col-sm-6">
-                                                <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
-                                                    <p class="mb-0">{{ $grievance->category_name }}</p>
-                                                    <p>{{ $grievance->count }}</p>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-12 order-lg-2 order-xl-0">
-                            <div class="card card-theme card-talentAcqPerformance ">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">PERFORMANCE *</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="#" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="card-title">
-                                        <div class="row g-md-2 g-1 align-items-center">
-                                            <div class="col">
-                                                <h3 class="text-nowrap">Appraisal Pending Departments </h3>
-                                            </div>
-                                            <div class="col-auto">
-                                                <a href="#" class="a-link">View All</a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="table-responsive mb-md-4 mb-3">
-                                        <table id="" class="table  w-100 mb-1">
-                                            <thead>
-                                                <tr>
-                                                    <th>Department</th>
-                                                    <th>Appraisal Time</th>
-                                                    <th>Employees</th>
-                                                    <th>Last Appraisal</th>
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr>
-                                                    <td>Management <span class="badge badge-themeLight">M-415</span>
-                                                    </td>
-                                                    <td>6 month</td>
-                                                    <td>15</td>
-                                                    <td>1 oct 2019</td>
-                                                    <td><span class="badge badge-themeYellow">Pending</span></td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Management <span class="badge badge-themeLight">M-415</span>
-                                                    </td>
-                                                    <td>6 month</td>
-                                                    <td>10</td>
-                                                    <td>5 July 2020</td>
-                                                    <td><span class="badge badge-themeSuccess">Done</span></td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Front Office <span class="badge badge-themeLight">F-845</span>
-                                                    </td>
-                                                    <td>6 month</td>
-                                                    <td>50</td>
-                                                    <td>20 Jun 2018</td>
-                                                    <td><span class="badge badge-themeSuccess">Done</span></td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Housekeeping <span class="badge badge-themeLight">H-451</span>
-                                                    </td>
-                                                    <td>6 month</td>
-                                                    <td>26</td>
-                                                    <td>3 Aug 2022</td>
-                                                    <td><span class="badge badge-themeSuccess">Done</span></td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Management <span class="badge badge-themeLight">M-515</span>
-                                                    </td>
-                                                    <td>6 month</td>
-                                                    <td>18</td>
-                                                    <td>7 Jan 2023</td>
-                                                    <td><span class="badge badge-themeSuccess">Done</span></td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div class="bg-themeGrayLight">
-                                        <div class="card-title">
-                                            <div class="row g-md-2 g-1 align-items-center">
-                                                <div class="col">
-                                                    <h3 class="text-nowrap">Monthly Check-In *</h3>
-                                                </div>
-                                                <div class="col-auto">
-                                                    <a href="#" class="a-link">View All</a>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="overflow-auto pe-1">
-                                            @foreach($monthlyCheckinPerformance as $checkin)
-                                            <div class="monthlyCheck-block">
-                                                <div class="img-circle  userImg-block "><img src="{{ Common::getResortUserPicture($checkin->employee->Admin_Parent_id) }}"
-                                                        alt="user">
-                                                </div>
-                                                <div class="w-100">
-                                                    <div class="d-flex">
-                                                        <div>
-                                                            <h6>{{ $checkin->employee->resortAdmin->full_name }}</h6><span
-                                                                class="badge badge-white">{{ $checkin->employee->Emp_id }}</span>
-                                                        </div>
-                                                        <span class="badge badge-themeNew1"><i
-                                                                class="fa-regular fa-calendar me-2"></i>{{ Carbon\Carbon::flexible($checkin->created_at)->format('d M Y') }}</span>
-                                                    </div>
-                                                    <p>{{ $checkin->comment }}</p>
-                                                    <a href="{{ route('Performance.GetMonthlyCheckInDetails', base64_encode($checkin->id)) }}"
-                                                        class="btn btn-themeYellow btn-small me-xl-3 me-2">View Details</a> 
-                                                </div>
-                                            </div>
-
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-12 col-lg-6  order-lg-1 order-xl-0">
-                            <div class="card card-theme">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">SOS</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{route('sos.dashboard.index')}}" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="card-title">
-                                        <div class="row g-md-2 g-1 align-items-center">
-                                            <div class="col">
-                                                <h3 class="text-nowrap">Recent SOS</h3>
-                                            </div>
-                                            <div class="col-auto">
-                                                <a href="{{ route('sos.dashboard.index') }}" class="a-link">View All</a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="table-responsive">
-                                        <table id="" class="table  table-sosHistory w-100 mb-1">
-                                            <thead>
-                                                <tr>
-                                                    <th>SOS Type</th>
-                                                    <th>Initiated By</th>
-                                                    <th>Location</th>
-                                                    <th>Date & Time</th>
-                                                    <th>Status</th>
-                                                    <th>Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($SOSHistory as $history)
-                                                <tr>
-                                                    <td>{{ $history->getSos->name }}</td>
-                                                    <td>
-                                                        <div class="tableUser-block">
-                                                            <div class="img-circle"><img src="{{ Common::getResortUserPicture($history->employee->Admin_Parent_id) }}"
-                                                                    alt="user">
-                                                            </div>
-                                                            <span class="userApplicants-btn">{{ $history->employee->resortAdmin->full_name }}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td>{{$history->location}}</td>
-                                                    <td>{{$history->date}}</td>
-                                                    <td><span class="badge badge-themeSuccess">{{$history->status}}</span></td>
-                                                    <td>
-                                                        <a href="{{route('sos.emergency.view', base64_encode($history->id))}}" class="btn-lg-icon icon-bg-skyblue">
-                                                            <i class="fa fa-eye"></i>
-                                                        </a>
-                                                        <a href="{{route('sos.showMap', base64_encode($history->id))}}" class="btn-lg-icon icon-bg-blue">
-                                                            <i class="fa fa-location"></i>
-                                                        </a>
-                                                    </td>
-                                                </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-12  order-lg-3 order-xl-0">
-                            <div class="card card-theme card-talentAcqPeople">
-                                <div class="card-title">
-                                    <div class="row g-md-2 g-1 align-items-center">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">PEOPLE</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{ route('people.hr.dashboard') }}" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row  g-md-3 g-2">
-                                        <div class="col-sm-6">
-                                            <div class="bg-themeGrayLight h-100">
-                                                <div class="card-title">
-                                                    <h3>Employee Type</h3>
-                                                </div>
-                                                <div class="incident-chart  mb-2">
-                                                   <canvas id="myDoughnutChart" data-male="{{$male_emp}}" data-female="{{$female_emp}}"></canvas>
-                                                </div>
-                                                <div class="row g-2 justify-content-center mb-md-3 mb-2">
-                                                    <div class="col-auto">
-                                                        <div class="doughnut-label">
-                                                            <span class="bg-theme"></span>Male
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-auto">
-                                                        <div class="doughnut-label">
-                                                            <span class="bg-themeSkyblue"></span>Female
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="d-flex align-items-center  mb-lg-2 mb-1">
-                                                    <div
-                                                        class="progress progress-custom progress-themeBlue flex-grow-1 me-2">
-                                                        <div class="progress-bar" role="progressbar" style="width: {{$male_emp_percentage}}%"
-                                                            aria-valuenow="{{$male_emp_percentage}}" aria-valuemin="0" aria-valuemax="100">{{$male_emp_percentage}}%
-                                                        </div>
-                                                    </div>
-                                                    <span>Male</span>
-                                                </div>
-                                                <div class="d-flex align-items-center  mb-lg-2 mb-1">
-                                                    <div
-                                                        class="progress progress-custom progress-themeskyblue flex-grow-1 me-2">
-                                                        <div class="progress-bar" role="progressbar" style="width: {{$female_emp_percentage}}%"
-                                                            aria-valuenow="{{$female_emp_percentage}}" aria-valuemin="0" aria-valuemax="100">{{$female_emp_percentage}}%
-                                                        </div>
-                                                    </div>
-                                                    <span>Female</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <div class="bg-themeGrayLight mb-md-3 mb-2">
-                                                <div class="card-title">
-                                                    <h3>Announcements</h3>
-                                                </div>
-                                                <div class="leaveUser-main">
-                                                    <div class="leaveUser-bgBlock">
-                                                        <h6>Total Announcements Published</h6>
-                                                          <strong>{{ $totalPublished }}</strong>
-                                                    </div>
-                                                    <div class="table-responsive">
-                                                        <table class="table-lableNew table-totalAnnSPeopleEmp w-100">
-                                                            <tbody>
-                                                                <tr>
-                                                                    <td>Employee Of The Month</td>
-                                                                    <th>01</th>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td>Supervisor Of The Quarter</td>
-                                                                    <th>02</th>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td>Manager Of The Quarter</td>
-                                                                    <th>01</th>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td>Special Recognition</td>
-                                                                    <th>01</th>
-                                                                </tr>
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="bg-themeGrayLight text-center viewOrgChart ">
-                                                <a href="{{route('people.org-chart')}}" class="fw-600">View Organization Chart</a>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-8">
-                                            <div class="card-title">
-                                                <h3>Info Update Requests</h3>
-                                            </div>
-                                            <div class="leaveUser-main">
-                                                @foreach($employeeInfoUpdateRequest as $emp_info)
-                                                    @php
-                                                        $profilePicture = App\Helpers\Common::GetAdminResortProfile($emp_info->employee->Admin_Parent_id);
-                                                    @endphp
-                                                    <div class="leaveUser-block">
-                                                            <div class="img-circle">
-                                                                <img src="{{$profilePicture}}" alt="user" class="img-fluid" />
-                                                            </div>
-                                                            <div>
-                                                                <h6 title="{{$emp_info->employee->resortAdmin->id}}">{{@$emp_info->employee->resortAdmin->full_name}} ({{ $emp_info->employee->position->position_title ?? 'N/A' }} - {{ $emp_info->employee->department->name ?? 'N/A' }}({{ $emp_info->employee->department->code ?? 'N/A' }}))</h6>
-                                                                <p>{{$emp_info->title}}</p>
-                                                            </div>
-                                                            <div>
-                                                                @if($emp_info->status == 'Pending')
-                                                                    <a href="{{route('people.info-update.show',$emp_info->id)}}"  data-bs-toggle="modal" data-bs-target="#reqApproval-modal" class="a-linkTheme open-ajax-modal">Update</a>
-                                                                    <a href="#" class="a-linkDanger"  data-bs-toggle="modal" data-id="{{$emp_info->id}}" data-bs-target="#reqReject-modal" >Reject</a>
-                                                                @else
-                                                                    <a href="#" class="@if($emp_info->status == 'Approved') a-linkTheme @else a-linkDanger @endif" >{{$emp_info->status}}</a>
-                                                                @endif
-                                                            </div>
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-4">
-                                            <div class="leaveUser-bgBlock talentAcqPronPeo-block">
-                                               <div class="d-flex">
-                                                    <h6>Total Employees On Probation</h6>
-                                                    <strong>{{$probationalEmployees ?? 0}}</strong>
-                                                </div>
-                                                <div class="w-100 text-center">
-                                                    <div class="row  g-xxl-4 g-md-2 g-2 ">
-                                                        <div class="col">
-                                                            <p class="fw-500">Active</p>
-                                                            <h5><b>{{$activeProbationCount ?? 0}}</b></h5>
-                                                        </div>
-                                                        <div class="col">
-                                                            <p class="fw-500">Failed</p>
-                                                            <h5><b>{{$failedProbationCount ?? 0}}</b></h5>
-                                                        </div>
-                                                        <div class="col">
-                                                            <p class="fw-500">Completed</p>
-                                                            <h5><b>{{$completedProbationCount ?? 0}}</b></h5>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="leaveUser-bgBlock talentAcqPromPeo-block">
-                                                <div class="card-title w-100">
-                                                    <h6>Promotion</h6>
-                                                </div>
-                                                <div class="col-sm-6">
-                                                    <div class="leaveUser-bgBlock">
-                                                        <h6>Total Promotions</h6>
-                                                        <strong>{{$total_promotions ?? 0 }}</strong>
-                                                    </div>
-                                                </div>
-                                                <div class="col-sm-6">
-                                                    <div class="leaveUser-bgBlock">
-                                                        <h6>Avg. Salary Increase</h6>
-                                                        <strong>{{ round($average_salary_increase,2)}}%</strong>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="leaveUser-bgBlock talentAcqPronPeo-block">
-                                                <div class="d-flex border-0 pb-0    mb-0">
-                                                    <h6>Total Exits Initiated *</h6>
-                                                    <strong>{{ $totalExitInitiated }}</strong>
-                                                </div>
-                                            </div>
-
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <div class="bg-themeGrayLight talentAcqAppPeo-block h-100">
-                                                <div class="card-title">
-                                                    <h3>Approvals *</h3>
-                                                </div>
-                                                <div class="leaveUser-bgBlock">
-                                                    <h6>Total Pending Approvals</h6>
-                                                    <strong>50</strong>
-                                                </div>
-                                                <div class="leaveUser-bgBlock">
-                                                    <h6>Approved</h6>
-                                                    <strong>25</strong>
-                                                </div>
-                                                <div class="leaveUser-bgBlock">
-                                                    <h6>Held</h6>
-                                                    <strong>15</strong>
-                                                </div>
-                                                <div class="leaveUser-bgBlock">
-                                                    <h6>Rejected</h6>
-                                                    <strong>10</strong>
-                                                </div>
-                                                <div class="approvalsPeopleEmp-block">
-                                                    <p>Oldest Pending Request</p>
-                                                    <p><i>2 Days Ago</i></p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <div class="bg-themeGrayLight talentAcqResPeo-block h-100">
-                                                <div class="card-title">
-                                                    <h3>Resignation</h3>
-                                                </div>
-                                                <div class="leaveUser-bgBlock">
-                                                    <h6>Total Resignations</h6>
-                                                    <strong>{{$total_resignations}}</strong>
-                                                </div>
-                                                <div class="leaveUser-bgBlock">
-                                                    <h6>Pending Clearance</h6>
-                                                    <strong>{{$pending_resignation}}</strong>
-                                                </div>
-                                                <div class="leaveUser-bgBlock">
-                                                    <h6>Withdraw Resignation</h6>
-                                                    <strong>{{$withdraw_resignation}}</strong>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-12">
-                                            <div class="talentAcqLiabilTrackPeo-block">
-                                                <div class="card-title">
-                                                    <div class="row g-md-2 g-1 align-items-center">
-                                                        <div class="col">
-                                                            <h3>Liability Tracker</h3>
-                                                        </div>
-                                                        <div class="col-auto">
-                                                            <a href="#" class="a-link">View All</a>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="leaveUser-bgBlock mb-2">
-                                                    <h6>Total Estimated Liability</h6>
-                                                    <div>
-                                                        <strong>{{ Common::GetResortCurrencySymbol() }} 100,000</strong>
-                                                        <span>(2026)</span>
-                                                    </div>
-                                                </div>
-                                                <div class="row g-md-4 g-2 align-items-center">
-                                                    <div class="col-sm-6">
-                                                        <div class="bg-themeGrayLight">
-                                                            <h6 class="fw-600 mb-2">Monthly Deduction Trend</h6>
-                                                            <div class="table-responsive">
-                                                                <table class="table-lableNew  w-100">
-                                                                    <tbody>
-                                                                        <tr>
-                                                                            <td>January</td>
-                                                                            <th>{{ Common::GetResortCurrencySymbol() }} 1,000</th>
-                                                                        </tr>
-                                                                        <tr>
-                                                                            <td>February</td>
-                                                                            <th>{{ Common::GetResortCurrencySymbol() }} 2,000</th>
-                                                                        </tr>
-                                                                    </tbody>
-                                                                </table>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-sm-6">
-                                                        <h6 class="fw-600 mb-2">Actual Payments Made</h6>
-                                                        <div class="d-flex align-items-center  mb-lg-3 mb-2">
-                                                            <div
-                                                                class="progress progress-custom progress-themeskyblue flex-grow-1 me-2">
-                                                                <div class="progress-bar" role="progressbar"
-                                                                    style="width: 65%" aria-valuenow="65"
-                                                                    aria-valuemin="0" aria-valuemax="100"></div>
-                                                            </div>
-                                                            <span>{{ Common::GetResortCurrencySymbol() }} 20,000</span>
-                                                        </div>
-                                                        <h6 class="fw-600 mb-2">Manual Adjustments</h6>
-                                                        <p>3 Adjustments, Total: $1,500</p>
-                                                    </div>
-                                                    <div class="col-12">
-                                                        <h6 class="fw-600 mb-md-2 mb-1">Estimation vs. Actual Comparison
-                                                        </h6>
-                                                        <div class="table-responsive">
-                                                            <table
-                                                                class="table-lableNew table-liabilityTrackPeopleEmp w-100">
-                                                                <thead>
-                                                                    <tr>
-                                                                        <th>Cost Category</th>
-                                                                        <th>Estimated Cost</th>
-                                                                        <th>Actual Cost</th>
-                                                                        <th>Remaining Liability</th>
-                                                                        <th>Remaining Liability</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    <tr>
-                                                                        <td>Overtime</td>
-                                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                                        <td><span class="text-themeSuccess">{{ Common::GetResortCurrencySymbol() }} 500</span>
-                                                                        </td>
-                                                                    </tr>
-                                                                    <tr>
-                                                                        <td>Loans</td>
-                                                                        <td>{{ Common::GetResortCurrencySymbol() }} 10,000</td>
-                                                                        <td>{{ Common::GetResortCurrencySymbol() }} 8,000</td>
-                                                                        <td>{{ Common::GetResortCurrencySymbol() }} 2,000</td>
-                                                                        <td><span class="text-themeDanger">-$600</span>
-                                                                        </td>
-                                                                    </tr>
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+    <!-- LEFT 23% — payroll + to do -->
+    <aside class="col-left">
+      <div class="hm-card pay-card" id="payCard">
+        <div class="rc-h">
+          <span class="t">Payroll</span>
+          <button type="button" class="rc-exp" id="rcExp" aria-label="Expand payroll details"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
         </div>
-    </div>
-    
-
-<!-- Modal HTML -->
-<div id="rejectionModal" class="modal fade" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Reason for Rejection</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <textarea id="rejectionReason" class="form-control" rows="3" placeholder="Enter a reason (optional)"></textarea>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" id="confirmRejectBtn" class="btn eb-btn-critical">Reject</button>
-            </div>
+        <div class="rc-cols">
+          <div class="rc-c">
+            <div class="rc-num" data-pay="fc">—</div>
+            <div class="rc-fillwrap"><div class="rc-fill" style="--h:50%;--fbg:rgba(1,70,83,.07);--fdot:rgba(1,70,83,.30)"></div></div>
+            <div class="rc-leg"><span class="l">Forecast</span></div>
+          </div>
+          <div class="rc-c">
+            <div class="rc-num" data-pay="last">—</div>
+            <div class="rc-fillwrap"><div class="rc-fill" style="--h:50%;--fbg:rgba(46,140,150,.10);--fdot:rgba(46,140,150,.34)"></div></div>
+            <div class="rc-leg"><span class="l">Last month</span></div>
+          </div>
+          <div class="rc-c">
+            <div class="rc-num" data-pay="svc">—</div>
+            <div class="rc-fillwrap"><div class="rc-fill" style="--h:50%;--fbg:rgba(224,255,2,.24);--fdot:rgba(150,184,0,.82)"></div></div>
+            <div class="rc-leg"><span class="l">Service / staff</span></div>
+          </div>
         </div>
+      </div>
+
+      <div class="hm-card td-card">
+        <div class="td-h"><span class="t">To do</span><span class="n" id="tdCount">0</span></div>
+        <div class="td-list" id="tdList">
+          @foreach ($todoRows as $t)
+            @php
+                $isApplicant = isset($t->ApplicantID);
+                $person = $isApplicant ? ucfirst($t->first_name) . ' ' . ucfirst($t->last_name) : ($t->rank_name ?? '');
+                $photo = $isApplicant ? ($t->profileImg ?? '') : ($todoPics[$t->user_id] ?? '');
+                $photo = $photo === $defaultPic ? '' : $photo;
+                if (!$isApplicant) {
+                    $title = ($t->Position ?? '') . ' vacancy';
+                    $sub = ($t->rank_name ?? '') . ' approved';
+                    $needsQuestionnaire = ($t->LinkShareOrNot ?? '') === 'No';
+                    $btn = $needsQuestionnaire ? 'Add' : 'Create';
+                    $sub = $needsQuestionnaire ? 'Questionnaire required to advertise' : $sub;
+                    $href = $needsQuestionnaire ? route('resort.ta.add.Questionnaire') : route('resort.recruitement.hrdashboard');
+                } elseif (($t->ApplicationStatus ?? '') === 'Sortlisted') {
+                    $title = $person;
+                    $sub = ($t->Position ?? '') . ' applicant · shortlisted';
+                    $btn = 'Invite';
+                    $href = route('resort.ta.Applicants', base64_encode($t->V_id));
+                } else {
+                    $title = $person;
+                    $sub = ($t->Position ?? '') . ' applicant';
+                    $btn = 'Review';
+                    $href = route('resort.ta.Applicants', base64_encode($t->V_id));
+                }
+            @endphp
+            @if (!$isApplicant || in_array($t->ApplicationStatus ?? '', ['Sortlisted', 'Complete']))
+            <div class="td-item">
+              <span class="td-ico">@if($photo)<img src="{{ $photo }}" alt="{{ $person }}" data-i="{{ $initials($person) }}" onerror="this.parentNode.textContent=this.dataset.i">@else{{ $initials($person) }}@endif</span>
+              <span class="td-bd"><span class="td-tt">{{ $title }}<small>{{ $sub }}</small></span></span>
+              <a class="td-btn" href="{{ $href }}">{{ $btn }}</a>
+            </div>
+            @endif
+          @endforeach
+        </div>
+      </div>
+    </aside>
+
+    <!-- MIDDLE 54% -->
+    <main class="col-mid">
+
+      <!-- WAI Intelligence ask — glass -->
+      <div class="wai-hero">
+        <div class="wai-glass" id="waiGlass">
+          <div class="gl">WAI Intelligence</div>
+          <input class="pin" id="askInput" type="text" placeholder="Ask about payroll, attendance, compliance…" autocomplete="off" maxlength="2000">
+          <div class="hm-askrow">
+            <span class="hm-askchip" role="button" tabindex="0">Who's absent today?</span>
+            <span class="hm-askchip" role="button" tabindex="0">Why is F&amp;B overtime up?</span>
+            <span class="hm-askchip" role="button" tabindex="0">Whose permits expire soon?</span>
+            <span class="grow"></span>
+            <button type="button" class="send" id="askGo" aria-label="Ask WAI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- WAI Insights spotlight -->
+      <div class="hm-card wi-card" id="waiIns">
+        <div class="wi-mh"><span class="t">WAI Insights</span><span class="u"><span id="wiTotal">0</span> open</span></div>
+        <div class="wi-lens" id="wiLens"></div>
+        <div class="wi-swrap"><div class="wi-scard" id="wiScard"></div></div>
+        <div class="wi-snav">
+          <button type="button" id="wiPrev" aria-label="Previous insight">‹</button>
+          <span class="prog"><i id="wiProg"></i></span>
+          <span class="ct" id="wiCt"></span>
+          <button type="button" id="wiPlay" aria-label="Pause auto-rotate">⏸</button>
+          <button type="button" id="wiNext" aria-label="Next insight">›</button>
+        </div>
+      </div>
+
+      <!-- Workforce metrics -->
+      <div class="m-grid" id="wfGrid">
+        <div class="hm-card metric-c"><div class="m-val"><span class="mn tnum">{{ $total_employees }}</span></div><div class="m-lbl">Total workforce · {{ $plural($resort_departments_count, 'department') }}</div></div>
+        <div class="hm-card metric-c"><div class="m-val"><span class="mn tnum">{{ $present_employee_counts }}</span> <span class="sec tnum">{{ $pctOf($present_employee_counts) }}%</span></div><div class="m-lbl">Present today</div></div>
+        <div class="hm-card metric-c"><div class="m-val"><span class="mn tnum">{{ $leave_employee_counts }}</span> <span class="sec tnum">{{ $pctOf($leave_employee_counts) }}%</span></div><div class="m-lbl">On leave</div></div>
+        <div class="hm-card metric-c"><div class="m-val"><span class="mn tnum">{{ $absent_employee_counts }}</span> <span class="sec tnum">{{ $absentPct }}%</span></div><div class="m-lbl">Absent</div></div>
+      </div>
+
+      <!-- Attendance trend -->
+      <div class="hm-card att-card">
+        <div class="att-h">
+          <span class="t">Attendance trend</span>
+          <span class="att-drop">Last 12 months <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+        </div>
+        <div class="att-chart" id="attChart"><div class="att-tip" id="attTip"></div></div>
+        <div class="att-x" id="attX"></div>
+      </div>
+
+      <!-- Compliance (grouped, collapsible) -->
+      <div class="hm-card cmp-card">
+        <div class="cmp-h"><span class="t">Compliance</span><span class="n" id="cmpOpen">0 open</span><a class="va" href="{{ route('people.compliance.index') }}">View all</a></div>
+        @foreach ([['crit', 'Critical'], ['high', 'High'], ['med', 'Medium']] as [$k, $label])
+        <div class="cmp-group" id="cmp-{{ $k }}">
+          <button type="button" class="cmp-gh" data-grp="cmp-{{ $k }}" aria-expanded="true"><span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span><span class="sev sev-{{ $k }}">{{ $label }}</span><span class="gc">· 0</span></button>
+          <div class="cmp-gbody"></div>
+        </div>
+        @endforeach
+      </div>
+
+    </main>
+
+    <!-- RIGHT 23% — calendar + upcoming -->
+    <aside class="hm-card col-right">
+      <div class="crh"><span class="mo" id="calMo"></span><span class="cal-nav"><button type="button" id="calPrev" aria-label="Previous month">‹</button><button type="button" id="calNext" aria-label="Next month">›</button></span></div>
+      <div class="dow-row"><span class="dow">Su</span><span class="dow">Mo</span><span class="dow">Tu</span><span class="dow">We</span><span class="dow">Th</span><span class="dow">Fr</span><span class="dow">Sa</span></div>
+      <div class="mg" id="mg"></div>
+      <div class="up-l">Upcoming events</div>
+      <div class="up" id="upList"></div>
+    </aside>
+
+  </div>
+
+  <!-- PAYROLL EXPANDED VIEW -->
+  <div class="px" id="px" role="dialog" aria-modal="true" aria-label="Payroll details">
+    <div class="px-panel">
+      <div class="px-glass">
+        <div class="px-head"><span class="t">Payroll</span><span class="sub" id="pxSub">— detailed view</span><button type="button" class="px-close" id="pxClose" aria-label="Close">✕</button></div>
+        <div class="px-body">
+          <div class="px-c">
+            <div class="px-lbl">Forecast</div>
+            <div class="px-num" data-px="fc">—</div>
+            <div class="px-fillwrap"><div class="rc-fill" style="--h:50%;--fbg:rgba(1,70,83,.07);--fdot:rgba(1,70,83,.30)"></div></div>
+            <div class="px-rows">
+              <div class="px-r"><span>vs last month</span><b data-px="fcDelta">—</b></div>
+            </div>
+          </div>
+          <div class="px-c">
+            <div class="px-lbl" id="pxLastLbl">Last month</div>
+            <div class="px-num" data-px="last">—</div>
+            <div class="px-fillwrap"><div class="rc-fill" style="--h:50%;--fbg:rgba(46,140,150,.10);--fdot:rgba(46,140,150,.34)"></div></div>
+            <div class="px-rows">
+              <div class="px-r"><span>Staff</span><b>{{ $total_employees }}</b></div>
+            </div>
+          </div>
+          <div class="px-c">
+            <div class="px-lbl">Avg service charge</div>
+            <div class="px-num"><span data-px="svc">—</span><span style="font-size:14px;font-weight:400;color:var(--muted)"> /staff</span></div>
+            <div class="px-fillwrap"><div class="rc-fill" style="--h:50%;--fbg:rgba(224,255,2,.24);--fdot:rgba(150,184,0,.82)"></div></div>
+            <div class="px-rows">
+              <div class="px-r"><span>Total pool</span><b data-px="pool">—</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
+
+  <!-- COMPLIANCE SUGGESTION MODAL -->
+  <div class="focus" id="cmpFix" role="dialog" aria-modal="true" aria-label="Suggested fix">
+    <div class="focus-panel" style="height:auto;max-height:82vh;width:min(640px,92vw)">
+      <div class="focus-glass">
+        <div class="fp-head"><span class="t">WAI Suggestion</span><span class="sub" id="cfSub"></span><button type="button" class="fp-close" id="cfClose" aria-label="Close">✕</button></div>
+        <div class="fp-body" id="cfBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WAI ANSWER MODAL -->
+  <div class="focus" id="focus" role="dialog" aria-modal="true" aria-label="WAI Intelligence">
+    <div class="focus-panel">
+      <div class="focus-glass">
+        <div class="fp-head"><span class="t">WAI Intelligence</span><span class="sub">— focused answer</span><button type="button" class="fp-close" id="fpClose" aria-label="Close">✕</button></div>
+        <div class="fp-body" id="fpBody"></div>
+        <div class="fp-foot">
+          <div class="fp-bar"><input id="fpInput" type="text" placeholder="Ask a follow-up…" autocomplete="off" maxlength="2000"><button type="button" class="go" id="fpGo" aria-label="Ask WAI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg></button></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
-@include('resorts._emotional_buttons_v2_styles')
+
+        </div>
+</div>
 @endsection
 
 @section('import-css')
 <style>
-    .monthlyCheck-block .img-circle img {
-    object-fit: cover;
+#hrmd{
+  --teal:#014653; --teal-2:#035b6c; --teal-3:#E6F0F1; --teal-soft:#f1f7f7;
+  --ink:#14232A; --g1:#3A4145; --g2:#6B7378; --muted:#5D6F75; --faint:#93A4A9; --g4:#C7CDCF;
+  --line:#E2EBEC; --line-2:#EEF4F4; --bg:#EEF2F2; --card:#fff;
+  --ok:#1F9D6B; --ok-bg:#E7F4EC; --warn:#B7791F; --warn-bg:#FBF0DC; --err:#E5573F; --err-bg:#FDEEEB;
+  --violet:#6B5FC7; --coral:#E0673F; --info:#1E7A85;
+  --shadow:0 1px 2px rgba(1,70,83,.04),0 8px 22px rgba(1,70,83,.05);
+  --font:'Poppins',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+#hrmd *{box-sizing:border-box;margin:0;padding:0}
+#hrmd .tnum{font-variant-numeric:tabular-nums}
+#hrmd .hm-card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+#hrmd .cols{display:grid;grid-template-columns:minmax(0,23fr) minmax(0,54fr) minmax(0,23fr);gap:16px;align-items:start}
+#hrmd .col-left,#hrmd .col-right{position:sticky;top:20px;height:calc(100vh - 40px);display:flex;flex-direction:column;overflow:hidden}
+#hrmd .col-mid{min-width:0;display:flex;flex-direction:column;gap:16px}
+@media(max-width:1100px){#hrmd .cols{grid-template-columns:1fr}
+#hrmd .col-left,#hrmd .col-right{position:static;height:auto;min-height:420px}}
+#hrmd .col-left{padding:0;gap:14px}
+#hrmd .pay-card{padding:16px;flex:none;display:flex;flex-direction:column}
+#hrmd .rc-h{display:flex;align-items:center;justify-content:space-between}
+#hrmd .rc-h .t{font-size:13px;font-weight:600}
+#hrmd .rc-exp{width:26px;height:26px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--g2);cursor:pointer;display:grid;place-items:center}
+#hrmd .rc-exp svg{width:13px;height:13px}
+#hrmd .rc-cols{flex:1;display:flex;margin-top:14px;min-height:0}
+#hrmd .rc-c{flex:1;display:flex;flex-direction:column;padding:0 10px;min-width:0}
+#hrmd .rc-c + .rc-c{border-left:1px solid var(--line-2)}
+#hrmd .rc-num{font-size:20px;font-weight:600;letter-spacing:-.6px;line-height:1;color:var(--ink);white-space:nowrap}
+#hrmd .rc-num .cur{font-size:13px;font-weight:400;color:var(--g4)}
+#hrmd .rc-num .k{font-size:13px;font-weight:400;color:var(--g4)}
+#hrmd .rc-fillwrap{flex:1;position:relative;margin-top:12px;min-height:0}
+#hrmd .rc-fill{position:absolute;left:0;right:0;bottom:0;height:var(--h);border-radius:9px 9px 0 0;
+  background-color:var(--fbg);
+  background-image:radial-gradient(circle at center, var(--fdot) 1.5px, transparent 1.7px);
+  background-size:9px 9px;background-position:center bottom;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 46%);
+  mask-image:linear-gradient(180deg,transparent 0,#000 46%)}
+#hrmd .rc-leg{margin-top:12px}
+#hrmd .rc-leg .l{font-size:11px;font-weight:500;color:var(--g2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hrmd .px{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;padding:6vh 5vw;
+  background:rgba(3,45,54,.4);backdrop-filter:blur(12px) saturate(115%);-webkit-backdrop-filter:blur(12px) saturate(115%)}
+#hrmd .px.open{display:flex;animation:hrmdFade .18s ease}
+#hrmd .px-panel{width:min(780px,94vw);max-height:86vh;border-radius:24px;padding:12px;overflow:hidden;display:flex;
+  background:
+    radial-gradient(58% 92% at 2% 1%, rgba(1,70,83,.5), transparent 56%),
+    radial-gradient(56% 92% at 100% 104%, rgba(224,255,2,.42), transparent 55%),
+    linear-gradient(135deg,#f9f8f1,#fbfbf4);
+  box-shadow:0 40px 110px rgba(1,45,54,.45);animation:hrmdPop .22s cubic-bezier(.34,1.56,.64,1)}
+#hrmd .px-glass{flex:1;min-width:0;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;position:relative;
+  background:rgba(255,255,255,.78);
+  backdrop-filter:blur(26px) saturate(185%);-webkit-backdrop-filter:blur(26px) saturate(185%);
+  border:1px solid rgba(255,255,255,.7);box-shadow:inset 0 1px 1px rgba(255,255,255,.8)}
+#hrmd .px-head{display:flex;align-items:center;gap:10px;padding:18px 22px;border-bottom:1px solid rgba(1,70,83,.09)}
+#hrmd .px-head .t{font-size:15px;font-weight:600;color:var(--teal)}
+#hrmd .px-head .sub{font-size:12.5px;color:var(--muted)}
+#hrmd .px-close{margin-left:auto;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.9);background:rgba(255,255,255,.55);color:var(--g2);font-size:15px;cursor:pointer;flex:none}
+#hrmd .px-close:hover{background:#fff}
+#hrmd .px-body{padding:26px 14px 24px;overflow-y:auto;display:flex}
+#hrmd .px-c{flex:1;padding:0 20px;min-width:0}
+#hrmd .px-c + .px-c{border-left:1px solid var(--line-2)}
+#hrmd .px-lbl{font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--faint)}
+#hrmd .px-num{font-size:31px;font-weight:600;letter-spacing:-1px;margin-top:9px;color:var(--ink);white-space:nowrap}
+#hrmd .px-num .cur{font-size:17px;font-weight:400;color:var(--g4)}
+#hrmd .px-fillwrap{position:relative;height:150px;margin-top:18px}
+#hrmd .px-fillwrap .rc-fill{border-radius:11px 11px 0 0}
+#hrmd .px-hpct{position:absolute;top:0;left:0;font-size:12.5px;font-weight:600;color:var(--g2)}
+#hrmd .px-rows{margin-top:16px}
+#hrmd .px-r{display:flex;align-items:center;justify-content:space-between;padding:9px 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line-2)}
+#hrmd .px-r:first-child{border-top:none}
+#hrmd .px-r b{color:var(--ink);font-weight:600}
+@media (max-width:620px){#hrmd .px-body{flex-direction:column;gap:8px}
+#hrmd .px-c+.px-c{border-left:none;border-top:1px solid var(--line-2);padding-top:16px}
+#hrmd .px-fillwrap{height:96px}}
+@media (prefers-reduced-transparency:reduce){#hrmd .px-glass{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+#hrmd .px-close{background:#fff}}
+#hrmd .td-card{flex:1;min-height:160px;padding:16px 16px 8px;display:flex;flex-direction:column;overflow:hidden}
+#hrmd .td-h{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
+#hrmd .td-h .t{font-size:13px;font-weight:600}
+#hrmd .td-h .n{font-size:11px;font-weight:600;color:var(--teal);background:var(--teal-soft);border-radius:20px;padding:1px 8px}
+#hrmd .td-h .va{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--teal);cursor:pointer;text-decoration:none}
+#hrmd .td-h .va:hover{text-decoration:underline}
+#hrmd .td-list{flex:1;overflow-y:auto;margin:10px -4px 0;padding:0 4px;display:flex;flex-direction:column;gap:9px}
+#hrmd .td-list::-webkit-scrollbar{width:6px}
+#hrmd .td-list::-webkit-scrollbar-thumb{background:var(--g4);border-radius:6px}
+#hrmd .td-item{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:12px;background:#fafcfc;border:1px solid var(--line-2)}
+#hrmd .td-ico{width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:10.5px;font-weight:600;color:var(--teal);background:#E1EBEC;overflow:hidden;background-size:cover;background-position:center}
+#hrmd .td-ico img{width:100%;height:100%;object-fit:cover}
+#hrmd .td-bd{flex:1;min-width:0}
+#hrmd .td-tt{font-size:12px;color:var(--ink);line-height:1.3}
+#hrmd .td-tt small{display:block;font-size:10.5px;color:var(--muted);margin-top:1px}
+#hrmd .td-btn{flex:none;font-size:11px;font-weight:600;border-radius:8px;padding:6px 11px;cursor:pointer;border:1px solid var(--teal-3);background:var(--teal-soft);color:var(--teal)}
+#hrmd .td-btn:hover{background:var(--teal-3)}
+#hrmd .td-btn.green{border-color:#CFEADB;background:#EAF6EF;color:#1F9D6B}
+#hrmd .td-btn.green:hover{background:#DCEFE4}
+#hrmd .td-btn.red{border-color:#F6D8D0;background:#FCEFEC;color:#D2543C}
+#hrmd .td-btn.red:hover{background:#F9E2DC}
+#hrmd .td-btn.amber{border-color:#F1E3BE;background:#FBF4E1;color:#B0791F}
+#hrmd .td-btn.amber:hover{background:#F7EBCB}
+#hrmd .wai-hero{position:relative;border-radius:18px;padding:14px;overflow:hidden;
+  box-shadow:0 1px 2px rgba(1,70,83,.05),0 16px 40px rgba(1,70,83,.10);
+  background:
+    radial-gradient(78% 125% at 5% 2%, rgba(1,70,83,.52), transparent 58%),
+    radial-gradient(70% 120% at 98% 108%, rgba(224,255,2,.48), transparent 56%),
+    linear-gradient(135deg,#f9f8f1,#fbfbf4)}
+#hrmd .wai-glass{position:relative;border-radius:14px;padding:18px;overflow:hidden;
+  background:rgba(255,255,255,.62);
+  backdrop-filter:blur(24px) saturate(185%);-webkit-backdrop-filter:blur(24px) saturate(185%);
+  border:1px solid rgba(255,255,255,.72);
+  box-shadow:inset 0 0 24px rgba(255,255,255,.18),0 10px 28px rgba(1,45,54,.16)}
+#hrmd .wai-glass::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(220px 150px at var(--mx,75%) var(--my,-10%),rgba(255,255,255,.4),transparent 60%);opacity:.9;transition:opacity .3s}
+#hrmd .wai-glass .gl{position:relative;font-size:13px;font-weight:600;color:var(--teal);margin-bottom:12px}
+#hrmd .wai-glass .pin{position:relative;width:100%;border:none;background:none;outline:none;font:inherit;font-size:15px;color:var(--ink);padding:2px}
+#hrmd .wai-glass .pin::placeholder{color:var(--muted)}
+#hrmd .hm-askrow{display:flex;align-items:center;gap:8px;margin-top:20px;position:relative}
+#hrmd .hm-askrow .grow{flex:1}
+#hrmd .hm-askchip{display:inline-block;font-size:11.5px;color:var(--teal);background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.8);border-radius:20px;padding:7px 12px;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);white-space:nowrap}
+#hrmd .hm-askchip{transition:transform .15s ease,box-shadow .15s ease}
+#hrmd .hm-askchip:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(1,70,83,.14)}
+#hrmd .send{width:40px;height:40px;border-radius:50%;border:none;display:grid;place-items:center;cursor:pointer;flex:none;background:var(--teal);color:#fff;box-shadow:0 6px 16px rgba(1,70,83,.28)}
+#hrmd .send svg{width:18px;height:18px}
+#hrmd .send:hover{background:var(--teal-2)}
+@media (prefers-reduced-transparency:reduce){#hrmd .wai-glass{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}#hrmd .hm-askchip{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}}
+#hrmd .wi-card{overflow:hidden}
+#hrmd .wi-mh{display:flex;align-items:center;gap:8px;padding:12px 16px;color:#fff;background:linear-gradient(100deg,#013a44 0%,#025a68 44%,#2f8f72 72%,#c7ec3f 132%)}
+#hrmd .wi-mh .t{font-size:14px;font-weight:600}
+#hrmd .wi-mh .u{margin-left:auto;font-size:11px;color:rgba(255,255,255,.85)}
+#hrmd .wi-mh .u u{cursor:pointer}
+#hrmd .wi-lens{display:flex;gap:6px;flex-wrap:wrap;padding:12px 16px 2px}
+#hrmd .wi-lchip{font-size:11px;font-weight:500;color:var(--g2);background:#fff;border:1px solid var(--line);border-radius:20px;padding:4px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+#hrmd .wi-lchip .cnt{font-size:10px;opacity:.8}
+#hrmd .wi-lchip.on{background:var(--teal);border-color:var(--teal);color:#fff}
+#hrmd .wi-swrap{position:relative;margin:16px 18px 6px}
+#hrmd .wi-swrap::before,#hrmd .wi-swrap::after{content:"";position:absolute;left:14px;right:14px;border-radius:12px;background:#fff;border:1px solid var(--line)}
+#hrmd .wi-swrap::before{top:-6px;height:14px;opacity:.65}
+#hrmd .wi-swrap::after{top:-11px;left:24px;right:24px;height:14px;opacity:.35}
+#hrmd .wi-scard{position:relative;background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 16px 14px;min-height:128px}
+#hrmd .wi-scard .tag{font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--faint)}
+#hrmd .wi-scard .tag .sv{font-weight:600}
+#hrmd .wi-scard .x{font-size:15px;color:var(--ink);line-height:1.5;margin-top:9px;font-weight:400}
+#hrmd .wi-scard .x b{font-weight:600}
+#hrmd .wi-scard .a{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
+#hrmd .wi-scard .a a{font-size:12px;font-weight:600;color:var(--teal);cursor:pointer}
+#hrmd .wi-scard .a a.mut{color:var(--muted);font-weight:500}
+#hrmd .wi-snav{display:flex;align-items:center;gap:12px;padding:10px 18px 14px}
+#hrmd .wi-snav button{width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--g2);cursor:pointer;font-size:14px;display:grid;place-items:center;flex:none}
+#hrmd .wi-snav button:hover{background:var(--teal-soft);color:var(--teal)}
+#hrmd .wi-snav .prog{flex:1;height:4px;border-radius:4px;background:var(--line-2);overflow:hidden}
+#hrmd .wi-snav .prog i{display:block;height:100%;background:linear-gradient(90deg,var(--teal),var(--lime));transition:width .3s}
+#hrmd .wi-snav .ct{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}
+#hrmd .sev-watch{color:var(--teal)}
+@media(max-width:640px){}
+#hrmd .m-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:12px}
+@media(max-width:760px){#hrmd .m-grid{grid-template-columns:1fr 1fr}}
+#hrmd .metric-c{padding:20px}
+#hrmd .m-val{display:flex;align-items:baseline;gap:6px;font-size:50px;font-weight:400;letter-spacing:-2px;line-height:1;color:var(--ink)}
+#hrmd .m-val .mn{display:inline-block;transform:scaleX(.88);transform-origin:left center}
+#hrmd .m-val .sec{font-size:15px;font-weight:400;color:var(--g4);letter-spacing:-.3px}
+#hrmd .m-val .arw{font-size:14px;font-weight:600}
+#hrmd .m-val .arw.good{color:var(--ok)}
+#hrmd .m-val .arw.bad{color:var(--err)}
+#hrmd .m-lbl{font-size:12.5px;color:var(--muted);margin-top:12px}
+#hrmd .att-card{padding:16px 18px}
+#hrmd .att-h{display:flex;align-items:center;justify-content:space-between}
+#hrmd .att-h .t{font-size:14px;font-weight:600}
+#hrmd .att-drop{font-size:11.5px;font-weight:600;color:var(--g2);background:#fff;border:1px solid var(--line);border-radius:20px;padding:5px 11px;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+#hrmd .att-drop svg{width:11px;height:11px}
+#hrmd .att-chart{position:relative;display:flex;align-items:flex-end;gap:8px;height:158px;margin-top:18px}
+#hrmd .att-col{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;position:relative;cursor:pointer}
+#hrmd .att-track{position:absolute;inset:0;border-radius:7px;overflow:hidden;background-color:#fafcfc;
+  background-image:repeating-linear-gradient(45deg, var(--line-2) 0 3px, transparent 3px 7px)}
+#hrmd .att-bar{position:relative;height:var(--h);border-radius:7px 7px 0 0;opacity:.88;transition:opacity .15s,box-shadow .15s;
+  background:linear-gradient(180deg,#E0FF02 0%,#eaf7a3 46%,#e8f0d6 100%);
+  background-size:100% 158px;background-position:left bottom;background-repeat:no-repeat}
+#hrmd .att-bar::after{content:"";position:absolute;top:5px;left:18%;right:18%;height:2px;border-radius:2px;background:rgba(1,70,83,.28)}
+#hrmd .att-col.active .att-bar{opacity:1;box-shadow:0 0 0 1.5px rgba(1,70,83,.22)}
+#hrmd .att-col.active .att-bar::after{background:rgba(1,70,83,.5)}
+#hrmd .att-x{display:flex;gap:8px;margin-top:9px}
+#hrmd .att-x span{flex:1;text-align:center;font-size:9.5px;color:var(--faint);font-weight:500}
+#hrmd .att-x span.on{color:var(--teal);font-weight:600}
+#hrmd .att-tip{position:absolute;pointer-events:none;z-index:5;left:0;top:0;
+  background:rgba(255,255,255,.55);
+  backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);
+  border:1px solid rgba(255,255,255,.85);border-radius:13px;
+  box-shadow:0 14px 34px rgba(1,45,54,.22),inset 0 1px 1px rgba(255,255,255,.8);
+  padding:11px 13px;min-width:170px;opacity:0;transition:opacity .12s}
+#hrmd .att-tip .tm{font-size:11.5px;font-weight:400;color:var(--muted);margin-bottom:9px}
+#hrmd .att-tip .tm b{color:var(--ink);font-weight:400}
+#hrmd .att-tip .tr{display:flex;align-items:center;justify-content:space-between;gap:18px;font-size:11.5px;padding:3px 0}
+#hrmd .att-tip .tr .lb{display:flex;align-items:center;gap:7px;color:var(--muted)}
+#hrmd .att-tip .tr .lb i{width:9px;height:9px;border-radius:3px;flex:none;display:inline-block}
+#hrmd .att-tip .tr b{color:var(--ink);font-weight:600}
+#hrmd .att-tip .tr b .pc{color:var(--faint);font-weight:400;font-size:10.5px;margin-left:4px}
+@media (prefers-reduced-transparency:reduce){#hrmd .att-tip{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}}
+#hrmd .cmp-card{padding:16px 18px}
+#hrmd .cmp-h{display:flex;align-items:center;gap:10px;margin-bottom:2px}
+#hrmd .cmp-h .t{font-size:14px;font-weight:600}
+#hrmd .cmp-h .n{font-size:11px;font-weight:600;color:var(--teal);background:var(--teal-soft);border-radius:20px;padding:1px 8px}
+#hrmd .cmp-h .va{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--teal);cursor:pointer;text-decoration:none}
+#hrmd .cmp-h .va:hover{text-decoration:underline}
+#hrmd .sev{font-weight:600}
+#hrmd .sev-crit{color:var(--err)}
+#hrmd .sev-high{color:var(--warn)}
+#hrmd .sev-med{color:var(--info)}
+#hrmd .cmp-group{border-top:1px solid var(--line-2)}
+#hrmd .cmp-group:first-of-type{border-top:none;margin-top:6px}
+#hrmd .cmp-gh{display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;cursor:pointer;padding:13px 2px;font:inherit;text-align:left}
+#hrmd .cmp-gh .chev{color:var(--g4);transition:transform .2s;display:grid;place-items:center}
+#hrmd .cmp-gh .chev svg{width:13px;height:13px}
+#hrmd .cmp-group.collapsed .cmp-gh .chev{transform:rotate(-90deg)}
+#hrmd .cmp-gh .sev{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase}
+#hrmd .cmp-gh .gc{color:var(--g4);font-weight:600;font-size:10.5px}
+#hrmd .cmp-gbody{overflow:hidden;max-height:600px;transition:max-height .28s ease}
+#hrmd .cmp-group.collapsed .cmp-gbody{max-height:0}
+#hrmd .cmp-item{display:flex;align-items:center;gap:11px;padding:10px 2px 10px 22px;border-bottom:1px solid var(--line-2)}
+#hrmd .cmp-gbody .cmp-item:last-child{border-bottom:none;padding-bottom:14px}
+#hrmd .cmp-av{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:10px;font-weight:600;color:var(--teal);background:#E1EBEC;overflow:hidden}
+#hrmd .cmp-av img{width:100%;height:100%;object-fit:cover}
+#hrmd .cmp-main{flex:1;min-width:0}
+#hrmd .cmp-rule{font-size:12.5px;color:var(--ink)}
+#hrmd .cmp-sub{font-size:10.5px;color:var(--muted);margin-top:1px}
+#hrmd .cmp-rep{font-size:11px;color:var(--muted);white-space:nowrap}
+#hrmd .cmp-fix{flex:none;font-size:11px;font-weight:600;color:var(--teal);white-space:nowrap;border:1px solid var(--teal-3);border-radius:9px;padding:6px 12px;cursor:pointer;
+  background:radial-gradient(130% 150% at 100% 130%, rgba(224,255,2,.42), transparent 55%),radial-gradient(120% 150% at 0% -30%, rgba(1,70,83,.12), transparent 55%),#fff}
+#hrmd .cmp-fix:hover{filter:brightness(.985)}
+#hrmd .col-right{padding:18px}
+#hrmd .crh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+#hrmd .crh .mo{font-size:14.5px;font-weight:600}
+#hrmd .cal-nav{display:flex;gap:5px}
+#hrmd .cal-nav button{width:26px;height:26px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--g2);cursor:pointer;font-size:14px}
+#hrmd .dow-row{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px}
+#hrmd .dow{font-size:10px;font-weight:600;color:var(--faint);text-align:center}
+#hrmd .mg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+#hrmd .dcell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;position:relative;font-size:12.5px;color:var(--g1);border-radius:8px;font-variant-numeric:tabular-nums}
+#hrmd .dcell.mut{color:var(--g4)}
+#hrmd .dcell.ev{background:var(--teal-soft);color:var(--teal);font-weight:600}
+#hrmd .dcell.ev .evd{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--teal)}
+#hrmd .dcell.today{background:var(--teal);color:#fff;font-weight:600}
+#hrmd .dcell.today .evd{background:var(--n-lime,#D9FF33)}
+#hrmd .up-l{font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--faint);margin:16px 0 4px;padding-top:14px;border-top:1px solid var(--line-2)}
+#hrmd .up{flex:1;min-height:0;overflow-y:auto;padding-right:4px;display:flex;flex-direction:column;gap:8px}
+#hrmd .up::-webkit-scrollbar{width:6px}
+#hrmd .up::-webkit-scrollbar-thumb{background:var(--g4);border-radius:6px}
+#hrmd .ue{display:flex;gap:11px;align-items:center;padding:11px 12px;border-radius:12px;background:#fafcfc;border:1px solid var(--line-2)}
+#hrmd .ue .dchip{flex:none;width:40px;text-align:center}
+#hrmd .ue .dchip .dd{font-size:15px;font-weight:600;line-height:1;color:var(--teal)}
+#hrmd .ue .dchip .dm{font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--faint)}
+#hrmd .ue .ub{flex:1;min-width:0}
+#hrmd .ue .ut{font-size:13px;font-weight:500;color:var(--ink);line-height:1.3}
+#hrmd .ue .us{font-size:11.5px;color:var(--muted);margin-top:1px}
+#hrmd .ue .ue-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none}
+#hrmd .ue .uw{font-size:11px;font-weight:600;white-space:nowrap;color:var(--faint)}
+#hrmd .ue .uw.soon{color:var(--err)}
+#hrmd .ue .uw.today{color:var(--teal)}
+#hrmd .ue .av{width:32px;height:32px;border-radius:50%;background:#E1EBEC;color:var(--teal);font-size:10px;font-weight:600;display:grid;place-items:center;flex:none;border:2px solid #fff;box-shadow:0 0 0 1.5px var(--teal-3);overflow:hidden}
+#hrmd .ue .av img{width:100%;height:100%;object-fit:cover}
+#hrmd .ue .stack{display:flex}
+#hrmd .ue .stack .av{margin-left:-11px}
+#hrmd .ue .stack .av:first-child{margin-left:0}
+#hrmd .ue .stack .more{width:32px;height:32px;border-radius:50%;background:var(--teal-soft);color:var(--teal);font-size:9.5px;font-weight:600;display:grid;place-items:center;border:2px solid #fff;margin-left:-11px}
+#hrmd .focus{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;padding:5vh 5vw;
+  background:rgba(3,45,54,.4);backdrop-filter:blur(12px) saturate(115%);-webkit-backdrop-filter:blur(12px) saturate(115%)}
+#hrmd .focus.open{display:flex;animation:hrmdFade .18s ease}
+@keyframes hrmdFade{from{opacity:0}to{opacity:1}}
+#hrmd .focus-panel{width:80vw;max-width:1120px;height:82vh;border-radius:24px;padding:12px;overflow:hidden;display:flex;
+  background:
+    radial-gradient(58% 92% at 2% 1%, rgba(1,70,83,.5), transparent 56%),
+    radial-gradient(56% 92% at 100% 104%, rgba(224,255,2,.42), transparent 55%),
+    linear-gradient(135deg,#f9f8f1,#fbfbf4);
+  box-shadow:0 40px 110px rgba(1,45,54,.45);animation:hrmdPop .22s cubic-bezier(.34,1.56,.64,1)}
+@keyframes hrmdPop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+#hrmd .focus-glass{flex:1;min-width:0;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;position:relative;
+  background:rgba(255,255,255,.74);
+  backdrop-filter:blur(26px) saturate(185%);-webkit-backdrop-filter:blur(26px) saturate(185%);
+  border:1px solid rgba(255,255,255,.7);box-shadow:inset 0 1px 1px rgba(255,255,255,.8)}
+#hrmd .focus-glass::after{content:"";position:absolute;left:5%;right:5%;top:0;height:1px;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(255,255,255,.9),transparent);z-index:2}
+#hrmd .fp-head{display:flex;align-items:center;gap:10px;padding:18px 22px;border-bottom:1px solid rgba(1,70,83,.09)}
+#hrmd .fp-head .t{font-size:15px;font-weight:600;color:var(--teal)}
+#hrmd .fp-head .sub{font-size:12.5px;color:var(--muted)}
+#hrmd .fp-close{margin-left:auto;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.9);background:rgba(255,255,255,.55);color:var(--g2);font-size:15px;cursor:pointer;flex:none}
+#hrmd .fp-close:hover{background:#fff}
+#hrmd .fp-body{flex:1;min-height:0;overflow-y:auto;padding:22px 26px;display:flex;flex-direction:column;gap:18px}
+#hrmd .fp-body::-webkit-scrollbar{width:8px}
+#hrmd .fp-body::-webkit-scrollbar-thumb{background:var(--g4);border-radius:8px}
+#hrmd .q{align-self:flex-end;max-width:75%;background:var(--teal);color:#fff;border-radius:14px 14px 4px 14px;padding:11px 15px;font-size:13.5px}
+#hrmd .a{align-self:flex-start;max-width:88%}
+#hrmd .a .a-tag{display:inline-flex;align-items:center;gap:7px;font-size:10.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--teal);margin-bottom:8px}
+#hrmd .a p{font-size:13.5px;color:var(--g1);line-height:1.55}
+#hrmd .a-list{margin-top:12px;border:1px solid rgba(255,255,255,.9);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.62)}
+#hrmd .a-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(1,70,83,.07)}
+#hrmd .a-row:last-child{border-bottom:none}
+#hrmd .a-row .av{width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:11px;font-weight:600;color:#fff;background:var(--teal)}
+#hrmd .a-row .ab{flex:1;min-width:0}
+#hrmd .a-row .at{font-size:13px;font-weight:500}
+#hrmd .a-row .ac{font-size:11.5px;color:var(--muted);margin-top:1px}
+#hrmd .a-row .atag{font-size:10.5px;font-weight:600;border-radius:20px;padding:2px 9px;flex:none;background:var(--warn-bg);color:var(--warn)}
+#hrmd .a-more{padding:10px 14px;font-size:12px;color:var(--muted);background:rgba(255,255,255,.42)}
+#hrmd .fp-foot{padding:16px 22px;border-top:1px solid rgba(1,70,83,.09)}
+#hrmd .fp-bar{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.9)}
+#hrmd .fp-bar input{flex:1;border:none;background:none;outline:none;font:inherit;font-size:14px;color:var(--ink)}
+#hrmd .fp-bar input::placeholder{color:var(--muted)}
+#hrmd .fp-bar .go{width:38px;height:38px;border-radius:50%;background:var(--teal);border:none;display:grid;place-items:center;color:#fff;cursor:pointer;flex:none;box-shadow:0 6px 16px rgba(1,70,83,.28)}
+#hrmd .fp-bar .go:hover{background:var(--teal-2)}
+#hrmd .fp-bar .go svg{width:18px;height:18px}
+@media (prefers-reduced-transparency:reduce){#hrmd .focus-glass{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+#hrmd .fp-close,#hrmd .fp-bar,#hrmd .a-list,#hrmd .a-more{background:#fff}}#hrmd{--lime:#D9FF33;font-family:var(--font);color:var(--ink);font-size:14px;line-height:1.5;letter-spacing:-.005em}
+#hrmd .cols{align-items:start}
+#hrmd .col-left,#hrmd .col-right{position:sticky;top:20px;height:calc(100vh - 40px);min-height:520px}
+@media(max-width:1100px){#hrmd .col-left,#hrmd .col-right{height:auto;min-height:420px}}
+#hrmd a.td-btn{text-decoration:none;display:inline-block}
+#hrmd .cmp-fix{font-family:inherit}
+#hrmd .a-row .av{overflow:hidden}
+#hrmd .a-row .av img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+#hrmd #cfBody .a-list{background:var(--teal-soft);border-color:var(--teal-3)}
+#hrmd #cfBody .a p{text-align:justify}
+#hrmd .empty{font-size:12px;color:var(--muted);padding:10px 2px}
+#hrmd .wi-scard .a a{text-decoration:none}
+#hrmd .ue .ub{min-width:0}
+#hrmd .ue .ut,#hrmd .ue .us{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (prefers-reduced-motion:reduce){
+  #hrmd *{animation:none!important;transition:none!important}
+  #hrmd .wai-glass::before{display:none}
+}
+@media (prefers-reduced-transparency:reduce){
+  #hrmd .wi-mh,#hrmd .wai-hero{background-image:none}
 }
 </style>
 @endsection
 
 @section('import-scripts')
-<script type="text/javascript">
-const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-  var isDateSelected = false;
-    $(".table-icon").click(function () {
-        $(this).parents('tr').toggleClass("in");
-    });
-
-    // Initialize tooltips
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl)
-    });
-
-    // full-calendar
-   $(function () {
-        var todayDate = moment().startOf('day');
-        var YM = todayDate.format('YYYY-MM');
-        var YESTERDAY = todayDate.clone().subtract(1, 'day').format('YYYY-MM-DD');
-        var TODAY = todayDate.format('YYYY-MM-DD');
-        var TOMORROW = todayDate.clone().add(1, 'day').format('YYYY-MM-DD');
-        var cal = $('#calendar').fullCalendar({
-            header: {
-                left: 'prev',
-                center: 'title',
-                right: 'next'
-            },
-            editable: true,
-            eventLimit: 0, // Allow "more" link when too many events
-            navLinks: false,
-            // height/contentHeight = 'auto' tells FullCalendar to render at
-            // natural content height, so day cells don't get clipped to a
-            // fixed area with an internal vertical scrollbar.
-            height: 'auto',
-            contentHeight: 'auto',
-            events: function(start, end, timezone, callback) {
-                let Resort_id = $("#Dasboard_resort_id").val();
-
-                $.ajax({
-                    url: "{{ route('resort.ta.GetDateclickWiseUpcomingInterview') }}",
-                    type: "POST",
-                    data: {
-                        start: start.format('YYYY-MM-DD'),
-                        end: end.format('YYYY-MM-DD'),
-                        Resort_id: Resort_id,
-                        "_token": "{{ csrf_token() }}",
-                    },
-                    success: function(response) {
-                        $("#upinterviews").html(response.view);
-                        $('.fc-day').removeClass('custom-dot');
-
-                        response.dates.forEach(function(date) {
-                            let formattedDate = moment(date).format('YYYY-MM-DD');
-                            let dayCell = $(`.fc-day[data-date="${formattedDate}"]`);
-                            if (dayCell.length)
-                            {
-                                dayCell.addClass('custom-dot');
-                            }
-                        });
-                        callback([]);
-                    },
-                    error: function(xhr) {
-                        console.error("Error fetching interview dates", xhr);
-                    }
-                });
-            },
-            dayClick: function(date, jsEvent, view) {
-
-                    let Resort_id = $("#Dasboard_resort_id").val();
-                    $.ajax({
-                        url: "{{ route('resort.ta.GetDateclickWiseUpcomingInterview') }}",
-                        type: "POST",
-                        data: {
-                            date: date.format('YYYY-MM-DD'),
-                            Resort_id: Resort_id,
-                            "_token": "{{ csrf_token() }}"
-                        },
-                        success: function(response) {
-
-                            if (response.success) {
-                                $("#upinterviews").html(response.view);
-
-                            } else {
-                                // Display error message if success is false
-                                toastr.error(response.message, "Error", {
-                                    positionClass: 'toast-bottom-right'
-                                });
-                            }
-                        },
-                        error: function(response) {
-                            var errors = response.responseJSON;
-                            var errs = '';
-
-                            // Adjust based on response format
-                            if (errors && errors.errors) {
-                                $.each(errors.errors, function(key, error) {
-                                    console.log(error);
-                                    errs += error + '<br>';
-                                });
-                            } else {
-                                errs = "An unexpected error occurred.";
-                            }
-
-                            // Display errors
-                            toastr.error(errs, {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    });
-                }
-        });
-    });
-
-
-        $('#respond-HoldModel').on('shown.bs.modal', function () {
-            $('#calendarModal').fullCalendar('render');
-        });
-
-        $('#sendRequest-modal').on('shown.bs.modal', function () {
-            $('#calendarModalSendInterView').fullCalendar('render');
-        });
-
-        $(function () {
-            var todayDate = moment().startOf('day');
-            var YM = todayDate.format('YYYY-MM');
-            var YESTERDAY = todayDate.clone().subtract(1, 'day').format('YYYY-MM-DD');
-            var TODAY = todayDate.format('YYYY-MM-DD');
-            var TOMORROW = todayDate.clone().add(1, 'day').format('YYYY-MM-DD');
-
-            // Calendar for respond modal
-            $('#calendarModal').fullCalendar({
-                header: {
-                        left: 'prev',
-                        center: 'title',
-                        right: 'next'
-                    },
-                    editable: true,
-                    eventLimit: 0,
-                    navLinks: false,
-                    selectable: true,
-                    select: function(start, end) {
-                      var selectedStartDate = start.format('YYYY-MM-DD');  // Format as you need
-                      $("#HoldDate").val(selectedStartDate);
-                      isDateSelected = true;
-                      $("#respond-HoldModel").modal("show");
-                    },
-            });
-
-            // Calendar for send request modal
-            $('#calendarModalSendInterView').fullCalendar({
-                header: {
-                        left: 'prev',
-                        center: 'title',
-                        right: 'next'
-                    },
-                    editable: true,
-                    eventLimit: 0,
-                    navLinks: false,
-                    selectable: true, // Add this line
-                    select: function(start, end) {
-                      var selectedStartDate = start.format('YYYY-MM-DD');  // Format as you need
-                      $("#InterviewDate").val(selectedStartDate);
-                      $("#TimeSlotsFormdate").val(selectedStartDate);
-                      $("#sendRequest-modal").modal("show");
-                    }
-            });
-        });
-
-        $(document).on("change", "#ResortPosition", function () {
-            let PositionId = $(this).val();
-            $.ajax({
-                url: "{{ route('resort.ta.GePositionWiseTopAppliants') }}",
-                type: "POST",
-                data: {
-                    PositionId: PositionId,
-                    _token: "{{ csrf_token() }}"
-                },
-                success: function (response) {
-                    let string1 = '';
-
-                    // Check if response contains the applicant trends
-                    if (response && response.applicantTrends) {
-                        // Loop through the trends and construct rows
-                        $.each(response.applicantTrends, function (i, v) {
-                            string1 += `
-                                <tr>
-                                    <td><img src="${v.flag_url}" alt="flag" class="flag">${v.country}</td>
-                                    <td>${v.latest_count}</td>
-                                    <td><img src="${v.trend}" alt="icon"></td>
-                                </tr>`;
-                        });
-
-
-                        $("#topCountriesWiseCount").html(string1);            }
-                },
-                error: function (xhr, status, error) {
-                    console.error("AJAX Error:", error);
-                    alert("An error occurred while fetching data.");
-                }
-            });
-        });
-
-
-        var cty = document.getElementById('myStackedBarChart').getContext('2d');
-        // Function to fetch chart data dynamically
-        function fetchChartData(year) {
-            $.ajax({
-                url: "{{ route('payroll.getExpenses') }}", // Adjust route accordingly
-                method: "GET",
-                data: { year: year },
-                success: function (response) {
-                    if (response.success) {
-                        updateChart(response.labels, response.data);
-                    }
-                },
-                error: function (xhr, error, code) {
-                    console.error("Error fetching chart data:", error);
-                }
-            });
-        }
-
-        // Function to update the chart dynamically
-        function updateChart(labels, datasetValues) {
-            myStackedBarChart.data.labels = labels;
-            myStackedBarChart.data.datasets[0].data = datasetValues.payrollCost;
-            myStackedBarChart.data.datasets[1].data = datasetValues.otCost;
-            myStackedBarChart.data.datasets[2].data = datasetValues.serviceCharge;
-            myStackedBarChart.update(); // Update the chart
-        }
-
-        // Initialize the chart
-        var _pMdH1 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3', card: '#fff' };
-        var myStackedBarChart = new Chart(cty, {
-            type: 'bar',
-            data: {
-                labels: [], // Initially empty, will be updated via AJAX
-                datasets: [
-                    {
-                        label: 'Payroll Cost',
-                        data: [],
-                        backgroundColor: _pMdH1.teal,
-                        borderColor: _pMdH1.card,
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: 'OT Cost',
-                        data: [],
-                        backgroundColor: _pMdH1.aqua,
-                        borderColor: _pMdH1.card,
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: 'Service Charge',
-                        data: [],
-                        backgroundColor: '#EFB408',
-                        borderColor: _pMdH1.card,
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                ]
-            },
-            options: {
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        enabled: true,
-                        mode: 'index',
-                        intersect: false,
-                        callbacks: {
-                            label: function (tooltipItem) {
-                                return tooltipItem.dataset.label;
-                            },
-                            afterLabel: function (tooltipItem) {
-                                return currencySymbol + ' ' + tooltipItem.raw;
-                            }
-                        },
-                        displayColors: false
-                    }
-                },
-                scales: {
-                    x: { stacked: true, grid: { display: false } },
-                    y: { stacked: true, beginAtZero: true, grid: { display: false } }
-                }
-            }
-        });
-        if (window.WaiChart) window.WaiChart.registerForTheme(myStackedBarChart, function (c, p) {
-            c.data.datasets[0].backgroundColor = p.teal;
-            c.data.datasets[1].backgroundColor = p.aqua;
-            c.data.datasets.forEach(function (ds) { ds.borderColor = p.card; });
-        });
-
-        // Fetch initial chart data
-        let initialYear = $("#yearFilter").val();
-        fetchChartData(initialYear);
-
-        // Change event for the year filter
-        $("#yearFilter").change(function () {
-            let selectedYear = $(this).val();
-            fetchChartData(selectedYear);
-        });
-
-</script>
-
-<script type="text/javascript">
-    $(document).ready(function() {
-        $('#leave-request-table tbody').empty();
-
-        if ($.fn.DataTable.isDataTable('#leave-request-table'))
-        {
-            $('#leave-request-table').DataTable().destroy();
-        }
-
-        var table = $('#leave-request-table').DataTable({
-            searching: false,
-            bLengthChange: false,
-            bFilter: true,
-            bInfo: true,
-            bAutoWidth: false,
-            scrollX: true,
-            iDisplayLength: 10,
-            processing: true,
-            serverSide: true,
-            ajax: function(data, callback, settings) {
-                // Get the department filter value
-                var departmentId = $('#department-filter').val();
-
-                $.ajax({
-                    url: "{{ route('leave-requests.get') }}",
-                    method: "GET",
-                    data: {
-                        department_id: departmentId,
-                        start: settings.start, // For pagination
-                        length: settings.length, // For pagination
-                    },
-                    success: function(response) {
-                        callback({
-                            draw: settings.draw,
-                            recordsTotal: response.recordsTotal, // Total records
-                            recordsFiltered: response.recordsFiltered, // Filtered records
-                            data: response.data // Data for the current page
-                        });
-                    }
-                });
-            },
-            columns: [
-                {   
-                    data: 'employee_id' },
-                {   
-                    data: 'full_name', render: function(data, type, row) {
-                    return '<div class="tableUser-block"><div class="img-circle"><img src="'+row.profile_picture+'" alt="user"></div><span class="userApplicants-btn">'+ row.first_name + ' ' + row.last_name + '</span></div>';
-                }},
-                {   
-                    data: 'total_days' },
-                {   
-                    data: 'leave_status',
-                    render: function(data, type, row) {
-                        let statusClass = 'badge-secondary'; // Default class
-
-                        // Check for specific keywords in the status text and assign the appropriate class
-                        if (row.status_text.includes('Approved')) {
-                            statusClass = 'badge-themeSuccess'; // Green for approved
-                        } else if (row.status_text.includes('Rejected')) {
-                            statusClass = 'badge-themeDanger'; // Red for rejected
-                        } else if (row.status_text.includes('Pending')) {
-                            statusClass = 'badge-themeWarning'; // Yellow for pending
-                        }
-
-                        // Render the badge with the dynamic class and status text
-                        return `<span class="badge ${statusClass}">${row.status_text}</span>`;
-                    }
-                },
-                {
-                    data: 'action',
-                    render: function(data, type, row) {
-
-                        return `
-                            <a title="Leave Details" href="${row.routes}" class="eye-btn mx-1">
-                                <i class="fa-regular fa-eye"></i>
-                            </a>
-                            <a href="javascript:void(0);" class="correct-btn mx-1 approve-btn" data-leave-id="${row.id}"">
-                                    <i class="fa-solid fa-check"></i>
-                            </a>
-                            <a href="javascript:void(0);" class="close-btn mx-1 reject-btn" data-leave-id="${row.id}"">
-                                <i class="fa-solid fa-xmark"></i>
-                            </a>
-                        `;
-                    }
-                }
-            ],
-        });
-
-        // Trigger table reload when department filter changes
-        $('#department-filter').on('change', function() {
-            table.ajax.reload(); 
-        });
-
-        let currentLeaveId = null; 
-
-        $('#leave-request-table').on('click', '.approve-btn', function () {
-            const leaveId = $(this).data('leave-id');
-
-            // Perform the approval action
-            handleLeaveAction(leaveId, 'Approved', '');
-        });
-
-        $('#leave-request-table').on('click', '.reject-btn', function () {
-            currentLeaveId = $(this).data('leave-id');
-
-            // Show the rejection modal
-            $('#rejectionModal').modal('show');
-        });
-
-        $('#confirmRejectBtn').on('click', function () {
-            const reason = $('#rejectionReason').val(); // Get the reason (optional)
-
-            // Perform the rejection action
-            handleLeaveAction(currentLeaveId, 'Rejected', reason);
-
-            // Hide the modal
-            $('#rejectionModal').modal('hide');
-            $('#rejectionReason').val(''); // Clear the input for the next use
-        });
-
-        function handleLeaveAction(leaveId, action, reason) {
-            $.ajax({
-                url: "{{route('leave.handleAction')}}",
-                method: 'POST',
-                data: {
-                    leave_id: leaveId,
-                    action: action,
-                    reason: reason,
-                    _token: $('meta[name="csrf-token"]').attr('content'),
-                },
-                success: function (response) {
-                    // console.log(response);
-                    if (response.status == "success") {
-                        toastr.success(response.message, "Success", {
-                            positionClass: 'toast-bottom-right'
-                        });
-
-                        window.setTimeout(function () {
-                            window.location.reload();
-                        }, 2000);
-                    } else {
-                        toastr.error(response.message, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                },
-                error: function (xhr) {
-                    if (xhr.status === 403) {
-                        let response = xhr.responseJSON;
-                        if (response.status == "error") {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    } else {
-                        toastr.error("An unexpected error occurred. Please try again.", "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                }
-            });
-        }    });
-     
-     const ctyBar = document.getElementById('myBarChart').getContext('2d');
-    var _pMdH2 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
-    const myBarChart = new Chart(ctyBar, {
-        type: 'bar', // Type of chart
-        data: {
-            labels: ['2021', '2022', '2023', '2024'], // X-axis labels
-            datasets: [
-                {
-                    label: 'Budgeted', // Label for the first dataset
-                    data: [1800, 2300, 2400, 1800], // Data for the first dataset
-                    backgroundColor: _pMdH2.teal,
-                    borderRadius: 3, // Set the border radius for bars
-                    barThickness: 14 // Set the width of the bars
-                },
-                {
-                    label: 'Actual', // Label for the second dataset
-                    data: [2000, 2200, 2000, 2400], // Data for the second dataset
-                    backgroundColor: _pMdH2.aqua,
-                    borderRadius: 3, // Set the border radius for bars
-                    barThickness: 14 // Set the width of the bars
-                }
-            ]
-        },
-        options: {
-            plugins: {
-                legend: {
-                    display: false
-                },
-                layout: {
-                    padding: {
-                        top: 0,
-                        bottom: 0,
-                        left: 0,
-                        right: 0
-                    }
-                },
-                tooltip: {
-                    enabled: true, // Enable tooltips
-                    callbacks: {
-                        label: function (tooltipItem) {
-                            // const datasetLabel = tooltipItem.dataset.label || '';
-                            const value = tooltipItem.raw.toLocaleString(); // Format the value with commas
-                            return formatAmount(value, 'USD'); // Custom tooltip format
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    beginAtZero: true, // Start x-axis at zero
-                    grid: {
-                        display: false // Hide grid lines on the x-axis
-                    },
-                    border: {
-                        display: true // Show the x-axis border
-                    }
-                },
-                y: {
-                    beginAtZero: false, // Do not start y-axis at zero
-                    min: 100, // Set the minimum value for y-axis
-                    grid: {
-                        display: false // Hide grid lines on the y-axis
-                    },
-                    border: {
-                        display: true // Show the y-axis border
-                    },
-                    ticks: {
-                        callback: function (value) {
-                            return formatAmount(value, 'USD'); // Format y-axis labels as currency
-                        }
-                    }
-                }
-            }
-        }
-    });
-    if (window.WaiChart) window.WaiChart.registerForTheme(myBarChart, function (c, p) {
-        c.data.datasets[0].backgroundColor = p.teal;
-        c.data.datasets[1].backgroundColor = p.aqua;
-    });
-
-    $(document).ready(function(){
-
-         const ctx = document.getElementById('myAttendance').getContext('2d');
-        const currentYear = new Date().getFullYear();
-        const selectedYear = currentYear; // Default selected year
-
-        function generateLabels(year) {
-            const labels = [];
-            const firstMonth = 0; // January (0-indexed in JavaScript)
-            const lastMonth = 11; // December (0-indexed in JavaScript)
-
-            for (let i = firstMonth; i <= lastMonth; i++) {
-                const month = new Date(year, i);
-                labels.push(month.toLocaleString('default', { month: 'short', year: 'numeric' }));
-            }
-            return labels;
-        }
-
-        const myAttendance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: generateLabels(selectedYear),
-                datasets: []
-            },
-            options: {
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    layout: {
-                        padding: {
-                            top: 0,
-                            bottom: 0,
-                            left: 0,
-                            right: 0
-                        }
-                    },
-                    tooltip: {
-                        enabled: true, // Enable tooltips
-                        callbacks: {
-                            label: function (tooltipItem) {
-                                const value = tooltipItem.raw.toLocaleString();
-                                return `${value}%`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        beginAtZero: true, // Start x-axis at zero
-                        grid: {
-                            display: false // Hide grid lines on the x-axis
-                        },
-                        border: {
-                            display: true // Show the x-axis border
-                        }
-                    },
-                    y: {
-                        beginAtZero: true, // Do not start y-axis at zero
-                        grid: {
-                            display: false // Hide grid lines on the y-axis
-                        },
-                        ticks: {
-                            stepSize: 20,
-                        },
-                        border: {
-                            display: true // Show the y-axis border
-                        },
-                    }
-                }
-            }
-
-        });
-        // datasets are populated entirely by the AJAX response below (server-
-        // supplied colours, out of scope) — only axes/legend/tooltip retheme.
-        if (window.WaiChart) window.WaiChart.registerForTheme(myAttendance);
-        function updateAttendanceChart(year) {
-            $.ajax({
-                url: "{{ route('resort.recruitement.getAttandanceData') }}",
-                type: "POST",
-                data: {
-                    year: year,
-                    "_token": "{{ csrf_token() }}"
-                },
-                success: function (response) {
-                    if (response.datasets && Array.isArray(response.datasets)) {
-                        myAttendance.data.labels = generateLabels(year);
-                        myAttendance.data.datasets = response.datasets;
-                        myAttendance.update();
-                    } else {
-                        console.error("Invalid datasets format:", response.datasets);
-                    }
-                },
-                error: function (xhr) {
-                    console.error("Failed to fetch chart data", xhr);
-                }
-            });
-        }
-
-        $(document).on('change', '.YearWiseAttandance', function () {
-            const selectedYear = $(this).val();
-            updateAttendanceChart(selectedYear);
-        });
-
-        // Initial chart load
-        updateAttendanceChart(selectedYear);
-        loadUpcomingMeetings();
-    });
-    
-  
-     function loadUpcomingMeetings() {
-            $.ajax({
-                url: '{{ route("incident.getUpcomingMeetings") }}',
-                method: 'GET',
-                success: function (meetings) {
-                    let container = $('#upcoming-meetings');
-                    container.empty();
-
-                    if (meetings.length === 0) {
-                        container.append('<div class="text-muted px-3 py-2">No upcoming meetings.</div>');
-                        return;
-                    }
-
-                    meetings.forEach(meeting => {
-                        container.append(`
-                            <div class="leaveUser-block">
-                                <div>
-                                    <div class="d-flex justify-content-between">
-                                        <h6>${meeting.title}</h6>
-                                        <span class="badge badge-themeNew1 border-0">${meeting.day_label}, ${meeting.scheduled_time}</span>
-                                    </div>
-                                    <p>${meeting.description}</p>
-                                    <div>
-                                        <a href="${meetingDetailBaseUrl.replace('MEETING_ID', btoa(meeting.id))}" class="a-linkTheme">View Details</a>
-                                    </div>
-                                </div>
-                            </div>
-                        `);
-                    });
-                }
-            });
-        }
-
-</script>
-
-<script type="module">
-        // Get the canvas and its data attributes
-        var canvas = document.getElementById('myDoughnutChart');
-        var ctx = canvas.getContext('2d');
-        var maleCount = parseInt(canvas.getAttribute('data-male')) || 0;
-        var femaleCount = parseInt(canvas.getAttribute('data-female')) || 0;
-
-        // Custom plugin for inside labels
-        const doughnutLabelsInside = {
-            id: 'doughnutLabelsInside',
-            afterDraw: function (chart) {
-                var ctx = chart.ctx;
-                chart.data.datasets.forEach(function (dataset, i) {
-                    var meta = chart.getDatasetMeta(i);
-                    if (!meta.hidden) {
-                        meta.data.forEach(function (element, index) {
-                            var dataValue = dataset.data[index];
-                            var total = dataset.data.reduce((acc, val) => acc + val, 0);
-                            var percentage = ((dataValue / total) * 100).toFixed(0) + '%';
-
-                            var position = element.tooltipPosition();
-                            ctx.fillStyle = '#fff';
-                            ctx.font = 'normal 14px Poppins';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            ctx.fillText(percentage, position.x, position.y);
-                        });
-                    }
-                });
-            }
-        };
-
-        // Chart config
-        var _pMdH3 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
-        var myDoughnutChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Male', 'Female'],
-                datasets: [{
-                    data: [maleCount, femaleCount],
-                    backgroundColor: [_pMdH3.aqua, _pMdH3.teal],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    doughnutLabelsInside: true,
-                    legend: {
-                        display: false
-                    }
-                },
-                layout: {
-                    padding: {
-                        top: 10,
-                        bottom: 10
-                    }
-                }
-            },
-            plugins: [doughnutLabelsInside]
-        });
-        if (window.WaiChart) window.WaiChart.registerForTheme(myDoughnutChart, function (c, p) {
-            c.data.datasets[0].backgroundColor = [p.aqua, p.teal];
-        });
-
-
-        // Function to update the chart with new data for Payroll Service Charges
-        $(document).ready(function () {
-            // Initialize the service charge chart
-            GetServiceChargeChart();
-        });
-
-        let myDoughnutChartService = null; // Reset the chart variable
-        const ctz = document.getElementById('myDoughnutChartService').getContext('2d');
-        const doughnutLabelsInsideN = {
-            id: 'doughnutLabelsInsideN',
-            afterDraw: function (chart) {
-                var ctx = chart.ctx;
-                chart.data.datasets.forEach(function (dataset, i) {
-                    var meta = chart.getDatasetMeta(i);
-                    if (!meta.hidden) {
-                        meta.data.forEach(function (element, index) {
-                            var dataValue = dataset.data[index];
-                            var total = dataset.data.reduce(function (acc, val) {
-                                return acc + val;
-                            }, 0);
-                            var percentage = ((dataValue / total) * 100).toFixed(0) + '%';
-                            var position = element.tooltipPosition();
-                            ctx.fillStyle = '#fff';
-                            ctx.font = 'normal 18px Poppins';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            ctx.fillText(percentage, position.x, position.y);
-                        });
-                    }
-                });
-            }
-        };
-
-        const centerText = {
-            id: 'centerText',
-            afterDraw: function (chart) {
-                const width = chart.width;
-                const height = chart.height;
-                const ctx = chart.ctx;
-
-                ctx.restore();
-
-                // Calculate total dynamically from the chart data
-                const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-
-                // Format the total as a currency value
-                const formattedTotal = formatAmount(total, 'USD');
-
-                // Text configuration
-                ctx.textBaseline = 'middle';
-                ctx.textAlign = 'center';
-
-                // Total number
-                var _pMdSvcH = window.WaiChart ? window.WaiChart.palette().darkblack : '#222222';
-                ctx.font = '500 22px Poppins';
-                ctx.fillStyle = _pMdSvcH;
-                // ctx.fillText('$' + total, width / 2, height / 2 - 15);
-                ctx.fillText(formattedTotal, width / 2, height / 2 - 15);
-
-                // "Total" label
-                ctx.font = '500 13px Poppins';
-                ctx.fillStyle = _pMdSvcH;
-                ctx.fillText('Avg', width / 2, height / 2 + 15);
-
-                ctx.save();
-            }
-        };
-    function GetServiceChargeChart() {
-        
-        $.ajax({
-            url: "{{ route('chart.service-charges') }}", // Replace with your actual route
-            type: "POST",
-            data: {
-                "_token": "{{ csrf_token() }}",
-                "YearWiseServichCharges": $(".YearWiseServichCharges").val()
-            },
-            success: function (response) {
-                console.log(response);
-                const data = response.data;
-                const total = response.total;
-                const labels = data.map(item => item.label);
-                const serviceCharges = data.map(item => item.service_charge);
-                const serviceChargespercentage = data.map(item => item.percentage);
-                // Only 1 of 6 matches an SSOT token — left literal as a
-                // whole set (also reused for the side-label swatches).
-                const colors = ['#014653', '#53CAFF', '#EFB408', '#50B9BF', '#333333', '#8DC9C9'];
-
-                // Check if the chart exists and destroy it
-                if (myDoughnutChartService !== null && typeof myDoughnutChartService.destroy === 'function') {
-                    myDoughnutChartService.destroy();
-                }
-                // Update the chart
-                myDoughnutChartService = new Chart(document.getElementById('myDoughnutChartService'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            data: serviceChargespercentage,
-                            backgroundColor: colors,
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        },
-                        layout: {
-                            padding: {
-                                top: 10,
-                                bottom: 10,
-                                left: 0,
-                                right: 0
-                            }
-                        }
-                    },
-                    plugins: [doughnutLabelsInsideN, centerText] // Attach the plugin to this chart only
-                });
-                if (window.WaiChart) window.WaiChart.registerForTheme(myDoughnutChartService);
-                // Update the side labels
-                const labelContainer = document.getElementById('myDoughnutChartServiceLabel');
-                let labelsHTML = '';
-                data.forEach((item, index) => {
-                    labelsHTML += `
-                        <div class="col-6">
-                            <div class="doughnut-label">
-                                <span style="background-color: ${colors[index]}"></span>${item.label} <br>${formatAmount(item.service_charge, 'USD')}
-                            </div>
-                        </div>
-                    `;
-                });
-                // Add total row
-                labelsHTML += `
-                    <div class="fw-500">Total: ${formatAmount(parseFloat(String(total).replace(/,/g,'')), 'USD')}</div>
-                `;
-
-                // Insert into the DOM
-                labelContainer.innerHTML = labelsHTML;
-            },
-            error: function (xhr) {
-                console.error("Failed to fetch chart data", xhr);
-            }
-        });
-    }
-
-    // Trigger data load on dropdown change
-    $(document).on("change", ".YearWiseServichCharges", function () {
-        GetServiceChargeChart();
-    });
-</script>
 <script>
-     $(document).ready(function() {
-
-        $(document).on("click", ".respondOfFreshmodal", function() {
-
-            // FreshRespond-modal
-            $('#FreshRespond-modal').modal('show');
-            var image= $(this).attr("data-images");
-            var name = $(this).attr("data-name");
-            var position = $(this).attr("data-position");
-            var department = $(this).attr("data-departmentname");
-            var NoOfVacnacy = $(this).attr("data-NoOfVacnacy");
-            var rank = $(this).attr('data-rank');
-            var ta_id= $(this).attr('data-ta_id');
-            var Child_ta_id= $(this).attr('data-Child_ta_id');
-
-            $("#holdResponseModel").attr("data-ta_id",ta_id);
-            $("#RejectResponseModel").attr("data-ta_id",ta_id);
-            $("#ApprovedResponseModel").attr("data-ta_id",ta_id);
-            $("#ApprovedResponseModel").attr("data-Child_ta_id",Child_ta_id);
-
-            $("#holdResponseModel").attr("data-Child_ta_id",Child_ta_id);
-            $("#RejectResponseModel").attr("data-Child_ta_id",Child_ta_id);
-
-
-            let hm =`<div class="respond-block">
-                                <div class="img-circle">
-                                    <img src="${image}" alt="image">
-                                </div>
-                                <div>
-                                    <h6>${department} (${rank})</h6>
-                                    <p>Requested to Hire ${NoOfVacnacy} ${position}</p>
-                                </div>
-
-                    </div>`;
-                $(".respond-main").html(hm);
-        });
-
-        // Hold Request Start
-
-        $(document).on("click", "#holdResponseModel", function() {
-            var Child_ta_id= $(this).attr('data-Child_ta_id');
-
-            $("#Calender_ta_id").val(Child_ta_id);
-
-
-        });
-        $(document).on("click", ".destoryApplicant", function() {
-            var base64_id= $(this).attr('data-id');
-            var location= $(this).attr('data-location');
-                 $.ajax({
-                    url: "{{ route('resort.ta.destoryApplicant') }}",
-                    type: "POST",
-                    data: {base64_id:base64_id,"_token":"{{ csrf_token() }}" },
-
-                    success: function(response) {
-                        $('#respond-rejectModal').modal('hide');
-                        if (response.success)
-                        {
-
-                                toastr.success(response.message, "Success", {
-                                    positionClass: 'toast-bottom-right'
-                                });
-                                $("#talentPool_"+location).remove();
-
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    },
-                    error: function(response) {
-                        var errors = response.responseJSON;
-                        var errs = '';
-                        $.each(errors.errors, function(key, error) { // Adjust according to your response format
-                            console.log(error);
-                            errs += error + '<br>';
-                        });
-                        toastr.error(errs, { positionClass: 'toast-bottom-right' });
-                    }
-                });
-
-        });
-
-        $('#HoldNewVacanciyForm').validate({
-            rules: {
-                HoldDate: {
-                    required: true,
-                }
-            },
-            messages: {
-                HoldDate: {
-                    required: "Please select Hold Date.",
-                }
-            },
-            submitHandler: function(form) {
-                var formData = new FormData(form);
-                if (!isDateSelected) {
-
-                    toastr.error("Please select a date from the calendar.", "Error", {
-                        positionClass: 'toast-bottom-right'
-                    });
-                    return false;
-                }
-
-                $.ajax({
-                    url: "{{ route('resort.ta.HiringNotification') }}",
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        $('#respond-HoldModel').modal('hide');
-                        if (response.success)
-                        {
-                            $("#FreshHiringRequest").html(response.view);
-                            toastr.success(response.message, "Success", {
-                                positionClass: 'toast-bottom-right'
-                            });
-
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    }
-
-                });
-            }
-        });
-
-        // End of Hold Request.
-
-        // Reject Vacanciy form
-        $(document).on("click", "#RejectResponseModel", function() {
-            var Child_ta_id= $(this).attr('data-Child_ta_id');
-
-            $("#Rejectio_ta_id").val(Child_ta_id);
-
-        });
-
-        $('#rejectionNewVacanciyForm').validate({
-            rules: {
-                New_Vacancy_Rejected: {
-                    required: true,
-                }
-            },
-            messages :
-            {
-                New_Vacancy_Rejected: {
-                    required: "Please Enter Reason.",
-                }
-            },
-            submitHandler: function(form) {
-
-                var formData = new FormData(form);
-
-                $.ajax({
-                    url: "{{ route('resort.ta.RejectionVcancies') }}",
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        $('#respond-rejectModal').modal('hide');
-                        if (response.success)
-                        {
-
-                            $("#FreshHiringRequest").html(response.view);
-                                toastr.success(response.message, "Success", {
-                                    positionClass: 'toast-bottom-right'
-                                });
-
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    }
-                });
-            }
-        });
-
-        // End of Reject Vacanciy form
-        //  Approval
-
-        flatpickr('#link_Expiry_date', {
-            dateFormat: 'd/m/Y',
-            allowInput: true,
-            appendTo: document.body
-        });
-        $("#ApprovedResponseModel").on("click",function(){
-            var ta_id= $(this).attr('data-ta_id');
-            var Child_ta_id = $(this).attr('data-Child_ta_id');
-            $.ajax({
-                    url: "{{ route('resort.ta.ApprovedVcancies') }}",
-                    type: "POST",
-                    data: {ta_id:ta_id,Child_ta_id:Child_ta_id,"_token":"{{ csrf_token() }}" },
-
-                    success: function(response) {
-                        $('#respond-rejectModal').modal('hide');
-                        if (response.success)
-                        {
-                            $('#respond-approvalModal').modal('show');
-                            $("#FreshHiringRequest").html(response.view);
-                            $(".todoList-main").html(response.Todolistview);
-                                toastr.success(response.message, "Success", {
-                                    positionClass: 'toast-bottom-right'
-                                });
-
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    },
-                    error: function(response) {
-                        var errors = response.responseJSON;
-                        var errs = '';
-                        $.each(errors.errors, function(key, error) { // Adjust according to your response format
-                            console.log(error);
-                            errs += error + '<br>';
-                        });
-                        toastr.error(errs, { positionClass: 'toast-bottom-right' });
-                    }
-                });
-        });
-
-        $(document).on("click", ".jobAD-modal", function () {
-            $("#jobAD-modal").modal("show");
-
-            // Fetch data attributes
-            let applicationUrlShow = $(this).data("applicationurlshow");
-            let applicantLink = $(this).data("applicant_link");
-            let jobAdv = $(this).data("jobadvertisement");
-            let jobLink = $(this).data("link");
-            let childId = $(this).data("ta_childid");
-            let expiryDate = $(this).data("expirydate");
-            let sourceLinks = $(this).data("source_links"); // This is the new data attribute
-
-            // Set values in the modal
-            $(".ta_child_id").val(childId);
-            $(".AppendJobAdvLink").attr("href", applicantLink).text(applicationUrlShow);
-
-            if (jobLink === "") {
-                $(".AppendJobAdvLink")
-                    .attr("href", applicantLink)
-                    .text(applicationUrlShow)
-                    .attr("data-disabled", "true")
-                    .addClass("ta-adv-disabled");
-                $(".Resort_id").val($(this).attr("data-Resort_id"));
-            } else {
-                $(".AppendJobAdvLink")
-                    .attr("href", applicantLink)
-                    .text(applicationUrlShow)
-                    .attr("data-disabled", "false")
-                    .removeClass("ta-adv-disabled");
-                $("#link_Expiry_date").addClass("link_Expiry_date_" + childId);
-                $(".link_Expiry_date_" + childId).attr("disabled", "true");
-            }
-
-            if (expiryDate) {
-                var parts = expiryDate.split("-");
-                var formattedDate = parts[2] + "/" + parts[1] + "/" + parts[0];
-                $("#link_Expiry_date").datepicker("setDate", formattedDate);
-            }
-
-            $(".link_Job").val(applicantLink).addClass("link_Job_");
-            $("#JobAdvertisementImage").attr("src", jobAdv);
-            $(".DowloadAdvertisement").attr("data-hrefLink", jobAdv);
-
-            // Handle Source Links
-            let sourceLinksList = $("#sourceLinksList");
-            let sourceLinksHidden = $("#sourceLinksHidden");
-            sourceLinksList.empty(); // Clear previous links
-
-            if (sourceLinks && sourceLinks.length) {
-                sourceLinksHidden.val(JSON.stringify(sourceLinks)); // Save links in hidden input
-                sourceLinks.forEach((link) => {
-                    let listItem = $("<li></li>");
-                    let anchor = $("<a></a>")
-                        .attr("href", link)
-                        .attr("target", "_blank")
-                        .text(link);
-                    listItem.append(anchor);
-                    sourceLinksList.append(listItem);
-                });
-            } else {
-                sourceLinksHidden.val(applicantLink); // Save default applicant link in hidden input
-                sourceLinksList.append(`<li><a href="${applicantLink}" target="_blank">${applicantLink}</a></li>`); // Display the default applicant link
-            }
-        });
-
-        $(".AppendJobAdvLink").on('click', function (e) {
-            if ($(this).attr('data-disabled') === 'true')
-             {
-                e.preventDefault();
-            }
-        });
-
-        $(document).on("click", ".DowloadAdvertisement", function() {
-
-            var fileName = $(this).attr('data-hrefLink');
-
-            var link = document.createElement('a');
-
-            link.href = fileName;
-
-            link.download = fileName.split('/').pop();  // This extracts the file name from the URL
-
-            document.body.appendChild(link);
-
-            link.click();
-
-            document.body.removeChild(link);
-
-        });
-
-        //  jobAD-form
-        $('#jobAD-form').validate({
-            rules: {
-                link_Expiry_date: {
-                    required: true,
-                }
-            },
-            messages :
-            {
-                link_Expiry_date: {
-                    required: "Please Select Expiry Date.",
-                }
-            },
-            submitHandler: function(form) {
-                var formData = new FormData(form);
-                $.ajax({
-                    url: "{{ route('resort.ta.GenrateAdvLink') }}",
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        $('#respond-rejectModal').modal('hide');
-                        if (response.success)
-                        {
-                            $(form)
-                            .find('a')
-                            .removeClass('ta-adv-disabled')
-                            .attr('data-disabled', 'false')
-                            $("#FreshHiringRequest").html(response.view);
-                                toastr.success(response.message, "Success", {
-                                    positionClass: 'toast-bottom-right'
-                                });
-
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    },
-                    error: function(response) {
-                        var errors = response.responseJSON;
-                        var errs = '';
-                        $.each(errors.errors, function(key, error) { // Adjust according to your response format
-                            console.log(error);
-                            errs += error + '<br>';
-                        });
-                        toastr.error(errs, { positionClass: 'toast-bottom-right' });
-                    }
-                });
-            }
-        });
-
-        //SortListed Employee
-        $(document).on("click", ".SortlistedEmployee", function()
-        {
-            let resort_id= $(this).data('resort_id');
-            let ApplicantID= $(this).data('applicantid');
-            let ApplicantStatus_id= $(this).data('applicantstatus_id');
-            $("#Resort_id").val(resort_id);
-            $("#ApplicantID").val(ApplicantID);
-            $("#ApplicantStatus_id").val(ApplicantStatus_id);
-            $("#sendRequest-modal").modal("show");
-        });
-
-        $('#InterviewRequestSentForm').validate({
-            rules: {
-                InterviewDate: {
-                    required: true,
-                }
-            },
-            messages :
-            {
-                InterviewDate: {
-                    required: "Please Select Inteview Date.",
-                }
-            },
-            submitHandler: function(form) {
-                let Resort_id = $("#Resort_id").val();
-                let ApplicantID = $("#ApplicantID").val();
-                let ApplicantStatus_id = $("#ApplicantStatus_id").val();
-                let InterviewDate = $('#InterviewDate').val();
-
-                $.ajax({
-                    url: "{{ route('resort.ta.ApplicantTimeZoneget') }}",
-                    type: "POST",
-                    data:{InterviewDate:InterviewDate,Resort_id:Resort_id, ApplicantID:ApplicantID, ApplicantStatus_id:ApplicantStatus_id,"_token":"{{ csrf_token()}}"},
-
-                    success: function(response) {
-                        if (response.success)
-                        {
-                            toastr.success(response.message, "Success", {
-                                        positionClass: 'toast-bottom-right'
-                            });
-                            InterViewDate = response.InterviewDate;
-                            $("#sendRequest-modal").modal("hide");
-                            $("#TimeSlots-modal").modal("show");
-                            $(".sendRequestTime-main").html(response.view);
-
-                        }
-                        else
-                        {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    }
-                });
-            }
-        });
-
-        $(document).on("focus", '[name^="MalidivanManualTime"], [name^="ApplicantManualTime"]', function () {
-            $(".row_time").removeClass("active").find("input").prop("disabled", false);
-            $('[name^="ApplicantInterviewtime"]').val('');
-            $('[name^="ResortInterviewtime"]').val('');
-        });
-        $(document).on("change", '[name="MalidivanManualTime"]', function () {
-            const timeValue = $(this).val(); // Get the value of the time input
-            if (timeValue) {
-                const [hours, minutes] = timeValue.split(":"); // Split the time into hours and minutes
-                const period = hours >= 12 ? "PM" : "AM"; // Determine AM or PM
-                const formattedHours = hours % 12 || 12; // Convert to 12-hour format
-                let MalidivanManualTime1 = formattedHours +":"+minutes+" "+period;
-                $('[name="MalidivanManualTime1"]').val(MalidivanManualTime1); // Display in console
-            } else {
-                console.log("No time selected");
-            }
-        });
-        $(document).on("change", '[name="ApplicantManualTime"]', function () {
-            const timeValue = $(this).val(); // Get the value of the time input
-            if (timeValue) {
-                const [hours, minutes] = timeValue.split(":"); // Split the time into hours and minutes
-                const period = hours >= 12 ? "PM" : "AM"; // Determine AM or PM
-                const formattedHours = hours % 12 || 12; // Convert to 12-hour format
-                let ApplicantManualTime1 = formattedHours +":"+minutes+" "+period;
-                $('[name="ApplicantManualTime1"]').val(ApplicantManualTime1); // Display in console
-            } else {
-                console.log("No time selected");
-            }
-        });
-
-        $(document).on("click", ".Timezone_checkBox", function() {
-            // Remove 'Active' class and enable all other rows
-            $(".row_time").not($(this).closest(".row_time")).removeClass("active").find("input").prop("disabled", false);
-
-            // Toggle 'active' class on the clicked row
-            $(this).closest(".row_time").toggleClass("active");
-            let location = $(this).data('id');
-
-            if ($(this).closest(".row_time").hasClass("active")) {
-                // Disable other rows and clear all input values
-                $(".row_time").not($(this).closest(".row_time")).find("input").prop("disabled", true);
-                $('[name^="ApplicantInterviewtime"]').val('');
-                $('[name^="ResortInterviewtime"]').val('');
-
-                // Retrieve and set the data attributes for the selected row
-                let ApplicantInterviewtime = $(this).data('applicantinterviewtime');
-                let ResortInterviewtime = $(this).data('resortinterviewtime');
-
-                // Check if data attributes are undefined or null before setting
-                if (ApplicantInterviewtime) {
-                    $("#ApplicantInterviewtime_" + location).val(ApplicantInterviewtime);
-                }
-
-                if (ResortInterviewtime) {
-                    $("#ResortInterviewtime_" + location).val(ResortInterviewtime);
-                }
-            } else {
-                // Enable all rows if no row is active
-                $(".row_time").find("input").prop("disabled", false);
-            }
-        });
-
-
-        $('#TimeSlotsForm').validate({
-            rules: {
-                    SlotBook: {
-                        required: function (element) {
-                            // Require SlotBook only if both ManualTime fields are empty
-                            return (
-                                $('[name="MalidivanManualTime"]').val().trim() === "" &&
-                                $('[name="ApplicantManualTime"]').val().trim() === ""
-                            );
-                        },
-                    },
-                    MalidivanManualTime: {
-                        required: function (element) {
-                            // Require ManualTime fields only if SlotBook is not selected
-                            return $('[name="SlotBook"]:checked').length === 0;
-                        },
-                    },
-                    ApplicantManualTime: {
-                        required: function (element) {
-                            // Same condition for the second ManualTime field
-                            return $('[name="SlotBook"]:checked').length === 0;
-                        },
-                    },
-                },
-                messages: {
-                    SlotBook: {
-                        required: "Please select a valid time slot or enter a manual time.",
-                    },
-                    MalidivanManualTime: {
-                        required: "Please enter Malidivan Manual Time or select a valid time slot.",
-                    },
-                    ApplicantManualTime: {
-                        required: "Please enter Applicant Manual Time or select a valid time slot.",
-                    },
-                },
-            errorPlacement: function(error, element) {
-                if (element.hasClass("Timezone_checkBox")) {
-                    // Append error message after the .row_time element
-                    element.closest(".row_time").after(error);
-                    } else {
-                        error.insertAfter(element); // Default behavior
-                    }
-                },
-                submitHandler: function(form) {
-                    var formData = new FormData(form);
-
-                    $.ajax({
-                    url: "{{ route('resort.ta.InterviewRequest') }}",
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(response.message, "Success", {
-                                positionClass: 'toast-bottom-right'
-                            });
-
-
-                            $("#sendRequest-modal").modal("hide");
-                            $("#TimeSlots-modal").modal("hide");
-                            $(".sendRequestTime-main").html(response.view);
-                            $("#todoList-main").html( response.TodoDataview);
-                            console.log(response,response.Final_response_data);
-                            $("#Final_response_data").html(response.Final_response_data);
-                            $("#sendRequestFinal-modal").modal("show");
-                            
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    }
-                });
-            }
-        });
-
+(function () {
+  'use strict';
+  var TOTAL = @json((int) $total_employees);
+  var INSIGHTS = @json($insights);
+  var EVENTS = @json($events);
+  var URLS = {
+    expenses: @json(route('payroll.getExpenses')),
+    estimate: @json(route('payroll.dashboard.estimate-breakdown')),
+    attendance: @json(route('resort.timeandattendance.GetYearWiseAttandanceData', ['year' => '__y__', 'date' => '__d__'])),
+    todo: @json(route('resort.timeandattendance.todolist')),
+    todoPage: @json(route('resort.timeandattendance.todolist')),
+    taDash: @json(route('resort.recruitement.hrdashboard')),
+    compliance: @json(route('people.compliance.list')),
+    compliancePage: @json(route('people.compliance.index')),
+    wai: @json(route('resort.wisdom.chat'))
+  };
+  var CSRF = document.querySelector('meta[name="csrf-token"]');
+  CSRF = CSRF ? CSRF.content : '';
+  var root = document.getElementById('hrmd');
+  var $ = function (id) { return document.getElementById(id); };
+  var AJAX = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+  function getJson(url) { return fetch(url, { headers: AJAX, credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+  function initials(n) { return (String(n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(function (p) { return p[0].toUpperCase(); }).join('')) || '?'; }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function fillAvatar(box, photo, name) {
+    var ini = initials(name);
+    if (!photo) { box.textContent = ini; return; }
+    var img = new Image(); img.alt = name || ''; img.src = photo;
+    img.onerror = function () { box.textContent = ini; };
+    box.appendChild(img);
+  }
+  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); }
+
+  /* ---------- Payroll (existing payroll.getExpenses + estimate-breakdown endpoints) ---------- */
+  (function () {
+    var now = new Date(), mo = now.getMonth();
+    var MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    function money(v) { return '$' + Math.round(v).toLocaleString('en-US'); }
+    function short(v, host) {
+      host.textContent = '';
+      var cur = el('span', 'cur', '$'); host.appendChild(cur);
+      host.appendChild(document.createTextNode(v >= 1000 ? (v / 1000).toFixed(1) : String(Math.round(v))));
+      if (v >= 1000) host.appendChild(el('span', 'k', 'k'));
+    }
+    $('pxSub').textContent = '— ' + MN[mo] + ' · detailed view';
+    $('pxLastLbl').textContent = mo > 0 ? 'Last month · ' + MN[mo - 1] : 'Last month';
+    function setFill(sel, pct) { root.querySelectorAll(sel).forEach(function (f) { f.style.setProperty('--h', pct + '%'); }); }
+    Promise.all([
+      getJson(URLS.expenses + '?year=' + now.getFullYear()).catch(function () { return {}; }),
+      getJson(URLS.estimate).catch(function () { return {}; })
+    ]).then(function (r) {
+      var res = r[0], est = r[1], d = res.data || {};
+      var pc = d.payrollCost || [], sc = d.serviceCharge || [];
+      // forecast = live estimate for the open cutoff period; once finalized, the locked figure for this month
+      var fc = est.is_estimated && +est.net > 0 ? +est.net : (+pc[mo] || 0);
+      var last = mo > 0 ? (+pc[mo - 1] || 0) : 0, svcPool = mo > 0 ? (+sc[mo - 1] || 0) : 0;
+      var svc = TOTAL > 0 ? svcPool / TOTAL : 0, top = Math.max(fc, last);
+      if (fc) { short(fc, root.querySelector('[data-pay="fc"]')); root.querySelector('[data-px="fc"]').textContent = money(fc); }
+      if (last) { short(last, root.querySelector('[data-pay="last"]')); root.querySelector('[data-px="last"]').textContent = money(last); }
+      if (svc) { short(svc, root.querySelector('[data-pay="svc"]')); root.querySelector('[data-px="svc"]').textContent = money(svc); root.querySelector('[data-px="pool"]').textContent = money(svcPool); }
+      if (top) { setFill('.rc-c:nth-child(1) .rc-fill,.px-c:nth-child(1) .rc-fill', Math.round(fc / top * 100)); setFill('.rc-c:nth-child(2) .rc-fill,.px-c:nth-child(2) .rc-fill', Math.round(last / top * 100)); }
+      if (fc && last) { var dl = (fc - last) / last * 100; root.querySelector('[data-px="fcDelta"]').textContent = (dl >= 0 ? '▲ ' : '▼ ') + Math.abs(dl).toFixed(1) + '%'; }
     });
+
+    var px = $('px');
+    function open() { px.classList.add('open'); document.body.style.overflow = 'hidden'; }
+    function shut() { px.classList.remove('open'); document.body.style.overflow = ''; }
+    $('rcExp').addEventListener('click', open);
+    $('pxClose').addEventListener('click', shut);
+    px.addEventListener('click', function (e) { if (e.target === px) shut(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && px.classList.contains('open')) shut(); });
+  })();
+
+  /* payroll card height follows the bottom of WAI Insights above 1100px */
+  (function () {
+    var pay = $('payCard'), ref = $('waiIns');
+    function align() {
+      pay.style.height = '';
+      if (window.innerWidth <= 1100) return;
+      var h = ref.getBoundingClientRect().bottom - pay.getBoundingClientRect().top;
+      if (h > 0) pay.style.height = h + 'px';
+    }
+    window.addEventListener('load', align);
+    window.addEventListener('resize', align);
+    requestAnimationFrame(align);
+  })();
+
+  /* ---------- To do: append Time & Attendance items to the server-rendered recruitment items ---------- */
+  (function () {
+    var list = $('tdList'), count = $('tdCount');
+    function refresh() {
+      var n = list.querySelectorAll('.td-item').length;
+      count.textContent = n;
+      if (!n && !list.querySelector('.empty')) list.appendChild(el('div', 'empty', 'Nothing to do right now.'));
+    }
+    refresh();
+    function addItem(photo, name, title, sub, label, href, cls) {
+      var item = el('div', 'td-item'), ico = el('span', 'td-ico'), bd = el('span', 'td-bd'), tt = el('span', 'td-tt', title), btn = el('a', 'td-btn' + (cls ? ' ' + cls : ''), label);
+      fillAvatar(ico, photo, name); tt.appendChild(el('small', '', sub)); bd.appendChild(tt); btn.href = href;
+      item.appendChild(ico); item.appendChild(bd); item.appendChild(btn);
+      var empty = list.querySelector('.empty'); if (empty) empty.remove();
+      list.appendChild(item);
+    }
+    // The master controller hands this page an empty recruitment list for HR users whose rank isn't literally 3;
+    // the Talent Acquisition dashboard resolves the HR rank itself, so read the list it shows this same user.
+    if (!list.querySelector('.td-item')) {
+      fetch(URLS.taDash, { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
+        var doc = new DOMParser().parseFromString(t, 'text/html');
+        doc.querySelectorAll('#todoList-main .todoList-block').forEach(function (b) {
+          var p = b.querySelector('p'), a = b.querySelector('a'), img = b.querySelector('img');
+          if (!p) return;
+          var text = p.textContent.replace(/\s+/g, ' ').trim(), m, photo = img ? img.getAttribute('src') : '';
+          var href = a && a.getAttribute('href') && a.getAttribute('href').indexOf('javascript') !== 0 ? a.href : URLS.taDash;
+          if ((m = text.match(/^(.*?) approved the vacancy for (.*)$/))) {
+            var q = a && /questionnaire/i.test(a.textContent);
+            addItem(photo, m[1], m[2] + ' vacancy', q ? 'Questionnaire required to advertise' : m[1] + ' approved', q ? 'Add' : 'Create', href);
+          } else if ((m = text.match(/^(.*?) is shortlisted for (.*)$/))) {
+            addItem(photo, m[1], m[1], m[2] + ' applicant · shortlisted', 'Invite', href);
+          } else {
+            m = text.split(' - ');
+            addItem(photo, m[0], m[0], (m[1] || text), 'Review', href);
+          }
+        });
+        refresh();
+      }).catch(refresh);
+    }
+    getJson(URLS.todo + '?length=8').then(function (res) {
+      (res.data || []).slice(0, 8).forEach(function (r) {
+        var type = r.action_type, btn = el('a', 'td-btn', 'Open'), sub;
+        if (type === 'check_in') { btn.textContent = 'Check-in'; btn.className += ' green'; sub = 'Pending check-in · ' + (r.StartTime || '') + ' shift'; }
+        else if (type === 'check_out') { btn.textContent = 'Check-out'; btn.className += ' red'; sub = 'Pending check-out · ' + (r.ExpectedEndTime || r.EndTime || ''); }
+        else if (type === 'overtime_pending') { btn.textContent = 'Approve'; btn.className += ' amber'; sub = 'Overtime pending'; }
+        else return;
+        btn.href = URLS.todoPage;
+        var item = el('div', 'td-item'), ico = el('span', 'td-ico'), bd = el('span', 'td-bd'), tt = el('span', 'td-tt', r.EmployeeName || '');
+        var photo = r.profileImg ? (/^(https?:)?\/\//.test(r.profileImg) || r.profileImg[0] === '/' ? r.profileImg : '/' + r.profileImg) : '';
+        fillAvatar(ico, photo, r.EmployeeName);
+        tt.appendChild(el('small', '', sub)); bd.appendChild(tt);
+        item.appendChild(ico); item.appendChild(bd); item.appendChild(btn);
+        var empty = list.querySelector('.empty'); if (empty) empty.remove();
+        list.appendChild(item);
+      });
+      refresh();
+    }).catch(refresh);
+  })();
+
+  /* ---------- WAI ask → existing Wisdom chat endpoint ---------- */
+  (function () {
+    var focus = $('focus'), body = $('fpBody'), askInput = $('askInput'), fpInput = $('fpInput');
+    function open() { focus.classList.add('open'); document.body.style.overflow = 'hidden'; setTimeout(function () { fpInput.focus(); }, 60); }
+    function close() { focus.classList.remove('open'); document.body.style.overflow = ''; askInput.value = ''; }
+    function ask(q) {
+      body.appendChild(el('div', 'q', q));
+      var a = el('div', 'a'); a.appendChild(el('div', 'a-tag', 'WAI')); var p = el('p', '', 'Thinking…'); a.appendChild(p); body.appendChild(a);
+      body.scrollTop = body.scrollHeight;
+      fetch(URLS.wai, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', body: JSON.stringify({ message: q }) })
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (j) { p.style.whiteSpace = 'pre-wrap'; p.textContent = j.success ? j.reply : (j.message || 'Something went wrong. Please try again.'); body.scrollTop = body.scrollHeight; })
+        .catch(function () { p.textContent = 'Something went wrong. Please try again.'; });
+    }
+    function submitAsk() { var v = askInput.value.trim(); if (!v) return; body.textContent = ''; ask(v); open(); }
+    function submitFp() { var v = fpInput.value.trim(); if (!v) return; ask(v); fpInput.value = ''; }
+    $('askGo').addEventListener('click', submitAsk);
+    askInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') submitAsk(); });
+    root.querySelectorAll('.hm-askchip').forEach(function (c) {
+      function fill() { askInput.value = c.textContent.trim(); askInput.focus(); }
+      c.addEventListener('click', fill);
+      c.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fill(); } });
+    });
+    $('fpGo').addEventListener('click', submitFp);
+    fpInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') submitFp(); });
+    $('fpClose').addEventListener('click', close);
+    focus.addEventListener('click', function (e) { if (e.target === focus) close(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && focus.classList.contains('open')) close(); });
+
+    var g = $('waiGlass');
+    g.addEventListener('pointermove', function (e) { var r = g.getBoundingClientRect(); g.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%'); g.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%'); });
+    g.addEventListener('pointerleave', function () { g.style.setProperty('--mx', '75%'); g.style.setProperty('--my', '-10%'); });
+  })();
+
+  /* ---------- WAI Insights spotlight (dismiss is client-side only; reappears on reload) ---------- */
+  var addInsight;
+  (function () {
+    var SEVW = { crit: 'Critical', high: 'High', watch: 'Watch' }, ORDER = { crit: 0, high: 1, watch: 2 };
+    var data = INSIGHTS.slice(), ID = 0;
+    data.forEach(function (d) { d.id = ++ID; });
+    function sortData() { data.sort(function (a, b) { return ORDER[a.sev] - ORDER[b.sev]; }); }
+    sortData();
+    var lens = 'all', idx = 0, auto = !window.matchMedia('(prefers-reduced-motion:reduce)').matches, timer = null;
+    var lensEl = $('wiLens'), prog = $('wiProg'), ct = $('wiCt'), totalN = $('wiTotal'), scard = $('wiScard'), playBtn = $('wiPlay');
+    function filtered() { return lens === 'all' ? data : data.filter(function (d) { return d.sev === lens; }); }
+    function cnt(s) { return s === 'all' ? data.length : data.filter(function (d) { return d.sev === s; }).length; }
+    function renderLens() {
+      totalN.textContent = data.length;
+      lensEl.textContent = '';
+      [['all', 'All'], ['crit', 'Critical'], ['high', 'High'], ['watch', 'Watch']].forEach(function (d) {
+        var c = el('span', 'wi-lchip' + (lens === d[0] ? ' on' : ''), d[1] + ' ');
+        c.appendChild(el('span', 'cnt', cnt(d[0])));
+        c.onclick = function () { lens = d[0]; idx = 0; renderLens(); renderCard(); startAuto(); };
+        lensEl.appendChild(c);
+      });
+    }
+    function renderCard() {
+      var list = filtered();
+      scard.textContent = '';
+      if (!list.length) {
+        scard.appendChild(el('div', 'x', 'All clear ✨ — nothing needs you right now.')).style.color = 'var(--muted)';
+        ct.textContent = '0 / 0'; prog.style.width = '0%'; return;
+      }
+      if (idx >= list.length) idx = 0;
+      var d = list[idx];
+      var tag = el('div', 'tag'); tag.appendChild(el('span', 'sv sev-' + (d.sev === 'crit' ? 'crit' : d.sev === 'high' ? 'high' : 'watch'), SEVW[d.sev])); tag.appendChild(document.createTextNode(' · ' + d.module));
+      var x = el('div', 'x'); x.innerHTML = d.html; // server-built from integers + fixed strings only
+      var a = el('div', 'a'), view = el('a', '', 'View details →'), dis = el('a', 'mut', 'Dismiss');
+      view.href = d.url; view.style.cursor = 'pointer';
+      dis.onclick = function () { dismiss(d.id); };
+      a.appendChild(view); a.appendChild(dis);
+      scard.appendChild(tag); scard.appendChild(x); scard.appendChild(a);
+      ct.textContent = (idx + 1) + ' / ' + list.length;
+      prog.style.width = ((idx + 1) / list.length * 100) + '%';
+    }
+    function step(n) { var l = filtered(); if (!l.length) return; idx = (idx + n + l.length) % l.length; renderCard(); }
+    function dismiss(id) { var k = data.findIndex(function (x) { return x.id === id; }); if (k > -1) data.splice(k, 1); renderLens(); renderCard(); }
+    function stopAuto() { if (timer) { clearInterval(timer); timer = null; } }
+    function startAuto() { stopAuto(); if (auto) timer = setInterval(function () { step(1); }, 6000); }
+    $('wiPrev').onclick = function () { step(-1); startAuto(); };
+    $('wiNext').onclick = function () { step(1); startAuto(); };
+    function setPlay() { playBtn.textContent = auto ? '⏸' : '▶'; playBtn.setAttribute('aria-label', auto ? 'Pause auto-rotate' : 'Start auto-rotate'); }
+    playBtn.onclick = function () { auto = !auto; setPlay(); auto ? startAuto() : stopAuto(); };
+    var box = $('waiIns');
+    box.addEventListener('mouseenter', stopAuto);
+    box.addEventListener('mouseleave', function () { if (auto) startAuto(); });
+    addInsight = function (d) { d.id = ++ID; data.push(d); sortData(); renderLens(); renderCard(); };
+    setPlay(); renderLens(); renderCard(); startAuto();
+  })();
+
+  /* ---------- Attendance trend: last 12 months from the existing Time & Attendance year endpoint ---------- */
+  (function () {
+    var chart = $('attChart'), xrow = $('attX'), tip = $('attTip');
+    var now = new Date(), y = now.getFullYear(), m = now.getMonth();
+    var MS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    var today = now.toISOString().slice(0, 10);
+    function fetchYear(yr) { return getJson(URLS.attendance.replace('__y__', yr).replace('__d__', today)).then(function (r) { return (r.datasets && r.datasets[0] && r.datasets[0].data) || []; }).catch(function () { return []; }); }
+    Promise.all([fetchYear(y - 1), fetchYear(y)]).then(function (yrs) {
+      var months = [];
+      for (var i = 11; i >= 0; i--) {
+        var mm = m - i, yy = y;
+        if (mm < 0) { mm += 12; yy -= 1; }
+        var arr = yrs[yy === y ? 1 : 0];
+        months.push({ m: MS[mm], mo: MN[mm] + ' ' + yy, rate: Math.min(100, Math.max(0, +arr[mm] || 0)) });
+      }
+      render(months);
+    });
+    function render(data) {
+      var def = data.length - 1, cols = [];
+      data.forEach(function (d, i) {
+        var col = el('div', 'att-col' + (i === def ? ' active' : ''));
+        col.appendChild(el('div', 'att-track'));
+        var bar = el('div', 'att-bar'); bar.style.setProperty('--h', d.rate.toFixed(1) + '%'); col.appendChild(bar);
+        chart.appendChild(col); cols.push(col);
+        xrow.appendChild(el('span', i === def ? 'on' : '', d.m));
+      });
+      var xs = [].slice.call(xrow.children);
+      function setActive(i) { cols.forEach(function (c, j) { c.classList.toggle('active', j === i); }); xs.forEach(function (s, j) { s.classList.toggle('on', j === i); }); }
+      function row(color, label, val) {
+        var r = el('div', 'tr'), lb = el('span', 'lb'), sw = el('i'); sw.style.background = color;
+        lb.appendChild(sw); lb.appendChild(document.createTextNode(label));
+        r.appendChild(lb); r.appendChild(el('b', '', val)); return r;
+      }
+      function showTip(i) {
+        var d = data[i];
+        tip.textContent = '';
+        var tm = el('div', 'tm'); tm.appendChild(el('b', '', d.mo)); tip.appendChild(tm);
+        if (d.rate > 0) { tip.appendChild(row('#014653', 'Present', d.rate.toFixed(1) + '%')); tip.appendChild(row('#E0673F', 'Not present', (100 - d.rate).toFixed(1) + '%')); }
+        else tip.appendChild(el('div', 'tr', 'No attendance recorded'));
+        var cr = chart.getBoundingClientRect(), br = cols[i].getBoundingClientRect(), left = br.left - cr.left + br.width / 2;
+        tip.style.opacity = '0'; tip.style.left = left + 'px'; tip.style.top = (cr.height * (1 - d.rate / 100) - 10) + 'px';
+        requestAnimationFrame(function () {
+          var tw = tip.offsetWidth; left = Math.max(tw / 2 + 2, Math.min(cr.width - tw / 2 - 2, left));
+          tip.style.left = left + 'px'; tip.style.transform = 'translate(-50%,-100%)'; tip.style.opacity = '1';
+        });
+      }
+      cols.forEach(function (c, i) { c.addEventListener('pointerenter', function () { setActive(i); showTip(i); }); });
+      chart.addEventListener('pointerleave', function () { tip.style.opacity = '0'; setActive(def); });
+    }
+  })();
+
+  /* ---------- Compliance: existing compliance list endpoint, grouped by severity ---------- */
+  (function () {
+    var parser = new DOMParser();
+    function html(s) { return parser.parseFromString(s || '', 'text/html'); }
+    function txt(doc, sel) { var n = doc.querySelector(sel); return n ? n.textContent.trim() : ''; }
+    var groups = { crit: [], high: [], med: [] };
+    root.querySelectorAll('.cmp-gh[data-grp]').forEach(function (h) {
+      h.addEventListener('click', function () {
+        var g = $(h.dataset.grp); g.classList.toggle('collapsed');
+        h.setAttribute('aria-expanded', g.classList.contains('collapsed') ? 'false' : 'true');
+      });
+    });
+    var cf = $('cmpFix'), cfBody = $('cfBody');
+    // AI text is stored HTML-encoded (e.g. &#039;); decode to plain text (textContent below keeps it safe)
+    function plain(t) { return new DOMParser().parseFromString(t || '', 'text/html').documentElement.textContent; }
+    function closeFix() { cf.classList.remove('open'); document.body.style.overflow = ''; }
+    function openFix(it) {
+      $('cfSub').textContent = '— ' + it.rule;
+      cfBody.textContent = '';
+      var a = el('div', 'a'), list = el('div', 'a-list'), r = el('div', 'a-row'), av = el('div', 'av'), ab = el('div', 'ab');
+      a.appendChild(el('div', 'a-tag', 'Compliance' + (it.module ? ' · ' + it.module : '')));
+      fillAvatar(av, it.photo, it.name); av.style.background = 'var(--teal)';
+      ab.appendChild(el('div', 'at', it.name || 'Employee')); ab.appendChild(el('div', 'ac', [it.role, it.rule].filter(Boolean).join(' · ')));
+      r.appendChild(av); r.appendChild(ab); r.appendChild(el('span', 'atag', { crit: 'Critical', high: 'High', med: 'Medium' }[it.sev])); list.appendChild(r);
+      a.appendChild(list);
+      if (it.desc) { var d = el('p', '', it.desc); d.style.marginTop = '14px'; a.appendChild(d); }
+      a.appendChild(el('div', 'a-tag', 'Suggested fix')).style.marginTop = '16px';
+      a.appendChild(el('p', '', it.fix || 'No suggestion has been generated for this breach yet. Open Compliance to regenerate it.'));
+      var go = el('a', '', 'Open in Compliance →'); go.href = URLS.compliancePage; go.style.cssText = 'display:inline-block;margin-top:14px;font-size:12px;font-weight:600;color:var(--teal);text-decoration:none';
+      a.appendChild(go);
+      cfBody.appendChild(a);
+      cf.classList.add('open'); document.body.style.overflow = 'hidden';
+    }
+    $('cfClose').addEventListener('click', closeFix);
+    cf.addEventListener('click', function (e) { if (e.target === cf) closeFix(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && cf.classList.contains('open')) closeFix(); });
+    getJson(URLS.compliance + '?length=200').then(function (res) {
+      (res.data || []).forEach(function (r) {
+        var sev = (r.severity_ai || '').toLowerCase(), key = sev === 'critical' ? 'crit' : sev === 'high' ? 'high' : 'med';
+        var emp = html(r.employee_name), av = emp.querySelector('.cc-emp-avatar img');
+        var date = txt(html(r.reported_on), 'div').split(' ').slice(0, 2).join(' ');
+        var role = txt(emp, '.cc-emp-role');
+        groups[key].push({
+          rule: txt(html(r.compliance_breached_name), '.cc-rule-name') || r.compliance_breached_name || 'Compliance breach',
+          name: txt(emp, '.cc-emp-name'), photo: av ? av.getAttribute('src') : '',
+          sub: [txt(emp, '.cc-emp-name'), role, r.module_name].filter(Boolean).join(' · '), date: date,
+          role: role, module: r.module_name || '', sev: key,
+          desc: plain(r.description_ai || '').replace(/§\s?(\d)/g, 'Section $1') || txt(html(r.description), '.cc-desc-text') || '',
+          fix: plain(r.remediation_ai)
+        });
+      });
+      var open = 0;
+      Object.keys(groups).forEach(function (k) {
+        var list = groups[k], g = $('cmp-' + k), bodyEl = g.querySelector('.cmp-gbody');
+        open += list.length;
+        g.querySelector('.gc').textContent = '· ' + list.length;
+        if (!list.length) { bodyEl.appendChild(el('div', 'empty', 'No ' + (k === 'crit' ? 'critical' : k === 'high' ? 'high' : 'medium') + ' breaches.')); return; }
+        list.slice(0, 5).forEach(function (it) {
+          var item = el('div', 'cmp-item'), a = el('span', 'cmp-av'), main = el('div', 'cmp-main');
+          fillAvatar(a, it.photo, it.name);
+          main.appendChild(el('div', 'cmp-rule', it.rule)); main.appendChild(el('div', 'cmp-sub', it.sub));
+          var fix = el('button', 'cmp-fix', 'Suggestion'); fix.type = 'button'; fix.onclick = function () { openFix(it); };
+          item.appendChild(a); item.appendChild(main); item.appendChild(el('span', 'cmp-rep', it.date)); item.appendChild(fix);
+          bodyEl.appendChild(item);
+        });
+      });
+      $('cmpOpen').textContent = open + ' open';
+      if (groups.crit.length) addInsight({ module: 'Compliance', sev: 'crit', title: 'Critical breaches', html: '<b>' + plural(groups.crit.length, 'critical compliance breach', 'critical compliance breaches') + '</b> open.', url: URLS.compliancePage });
+    }).catch(function () {
+      $('cmpOpen').textContent = 'Unavailable';
+      $('cmp-crit').querySelector('.cmp-gbody').appendChild(el('div', 'empty', 'Compliance could not be loaded.'));
+    });
+  })();
+
+  /* ---------- Calendar + upcoming events ---------- */
+  (function () {
+    var mg = $('mg'), moEl = $('calMo'), up = $('upList');
+    var MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    var MS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var now = new Date(), cy = now.getFullYear(), cm = now.getMonth();
+    function key(y, m, d) { return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
+    var evDays = {}; EVENTS.forEach(function (e) { evDays[e.date] = 1; });
+    function grid() {
+      moEl.textContent = MN[cm] + ' ' + cy;
+      var first = new Date(cy, cm, 1).getDay(), dim = new Date(cy, cm + 1, 0).getDate(), prev = new Date(cy, cm, 0).getDate(), tk = key(now.getFullYear(), now.getMonth(), now.getDate());
+      mg.textContent = '';
+      for (var i = 0; i < first; i++) mg.appendChild(el('div', 'dcell mut', prev - first + 1 + i));
+      for (var d = 1; d <= dim; d++) {
+        var k = key(cy, cm, d), cls = 'dcell' + (k === tk ? ' today' : evDays[k] ? ' ev' : '');
+        var c = el('div', cls, d); if (k === tk || evDays[k]) c.appendChild(el('span', 'evd')); mg.appendChild(c);
+      }
+      var trail = (7 - (first + dim) % 7) % 7;
+      for (var j = 1; j <= trail; j++) mg.appendChild(el('div', 'dcell mut', j));
+    }
+    $('calPrev').onclick = function () { cm--; if (cm < 0) { cm = 11; cy--; } grid(); };
+    $('calNext').onclick = function () { cm++; if (cm > 11) { cm = 0; cy++; } grid(); };
+    grid();
+
+    var t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var upcoming = EVENTS.filter(function (e) { return new Date(e.date + 'T00:00:00') >= t0; });
+    if (!upcoming.length) up.appendChild(el('div', 'empty', 'No upcoming events.'));
+    upcoming.forEach(function (e) {
+      var d = new Date(e.date + 'T00:00:00'), days = Math.round((d - t0) / 864e5);
+      var ue = el('div', 'ue'), chip = el('div', 'dchip'), ub = el('div', 'ub'), right = el('div', 'ue-right');
+      chip.appendChild(el('div', 'dd tnum', String(d.getDate()).padStart(2, '0'))); chip.appendChild(el('div', 'dm', MS[d.getMonth()]));
+      ub.appendChild(el('div', 'ut', e.title)); ub.appendChild(el('div', 'us', e.sub));
+      var people = e.people || [];
+      if (people.length === 1) { var av = el('span', 'av'); fillAvatar(av, people[0].photo, people[0].name); right.appendChild(av); }
+      else if (people.length > 1) { var st = el('span', 'stack'); people.slice(0, 2).forEach(function (p) { var a = el('span', 'av'); fillAvatar(a, p.photo, p.name); st.appendChild(a); }); if (people.length > 2) st.appendChild(el('span', 'more', '+' + (people.length - 2))); right.appendChild(st); }
+      right.appendChild(el('span', 'uw' + (days === 0 ? ' today' : days <= 3 ? ' soon' : ''), days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : days <= 3 ? days + ' days' : d.getDate() + ' ' + MS[d.getMonth()]));
+      ue.appendChild(chip); ue.appendChild(ub); ue.appendChild(right); up.appendChild(ue);
+    });
+  })();
+})();
 </script>
 @endsection
-

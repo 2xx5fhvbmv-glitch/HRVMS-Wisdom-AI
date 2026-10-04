@@ -210,6 +210,8 @@
 
     /* Employee avatar — same 32px bump as the Payslip/Pension lists. */
     #ewtTaxTable .tableUser-block .img-circle { width: 32px; height: 32px; min-width: 32px; }
+    /* Global .img-circle > img uses object-fit: contain, so non-square photos don't fill the circle. */
+    #ewtTaxTable .tableUser-block .img-circle img { object-fit: cover; }
 
     /* Freeze ID/Employee/Department/Position/Annual Total while the Jan-Dec
        columns scroll horizontally underneath. DataTables' FixedColumns
@@ -372,7 +374,7 @@
 
                                         return `
                                             <div class="ewt-cell text-end">
-                                                <span class="d-block fw-600" style="font-size:14px;">${formatAmount(parseFloat(data.ewt), 'USD')}</span>
+                                                <span class="d-block" style="font-size:14px;font-weight:400;">${formatAmount(parseFloat(data.ewt), 'USD')}</span>
                                                 <div class="ewt-tooltip">
                                                     <div class="ewt-row"><span class="ewt-label">Earnings</span><span class="ewt-value">${formatAmount(parseFloat(data.earnings), 'USD')}</span></div>
                                                     <div class="ewt-row"><span class="ewt-label">Tax Rate</span><span class="ewt-value">${data.tax_rate}%</span></div>
