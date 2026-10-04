@@ -18,7 +18,7 @@ class Authenticate extends Middleware
     {
        
         if (! $request->expectsJson()) {
-            if (request()->route()->getPrefix() == "/admin") {
+            if (request()->route()->getPrefix() == config('settings.route_prefix.admin')) {
                 return route('admin.loginindex');
             } else if (request()->route()->getPrefix() == "/resort") {
                 return route('resort.loginindex');

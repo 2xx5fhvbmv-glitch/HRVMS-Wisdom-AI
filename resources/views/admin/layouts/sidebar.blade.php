@@ -193,6 +193,13 @@
 					</a>
 				</li>
 
+				<li class="nav-item">
+					<a href="{{route('admin.2fa.setup')}}" class="nav-link">
+						<i class="nav-icon fas fa-key"></i>
+						<p>Two-factor &amp; Passkeys</p>
+					</a>
+				</li>
+
 				@if(Common::hasPermission(config('settings.admin_modules.email_templates'),config('settings.permissions.view')))
 					<li class="nav-item">
 						<a href="{{route('admin.emailTemplate.index')}}" class="nav-link @if(in_array(Route::currentRouteName(), array('admin.emailTemplate.index','admin.emailTemplate.create', 'admin.emailTemplate.edit'))) active @endif">

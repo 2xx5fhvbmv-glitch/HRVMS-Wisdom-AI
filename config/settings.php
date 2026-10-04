@@ -487,7 +487,9 @@ return [
 	],
 
 	'route_prefix' => [
-		'admin' => '/admin',
+		// Decision G: set ADMIN_ROUTE_PREFIX in prod .env to a non-obvious path (kept out of git).
+		// Defence against scanners only — MFA/IP rules are the real protection.
+		'admin' => '/' . trim(env('ADMIN_ROUTE_PREFIX', 'admin'), '/'),
 		'user' => '/user',
 		'customer' => '/customer'
 	],

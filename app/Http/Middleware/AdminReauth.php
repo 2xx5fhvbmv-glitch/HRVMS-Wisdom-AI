@@ -20,9 +20,11 @@ class AdminReauth
             return $next($request);
         }
 
-        if ($request->expectsJson() || $request->ajax()) {
-            // Return to the page the action was fired from, not the AJAX endpoint.
+        if ($request->expectsJson() || $request->ajax() || !$request->isMethod('GET')) {
+            // Return to the page the action was fired from, not the AJAX/POST endpoint.
             $request->session()->put('url.intended', url()->previous());
+        }
+        if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => false,
                 'reauth_required' => true,
@@ -31,6 +33,6 @@ class AdminReauth
             ], 403);
         }
 
-        return redirect()->guest(route('admin.reauth'));
+        return $request->isMethod('GET') ? redirect()->guest(route('admin.reauth')) : redirect()->route('admin.reauth');
     }
 }

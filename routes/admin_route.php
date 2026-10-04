@@ -1,7 +1,7 @@
 <?php
 
 /** Routes without login ***/
-Route::prefix('admin')->namespace('Admin')->group(function () {
+Route::prefix(config('settings.route_prefix.admin'))->namespace('Admin')->group(function () {
   Route::get('/', 'LoginController@showLoginForm')->name('admin.loginindex');
   Route::post('/do-login', 'LoginController@login')->middleware('throttle:admin-login')->name('admin.login');
   Route::get('/request-password', 'ForgotPasswordController@requestPassword')->name('admin.password.request');
@@ -12,10 +12,12 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
   // MFA login step 2 (password already verified; session holds a short-lived pending marker).
   Route::get('/two-factor', 'TwoFactorController@challenge')->name('admin.2fa.challenge');
   Route::post('/two-factor', 'TwoFactorController@verify')->middleware('throttle:admin-login')->name('admin.2fa.verify');
+  Route::post('/two-factor/passkey/options', 'PasskeyController@loginOptions')->middleware('throttle:admin-login')->name('admin.passkey.login.options');
+  Route::post('/two-factor/passkey', 'PasskeyController@login')->middleware('throttle:admin-login')->name('admin.passkey.login');
 });
 
 /*** Admin Authenticated Routes ***/
-    Route::prefix('admin')->middleware(['auth:admin','forcePasswordChange:admin','admin.security','revalidate'])->namespace('Admin')->group(function () {
+    Route::prefix(config('settings.route_prefix.admin'))->middleware(['auth:admin','forcePasswordChange:admin','admin.security','revalidate'])->namespace('Admin')->group(function () {
 
     /*** Logout ***/
     Route::get('/logout', 'LoginController@logout')->name('admin.logout');
@@ -25,6 +27,9 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
     Route::post('/two-factor/setup', 'TwoFactorController@confirm')->middleware('throttle:admin-login')->name('admin.2fa.confirm');
     Route::get('/confirm-identity', 'TwoFactorController@reauthForm')->name('admin.reauth');
     Route::post('/confirm-identity', 'TwoFactorController@reauth')->middleware('throttle:admin-login')->name('admin.reauth.submit');
+    Route::post('/passkeys/options', 'PasskeyController@registerOptions')->middleware('admin.reauth')->name('admin.passkey.register.options');
+    Route::post('/passkeys', 'PasskeyController@register')->middleware('admin.reauth')->name('admin.passkey.register');
+    Route::post('/passkeys/{id}/delete', 'PasskeyController@destroy')->middleware('admin.reauth')->name('admin.passkey.destroy');
 
 
     /***** Start Admin to Resort Login ****/

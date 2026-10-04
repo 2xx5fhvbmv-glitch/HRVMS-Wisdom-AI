@@ -8,6 +8,7 @@ use App\Models\Admin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use F9WebLtd\QrCode\Facades\QrCode;
@@ -26,15 +27,16 @@ class TwoFactorController extends Controller
     /** Login step 2 — password already checked by LoginController::login(). */
     public function challenge(Request $request)
     {
-        if (!$this->pendingAdmin($request)) {
+        $admin = self::pendingAdmin($request);
+        if (!$admin) {
             return redirect()->route('admin.loginindex');
         }
-        return view('admin.auth.two_factor', ['mode' => 'challenge']);
+        return view('admin.auth.two_factor', ['mode' => 'challenge', 'hasPasskey' => DB::table('admin_passkeys')->where('admin_id', $admin->id)->exists()]);
     }
 
     public function verify(Request $request)
     {
-        $admin = $this->pendingAdmin($request);
+        $admin = self::pendingAdmin($request);
         if (!$admin) {
             return redirect()->route('admin.loginindex')->withErrors(['Your sign-in expired. Please start again.']);
         }
@@ -61,7 +63,11 @@ class TwoFactorController extends Controller
     {
         $admin = Auth::guard('admin')->user();
         if ($admin->two_factor_confirmed_at) {
-            return response()->view('admin.auth.two_factor', ['mode' => 'enrolled', 'admin' => $admin]);
+            return response()->view('admin.auth.two_factor', [
+                'mode' => 'enrolled',
+                'admin' => $admin,
+                'passkeys' => DB::table('admin_passkeys')->where('admin_id', $admin->id)->orderBy('id')->get(),
+            ]);
         }
 
         $secret = $request->session()->get('admin_2fa_setup_secret') ?: Totp::generateSecret();
@@ -125,10 +131,13 @@ class TwoFactorController extends Controller
      */
     private function fail(string $mode, string $error)
     {
-        return response()->view('admin.auth.two_factor', ['mode' => $mode, 'error' => $error], 422);
+        $hasPasskey = $mode === 'challenge' && ($admin = self::pendingAdmin(request()))
+            && DB::table('admin_passkeys')->where('admin_id', $admin->id)->exists();
+        return response()->view('admin.auth.two_factor', ['mode' => $mode, 'error' => $error, 'hasPasskey' => $hasPasskey], 422);
     }
 
-    private function pendingAdmin(Request $request): ?Admin
+    /** Shared with PasskeyController (passkey is the alternative second factor). */
+    public static function pendingAdmin(Request $request): ?Admin
     {
         $pending = $request->session()->get('admin_2fa_pending');
         if (!$pending || time() - $pending['at'] > self::PENDING_TTL) {
