@@ -106,5 +106,15 @@
             </tr>
         </tbody>
     </table>
+
+    @include('resorts.pdf_partials._signature_block', [
+        'signatures' => $payroll->approvals()
+            ->where('status', 'approved')
+            ->whereNotNull('signature_name')
+            ->orderBy('step_order')
+            ->get()
+            ->map(fn ($a) => ['name' => $a->signature_name, 'signature_img' => $a->signature_img, 'timestamp' => $a->signed_at])
+            ->all(),
+    ])
 </body>
 </html>

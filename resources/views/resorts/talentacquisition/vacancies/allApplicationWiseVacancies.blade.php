@@ -462,6 +462,47 @@ $(document).ready(function() {
                 datatablelist();
             }
         }
+        // Copy the public application link
+        $(document).on('click', '.copyApplyLink', function () {
+            let link = $(this).data('link');
+            let done = function () { toastr.success('Application link copied.', 'Success', { positionClass: 'toast-bottom-right' }); };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(link).then(done);
+            } else {
+                let $t = $('<textarea>').val(link).appendTo('body').select();
+                document.execCommand('copy');
+                $t.remove();
+                done();
+            }
+        });
+
+        // Close / reopen a vacancy
+        function vacancyAction(routeTpl, id, confirmText) {
+            if (!confirm(confirmText)) return;
+            $.ajax({
+                url: routeTpl.replace(':id', id),
+                type: 'POST',
+                data: { _token: '{{ csrf_token() }}' },
+                success: function (res) {
+                    if (res.success) {
+                        toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                        checkGrid();
+                    } else {
+                        toastr.error(res.message, 'Error', { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function (xhr) {
+                    toastr.error((xhr.responseJSON && xhr.responseJSON.message) || 'Something went wrong.', 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            });
+        }
+        $(document).on('click', '.closeVacancyBtn', function () {
+            vacancyAction("{{ route('resort.vacancies.close', ':id') }}", $(this).data('id'), 'Close this vacancy? The application link will stop accepting applicants.');
+        });
+        $(document).on('click', '.reopenVacancyBtn', function () {
+            vacancyAction("{{ route('resort.vacancies.reopen', ':id') }}", $(this).data('id'), 'Reopen this vacancy and restore its application link?');
+        });
+
         function datatablelist()
         {
             if ($.fn.DataTable.isDataTable('#VacanciesApplcation')) {

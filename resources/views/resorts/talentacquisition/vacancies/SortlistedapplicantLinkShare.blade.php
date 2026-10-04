@@ -227,6 +227,65 @@
             </div>
         </div>
     </div>
+    <div class="modal fade" id="rescheduleInterview-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-small">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Reschedule Interview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="rescheduleInterviewForm">
+                    @csrf
+                    <div class="modal-body">
+                        <input type="hidden" name="interview_id" id="reschedule_interview_id">
+                        <div class="mb-3">
+                            <label class="form-label">New date</label>
+                            <input type="date" class="form-control" name="TimeSlotsFormdate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Resort time</label>
+                            <input type="text" class="form-control" name="ResortInterviewtime" placeholder="e.g. 10:00 AM" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Candidate's local time</label>
+                            <input type="text" class="form-control" name="ApplicantInterviewtime" placeholder="e.g. 11:30 AM" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Meeting link (optional)</label>
+                            <input type="text" class="form-control" name="MeetingLink" placeholder="https://">
+                        </div>
+                        <p class="small text-muted mb-0">If the candidate was already invited, they are told the old slot is cancelled and a new invitation is sent.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-primary">Reschedule</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="removeShortlist-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-small">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Remove from Shortlist</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="removeShortlistForm">
+                    @csrf
+                    <div class="modal-body">
+                        <input type="hidden" name="ApplicantStatus_id" id="remove_applicant_status_id">
+                        <p class="mb-2">The applicant is moved to <strong>Rejected</strong> and any open interview slot is cancelled.</p>
+                        <textarea class="form-control" name="reason" rows="3" maxlength="1000" placeholder="Reason (required)" required></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-critical">Remove</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     <div class="userApplicants-wrapper ">
 
     </div>
@@ -799,6 +858,63 @@ $(document).on("change", '[name="MalidivanManualTime"]', function () {
                     }
                 });
             }
+        });
+
+        // ---- Reschedule / remove from shortlist / copy booking link
+        function taErr(xhr) {
+            var m = (xhr.responseJSON && (xhr.responseJSON.message || Object.values(xhr.responseJSON.errors || {}).flat().join(' '))) || 'Something went wrong.';
+            toastr.error(m, 'Error', { positionClass: 'toast-bottom-right' });
+        }
+        $(document).on('click', '.CopyBookingLink', function () {
+            var link = $(this).data('link');
+            var done = function () { toastr.success('Booking link copied.', 'Success', { positionClass: 'toast-bottom-right' }); };
+            if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(link).then(done); }
+            else { var $t = $('<textarea>').val(link).appendTo('body').select(); document.execCommand('copy'); $t.remove(); done(); }
+        });
+        $(document).on('click', '.RescheduleInterview', function () {
+            $('#rescheduleInterviewForm')[0].reset();
+            $('#reschedule_interview_id').val($(this).data('interview_id'));
+            $('#rescheduleInterview-modal').modal('show');
+        });
+        $('#rescheduleInterviewForm').on('submit', function (e) {
+            e.preventDefault();
+            var $btn = $(this).find('button[type="submit"]').prop('disabled', true);
+            $.ajax({
+                url: "{{ route('resort.ta.RescheduleInterview') }}", type: 'POST', data: $(this).serialize(),
+                success: function (res) {
+                    $('#rescheduleInterview-modal').modal('hide');
+                    $('#SortlistedApplicants').DataTable().ajax.reload();
+                    if (!res.success) { toastr.error(res.message, 'Error', { positionClass: 'toast-bottom-right' }); return; }
+                    toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                    // Re-send the invitation straight away when the interview already has an email template.
+                    if (res.email_template_id && confirm('Send the new invitation to the candidate now?')) {
+                        $.post("{{ route('resort.ta.SendInterviewEmail') }}", { interview_id: res.interview_id, email_template_id: res.email_template_id, _token: '{{ csrf_token() }}' })
+                            .done(function (r) { toastr[r.success ? 'success' : 'error'](r.message, r.success ? 'Success' : 'Error', { positionClass: 'toast-bottom-right' }); $('#SortlistedApplicants').DataTable().ajax.reload(); })
+                            .fail(taErr);
+                    }
+                },
+                error: taErr,
+                complete: function () { $btn.prop('disabled', false); }
+            });
+        });
+        $(document).on('click', '.RemoveFromShortlist', function () {
+            $('#removeShortlistForm')[0].reset();
+            $('#remove_applicant_status_id').val($(this).data('id'));
+            $('#removeShortlist-modal').modal('show');
+        });
+        $('#removeShortlistForm').on('submit', function (e) {
+            e.preventDefault();
+            var $btn = $(this).find('button[type="submit"]').prop('disabled', true);
+            $.ajax({
+                url: "{{ route('resort.ta.RemoveFromShortlist') }}", type: 'POST', data: $(this).serialize(),
+                success: function (res) {
+                    $('#removeShortlist-modal').modal('hide');
+                    toastr[res.success ? 'success' : 'error'](res.message, res.success ? 'Success' : 'Error', { positionClass: 'toast-bottom-right' });
+                    $('#SortlistedApplicants').DataTable().ajax.reload();
+                },
+                error: taErr,
+                complete: function () { $btn.prop('disabled', false); }
+            });
         });
         $(document).on("click", ".ApplicantShareLink", function() {
             let Interview_id = $(this).data("interview_id");

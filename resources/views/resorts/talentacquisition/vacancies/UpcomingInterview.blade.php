@@ -182,6 +182,8 @@
             </div>
         </div>
     </div>
+
+    <div class="userApplicants-wrapper"></div>
     @endsection
 
 @section('import-css')
@@ -220,7 +222,7 @@ $(document).ready(function() {
                 { data: 'AppliedDate', name: 'AppliedDate', className: 'text-nowrap' },
                 { data: 'Stage', name: 'Stage', className: 'text-nowrap' },
                 { data: 'Nationality', name: 'Nationality', className: 'text-nowrap' },
-                { data: 'InterViewDate', name: 'InterViewDate', className: 'text-nowrap' },
+                { data: 'InterViewDate', name: 'interview_date_raw', className: 'text-nowrap' }, // sort on the raw date, not the d M Y text
                 { data: 'MalidivanTime', name: 'MalidivanTime', className: 'text-nowrap' },
                 { data: 'ApplicantTime', name: 'ApplicantTime', className: 'text-nowrap' },
                 { data: 'InterviewStatus', name: 'InterviewStatus', className: 'text-nowrap' },
@@ -228,6 +230,31 @@ $(document).ready(function() {
                 {data:'created_at', visible:false,searchable:false},
 
             ]
+    });
+
+    // Applicant sidebar (name click) — same handler as the other TA list pages
+    const $userApplicantsWrapper = $(".userApplicants-wrapper");
+    $(document).on("click", ".userApplicants-btn", function (e) {
+        e.stopPropagation();
+        let url = "{{ route('resort.ta.TaUserApplicantsSideBar', ':id') }}".replace(':id', $(this).data("id"));
+        $.ajax({
+            url: url,
+            type: "GET",
+            success: function (response) {
+                if (response.success) {
+                    $(".userApplicants-wrapper").html(response.view);
+                }
+            },
+            error: function () {
+                toastr.error('Failed to load applicant details.', { positionClass: 'toast-bottom-right' });
+            }
+        });
+        $userApplicantsWrapper.toggleClass("end-0");
+    });
+
+    $(document).on("click", ".closeSlider", function (e) {
+        e.preventDefault();
+        $userApplicantsWrapper.toggleClass("end-0");
     });
 });
 </script>

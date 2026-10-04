@@ -303,7 +303,14 @@ class ApplicantController extends Controller
 
     public function applicant_formStore(Request $request)
     {
-
+            // Vacancy closed after this applicant opened the form — the link is
+            // expired but their session still carries the pinned context.
+            // Checked before validation so they aren't asked to fix fields
+            // and re-upload files for a vacancy that can't accept them.
+            $pinned = Session::get('applicant_link');
+            if ($pinned && Vacancies::where('id', $pinned['vacancy_id'])->where('status', 'Closed')->exists()) {
+                return response()->json(['success' => false, 'message' => 'This vacancy is closed and no longer accepting applications.'], 422);
+            }
 
             // Validation rules
             $validatedData = $request->validate([

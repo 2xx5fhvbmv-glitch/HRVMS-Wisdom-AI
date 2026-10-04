@@ -1695,6 +1695,134 @@ class VacancyController extends Controller
         return view("resorts.talentacquisition.vacancies.alltodoList",compact('page_title'));
     }
 
+    /** Public application URL — same format the job-ad link is generated with (resort/ta_child/vacancy). */
+    private function vacancyPublicLink($resort_id, $taChildId, $vacancyId): ?string
+    {
+        return $taChildId
+            ? route('resort.applicantForm', base64_encode($resort_id . '/' . $taChildId . '/' . $vacancyId))
+            : null;
+    }
+
+    /** application_links rows belonging to one vacancy (vacancy -> notification parent -> child -> link). */
+    private function vacancyLinks($vacancyId)
+    {
+        return ApplicationLink::where('Resort_id', $this->resort->resort_id)
+            ->whereIn('ta_child_id', DB::table('t_anotification_children as c')
+                ->join('t_anotification_parents as p', 'p.id', '=', 'c.Parent_ta_id')
+                ->where('p.V_id', $vacancyId)
+                ->select('c.id'));
+    }
+
+    /**
+     * Close a vacancy: status Closed + application link(s) expired today so the
+     * public form stops accepting applicants. Existing applicants/interviews are
+     * untouched. The previous expiry is kept in expiry_before_close so
+     * reopenVacancy() can restore it (Old_ExpiryDate is a DATE column the
+     * extend-expiry flow already uses, so it is deliberately left alone).
+     */
+    public function closeVacancy(Request $request, $id)
+    {
+        if (!Common::hasFullDataAccess($this->resort->GetEmployee ?? null)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+        $vacancy = Vacancies::where('Resort_id', $this->resort->resort_id)->find($id);
+        if (!$vacancy) {
+            return response()->json(['success' => false, 'message' => 'Vacancy not found.'], 404);
+        }
+        if ($vacancy->status !== 'Active') {
+            return response()->json(['success' => false, 'message' => 'Only an Active vacancy can be closed.'], 422);
+        }
+
+        DB::transaction(function () use ($vacancy) {
+            foreach ($this->vacancyLinks($vacancy->id)->get() as $link) {
+                $link->update([
+                    'expiry_before_close' => $link->link_Expiry_date, // null = it had no expiry
+                    'link_Expiry_date' => Carbon::today()->subDay()->format('Y-m-d'), // expired as of today
+                ]);
+            }
+            $vacancy->update(['status' => 'Closed']);
+        });
+
+        return response()->json(['success' => true, 'message' => 'Vacancy closed. The application link no longer accepts applicants.']);
+    }
+
+    public function reopenVacancy(Request $request, $id)
+    {
+        if (!Common::hasFullDataAccess($this->resort->GetEmployee ?? null)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+        $vacancy = Vacancies::where('Resort_id', $this->resort->resort_id)->find($id);
+        if (!$vacancy) {
+            return response()->json(['success' => false, 'message' => 'Vacancy not found.'], 404);
+        }
+        if ($vacancy->status !== 'Closed') {
+            return response()->json(['success' => false, 'message' => 'Only a Closed vacancy can be reopened.'], 422);
+        }
+
+        DB::transaction(function () use ($vacancy) {
+            foreach ($this->vacancyLinks($vacancy->id)->get() as $link) {
+                $link->update(['link_Expiry_date' => $link->expiry_before_close, 'expiry_before_close' => null]);
+            }
+            $vacancy->update(['status' => 'Active']);
+        });
+
+        return response()->json(['success' => true, 'message' => 'Vacancy reopened.']);
+    }
+
+    /** Applicant photo URL via the disk-aware helper (URL::asset breaks on wasabi). */
+    private function applicantPhotoUrl($path): ?string
+    {
+        return $path ? (Common::GetApplicantAWSFile($path)['NewURLshow'] ?? null) : null;
+    }
+
+    /** [vacancy_id => hired count] — shared by the list and grid views. */
+    private function hiredByVacancy($resort_id, array $vacancyIds): array
+    {
+        // Hired-count lookup. Two sources, in order of preference:
+        //   1. employees.vacancy_id — set when a new hire is created
+        //      via /people/employees/create (mandatory vacancy pick).
+        //      The most accurate signal because it ties the actual
+        //      employee record to the vacancy. Requires the 2026_06_01
+        //      migration; guarded with Schema::hasColumn.
+        //   2. applicant_wise_statuses.status='Contract Accepted' on
+        //      applicant_form_data.Parent_v_id — the TA-flow definition
+        //      of "hired" the dashboard already counts. Works on every
+        //      environment, captures historical hires that pre-date the
+        //      vacancy_id column.
+        // The greater of the two per vacancy is reported so neither
+        // path can under-count.
+        $hiredByVacancy = [];
+        if (!empty($vacancyIds)) {
+            if (Schema::hasColumn('employees', 'vacancy_id')) {
+                $empCounts = DB::table('employees')
+                    ->where('resort_id', $resort_id)
+                    ->whereIn('vacancy_id', $vacancyIds)
+                    ->whereNotIn('status', ['Terminated', 'Inactive'])
+                    ->groupBy('vacancy_id')
+                    ->select('vacancy_id', DB::raw('COUNT(*) as n'))
+                    ->pluck('n', 'vacancy_id')
+                    ->toArray();
+                foreach ($empCounts as $vid => $n) {
+                    $hiredByVacancy[$vid] = max($hiredByVacancy[$vid] ?? 0, (int) $n);
+                }
+            }
+            $taCounts = DB::table('applicant_wise_statuses as aws')
+                ->join('applicant_form_data as afd', 'afd.id', '=', 'aws.Applicant_id')
+                ->where('afd.resort_id', $resort_id)
+                ->whereIn('afd.Parent_v_id', $vacancyIds)
+                ->where('aws.status', 'Contract Accepted')
+                ->groupBy('afd.Parent_v_id')
+                ->select('afd.Parent_v_id as vacancy_id', DB::raw('COUNT(DISTINCT aws.Applicant_id) as n'))
+                ->pluck('n', 'vacancy_id')
+                ->toArray();
+            foreach ($taCounts as $vid => $n) {
+                $hiredByVacancy[$vid] = max($hiredByVacancy[$vid] ?? 0, (int) $n);
+            }
+        }
+
+        return $hiredByVacancy;
+    }
+
     public function GetAllApplicatioWiseVacancies(Request $request)
     {
         $page_title  = "Vacancies";
@@ -1780,8 +1908,11 @@ class VacancyController extends Controller
             COUNT(DISTINCT t6.id) AS NoOfApplication,
             MAX(t5.link_Expiry_date) AS link_Expiry_date,
             MAX(t6.Application_date) AS Application_date,
+            MAX(vacancies.created_at) AS posted_date,
             MAX(t5.id) as application_id,
             MAX(t5.link) as jobAdLink,
+            MAX(t5.ta_child_id) as ta_child_id,
+            MAX(vacancies.status) as vacancy_status,
             vacancies.Total_position_required
             ")
             ->groupBy("vacancies.id", "t2.position_title", "t2.id", "t2.code", "t1.name", "t1.code", "vacancies.Total_position_required")
@@ -1802,63 +1933,28 @@ class VacancyController extends Controller
             $showDeptFilter = false;
             $filterPositions = $employee ? ResortPosition::where('dept_id', $employee->Dept_id)->get() : collect();
         }
-        // Hired-count lookup. Two sources, in order of preference:
-        //   1. employees.vacancy_id — set when a new hire is created
-        //      via /people/employees/create (mandatory vacancy pick).
-        //      The most accurate signal because it ties the actual
-        //      employee record to the vacancy. Requires the 2026_06_01
-        //      migration; guarded with Schema::hasColumn.
-        //   2. applicant_wise_statuses.status='Contract Accepted' on
-        //      applicant_form_data.Parent_v_id — the TA-flow definition
-        //      of "hired" the dashboard already counts. Works on every
-        //      environment, captures historical hires that pre-date the
-        //      vacancy_id column.
-        // The greater of the two per vacancy is reported so neither
-        // path can under-count.
-        $vacancyIds = $NewVacancies->pluck('vacancy_id')->filter()->all();
-        $hiredByVacancy = [];
-        if (!empty($vacancyIds)) {
-            if (Schema::hasColumn('employees', 'vacancy_id')) {
-                $empCounts = DB::table('employees')
-                    ->where('resort_id', $resort_id)
-                    ->whereIn('vacancy_id', $vacancyIds)
-                    ->whereNotIn('status', ['Terminated', 'Inactive'])
-                    ->groupBy('vacancy_id')
-                    ->select('vacancy_id', DB::raw('COUNT(*) as n'))
-                    ->pluck('n', 'vacancy_id')
-                    ->toArray();
-                foreach ($empCounts as $vid => $n) {
-                    $hiredByVacancy[$vid] = max($hiredByVacancy[$vid] ?? 0, (int) $n);
-                }
-            }
-            $taCounts = DB::table('applicant_wise_statuses as aws')
-                ->join('applicant_form_data as afd', 'afd.id', '=', 'aws.Applicant_id')
-                ->where('afd.resort_id', $resort_id)
-                ->whereIn('afd.Parent_v_id', $vacancyIds)
-                ->where('aws.status', 'Contract Accepted')
-                ->groupBy('afd.Parent_v_id')
-                ->select('afd.Parent_v_id as vacancy_id', DB::raw('COUNT(DISTINCT aws.Applicant_id) as n'))
-                ->pluck('n', 'vacancy_id')
-                ->toArray();
-            foreach ($taCounts as $vid => $n) {
-                $hiredByVacancy[$vid] = max($hiredByVacancy[$vid] ?? 0, (int) $n);
-            }
-        }
+        $hiredByVacancy = $this->hiredByVacancy($resort_id, $NewVacancies->pluck('vacancy_id')->filter()->all());
+
+        $posters = Common::vacancyPosterInfo($resort_id, $NewVacancies->pluck('vacancy_id')->all());
 
         foreach($NewVacancies  as $v)
         {
             // $applicationdata =$v->TAnotificationParent[0]->TaNotificationChildren->where("Approved_By",Common::TaFinalApproval($resort_id))->first();
             // $ApplicationLink = ApplicationLink::where('ta_child_id',$applicationdata->id)->first();
             $v->positionTitle;
-            $v->PositonCode;
+            $v->PositionCode;
             $v->Department;
             $v->DepartmentCode;
             $v->NoOfVacnacy = $v->Total_position_required; // No of positions
             $v->NoOfApplication;
-            $v->ApplicationDate =  Carbon::parse($v->Application_date)->format('d M Y');
-            $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d M Y');
+            $v->ApplicationDate = $v->Application_date ? Carbon::parse($v->Application_date)->format('d M Y') : null;
+            $v->ExpiryDate = $v->link_Expiry_date ? Carbon::parse($v->link_Expiry_date)->format('d M Y') : null;
+            $v->PostedDate = $v->posted_date ? Carbon::parse($v->posted_date)->format('d M Y') : null;
             $v->ApplicationId= $v->application_id;
-            $v->allJobAdImages = json_encode([Common::resolveVacancyPosterImage($resort_id, $v->vacancy_id)]);
+            $v->allJobAdImages = json_encode([$posters[$v->vacancy_id]['image']]);
+            $v->has_job_ad = $posters[$v->vacancy_id]['has_job_ad'];
+            $v->public_link = $this->vacancyPublicLink($resort_id, $v->ta_child_id, $v->vacancy_id);
+            $v->is_closed = $v->vacancy_status === 'Closed';
 
             // Hired status — drives the new "Hired" column. Three states:
             //   • filled = required → "1 of 1" green
@@ -1888,14 +1984,22 @@ class VacancyController extends Controller
                 $actions = '<a href="'.$route.'" class="btn btn-sm ta-btn-secondary me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicants"><i class="fa-solid fa-eye"></i></a>';
 
                 if ($canSeeAction) {
-                    $actions .= '<a href="javascript:void(0)" class="btn btn-sm ta-btn-attention ExtendJobLink" data-ExpiryDate="'.$row->ExpiryDate.'" data-ApplicationId="'.$row->ApplicationId.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend The Job Ad Link"><i class="fa-solid fa-link"></i></a>
-                            <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary viewJobAd ms-1" data-vacancy-id="'.e($row->vacancy_id).'" data-position="'.$row->positionTitle.'" data-joblink="'.htmlspecialchars($row->jobAdLink ?? '', ENT_QUOTES, 'UTF-8').'" data-alljobimages=\''.htmlspecialchars($row->allJobAdImages, ENT_QUOTES, 'UTF-8').'\' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-image"></i></a>';
+                    if (!$row->is_closed) {
+                        $actions .= '<a href="javascript:void(0)" class="btn btn-sm ta-btn-attention ExtendJobLink" data-ExpiryDate="'.$row->ExpiryDate.'" data-ApplicationId="'.$row->ApplicationId.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend The Job Ad Link"><i class="fa-solid fa-link"></i></a>';
+                    }
+                    $actions .= '<a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary viewJobAd ms-1" data-vacancy-id="'.e($row->vacancy_id).'" data-position="'.e($row->positionTitle).'" data-joblink="'.htmlspecialchars($row->public_link ?? $row->jobAdLink ?? '', ENT_QUOTES, 'UTF-8').'" data-alljobimages=\''.htmlspecialchars($row->allJobAdImages, ENT_QUOTES, 'UTF-8').'\' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-image"></i></a>';
+                    if ($row->public_link) {
+                        $actions .= '<a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary copyApplyLink ms-1" data-link="'.e($row->public_link).'" data-bs-toggle="tooltip" data-bs-placement="top" title="Copy application link"><i class="fa-solid fa-copy"></i></a>';
+                    }
+                    $actions .= $row->is_closed
+                        ? '<a href="javascript:void(0)" class="btn btn-sm ta-btn-attention reopenVacancyBtn ms-1" data-id="'.e($row->vacancy_id).'" data-bs-toggle="tooltip" data-bs-placement="top" title="Reopen vacancy"><i class="fa-solid fa-lock-open"></i></a>'
+                        : '<a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary closeVacancyBtn ms-1" data-id="'.e($row->vacancy_id).'" data-bs-toggle="tooltip" data-bs-placement="top" title="Close vacancy"><i class="fa-solid fa-lock"></i></a>';
                 }
 
                 return $actions;
                         })
                     ->addColumn('Position', function ($row) {
-                        return $row->positionTitle.' '.'<span class="badge badge-themeLight">' . htmlspecialchars($row->PositonCode  , ENT_QUOTES, 'UTF-8') . '</span>';
+                        return $row->positionTitle.' '.'<span class="badge badge-themeLight">' . htmlspecialchars($row->PositionCode  , ENT_QUOTES, 'UTF-8') . '</span>' . ($row->is_closed ? ' <span class="badge badge-themeDanger">Closed</span>' : '');
                     })
 
                     ->addColumn('Department', function ($row)
@@ -2031,8 +2135,11 @@ class VacancyController extends Controller
                             COUNT(DISTINCT t6.id) AS NoOfApplication,
                             MAX(t5.link_Expiry_date) AS link_Expiry_date,
                             MAX(t6.Application_date) AS Application_date,
+                            MAX(vacancies.created_at) AS posted_date,
                             MAX(t5.id) as application_id,
                             MAX(t5.link) as jobAdLink,
+                            MAX(t5.ta_child_id) as ta_child_id,
+                            MAX(vacancies.status) as vacancy_status,
                             vacancies.Total_position_required as NoOfVacnacy
                         ")
                         ->groupBy(
@@ -2047,10 +2154,19 @@ class VacancyController extends Controller
                                 )->paginate(10);
 
 
-                    $NewVacancies->getCollection()->transform(function ($vacancy) use ($resort_id) {
-                        $poster = Common::resolveVacancyPosterImage($resort_id, $vacancy->vacancy_id);
-                        $vacancy->image = $poster;
-                        $vacancy->allJobAdImages = [$poster];
+                    $gridIds = $NewVacancies->getCollection()->pluck('vacancy_id')->all();
+                    $posters = Common::vacancyPosterInfo($resort_id, $gridIds);
+                    $hiredByVacancy = $this->hiredByVacancy($resort_id, array_filter($gridIds));
+
+                    $NewVacancies->getCollection()->transform(function ($vacancy) use ($posters, $hiredByVacancy, $resort_id) {
+                        $vacancy->public_link = $this->vacancyPublicLink($resort_id, $vacancy->ta_child_id, $vacancy->vacancy_id);
+                        $vacancy->is_closed = $vacancy->vacancy_status === 'Closed';
+                        $vacancy->image = $posters[$vacancy->vacancy_id]['image'];
+                        $vacancy->has_job_ad = $posters[$vacancy->vacancy_id]['has_job_ad'];
+                        $vacancy->allJobAdImages = [$vacancy->image];
+                        $vacancy->HiredCount = (int) ($hiredByVacancy[$vacancy->vacancy_id] ?? 0);
+                        $vacancy->ApplicationDate = $vacancy->Application_date ? Carbon::parse($vacancy->Application_date)->format('d M Y') : null;
+                        $vacancy->PostedDate = $vacancy->posted_date ? Carbon::parse($vacancy->posted_date)->format('d M Y') : null;
                         $vacancy->ExpiryDate = $vacancy->link_Expiry_date ? Carbon::parse($vacancy->link_Expiry_date)->format('d M Y') : null;
                         return $vacancy;
                     });
@@ -2283,6 +2399,7 @@ class VacancyController extends Controller
                             t1.email as Email,
                             t1.created_at,
                             t2.name AS Nation,
+                            t2.flag_url,
                             t3.InterViewDate,
                             t3.ApplicantInterviewtime,
                             t3.ResortInterviewtime,
@@ -2312,7 +2429,7 @@ class VacancyController extends Controller
                     return datatables()->of($SorlistedApplicants)
                     ->addColumn('Applicants', function ($row){
                         $userName = htmlspecialchars(ucfirst($row->first_name . ' ' . $row->last_name), ENT_QUOTES, 'UTF-8');
-                        $photo = URL::asset($row->passport_photo);
+                        $photo = $this->applicantPhotoUrl($row->passport_photo);
                         // Must match ApplicantStatus_id, not Applicant_id — TaUserApplicantsSideBar
                         // filters by applicant_wise_statuses.id, same fix as shortlistedapplicantsShareLink.
                         $string = '<div class="tableUser-block">
@@ -2456,6 +2573,7 @@ class VacancyController extends Controller
             t1.mobile_number as Contact,
             t1.email as Email,
             t2.name AS Nationality,
+            t2.flag_url,
             t3.InterViewDate,
             t3.ApplicantInterviewtime,
             t3.ResortInterviewtime,
@@ -2465,7 +2583,8 @@ class VacancyController extends Controller
             t4.status AS ApplicationStatus,
             t5.position_title as Position,
             t4.id as ApplicantStatus_id,
-            t3.id as Interview_id
+            t3.id as Interview_id,
+            t3.invitation_token
         ')
         ->get()
         ->map(function ($item) {
@@ -2478,6 +2597,9 @@ class VacancyController extends Controller
             $item->ApplicantTime = $item->ApplicantInterviewtime ?? '-';
 
             $item->InterviewStatus = $item->InterviewStatus ?? 'Slot Not Booked';
+
+            // Applicant's slot-booking page, same URL the invitation email carries.
+            $item->booking_url = $item->invitation_token ? route('resort.interview.invitation.show', $item->invitation_token) : null;
 
             return $item;
             });
@@ -2542,7 +2664,18 @@ class VacancyController extends Controller
                             $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm ta-badge-muted me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="No Slot Found"><i class="fa-solid fa-calendar-xmark"></i></a>';
                         }
 
-                        return $sendInterviewBtn . '<a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary userApplicants-btn" data-id="'.$ApplicantStatus_id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicant"><i class="fa-solid fa-eye"></i></a>';
+                        $extra = '';
+                        // Reschedule: any interview that already has a slot (same row is reused server-side).
+                        if ($row->Interview_id && in_array($row->InterviewStatus, ['Pending Review', 'Invitation Sent', 'Slot Booked', 'Invitation Rejected'], true)) {
+                            $extra .= '<a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary RescheduleInterview ms-1" data-interview_id="'.e(base64_encode($row->Interview_id)).'" data-bs-toggle="tooltip" data-bs-placement="top" title="Reschedule Interview"><i class="fa-solid fa-calendar-days"></i></a>';
+                        }
+                        // Booking link the candidate uses to accept/decline the slot.
+                        if ($row->booking_url && in_array($row->InterviewStatus, ['Pending Review', 'Invitation Sent'], true)) {
+                            $extra .= '<a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary CopyBookingLink ms-1" data-link="'.e($row->booking_url).'" data-bs-toggle="tooltip" data-bs-placement="top" title="Copy Booking Link"><i class="fa-solid fa-link"></i></a>';
+                        }
+                        $extra .= '<a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary RemoveFromShortlist ms-1" data-id="'.$ApplicantStatus_id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Remove from Shortlist"><i class="fa-solid fa-user-xmark"></i></a>';
+
+                        return $sendInterviewBtn . '<a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary userApplicants-btn" data-id="'.$ApplicantStatus_id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicant"><i class="fa-solid fa-eye"></i></a>' . $extra;
                     })
 
                         ->rawColumns(['Applicants','Action', 'Stage', 'rank_name', 'Required'])
@@ -2627,8 +2760,11 @@ class VacancyController extends Controller
                             ')
                             ->get()
                             ->map(function ($item) use($config) {
+                                $item->profileImg = $this->applicantPhotoUrl($item->passport_photo);
                                 $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
 
+                                // Raw date so the table can sort chronologically (formatted d M Y sorts as text).
+                                $item->interview_date_raw = $item->InterViewDate;
                                 $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d M Y') : '-';
 
                                 $item->MalidivanTime = $item->ResortInterviewtime ?? '-';
@@ -2643,7 +2779,7 @@ class VacancyController extends Controller
                 return datatables()->of($UplcomingApplicants)
                 ->addColumn('Applicants', function ($row){
                     $userName = htmlspecialchars(ucfirst($row->first_name . ' ' . $row->last_name), ENT_QUOTES, 'UTF-8');
-                    $photo = URL::asset($row->passport_photo);
+                    $photo = $this->applicantPhotoUrl($row->passport_photo);
                     $string = '<div class="tableUser-block">
                         <div class="img-circle"><img src="'.$photo.'" alt="user"></div>
                         <span class="userApplicants-btn" data-id="' . base64_encode($row->ApplicantStatus_id) . '">' . $userName . '</span>
@@ -2776,7 +2912,7 @@ class VacancyController extends Controller
                 return datatables()->of($UplcomingApplicants)
                 ->addColumn('Applicants', function ($row){
                     $userName = htmlspecialchars(ucfirst($row->first_name . ' ' . $row->last_name), ENT_QUOTES, 'UTF-8');
-                    $photo = URL::asset($row->passport_photo);
+                    $photo = $this->applicantPhotoUrl($row->passport_photo);
                     $string = '<div class="tableUser-block">
                         <div class="img-circle"><img src="'.  $photo.'" alt="user"></div>
                         <span class="userApplicants-btn" data-id="' . base64_encode($row->ApplicantStatus_id) . '">' . $userName . '</span>
@@ -2854,7 +2990,6 @@ class VacancyController extends Controller
             ->join("resort_departments as t6", "t6.id", "=", "t5.dept_id")
             ->where('t1.id',$ApplicantInterViewDetails->Applicant_id)
             ->where('t4.id',$ApplicantInterViewDetails->ApplicantStatus_id)
-            ->where('vacancies.status', '=', "Active")
             ->selectRaw('
                 t1.id as Applicant_id,
                 t1.Application_date,
@@ -2877,6 +3012,9 @@ class VacancyController extends Controller
                 t6.name as Department
             ')
             ->first();
+            if (!$Final_response_data) {
+                return response()->json(['success' => false, 'message' => 'Interview details not found.'], 404);
+            }
             $InterViewDate = Carbon::parse($Final_response_data->InterViewDate)->format('Y-m-d');
             $FianlResponse ='';
             if($Final_response_data)

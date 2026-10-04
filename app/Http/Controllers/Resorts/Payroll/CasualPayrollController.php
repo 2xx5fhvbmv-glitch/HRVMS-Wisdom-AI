@@ -323,6 +323,7 @@ class CasualPayrollController extends Controller
                 'present' => $presentCount,
                 'day_offs' => $dayOffCount,
                 'unpaid_days' => $unpaidCount,
+                'unaccounted_days' => Common::unaccountedDays($records, $periodStart, $periodEnd),
                 'regular_ot' => round($regularOT, 2),
                 'friday_ot' => round($fridayOT, 2),
                 'holiday_ot' => round($holidayOT, 2),

@@ -414,6 +414,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::get( 'talent-acquisition/shortlisted/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','shortlisted'])->name('resort.ta.shortlisted');
     Route::get( 'talent-acquisition/shortlisted', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','shortlisted'])->name('resort.ta.shortlistedIndex');
     Route::get( 'talent-acquisition/upcoming-applicants', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','UpcomingApplicants'])->name('resort.ta.UpcomingApplicants');
+    Route::post('/talent-acquisition/vacancy/{id}/close', 'TalentAcquisition\VacancyController@closeVacancy')->name('resort.vacancies.close');
+    Route::post('/talent-acquisition/vacancy/{id}/reopen', 'TalentAcquisition\VacancyController@reopenVacancy')->name('resort.vacancies.reopen');
     Route::post( 'talent-acquisition/get/add-interview-link', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','AddInterViewLink'])->name('resort.ta.AddInterViewLink');
 
     Route::get( '/get/talent-acquisition/configration', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','index'])->name('resort.ta.configration');
@@ -516,6 +518,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::get('/talent-acquisition/sortlisted-applicants/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','SortlistedApplicants'])->name('resort.ta.SortlistedApplicants');
     Route::post('/talent-acquisition/interview-request', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','InterviewRequest'])->name('resort.ta.InterviewRequest');
     Route::post('/talent-acquisition/send-interview-email', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','SendInterviewEmail'])->name('resort.ta.SendInterviewEmail');
+    Route::post('/talent-acquisition/reschedule-interview', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','RescheduleInterview'])->name('resort.ta.RescheduleInterview');
+    Route::post('/talent-acquisition/remove-from-shortlist', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','RemoveFromShortlist'])->name('resort.ta.RemoveFromShortlist');
     Route::post('/talent-acquisition/delete-pending-interview', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','DeletePendingInterview'])->name('resort.ta.DeletePendingInterview');
 
     Route::post('/talent-acquisition/get-slots', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','ApplicantTimeZoneget'])->name('resort.ta.ApplicantTimeZoneget');

@@ -201,7 +201,7 @@
                 { data: 'department', name: 'department' },
                 { data: 'countryName', name: 'countryName' },
                 { data: 'email', name: 'email' },
-                { data: 'rejection_date', name: 'rejection_date' },
+                { data: 'rejection_date', name: 'rejection_date_raw' }, // sort on the raw date
                 { data: 'rejection_reason', name: 'rejection_reason', render: function(data) {
                     return data ? '<span class="text-truncate d-inline-block" style="max-width:200px;" title="'+escHtml(data)+'">'+escHtml(data)+'</span>' : '-';
                 }},

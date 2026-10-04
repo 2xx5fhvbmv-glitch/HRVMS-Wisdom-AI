@@ -1545,6 +1545,33 @@ class Common
         return self::GetJobAdvertisementImage($resortId, $ad->Jobadvimg ?? null);
     }
 
+    /**
+     * Batched resolveVacancyPosterImage(): one query for many vacancies.
+     * Returns [vacancy_id => ['image' => url, 'has_job_ad' => bool]].
+     * image falls back to the resort-level generic ad like the single
+     * version; has_job_ad is true only when the vacancy has its OWN ad.
+     */
+    public static function vacancyPosterInfo($resortId, array $vacancyIds): array
+    {
+        $ads = JobAdvertisement::where('Resort_id', $resortId)
+            ->where(function ($q) use ($vacancyIds) {
+                $q->whereIn('vacancy_id', $vacancyIds)->orWhereNull('vacancy_id');
+            })
+            ->get();
+        $generic = $ads->first(fn ($a) => $a->vacancy_id === null);
+        $own = $ads->whereNotNull('vacancy_id')->keyBy('vacancy_id');
+
+        $out = [];
+        foreach ($vacancyIds as $vid) {
+            $ad = $own->get($vid);
+            $out[$vid] = [
+                'image' => self::GetJobAdvertisementImage($resortId, ($ad ?? $generic)->Jobadvimg ?? null),
+                'has_job_ad' => (bool) $ad,
+            ];
+        }
+        return $out;
+    }
+
     public static function nofitication($resortid,$type,$Msgid= 0,$Budget_id=0,$other='',$sendto='',$moduleName="",$pageId=null)
     {
         if($type==1)
@@ -6158,33 +6185,6 @@ class Common
     }
 
     /**
-     * Visa write gate — HR or Finance only. GM has canAccessVisa() (read)
-     * but never this, per the decided "GM read-only" split.
-     */
-    public static function canWriteVisa($employee = null): bool
-    {
-        if ($employee === null) {
-            $user = \Auth::guard('resort-admin')->user();
-            if (!$user) return false;
-            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
-                return true;
-            }
-            $employee = $user->GetEmployee ?? null;
-        }
-        if (!$employee) return false;
-
-        if ((int) $employee->rank === 3) return true; // HR
-        if (in_array((int) $employee->rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null)) {
-            return true; // HR HOD/EXCOM
-        }
-
-        return self::isFinanceDepartment($employee->Dept_id ?? null); // Finance
-    }
-
-    /**
-     * Accommodation settings/write gate (security audit AC-03, product
-     * decision): HR only — no separate Accommodation-manager role exists.
-    /**
      * Island Pass approval chain (security audit L-06), order of insertion
      * SM, HR, HOD (executed HOD -> HR -> SM by id). The applicant is never
      * their own approver: SM/HR skip to the next eligible holder, HOD falls
@@ -6301,6 +6301,33 @@ class Common
             || (in_array($rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null));
     }
 
+    /**
+     * Visa write gate — HR or Finance only. GM has canAccessVisa() (read)
+     * but never this, per the decided "GM read-only" split.
+     */
+    public static function canWriteVisa($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        if ((int) $employee->rank === 3) return true; // HR
+        if (in_array((int) $employee->rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null)) {
+            return true; // HR HOD/EXCOM
+        }
+
+        return self::isFinanceDepartment($employee->Dept_id ?? null); // Finance
+    }
+
+    /**
+     * Accommodation settings/write gate (security audit AC-03, product
+     * decision): HR only — no separate Accommodation-manager role exists.
      * Engineering HOD keeps their own existing app-side rank guard for
      * assigning/completing maintenance jobs (untouched by this gate).
      * HOD/EXCOM and GM are view-only for this module; everyone else is
@@ -12249,6 +12276,32 @@ class Common
             || str_starts_with($bytes, $jpg)
             || str_starts_with($bytes, $gif87)
             || str_starts_with($bytes, $gif89);
+    }
+
+    /**
+     * Days in [$start, $end] with no attendance status marked (nobody
+     * recorded Present/Absent/DayOff/leave). Future days are excluded.
+     * Payroll shows this next to present/day-off/unpaid so the gap to the
+     * period's total days is explained; mirrors the register's `not_marked`.
+     * $records: attendance rows (models/objects/arrays with date + Status) for ONE employee.
+     */
+    public static function unaccountedDays($records, $start, $end): int
+    {
+        $marked = [];
+        foreach ($records as $r) {
+            if (!empty(data_get($r, 'Status'))) {
+                $marked[Carbon::parse(data_get($r, 'date'))->format('Y-m-d')] = true;
+            }
+        }
+
+        $last = Carbon::parse($end)->min(Carbon::today());
+        $count = 0;
+        for ($d = Carbon::parse($start)->startOfDay(); $d->lte($last); $d->addDay()) {
+            if (!isset($marked[$d->format('Y-m-d')])) {
+                $count++;
+            }
+        }
+        return $count;
     }
 
     /**

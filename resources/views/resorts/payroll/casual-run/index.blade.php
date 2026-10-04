@@ -116,7 +116,6 @@
       <span class="ft-note">Net payable <b id="cpRevNet">—</b></span>
       <button type="button" class="cpx-btn ghost" data-back="4">← Back</button>
       <button type="button" class="cpx-btn ghost sm" id="cp-save-review">Save review</button>
-      <button type="button" class="cpx-btn ghost sm" id="cp-lock-payroll"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Lock payroll</button>
       <button type="button" class="cpx-btn primary" id="cp-send-approval">Send for approval</button>
     </div>
   </section>
@@ -576,21 +575,6 @@
                 toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
             },
             error: function () { toastr.error('Could not save review.', 'Error', { positionClass: 'toast-bottom-right' }); }
-        });
-    });
-
-    $('#cp-lock-payroll').on('click', function () {
-        if (!confirm('Lock this Casual payroll? This cannot be edited afterward.')) return;
-        $.ajax({
-            url: '{{ route('payroll.saveSummary') }}',
-            type: 'POST',
-            data: { payroll_id: cpPayrollId, _token: '{{ csrf_token() }}' },
-            success: function (res) {
-                if (!res.success) { toastr.error(res.message, 'Error', { positionClass: 'toast-bottom-right' }); return; }
-                toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
-                if (res.redirect_url) window.location.href = res.redirect_url;
-            },
-            error: function () { toastr.error('Could not lock payroll.', 'Error', { positionClass: 'toast-bottom-right' }); }
         });
     });
 

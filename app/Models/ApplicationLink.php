@@ -15,7 +15,8 @@ class ApplicationLink extends Model
             'ta_child_id',
             'link',
             'link_Expiry_date',
-            'Old_ExpiryDate'
+            'Old_ExpiryDate',
+            'expiry_before_close'
     ];
 
     // public function applicationlinktes()

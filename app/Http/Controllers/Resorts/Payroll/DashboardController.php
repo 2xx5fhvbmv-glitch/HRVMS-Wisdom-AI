@@ -995,7 +995,7 @@ class DashboardController extends Controller
             ->where('resort_id', $resort_id)
             // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
             ->where('payroll_category', 'Permanent')
-            ->where('status', 'locked')
+            ->whereIn('status', ['locked', 'approved'])
             ->whereYear('end_date', $year)
             ->groupBy('month_num')
             ->get();
@@ -1006,7 +1006,7 @@ class DashboardController extends Controller
             ->where('p.resort_id', $resort_id)
             // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
             ->where('p.payroll_category', 'Permanent')
-            ->where('p.status', 'locked')
+            ->whereIn('p.status', ['locked', 'approved'])
             ->whereYear('p.end_date', $year)
             ->select(
                 DB::raw("MONTH(p.end_date) as month_num"),
@@ -1025,7 +1025,7 @@ class DashboardController extends Controller
             ->where('payroll.resort_id', $resort_id)
             // WP9 — dashboard is Permanent-only; a Casual run's rows must never blend in.
             ->where('payroll.payroll_category', 'Permanent')
-            ->where('payroll.status', 'locked')
+            ->whereIn('payroll.status', ['locked', 'approved'])
             ->whereYear('payroll.end_date', $year)
             ->groupBy('month_num')
             ->get();

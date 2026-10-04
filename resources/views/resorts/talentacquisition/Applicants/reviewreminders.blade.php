@@ -93,7 +93,7 @@
                 }},
                 { data: 'position_title', name: 'position_title' },
                 { data: 'department', name: 'department' },
-                { data: 'interview_date', name: 'interview_date' },
+                { data: 'interview_date', name: 'InterViewDate' }, // sort on the raw date
                 { data: 'ResortInterviewtime', name: 'ResortInterviewtime' },
                 { data: 'ApplicantInterviewtime', name: 'ApplicantInterviewtime' },
                 { data: 'days', name: 'days', orderable: false, searchable: false },

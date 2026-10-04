@@ -32,6 +32,7 @@ use App\Events\ResortNotificationEvent;
 use App\Models\ApplicantInterViewDetails;
 use App\Models\Applicant_form_job_assessment;
 use Illuminate\Support\Str;
+use App\Jobs\TaEmailSent;
 use App\Models\ApplicantOfferContract;
 use App\Models\InterviewAssessmentResponseForm;
 use App\Models\ApplicantSalaryAllocation;
@@ -1678,6 +1679,140 @@ class ApplicantsController extends Controller
         ]);
     }
 
+    /** Tell the candidate their previously-sent interview slot is cancelled. Never throws. */
+    private function notifyCandidateInterviewCancelled(ApplicantInterViewDetails $interview, string $reason): void
+    {
+        try {
+            $applicant = Applicant_form_data::find($interview->Applicant_id);
+            if (!$applicant || !$applicant->email) {
+                return;
+            }
+            $resortName = Resort::find($interview->resort_id)->resort_name ?? '';
+            $date = $interview->InterViewDate ? Carbon::parse($interview->InterViewDate)->format('d M Y') : '';
+            $body = '<p>Dear ' . e(ucfirst($applicant->first_name)) . ',</p>'
+                . '<p>Your interview' . ($date ? ' scheduled for <strong>' . $date . '</strong>' : '') . ' has been <strong>cancelled</strong>. ' . e($reason) . '</p>'
+                . '<p>Regards,<br>HR Team<br>' . e($resortName) . '</p>';
+            TaEmailSent::dispatch($applicant->email, 'Interview Cancelled', ['mainbody' => $body], $interview->resort_id);
+        } catch (\Exception $e) {
+            \Log::warning('Interview cancellation notice failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Move an existing interview to a new date/time. Reuses the same
+     * applicant_inter_view_details row (no second interview row), issues a
+     * fresh invitation token and drops it back to 'Pending Review' so HR
+     * re-sends via SendInterviewEmail (response carries the ids for that
+     * call). A candidate who was already invited/booked is told the old slot
+     * is cancelled.
+     */
+    public function RescheduleInterview(Request $request)
+    {
+        if ($guard = $this->requireHrAccess()) return $guard;
+        $request->validate([
+            'interview_id' => 'required|string',
+            'TimeSlotsFormdate' => 'required|date_format:Y-m-d|after_or_equal:today',
+            'ResortInterviewtime' => 'required|string|max:255',
+            'ApplicantInterviewtime' => 'required|string|max:255',
+            'MeetingLink' => 'nullable|string|max:2048',
+        ]);
+
+        $interview = ApplicantInterViewDetails::where('resort_id', $this->resort->resort_id)
+            ->find(base64_decode($request->interview_id));
+        if (!$interview) {
+            return response()->json(['success' => false, 'message' => 'Interview record not found.'], 404);
+        }
+        if (!in_array($interview->Status, ['Pending Review', 'Invitation Sent', 'Slot Booked', 'Invitation Rejected'], true)) {
+            return response()->json(['success' => false, 'message' => 'This interview cannot be rescheduled.'], 422);
+        }
+
+        // Same resort-wide double-booking rule as InterviewRequest(), minus this interview's own slot.
+        $wanted = array_map('trim', explode(',', $request->ResortInterviewtime));
+        $others = ApplicantInterViewDetails::where('resort_id', $this->resort->resort_id)
+            ->where('InterViewDate', $request->TimeSlotsFormdate)
+            ->where('id', '!=', $interview->id)
+            ->whereIn('Status', ['Pending Review', 'Invitation Sent', 'Slot Booked'])
+            ->get();
+        foreach ($others as $other) {
+            $clash = array_intersect($wanted, array_map('trim', explode(',', $other->ResortInterviewtime)));
+            if ($clash) {
+                return response()->json(['success' => false, 'message' => 'Time slot ' . reset($clash) . ' is already booked for another candidate.'], 422);
+            }
+        }
+
+        $hadInvite = in_array($interview->Status, ['Invitation Sent', 'Slot Booked'], true);
+        if ($hadInvite) {
+            $this->notifyCandidateInterviewCancelled($interview, 'It is being rescheduled; you will receive a new invitation shortly.');
+        }
+
+        $interview->update([
+            'InterViewDate' => $request->TimeSlotsFormdate,
+            'ResortInterviewtime' => $request->ResortInterviewtime,
+            'ApplicantInterviewtime' => $request->ApplicantInterviewtime,
+            // Old link belonged to the old slot; only accept a new https one (T-07).
+            'MeetingLink' => str_starts_with((string) $request->MeetingLink, 'https://') ? $request->MeetingLink : '',
+            'Status' => 'Pending Review',
+            'invitation_token' => Str::uuid(),
+            'rejection_reason' => null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Interview rescheduled. Send the invitation to the candidate.',
+            'interview_id' => base64_encode($interview->id),
+            'email_template_id' => $interview->EmailTemplateId,
+        ]);
+    }
+
+    /**
+     * "Remove from list" on the shortlisted-applicants page = reject the
+     * applicant (same Rejected status + Comments the sidebar's reject writes,
+     * so they land on the Rejected list) and cancel any open interview slot.
+     */
+    public function RemoveFromShortlist(Request $request)
+    {
+        if ($guard = $this->requireHrAccess()) return $guard;
+        $request->validate([
+            'ApplicantStatus_id' => 'required|string',
+            'reason' => 'required|string|max:1000',
+        ]);
+
+        // applicant_wise_statuses has no resort_id — scope via the owning applicant.
+        $status = ApplicantWiseStatus::where('id', base64_decode($request->ApplicantStatus_id))
+            ->whereIn('Applicant_id', Applicant_form_data::where('resort_id', $this->resort->resort_id)->select('id'))
+            ->first();
+        if (!$status) {
+            return response()->json(['success' => false, 'message' => 'Applicant status not found.'], 404);
+        }
+        if (!in_array($status->status, ['Sortlisted', 'Sortlisted By Wisdom AI', 'Round'], true)) {
+            return response()->json(['success' => false, 'message' => 'This applicant is not on the shortlist.'], 422);
+        }
+
+        $notify = [];
+        DB::transaction(function () use ($status, $request, &$notify) {
+            $open = ApplicantInterViewDetails::where('resort_id', $this->resort->resort_id)
+                ->where('Applicant_id', $status->Applicant_id)
+                ->whereIn('Status', ['Pending Review', 'Invitation Sent', 'Slot Booked'])
+                ->get();
+            foreach ($open as $interview) {
+                if ($interview->Status !== 'Pending Review') {
+                    $notify[] = clone $interview; // candidate had been told about it
+                }
+                $interview->update(['Status' => 'Cancelled', 'rejection_reason' => 'Removed from shortlist by HR']);
+            }
+            $status->update([
+                'status' => 'Rejected',
+                'Comments' => preg_replace('/[\x00-\x1F\x7F]/u', '', $request->reason),
+            ]);
+        });
+
+        foreach ($notify as $interview) {
+            $this->notifyCandidateInterviewCancelled($interview, 'The process for this application has ended.');
+        }
+
+        return response()->json(['success' => true, 'message' => 'Applicant removed from the shortlist and moved to Rejected.']);
+    }
+
     public function ApprovedOrSortApplicantWiseStatus(Request $request)
     {
 
@@ -2984,6 +3119,7 @@ class ApplicantsController extends Controller
 
             $data = $query->get()->map(function ($item) {
                 $item->name = ucfirst($item->first_name . ' ' . $item->last_name);
+                $item->rejection_date_raw = $item->rejection_date; // sortable; the formatted one sorts as text
                 $item->rejection_date = $item->rejection_date ? Carbon::parse($item->rejection_date)->format('d M Y') : '-';
                 $item->applicant_id = base64_encode($item->applicant_status_id);
                 if ($item->passport_photo) {
@@ -3019,6 +3155,7 @@ class ApplicantsController extends Controller
                 ->leftJoin('vacancies as t4', 't4.id', '=', 't1.Parent_v_id')
                 ->leftJoin('resort_positions as t5', 't5.id', '=', 't4.position')
                 ->leftJoin('resort_departments as t6', 't6.id', '=', 't5.dept_id')
+                ->leftJoin('countries as t2', 't2.id', '=', 't1.country')
                 ->where('applicant_inter_view_details.Status', 'Slot Booked')
                 ->where('applicant_inter_view_details.InterViewDate', '>=', Carbon::today())
                 ->where('applicant_inter_view_details.InterViewDate', '<=', Carbon::today()->addDays(7))
@@ -3028,6 +3165,8 @@ class ApplicantsController extends Controller
                     t1.first_name,
                     t1.last_name,
                     t1.passport_photo,
+                    t2.name as Nationality,
+                    t2.flag_url,
                     t5.position_title,
                     t6.name as department,
                     applicant_inter_view_details.InterViewDate,

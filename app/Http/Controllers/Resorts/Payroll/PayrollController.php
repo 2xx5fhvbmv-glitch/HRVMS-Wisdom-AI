@@ -1200,97 +1200,97 @@ class PayrollController extends Controller
         ]);
     }
 
+    /**
+     * Lock = finalize the run: totals from PayrollReview, status 'locked', and
+     * close out the advance/loan recovery schedules and staff-shop payments
+     * deducted in this period. Caller owns the DB transaction. Shared by the
+     * final approval (approvePayroll) and the legacy stuck-run endpoint below
+     * so the two can't drift.
+     */
+    private function finalizeAndLockPayroll(Payroll $payroll, string $draftDate): void
+    {
+        $payrollId = $payroll->id;
+
+        // Totals from DB (don't trust frontend values which may have comma formatting issues)
+        $payroll->update([
+            'total_payroll' => round(PayrollReview::where('payroll_id', $payrollId)->sum('net_salary'), 2),
+            'total_employees' => PayrollReview::where('payroll_id', $payrollId)->count(),
+            'draft_date' => $draftDate,
+            'status' => 'locked',
+        ]);
+
+        foreach (PayrollDeduction::where('payroll_id', $payrollId)->get() as $deduction) {
+            $employeeId = $deduction->employee_id;
+
+            if ($deduction->advance_loan > 0) {
+                // Match fetchAdvanceRecovery()'s filter exactly (status='Pending',
+                // same date window) — that's what the advance_loan figure was
+                // summed from, so every row it summed must close out here, not
+                // just one. Only Pending rows are touched, so re-running is safe.
+                PayrollRecoverySchedule::where('employee_id', $employeeId)
+                    ->where('status', 'Pending')
+                    ->whereBetween('repayment_date', [$payroll->start_date, $payroll->end_date])
+                    ->update(['status' => 'Paid']);
+            }
+
+            if ($deduction->staff_shop > 0) {
+                Payment::where('emp_id', $employeeId)
+                    ->where('status', 'pending')
+                    ->whereBetween('purchased_date', [$payroll->start_date, $payroll->end_date])
+                    ->limit(1) // in case of partial deduction logic
+                    ->update(['status' => 'Paid']);
+            }
+        }
+    }
+
+    private function notifyPayrollLocked(Payroll $payroll): void
+    {
+        // payroll table has no created_by/creator column, so notify HR
+        // (the role that audits payroll) that this run is finalized.
+        try {
+            Common::notifyEmployees(
+                $payroll->resort_id,
+                Common::getResortHrEmployeeIds($payroll->resort_id),
+                'Payroll Locked',
+                "Payroll for period {$payroll->start_date} to {$payroll->end_date} has been locked/finalized.",
+                'Payroll',
+                $payroll->id
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Payroll lock notification failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Legacy: payroll now locks automatically on the final approval
+     * (approvePayroll). This endpoint only finalizes runs left stuck at
+     * 'approved' before that change; it refuses everything else so approvals
+     * can't be bypassed.
+     */
     public function saveSummaryToPayroll(Request $request)
     {
-        DB::beginTransaction(); // ✅ Start transaction for data consistency
-        // dd($request->all());
         try {
-            $payrollId = $request->payroll_id;
-
-            // This locks/finalizes a payroll purely by client-supplied id,
-            // then marks that payroll's salary-advance recovery schedules
-            // and staff-shop payments "Paid" below — verify it belongs to
-            // this resort and is still in draft (P-02) before locking it.
-            [, $error] = $this->editablePayrollOrError($payrollId, $this->resort->resort_id);
-            if ($error) {
-                DB::rollBack();
-                return $error;
+            $payroll = Payroll::where('id', $request->payroll_id)->where('resort_id', $this->resort->resort_id)->first();
+            if (!$payroll) {
+                return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
+            }
+            if ($payroll->status !== 'approved') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payroll locks automatically once all approvers have approved. It cannot be locked manually.',
+                ], 422);
             }
 
-            // Calculate totals from DB (don't trust frontend values which may have comma formatting issues)
-            $totalPayroll = PayrollReview::where('payroll_id', $payrollId)->sum('net_salary');
-            $totalEmployees = PayrollReview::where('payroll_id', $payrollId)->count();
-
-            Payroll::updateOrCreate(
-                [
-                    'id' => $payrollId,
-                ],
-                [
-                    'total_payroll' => round($totalPayroll, 2),
-                    'total_employees' => $totalEmployees,
-                    'draft_date' => $request['summaryData']['payrollDraftDate'] ?? now()->format('Y-m-d'),
-                    'status' => 'locked'
-                ]
-            );
-            $payroll = Payroll::where('id', $payrollId)->where('resort_id', $this->resort->resort_id)->firstOrFail();
-            $deductions = PayrollDeduction::where('payroll_id', $payrollId)->get();
-            foreach ($deductions as $deduction) {
-                $employeeId = $deduction->employee_id;
-                $advanceLoanAmount = $deduction->advance_loan;
-                $staffshoptAmount = $deduction->staff_shop;
-
-                if ($advanceLoanAmount > 0) {
-                    // Match fetchAdvanceRecovery()'s filter exactly (status='Pending',
-                    // same date window) — that's what the advance_loan figure was
-                    // summed from, so every row it summed must close out here, not
-                    // just one. A prior limit(1) left a second same-period
-                    // installment (e.g. loan + separate salary advance) stuck
-                    // Pending forever even though it was already deducted.
-                    PayrollRecoverySchedule::where('employee_id', $employeeId)
-                        ->where('status', 'Pending')
-                        ->whereBetween('repayment_date', [$payroll->start_date, $payroll->end_date])
-                        ->update([
-                            'status' => 'Paid',
-                        ]);
-                }
-
-                if ($staffshoptAmount > 0) {
-                    Payment::where('emp_id', $employeeId)
-                        ->where('status', 'pending')
-                        ->whereBetween('purchased_date', [$payroll->start_date, $payroll->end_date])
-                        ->limit(1) // in case of partial deduction logic
-                        ->update([
-                            'status' => 'Paid',
-                        ]);
-                }
-            }
-        
-            DB::commit(); // ✅ Commit transaction
-
-            // payroll table has no created_by/creator column, so notify HR
-            // (the role that locks/audits payroll) that this run is finalized.
-            try {
-                Common::notifyEmployees(
-                    $this->resort->resort_id,
-                    Common::getResortHrEmployeeIds($this->resort->resort_id),
-                    'Payroll Locked',
-                    "Payroll for period {$payroll->start_date} to {$payroll->end_date} has been locked/finalized.",
-                    'Payroll',
-                    $payrollId
-                );
-            } catch (\Exception $e) {
-                \Log::warning('Payroll lock notification failed: ' . $e->getMessage());
-            }
+            DB::transaction(fn () => $this->finalizeAndLockPayroll($payroll, now()->format('Y-m-d')));
+            $this->notifyPayrollLocked($payroll);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Payroll Locked Successfully.',
-                'redirect_url' => route('payroll.view', ['payroll_id' => base64_encode($request->payroll_id)])
+                'redirect_url' => route('payroll.view', ['payroll_id' => base64_encode($payroll->id)])
             ]);
-
         } catch (\Exception $e) {
-            DB::rollBack(); // ✅ Rollback in case of error
-            Log::error('Error for payroll locking: ' . $e->getMessage()); // ✅ Log error for debugging
+            Log::error('Error for payroll locking: ' . $e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -1309,14 +1309,13 @@ class PayrollController extends Controller
 
         $payroll = Payroll::where('id', $payrollId)->where('resort_id', $resortId)->firstOrFail();
 
-        // P-02: only a locked (fully reviewed) payroll can be sent for
-        // approval — not a still-open draft, and not one already
-        // pending_approval/approved (re-sending after rejection goes
-        // through saveSummaryToPayroll first, which puts it back to locked).
-        if ($payroll->status !== 'locked') {
+        // Order is draft -> send for approval -> Finance EXCOM -> HR EXCOM -> GM;
+        // the final approval locks the payroll automatically. Anything already
+        // pending_approval/approved/locked can't be re-sent.
+        if ($payroll->status !== 'draft') {
             return response()->json([
                 'success' => false,
-                'message' => 'This payroll must be locked before it can be sent for approval.',
+                'message' => 'Only a draft payroll can be sent for approval.',
             ], 422);
         }
 
@@ -1398,20 +1397,43 @@ class PayrollController extends Controller
             return response()->json(['success' => false, 'message' => 'Previous approval steps must be completed first.'], 400);
         }
 
-        $approval->update([
-            'status' => $request->action === 'reject' ? 'rejected' : 'approved',
-            'approver_id' => $employee->id,
-            'approver_name' => $currentUser->first_name . ' ' . $currentUser->last_name,
-            'remarks' => $request->remarks,
-            'approved_at' => now(),
-        ]);
-
         // resort_id scope: Payroll::find by primary key alone would let
         // a user of one resort read another's payroll metadata if the
         // id is known.
         $payroll = Payroll::where('id', $payrollId)
             ->where('resort_id', $this->resort->resort_id)
             ->firstOrFail();
+
+        $isReject = $request->action === 'reject';
+
+        // Frozen signature, only for an approve (same pattern as Final Settlement).
+        $signatureFields = $isReject ? [] : Common::snapshotSignature($currentUser->id, 'payroll-approval', $approval->id);
+
+        // The final approval and the auto-lock commit together, so a failure
+        // can't leave a fully-approved but half-locked run.
+        $allApproved = false;
+        DB::transaction(function () use ($approval, $isReject, $request, $employee, $currentUser, $signatureFields, $payroll, $payrollId, &$allApproved) {
+            $approval->update([
+                'status' => $isReject ? 'rejected' : 'approved',
+                'approver_id' => $employee->id,
+                'approver_name' => $currentUser->first_name . ' ' . $currentUser->last_name,
+                'remarks' => $request->remarks,
+                'approved_at' => now(),
+                'signature_img' => $signatureFields['signature_img'] ?? null,
+                'signature_name' => $signatureFields['name'] ?? null,
+                'signed_at' => $signatureFields['timestamp'] ?? null,
+            ]);
+
+            if (!$isReject) {
+                $allApproved = PayrollApproval::where('payroll_id', $payrollId)
+                    ->where('status', '!=', 'approved')
+                    ->doesntExist();
+                if ($allApproved) {
+                    $this->finalizeAndLockPayroll($payroll, now()->format('Y-m-d'));
+                }
+            }
+        });
+
         $period = Common::formatDate($payroll->start_date) . ' - ' . Common::formatDate($payroll->end_date);
         $approverName = $currentUser->first_name . ' ' . $currentUser->last_name;
 
@@ -1438,13 +1460,9 @@ class PayrollController extends Controller
             return response()->json(['success' => true, 'message' => 'Payroll has been rejected.']);
         }
 
-        // If all 3 steps approved, update payroll status
-        $allApproved = PayrollApproval::where('payroll_id', $payrollId)
-            ->where('status', '!=', 'approved')
-            ->doesntExist();
-
+        // All 3 steps approved: already locked in the transaction above.
         if ($allApproved) {
-            $payroll->update(['status' => 'approved']);
+            $this->notifyPayrollLocked($payroll);
 
             // Notify supervisor that all approvals are done
             $supervisor = Employee::where('resort_id', $resortId)->where('rank', 5)->first();
@@ -1454,7 +1472,7 @@ class PayrollController extends Controller
                         $resortId,
                         [$supervisor->id],
                         'Payroll Fully Approved',
-                        "Payroll for period {$period} has been fully approved by all approvers. You can now lock the payroll.",
+                        "Payroll for period {$period} has been fully approved by all approvers and locked.",
                         'Payroll Approval',
                         $payrollId
                     );
@@ -1519,6 +1537,7 @@ class PayrollController extends Controller
             'payroll_status' => $payroll->status ?? 'draft',
             'user_approval_step' => $userApprovalStep,
             'is_supervisor' => $isSupervisor,
+            // Legacy: only runs stuck at 'approved' before auto-lock existed.
             'can_lock' => $payroll->status === 'approved' && $isSupervisor,
         ]);
     }
@@ -2641,6 +2660,7 @@ class PayrollController extends Controller
                 'absent' => $absentCount,
                 'day_off' => $dayOffCount,
                 'unpaid_absent' => $unpaidAbsentCount,
+                'unaccounted_days' => Common::unaccountedDays($recordsArray, $periodStart, $periodEnd),
                 'absent_deduction' => round($absentDeduct, 2),
                 'section' => 'N/A',
                 'total_ot' => $totalHours,

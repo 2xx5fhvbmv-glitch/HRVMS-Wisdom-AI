@@ -361,32 +361,38 @@ class JobAdvertisementController extends Controller
                         return response()->json(['success' => false, 'message' => 'Application link not found.'], 404);
                     }
 
+                    // A closed vacancy's link is expired on purpose (VacancyController::closeVacancy);
+                    // extending it would reopen applications behind a "Closed" status.
+                    $isClosed = DB::table('t_anotification_children as c')
+                        ->join('t_anotification_parents as p', 'p.id', '=', 'c.Parent_ta_id')
+                        ->join('vacancies as v', 'v.id', '=', 'p.V_id')
+                        ->where('c.id', $a->ta_child_id)
+                        ->where('v.status', 'Closed')
+                        ->exists();
+                    if ($isClosed) {
+                        DB::rollBack();
+                        return response()->json(['success' => false, 'message' => 'This vacancy is closed. Reopen it before extending the link.'], 422);
+                    }
+
                     if(isset($a) &&  $a->link_Expiry_date == $new_link_Expiry_date)
                     {
+                        DB::rollBack();
                         return response()->json(['success' => false,'message' => 'Same Expiry Date You Selected.']);
                     }
                     else
                     {
-
-                        if(isset($a->Old_ExpiryDate) && $a->Old_ExpiryDate !="0000-00-00" )
-                        {
-                            $json_data =  json_decode($a->Old_ExpiryDate);
-
-                            array_push($json_data,$a->link_Expiry_date);
-
+                        // Old_ExpiryDate is a DATE column (nothing reads it back), so it
+                        // holds the single previous expiry. It used to get a JSON array,
+                        // which a DATE column drops (or rejects on a strict DB), and
+                        // json_decode() of a stored date threw a TypeError.
+                        if ($a->link_Expiry_date) {
+                            $a->Old_ExpiryDate = $a->link_Expiry_date;
                         }
-                        else
-                        {
-                            $array=array($a->link_Expiry_date);
-                            {
-                                $json_data = json_encode($array);
-                            }
-                        }
-
-                        
-                        $a->Old_ExpiryDate = $json_data;
                         $a->link_Expiry_date = $new_link_Expiry_date;
                         $a->save();
+                        // This branch never committed the transaction opened above, so the
+                        // extension was discarded at the end of the request.
+                        DB::commit();
                         return response()->json([
                             'success' => true,
                             'message' => "Expiry Date Extended to {$request->link_Expiry_date}"
@@ -455,6 +461,7 @@ class JobAdvertisementController extends Controller
             }
             else
             {
+                DB::rollBack();
                 return response()->json(['success' => false,'message' => 'Requirtment is started so you cant extend the  Expiry Date.']);
             }
             
