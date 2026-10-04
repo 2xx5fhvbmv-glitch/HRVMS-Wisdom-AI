@@ -201,7 +201,9 @@ class FetchDataAiController extends Controller
                 'file' => new \CURLFile($file->getRealPath(), $file->getMimeType(), $file->getClientOriginalName()),
                 'doc_type' => $docType,
             ],
-            CURLOPT_HTTPHEADER => ['Accept: application/json'],
+            // The Wisdom AI service has no auth of its own beyond this
+            // shared-secret header (config/services.php 'wisdom_ai').
+            CURLOPT_HTTPHEADER => ['Accept: application/json', 'X-Internal-Key: ' . config('services.wisdom_ai.internal_key')],
             CURLOPT_TIMEOUT => 30,
             CURLOPT_CONNECTTIMEOUT => 10,
         ]);
@@ -232,6 +234,9 @@ class FetchDataAiController extends Controller
         curl_setopt_array($curl, [
             CURLOPT_URL => $base . 'extract_result/' . $taskId,
             CURLOPT_RETURNTRANSFER => true,
+            // The Wisdom AI service has no auth of its own beyond this
+            // shared-secret header (config/services.php 'wisdom_ai').
+            CURLOPT_HTTPHEADER => ['X-Internal-Key: ' . config('services.wisdom_ai.internal_key')],
             CURLOPT_TIMEOUT => 20,
             CURLOPT_CONNECTTIMEOUT => 10,
         ]);

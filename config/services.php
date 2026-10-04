@@ -103,4 +103,14 @@ return [
     'ai_report' => [
         'url' => env('AI_Report_fetch_URL'),
     ],
+
+    // Shared secret sent as the X-Internal-Key header on every call to the
+    // Wisdom AI Python service (ai_extract/cv_extractor/ai_report above are
+    // all endpoints on that same service). It had zero authentication of
+    // its own — any network caller could reach it — so every curl call
+    // site to it now sends this header; the Python side rejects anything
+    // without a matching key.
+    'wisdom_ai' => [
+        'internal_key' => env('WISDOM_AI_INTERNAL_KEY'),
+    ],
 ];

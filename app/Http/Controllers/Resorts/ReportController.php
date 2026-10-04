@@ -615,6 +615,9 @@ class ReportController extends Controller
                 'Content-Type: application/json',
                 'Accept: application/json',
                 'Content-Length: ' . strlen($jsonData),
+                // The Wisdom AI service has no auth of its own beyond this
+                // shared-secret header (see config/services.php 'wisdom_ai').
+                'X-Internal-Key: ' . config('services.wisdom_ai.internal_key'),
             ],
         ]);
         $response = curl_exec($curl);

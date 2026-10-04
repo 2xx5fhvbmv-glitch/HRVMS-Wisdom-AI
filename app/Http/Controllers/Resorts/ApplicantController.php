@@ -213,6 +213,9 @@ class ApplicantController extends Controller
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => ['pdf_file' => $cFile],
+            // The Wisdom AI service has no auth of its own beyond this
+            // shared-secret header (see config/services.php 'wisdom_ai').
+            CURLOPT_HTTPHEADER     => ['X-Internal-Key: ' . config('services.wisdom_ai.internal_key')],
             // Scanned PDFs hit the OCR fallback which adds 30-60s on top
             // of the 5-15s LLM inference — verified ~74s on the user's
             // actual labour-document PDF. 120s covers worst-case while

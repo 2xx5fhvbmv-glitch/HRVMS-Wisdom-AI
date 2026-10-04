@@ -2743,6 +2743,9 @@ class EmployeeController extends Controller
                 CURLOPT_POSTFIELDS => $postFields,
                 CURLOPT_HTTPHEADER => [
                     'Accept: application/json',
+                    // The Wisdom AI service has no auth of its own beyond this
+                    // shared-secret header (config/services.php 'wisdom_ai').
+                    'X-Internal-Key: ' . config('services.wisdom_ai.internal_key'),
                 ],
             ]);
             $response = curl_exec($curl);

@@ -362,6 +362,9 @@ class RenewalController extends Controller
                     CURLOPT_POSTFIELDS => $postFields,
                     CURLOPT_HTTPHEADER => [
                         'Accept: application/json',
+                        // The Wisdom AI service has no auth of its own beyond
+                        // this shared-secret header (config/services.php 'wisdom_ai').
+                        'X-Internal-Key: ' . config('services.wisdom_ai.internal_key'),
                     ],
                     // Hostinger reverse proxy kills requests at ~60 s with
                     // its own HTML "Request Timeout" 500. 50 s here keeps
@@ -372,10 +375,10 @@ class RenewalController extends Controller
                 $response = curl_exec($curl);
                 $err = curl_error($curl);
                 curl_close($curl);
-                if($err) 
+                if($err)
                 {
                     return response()->json(['status' => false, 'message' =>  $err]);
-                } 
+                }
                 $ai_encode =$response;
                 $AI_Data = json_decode($response, true);
        
@@ -1562,6 +1565,9 @@ class RenewalController extends Controller
                 CURLOPT_POSTFIELDS => $postFields,
                 CURLOPT_HTTPHEADER => [
                     'Accept: application/json',
+                    // The Wisdom AI service has no auth of its own beyond this
+                    // shared-secret header (config/services.php 'wisdom_ai').
+                    'X-Internal-Key: ' . config('services.wisdom_ai.internal_key'),
                 ],
                 // Hostinger proxy kills the request at ~60 s — explicit
                 // 50 s timeout means PHP returns a clean JSON error first.
@@ -1680,6 +1686,9 @@ class RenewalController extends Controller
                 CURLOPT_POSTFIELDS => $postFields,
                 CURLOPT_HTTPHEADER => [
                     'Accept: application/json',
+                    // The Wisdom AI service has no auth of its own beyond this
+                    // shared-secret header (config/services.php 'wisdom_ai').
+                    'X-Internal-Key: ' . config('services.wisdom_ai.internal_key'),
                 ],
                 // Hostinger proxy kills the request at ~60 s — explicit
                 // 50 s timeout means PHP returns a clean JSON error first.
@@ -1741,6 +1750,9 @@ class RenewalController extends Controller
                 CURLOPT_POSTFIELDS => $postFields,
                 CURLOPT_HTTPHEADER => [
                     'Accept: application/json',
+                    // The Wisdom AI service has no auth of its own beyond this
+                    // shared-secret header (config/services.php 'wisdom_ai').
+                    'X-Internal-Key: ' . config('services.wisdom_ai.internal_key'),
                 ],
                 // Hostinger proxy kills the request at ~60 s — explicit
                 // 50 s timeout means PHP returns a clean JSON error first.
@@ -1806,6 +1818,9 @@ class RenewalController extends Controller
                 CURLOPT_POSTFIELDS => $postFields,
                 CURLOPT_HTTPHEADER => [
                     'Accept: application/json',
+                    // The Wisdom AI service has no auth of its own beyond this
+                    // shared-secret header (config/services.php 'wisdom_ai').
+                    'X-Internal-Key: ' . config('services.wisdom_ai.internal_key'),
                 ],
                 // Hostinger proxy kills the request at ~60 s — explicit
                 // 50 s timeout means PHP returns a clean JSON error first.
