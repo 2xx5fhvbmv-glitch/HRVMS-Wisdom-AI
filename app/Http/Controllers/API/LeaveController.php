@@ -54,7 +54,7 @@ class LeaveController extends Controller
             'to_date'                   => 'required|array',
             'to_date.*'                 => 'required|date_format:Y-m-d',
             'reason'                    => 'required|string',
-            'task_delegation'           => 'nullable|integer',
+            'task_delegation'           => ['nullable', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', Auth::guard('api')->user()->resort_id)], // L-09: same-resort only
             // Extending an already-approved leave: this is just a normal
             // leave request for the additional days, tagged back to the
             // original. Ownership + Approved-status of the referenced
@@ -462,54 +462,13 @@ class LeaveController extends Controller
                     }
                 }
 
-                $passApprovalFlow                       =   collect();
-
-
-                // Add Security Manager (SM) to the approval flow (rank 4)
-                $securityManagerTitles                  =   ['Security Manager', 'SM'];
-
-                // Get position IDs that match the titles in the current resort
-                $positionIds                            =   ResortPosition::where('resort_id', $user->resort_id)
-                                                                ->whereIn('position_title', $securityManagerTitles)
-                                                                ->pluck('id'); // Get the position IDs
-
-                // Get employees who hold these positions in the current resort.
-                // Same fix as BoardingPassController::boardingPassAdd() (this
-                // is a separate, duplicate approver-assignment code path for
-                // the Island Pass linked to a leave request with travel
-                // dates) — no status filter or ordering meant an Onboarding
-                // placeholder could be resolved instead of the real approver.
-                $SMApprover                             =   Employee::with(['resortAdmin','position'])->whereIn('Position_id', $positionIds)
-                                                                ->where('resort_id', $user->resort_id)->where('status', 'Active')
-                                                                ->select('id', 'rank')
-                                                                ->orderBy('id')
-                                                                ->first();
-
-                if ($SMApprover) {
-                    $SMApprover->approver_role           =   'SM';
-                    $passApprovalFlow->push($SMApprover); // Fourth approver: Security Officer
+                // L-06: shared chain builder — applicant never approves their own pass
+                $passChain = Common::buildIslandPassApprovalChain($user->resort_id, $employee);
+                if ($passChain['blocked'] && isset($request->arrival_date, $request->dept_date)) {
+                    DB::rollBack();
+                    return response()->json(['success' => false, 'message' => $passChain['blocked']], 200);
                 }
-
-                // Add HR to the approval flow. Raw rank=3 excluded any resort
-                // whose real HR employee isn't literally rank 3 (e.g. an
-                // HR-department employee ranked HOD/EXCOM), silently dropping
-                // HR from the whole approval chain.
-                $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($user->resort_id))->where('status', 'Active')->orderBy('id')->first();
-                if ($hrApprover) {
-                    $hrApprover->approver_role            =   'HR';
-                    $passApprovalFlow->push($hrApprover); // Third approver: HR
-                }
-
-                // Add department head to the approval flow — HOD (rank 2),
-                // falls back to EXCOM (rank 1) via FindResortHODDepartment()
-                // for departments with no rank-2 employee (previously
-                // excluded entirely, silently dropping the department-head
-                // step from the whole approval chain).
-                $hodApprover                             =   Common::FindResortHODDepartment($user->resort_id, $employee->Dept_id);
-                if ($hodApprover ) {
-                    $hodApprover->approver_role           =   'HOD';
-                    $passApprovalFlow->push($hodApprover); // Second approver: HOD
-                }
+                $passApprovalFlow = $passChain['flow'];
 
                 if (isset($request->arrival_date, $request->dept_date)) {
                     $boardingPass                       =   EmployeeTravelPass::create([
@@ -2119,10 +2078,16 @@ class LeaveController extends Controller
                 // view, it should show a leave regardless of status.
                 $leaveDetails = DB::table('employees_leaves')
                     ->where('id', $decodedId)
+                    ->where('resort_id', $resortId)
                     ->first();
 
                 if (!$leaveDetails) {
                     return response()->json(['success' => false, 'message' => 'Leave ID not found.',], 200);
+                }
+
+                // L-01: applicant, approval chain, HR/GM or scoped HOD only
+                if (!Common::canViewLeave($leaveDetails, $user->GetEmployee)) {
+                    return response()->json(['success' => false, 'message' => 'You are not authorized to view this leave.'], 403);
                 }
 
                 $leaveCategoryId = $leaveDetails->leave_category_id;
@@ -2276,6 +2241,7 @@ class LeaveController extends Controller
             'arrival_time'                              => 'nullable|date_format:H:i',
             'arrival_transportation'                    => 'nullable|integer',
             'dept_reason'                               => 'nullable',
+            'task_delegation'                           => ['nullable', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', Auth::guard('api')->user()->resort_id)], // L-09
 
         ]);
 
@@ -2559,48 +2525,13 @@ class LeaveController extends Controller
                             }
                         }
 
-                        $passApprovalFlow                       =   collect();
-
-                         // Add Security Manager (SM) to the approval flow (rank 4)
-                        $securityManagerTitles                  =   ['Security Manager', 'SM'];
-
-                        // Get position IDs that match the titles in the current resort
-                        $positionIds                            =   ResortPosition::where('resort_id', $user->resort_id)
-                                                                        ->whereIn('position_title', $securityManagerTitles)
-                                                                        ->pluck('id'); // Get the position IDs
-
-                        // Get employees who hold these positions in the current resort.
-                        // Same status/ordering fix as the other two copies of this
-                        // approver-assignment logic in this file.
-                        $SMApprover                             =   Employee::with(['resortAdmin','position'])->whereIn('Position_id', $positionIds)
-                                                                        ->where('resort_id', $user->resort_id)->where('status', 'Active')
-                                                                        ->select('id', 'rank')
-                                                                        ->orderBy('id')
-                                                                        ->first();
-                        if ($SMApprover) {
-                            $SMApprover->approver_role           =   'SM';
-                            $passApprovalFlow->push($SMApprover); // Fourth approver: Security Officer
+                        // L-06: shared chain builder — applicant never approves their own pass
+                        $passChain = Common::buildIslandPassApprovalChain($user->resort_id, $employee);
+                        if ($passChain['blocked'] && isset($request->arrival_date, $request->dept_date)) {
+                            DB::rollBack();
+                            return response()->json(['success' => false, 'message' => $passChain['blocked']], 200);
                         }
-
-                        // Add HR to the approval flow. Raw rank=3 excluded any resort
-                        // whose real HR employee isn't literally rank 3 (e.g. an
-                        // HR-department employee ranked HOD/EXCOM) — matches the fix
-                        // already applied to the other two copies of this logic.
-                        $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($user->resort_id))->where('status', 'Active')->orderBy('id')->first();
-                        if ($hrApprover) {
-                            $hrApprover->approver_role            =   'HR';
-                            $passApprovalFlow->push($hrApprover); // Third approver: HR
-                        }
-
-                        // Add department head to the approval flow — HOD
-                        // (rank 2), falls back to EXCOM (rank 1) via
-                        // FindResortHODDepartment() for departments with no
-                        // rank-2 employee.
-                        $hodApprover                             =   Common::FindResortHODDepartment($user->resort_id, $employee->Dept_id);
-                        if ($hodApprover ) {
-                            $hodApprover->approver_role           =   'HOD';
-                            $passApprovalFlow->push($hodApprover); // Second approver: HOD
-                        }
+                        $passApprovalFlow = $passChain['flow'];
 
                         if (isset($request->arrival_date, $request->dept_date)) {
                             if ($leaveUpdate->status == 'Pending') {
@@ -3629,6 +3560,18 @@ class LeaveController extends Controller
                     )) as transportation_details')
                 )->groupBy('el.id')->first();
 
+                // Same gate as viewLeaveRequest(): owner, anyone in the approval chain, or HR/GM.
+                if ($leaveDetail) {
+                    $isOwner    = (int) $emp_id === (int) $leaveDetail->emp_id;
+                    $isApprover = DB::table('employees_leaves_status')
+                        ->where('leave_request_id', $decodedId)
+                        ->where('approver_id', $emp_id)
+                        ->exists();
+                    if (!$isOwner && !$isApprover && !Common::hasFullDataAccess($employee)) {
+                        return response()->json(['success' => false, 'message' => 'You are not authorized to view this leave.'], 403);
+                    }
+                }
+
                 if ($isHOD) {
                     $from_date  = $leaveDetail->from_date;
                     $end_date   = $leaveDetail->to_date;
@@ -4321,7 +4264,7 @@ class LeaveController extends Controller
             $user                                       =   Auth::guard('api')->user();
             $employee                                   =   $user->GetEmployee;
             $currentApproverId                          =   $employee->id; // Assuming the logged-in user is the approver
-            $leave                                      =   EmployeeLeave::find($leaveId);
+            $leave                                      =   EmployeeLeave::where('resort_id', $user->resort_id)->find($leaveId); // L-05: tenant scope
 
             if (!$leave) {
                 return response()->json([

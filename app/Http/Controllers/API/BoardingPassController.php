@@ -272,73 +272,13 @@ class BoardingPassController extends Controller
                     'status'                            =>  'Pending',
                 ]);
 
-                // Determine approval flow for both Entry and Exit passes
-                $passApprovalFlow                       =   collect();
-
-                // Add Security Manager (SM) to the approval flow (rank 4)
-                $securityManagerTitles                  =   ['Security Manager', 'SM'];
-
-                // Get position IDs that match the titles in the current resort
-                $positionIds                            =   ResortPosition::where('resort_id', $this->resort_id)
-                                                                ->whereIn('position_title', $securityManagerTitles)
-                                                                ->pluck('id'); // Get the position IDs
-
-                // Get employees who hold these positions in the current resort
-                $SMApprover                             =   Employee::with(['resortAdmin','position'])->whereIn('Position_id', $positionIds)
-                                                                ->where('resort_id', $this->resort_id)->where('status', 'Active')
-                                                                ->select('id', 'rank')
-                                                                ->orderBy('id')
-                                                                ->first();
-
-                if ($SMApprover) {
-                    // Tag the FUNCTIONAL stage this approver fills — not
-                    // their personal rank. An HR head or Security Manager
-                    // can personally hold rank=2 ("HOD") same as a real
-                    // department HOD, which made every rank_type lookup
-                    // derived from approver_rank mislabel their rows "HOD"
-                    // too (see approver_role column comment).
-                    $SMApprover->approver_role          =   'SM';
-                    $passApprovalFlow->push($SMApprover); // Fourth approver: Security Officer
+                // L-06: shared chain builder — applicant never approves their own pass
+                $passChain = Common::buildIslandPassApprovalChain($this->resort_id, $employee);
+                if ($passChain['blocked']) {
+                    DB::rollBack();
+                    return response()->json(['success' => false, 'message' => $passChain['blocked']], 200);
                 }
-
-                // Add HR to the approval flow. Raw rank=3 excluded any
-                // resort whose real HR employee isn't literally rank 3
-                // (e.g. an HR-department employee ranked HOD/EXCOM),
-                // silently dropping HR from the whole approval chain.
-                $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($this->resort_id))->where('status', 'Active')->orderBy('id')->first();
-                if ($hrApprover) {
-                    $hrApprover->approver_role           =   'HR';
-                    $passApprovalFlow->push($hrApprover); // Third approver: HR
-                }
-
-                // Add department head to the approval flow — HOD (rank 2),
-                // falls back to EXCOM (rank 1) via FindResortHODDepartment()
-                // for departments with no rank-2 employee. That helper also
-                // already excludes inactive placeholder rows (onboarding
-                // records can carry a valid rank/dept before onboarding
-                // completes — confirmed against real data where a
-                // department had 3 rank=2 employees, only one Active).
-                $hodApprover                             =   Common::FindResortHODDepartment($this->resort_id, $employee->Dept_id);
-
-                // FindResortHODDepartment() has no self-exclusion — an HOD
-                // (or EXCOM, via its rank-1 fallback) requesting their own
-                // Island Pass got themselves back as "the department HOD"
-                // and could approve their own request. Route this stage to
-                // their reporting manager instead when that happens.
-                if ($hodApprover && (int) $hodApprover->id === (int) $employee->id) {
-                    $hodApprover                         =   $employee->reporting_to
-                                                                ? Employee::select('id', 'rank')
-                                                                    ->where('id', $employee->reporting_to)
-                                                                    ->where('resort_id', $this->resort_id)
-                                                                    ->where('status', 'Active')
-                                                                    ->first()
-                                                                : null;
-                }
-
-                if ($hodApprover ) {
-                    $hodApprover->approver_role          =   'HOD';
-                    $passApprovalFlow->push($hodApprover); // Second approver: HOD
-                }
+                $passApprovalFlow = $passChain['flow'];
 
                 // Add the same approval flow for Exit Pass as well
                 $passApprovalFlow->each(function($approver) use ($boardingPass) {

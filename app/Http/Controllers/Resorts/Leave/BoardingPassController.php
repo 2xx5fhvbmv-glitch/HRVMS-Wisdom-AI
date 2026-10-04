@@ -314,45 +314,13 @@ class BoardingPassController extends Controller
                 'status' => 'Pending',
             ]);
 
-            $passApprovalFlow = collect();
-
-            // L-06: the HOD step below already excludes the applicant (falls
-            // back to reporting_to when they're their own dept's HOD) — the
-            // SM and HR steps never got that same treatment, so an
-            // applicant who happens to be the resort's Security Manager or
-            // sole HR employee approved their own pass at that stage.
-            $positionIds = ResortPosition::where('resort_id', $resort_id)
-                ->whereIn('position_title', ['Security Manager', 'SM'])
-                ->pluck('id');
-            $smApprover = Employee::whereIn('Position_id', $positionIds)
-                ->where('resort_id', $resort_id)->where('status', 'Active')
-                ->where('id', '!=', $employee->id)
-                ->select('id', 'rank')->orderBy('id')->first();
-            if ($smApprover) {
-                $smApprover->approver_role = 'SM';
-                $passApprovalFlow->push($smApprover);
+            // L-06: shared chain builder — applicant never approves their own pass
+            $passChain = Common::buildIslandPassApprovalChain($resort_id, $employee);
+            if ($passChain['blocked']) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'msg' => $passChain['blocked']], 422);
             }
-
-            $hrApprover = Employee::select('id', 'rank')
-                ->whereIn('id', Common::getResortHrEmployeeIds($resort_id))
-                ->where('status', 'Active')->where('id', '!=', $employee->id)
-                ->orderBy('id')->first();
-            if ($hrApprover) {
-                $hrApprover->approver_role = 'HR';
-                $passApprovalFlow->push($hrApprover);
-            }
-
-            $hodApprover = Common::FindResortHODDepartment($resort_id, $employee->Dept_id);
-            if ($hodApprover && (int) $hodApprover->id === (int) $employee->id) {
-                $hodApprover = $employee->reporting_to
-                    ? Employee::select('id', 'rank')->where('id', $employee->reporting_to)
-                        ->where('resort_id', $resort_id)->where('status', 'Active')->first()
-                    : null;
-            }
-            if ($hodApprover) {
-                $hodApprover->approver_role = 'HOD';
-                $passApprovalFlow->push($hodApprover);
-            }
+            $passApprovalFlow = $passChain['flow'];
 
             $passApprovalFlow->each(function ($approver) use ($boardingPass) {
                 EmployeeTravelPassStatus::create([
@@ -575,6 +543,10 @@ class BoardingPassController extends Controller
         ])->where('id', $passId)->where('resort_id', $resort_id)->first();
         if (!$pass) {
             return response()->json(['success' => false, 'message' => 'Boarding pass not found.'], 404);
+        }
+        // L-01: applicant, approval chain, HR/GM, scoped HOD, Security Manager only
+        if (!Common::canViewIslandPass($pass, optional($this->resort)->GetEmployee) && !($this->resort->is_master_admin ?? 0)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
         }
 
         // Read times directly from DB so we never miss them (same record the DataTable shows)

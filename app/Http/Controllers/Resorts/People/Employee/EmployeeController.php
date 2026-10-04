@@ -65,12 +65,12 @@ class EmployeeController extends Controller
      * resort_id scoping that stops cross-tenant access, not a same-resort
      * HOD/EXCOM/ordinary employee from acting on any employee in their
      * own resort. Decided: HR only (same rule this codebase already uses
-     * everywhere else for "everyone vs HR/GM" — Common::hasFullDataAccess,
-     * which also covers GM and an HR-department HOD/EXCOM).
+     * everywhere else for "everyone vs HR/GM" — Common::canManageEmployeeRecords,
+     * which excludes GM/L&D unlike hasFullDataAccess).
      */
     private function requireHrAccess()
     {
-        if (!Common::hasFullDataAccess(optional($this->resort)->GetEmployee)) {
+        if (!Common::canManageEmployeeRecords()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
         }
         return null;

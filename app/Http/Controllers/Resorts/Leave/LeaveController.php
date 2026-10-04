@@ -1288,6 +1288,10 @@ class LeaveController extends Controller
         $empID = $request->empID;
         $leave_catId = $request->leave_catId;
 
+        if (!Common::canViewEmployeeLeaves($empID, optional($this->resort)->GetEmployee) && !($this->resort->is_master_admin ?? 0)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
+        }
+
         // Define the query
         $leaveUsageQuery = DB::table('employees_leaves')
             ->join('leave_categories', 'employees_leaves.leave_category_id', '=', 'leave_categories.id')
@@ -1420,6 +1424,10 @@ class LeaveController extends Controller
             }
             $resort_id = $this->resort->resort_id ?? 0;
             if (!$resort_id) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
+            }
+
+            if (!Common::canViewEmployeeLeaves($empID, optional($this->resort)->GetEmployee) && !($this->resort->is_master_admin ?? 0)) {
                 return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
             }
 
@@ -1904,39 +1912,14 @@ class LeaveController extends Controller
                     }
                 }
 
-                $passapprovalFlow                       =   collect();
-
-                // Boarding-pass approval chain follows the TRAVELING employee's
-                // own manager chain, not the submitter's — matters when HR/HOD
-                // applies this leave on the employee's behalf (see
-                // $targetReportingTo resolution above).
-                $directReportingManagerId = $targetReportingTo;
-                $directReportingManager = Employee::select('id', 'rank','reporting_to')->where('resort_id',$this->resort->resort_id)->find($directReportingManagerId); // Fetch only id and rank
-               
-                if ($directReportingManager && $directReportingManager->rank < "8") {
-                    $passapprovalFlow->push($directReportingManager); // First approver: Supervisor/Manager
-
-                    // Step 2: Find the HOD for this Supervisor/Manager
-                    $hod                                =   Employee::select('id', 'rank', 'reporting_to')->where('resort_id',$this->resort->resort_id)->find($directReportingManager->reporting_to);
-                    if ($hod && $hod->rank < "8") {
-                        $passapprovalFlow->push($hod); // Second approver: HOD
-                    }
+                // L-06: shared chain (HOD -> HR -> SM by id order, applicant never an approver),
+                // built for the TRAVELING employee (may differ from submitter when HR/HOD applies on behalf).
+                $passChain = Common::buildIslandPassApprovalChain($resort_id, $applicantEmployeeRecord);
+                if ($passChain['blocked'] && $request->input('departure') === 'Yes' && $request->filled('arr_date') && $request->filled('dept_date')) {
+                    DB::rollBack();
+                    return response()->json(['status' => 'error', 'message' => $passChain['blocked']], 422);
                 }
-
-                // Add HR to the approval flow. Raw rank=3 excluded any
-                // resort whose real HR employee isn't literally rank 3
-                // (e.g. HR-department HOD/EXCOM), silently dropping HR from
-                // the whole approval chain.
-                $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($this->resort->resort_id))->first(); // HR
-                if ($hrApprover) {
-                    $passapprovalFlow->push($hrApprover); // Third approver: HR
-                }
-
-                // Add Security Officer to the approval flow
-                $SOApprover                             =   Employee::select('id', 'rank')->where('resort_id',$this->resort->resort_id)->where('rank', 10)->first(); // Security Officer
-                if ($SOApprover) {
-                    $passapprovalFlow->push($SOApprover); // Fourth approver: Security Officer
-                }
+                $passapprovalFlow = $passChain['flow'];
 
                 // Only create a boarding pass when the user actually chose
                 // "Yes" for departure pass AND filled in both dates. The old
@@ -1965,6 +1948,7 @@ class LeaveController extends Controller
                             'travel_pass_id'            =>  $boardingPass->id,
                             'approver_id'               =>  $approverFlw->id,
                             'approver_rank'             =>  $approverFlw->rank,
+                            'approver_role'             =>  $approverFlw->approver_role ?? null,
                             'status'                    =>  'Pending',
                         ]);
                     }
@@ -2513,6 +2497,10 @@ class LeaveController extends Controller
 
         if (!$empIdInt || !$resort_id) {
             return redirect()->back()->with('error', 'Invalid request.');
+        }
+
+        if (!Common::canViewEmployeeLeaves($empIdInt, optional($this->resort)->GetEmployee) && !($this->resort->is_master_admin ?? 0)) {
+            return redirect()->back()->with('error', 'Unauthorized.');
         }
 
         // Ensure employee belongs to current resort

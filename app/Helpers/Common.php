@@ -6184,6 +6184,123 @@ class Common
     /**
      * Accommodation settings/write gate (security audit AC-03, product
      * decision): HR only — no separate Accommodation-manager role exists.
+    /**
+     * Island Pass approval chain (security audit L-06), order of insertion
+     * SM, HR, HOD (executed HOD -> HR -> SM by id). The applicant is never
+     * their own approver: SM/HR skip to the next eligible holder, HOD falls
+     * back to reporting_to. Returns ['flow' => Collection, 'blocked' => ?string];
+     * 'blocked' is set when the applicant is the ONLY holder of the SM/HR
+     * role, so no non-self approver exists for that step (callers reject
+     * the request rather than create a self-approvable stage).
+     */
+    public static function buildIslandPassApprovalChain($resortId, $applicant): array
+    {
+        $flow = collect();
+        $blocked = null;
+
+        $smPositionIds = \App\Models\ResortPosition::where('resort_id', $resortId)
+            ->whereIn('position_title', ['Security Manager', 'SM'])->pluck('id');
+        $steps = [
+            ['SM', 'Security Manager', \App\Models\Employee::whereIn('Position_id', $smPositionIds)->where('resort_id', $resortId)],
+            ['HR', 'HR', \App\Models\Employee::whereIn('id', self::getResortHrEmployeeIds($resortId))],
+        ];
+        foreach ($steps as [$role, $label, $query]) {
+            $holders = $query->where('status', 'Active')->select('id', 'rank')->orderBy('id')->get();
+            $approver = $holders->firstWhere(fn($e) => (int) $e->id !== (int) $applicant->id);
+            if ($approver) {
+                $approver->approver_role = $role;
+                $flow->push($approver);
+            } elseif ($holders->isNotEmpty()) {
+                $blocked = "You cannot request an Island Pass because you are the only {$label} and cannot approve your own request.";
+            }
+        }
+
+        $hod = self::FindResortHODDepartment($resortId, $applicant->Dept_id);
+        if ($hod && (int) $hod->id === (int) $applicant->id) {
+            $hod = $applicant->reporting_to
+                ? \App\Models\Employee::select('id', 'rank')->where('id', $applicant->reporting_to)
+                    ->where('resort_id', $resortId)->where('status', 'Active')->first()
+                : null;
+        }
+        if ($hod) {
+            $hod->approver_role = 'HOD';
+            $flow->push($hod);
+        }
+
+        return ['flow' => $flow, 'blocked' => $blocked];
+    }
+
+    /**
+     * Shared single-record read gate for a leave / island pass (security audit
+     * L-01). $record needs ->emp_id (or ->employee_id) and ->resort_id; $approverTable/$approverFk
+     * name the approval-chain table that holds approver_id for it.
+     * Allowed: same resort AND (applicant | anyone in the approval chain |
+     * HR/GM full access | HOD/EXCOM/MGR whose scoped depts include the
+     * applicant's | island pass only: Security Manager).
+     */
+    private static function canViewRequestRecord($record, $employee, string $approverTable, string $approverFk, bool $allowSecurity = false): bool
+    {
+        if (!$record || !$employee) return false;
+        $record->emp_id = $record->emp_id ?? $record->employee_id ?? null; // island pass uses employee_id
+        if ((int) $record->resort_id !== (int) $employee->resort_id) return false;
+        if ((int) $record->emp_id === (int) $employee->id) return true;
+
+        if (\DB::table($approverTable)->where($approverFk, $record->id)->where('approver_id', $employee->id)->exists()) {
+            return true;
+        }
+        if (self::hasFullDataAccess($employee)) return true;
+        if ($allowSecurity && optional($employee->position)->position_title === 'Security Manager') return true;
+
+        if (in_array((int) $employee->rank, [1, 2, 4], true)) {
+            $deptId = \DB::table('employees')->where('id', $record->emp_id)->where('resort_id', $record->resort_id)->value('Dept_id');
+            $scoped = self::getScopedDepartmentIds($employee);
+            return $deptId !== null && ($scoped === null || in_array((int) $deptId, array_map('intval', $scoped), true));
+        }
+        return false;
+    }
+
+    public static function canViewLeave($leave, $employee): bool
+    {
+        return self::canViewRequestRecord($leave, $employee, 'employees_leaves_status', 'leave_request_id');
+    }
+
+    /** Person-level variant for leave-history endpoints that take an employee id, not a leave id. */
+    public static function canViewEmployeeLeaves($empId, $employee): bool
+    {
+        if (!$employee) return false;
+        $reportingTo = \DB::table('employees')->where('id', $empId)->where('resort_id', $employee->resort_id)->value('reporting_to');
+        if ((int) $reportingTo === (int) $employee->id) return true;
+        return self::canViewRequestRecord((object) ['id' => 0, 'emp_id' => $empId, 'resort_id' => $employee->resort_id], $employee, 'employees_leaves_status', 'leave_request_id');
+    }
+
+    public static function canViewIslandPass($pass, $employee): bool
+    {
+        return self::canViewRequestRecord($pass, $employee, 'employee_travel_pass_status', 'travel_pass_id', true);
+    }
+
+    /**
+     * People-record write gate (security audit PE-01, decided HR-only):
+     * HR (rank 3) or HR-department HOD/EXCOM, plus master admin/super.
+     * Deliberately narrower than hasFullDataAccess() — GM and L&D managers
+     * get read access elsewhere but not employee-record edits.
+     */
+    public static function canManageEmployeeRecords($employee = null): bool
+    {
+        if ($employee === null) {
+            $user = \Auth::guard('resort-admin')->user();
+            if (!$user) return false;
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return true;
+            }
+            $employee = $user->GetEmployee ?? null;
+        }
+        if (!$employee) return false;
+
+        $rank = (int) $employee->rank;
+        return $rank === 3
+            || (in_array($rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null));
+    }
+
      * Engineering HOD keeps their own existing app-side rank guard for
      * assigning/completing maintenance jobs (untouched by this gate).
      * HOD/EXCOM and GM are view-only for this module; everyone else is
