@@ -225,6 +225,12 @@ class ResortsController extends Controller
               return response()->json(['success' => false, 'msg' => 'The resort IT email must be a valid and unique email address.']);
           }
 
+          // Employee IDs are "<prefix>-<n>" and the mobile app logs in by
+          // Employee ID alone, so two resorts sharing a prefix share IDs.
+          if (Validator::make($request->all(), ['resort_prefix' => 'required|unique:resorts,resort_prefix'])->fails()) {
+              return response()->json(['success' => false, 'msg' => 'The resort prefix is required and must not be used by another resort.']);
+          }
+
           // Validate personal email for uniqueness
           $email_validator = Validator::make($request->all(), [
               'email' => 'email:rfc,dns|unique:resort_admins,email'
@@ -466,6 +472,12 @@ class ResortsController extends Controller
 
         if ($resort_it_email_validator->fails()) {
             return response()->json(['success' => false, 'msg' => 'The resort IT email must be a valid and unique email address.']);
+        }
+
+        // Employee IDs are "<prefix>-<n>" and the mobile app logs in by
+        // Employee ID alone, so two resorts sharing a prefix share IDs.
+        if (Validator::make($request->all(), ['resort_prefix' => 'required|unique:resorts,resort_prefix,' . $resort->id])->fails()) {
+            return response()->json(['success' => false, 'msg' => 'The resort prefix is required and must not be used by another resort.']);
         }
 
         // Validate personal email for uniqueness, excluding the current resort admin

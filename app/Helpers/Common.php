@@ -267,7 +267,9 @@ class Common
             $employee->update($employeeData);
             $employeeCreated = false;
         } else {
-            $employeeData['Emp_id'] = self::nextEmployeeId($resortId);
+            // Resort Data Setup migrates staff with the client's own IDs; every
+            // other caller leaves Emp_id unset and gets the next generated one.
+            $employeeData['Emp_id'] = $employeeData['Emp_id'] ?? self::nextEmployeeId($resortId);
             $employee = Employee::create($employeeData);
 
             $folderExists = FilemangementSystem::where('resort_id', $resortId)

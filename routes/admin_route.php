@@ -110,6 +110,17 @@ Route::prefix(config('settings.route_prefix.admin'))->namespace('Admin')->group(
         Route::post('/resorts/delete/image', 'ResortsController@deleteImage')->name('admin.resorts.delete.image');
         Route::post('/resorts/check-email-exists', 'ResortsController@checkEmailExists')->name('admin.resorts.checkEmailExists');
         Route::get('/resort/login/{id}', 'ResortsController@loginAsResortAdmin')->name('admin.resorts.login');
+
+        /** Resort Data Setup — migrate a client's exports from their previous HR system **/
+        Route::get('/resort-data-setup', 'ResortDataSetupController@index')->name('admin.resort_data_setup.index');
+        Route::get('/resort-data-setup/{resort}', 'ResortDataSetupController@show')->name('admin.resort_data_setup.show');
+        Route::post('/resort-data-setup/{resort}/upload', 'ResortDataSetupController@upload')->name('admin.resort_data_setup.upload');
+        Route::post('/resort-data-setup/{resort}/files/{fileId}/mapping', 'ResortDataSetupController@mapping')->name('admin.resort_data_setup.mapping');
+        Route::post('/resort-data-setup/{resort}/files/{fileId}/remove', 'ResortDataSetupController@remove')->name('admin.resort_data_setup.remove');
+        Route::post('/resort-data-setup/{resort}/options', 'ResortDataSetupController@options')->name('admin.resort_data_setup.options');
+        Route::post('/resort-data-setup/{resort}/validate', 'ResortDataSetupController@validateImport')->name('admin.resort_data_setup.validate');
+        Route::post('/resort-data-setup/{resort}/import', 'ResortDataSetupController@import')->middleware('admin.reauth')->name('admin.resort_data_setup.import');
+        Route::post('/resort-data-setup/{resort}/credentials/clear', 'ResortDataSetupController@clearCredentials')->name('admin.resort_data_setup.clear_credentials');
         Route::get('/resort/edit-permissions/{id}', 'ResortsController@editPermissions')->name('admin.resorts.edit_permissions');
         Route::post('/resort/update-permissions/{id}', 'ResortsController@updatePermissions')->middleware('admin.reauth')->name('admin.resorts.update_permissions');
 
