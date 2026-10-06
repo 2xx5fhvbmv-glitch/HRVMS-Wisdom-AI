@@ -254,7 +254,6 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     /** Budget **/
     Route::get( '/budget/view-manning','BudgetController@ViewManning')->name('resort.budget.manning');
     Route::get( '/budget/view-budget','BudgetController@ViewBudget')->name('resort.budget.viewbudget');
-    Route::get('/resort/budget/get', 'BudgetController@ajaxViewBudget')->name('budget.view.ajax');
 
     // Hierarchical Budget API Routes
     Route::get('/budget/hierarchy/department', 'BudgetController@getDepartmentHierarchy')->name('resort.budget.hierarchy.department');
@@ -412,7 +411,6 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::get( 'talent-acquisition/alltodolist', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','ViewAllToDo'])->name('resort.ta.alltodolist');
     Route::get( 'talent-acquisition/shortlisted/applicants', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','shortlistedapplicantsShareLink'])->name('resort.ta.shortlistedapplicants');
     Route::get( 'talent-acquisition/shortlisted/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','shortlisted'])->name('resort.ta.shortlisted');
-    Route::get( 'talent-acquisition/shortlisted', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','shortlisted'])->name('resort.ta.shortlistedIndex');
     Route::get( 'talent-acquisition/upcoming-applicants', ['App\Http\Controllers\Resorts\TalentAcquisition\VacancyController','UpcomingApplicants'])->name('resort.ta.UpcomingApplicants');
     Route::post('/talent-acquisition/vacancy/{id}/close', 'TalentAcquisition\VacancyController@closeVacancy')->name('resort.vacancies.close');
     Route::post('/talent-acquisition/vacancy/{id}/reopen', 'TalentAcquisition\VacancyController@reopenVacancy')->name('resort.vacancies.reopen');
@@ -685,7 +683,6 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::post('/leaves/get-eligible', 'Leave\ConfigController@getEligibleLeaves')->name('leaves.getEligible');
 
     Route::get('/upcoming-holidays', 'Leave\DashboardController@get_upcomimg_holidays')->name('resort.upcomingholiday.list');
-    Route::get('/upcoming-birthdays', 'Leave\DashboardController@getUpcomingBirthdays')->name('resort.upcomingBirthdays');
     Route::get('/upcoming-birthdays/list', 'Leave\DashboardController@getUpcomingBirthdaysList')->name('resort.upcomingBirthdays.list');
     Route::post('/send-birthday-notification', 'Leave\DashboardController@sendBirthdayNotification')->name('birthday.notification.send');
 
@@ -714,7 +711,6 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
 
     Route::post('/get/leave-chart', 'Leave\DashboardController@getLeaveChartData')->name('leave-chart-data');
     Route::get('/get/combine-info', 'Leave\LeaveController@getCombineInfo')->name('leaves.combineInfo.get');
-    Route::get('/get/used-leave','Leave\LeaveController@getLeaveCount')->name('leaves.used.leave');
 
     Route::post('/leaves/handle-leave-action', 'Leave\LeaveController@handleLeaveAction')->name('leave.handleAction');
     Route::post('/leaves/recommend-alternative-dates','Leave\LeaveController@recommendAlternativeDate')->name('leave.recommendAlternativeDate');
@@ -729,7 +725,6 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::get('/leaves/boarding-pass-application', 'Leave\BoardingPassController@apply')->name('resort.boardingpass.apply');
     Route::post('/leaves/boarding-pass-submit', 'Leave\BoardingPassController@store')->name('resort.boardingpass.store');
     Route::post('/leaves/handle-pass-action', 'Leave\BoardingPassController@BoardingPassStatusUpdate')->name('pass.handleAction');
-    Route::get('/leaves/boarding-pass/filter/grid', 'Leave\BoardingPassController@filterPassGridRequests')->name('pass.filter.grid');
     Route::get('/leaves/boarding-pass', 'Leave\BoardingPassController@index')->name('resort.boarding-pass');
     Route::post('/leaves/boarding/status-update', 'Leave\BoardingPassController@BoardingPassStatusUpdate')->name('resort.BoardingStatusUpdate');
 
@@ -917,7 +912,6 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::get('/payroll/data/{payroll_id}', 'Payroll\PayrollController@getPayrollData')->name('payroll.getData');
 
     Route::get('/payroll/view-payroll', 'Payroll\DashboardController@viewPayrollData')->name('payroll.view.all');
-    Route::get('/payroll/data-payroll', 'Payroll\DashboardController@getPayroll')->name('payroll.data');
 
     Route::get('/payroll/columns/{payroll_id}', 'Payroll\PayrollController@getPayrollColumns')->name('payroll.getColumns');
 
@@ -1376,7 +1370,6 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('survey/get/pending-participants', 'Survey\SurveyController@GetPendingParticipants')->name('Survey.getPendingParticipants');
 
     Route::get('survey/get/near-to-deadline-survey', 'Survey\SurveyController@Getneartodeadlinesurvey')->name('Survey.Getneartodeadlinesurvey');
-    Route::get('survey/raise-ticket', 'Support\SupportController@raiseTicket')->name('support.raise.ticket');
     Route::get('/survey/get/survey-results/{id}', 'Survey\SurveyController@GetSurveyResults')->name('Survey.GetSurveyResults');
     Route::get('survey/result-export', 'Survey\SurveyController@SurveyReultExport')->name('Survey.SurveyReultExport');
     Route::get('survey/download-question-ans/{id}', 'Survey\SurveyController@DownloadQuestionAndAns')->name('Survey.DownloadQuestionAndAns');
@@ -1960,7 +1953,6 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
       Route::post('people/onboarding/cultuarl-insights/store', 'People\Onboarding\OnboardingController@storeOrUpdateCI')->name('onboarding.cultural_insights.storeOrUpdate');
 
       //Itinerary Creation
-      Route::get('people/onboarding/itinerary/create', 'People\Onboarding\OnboardingController@createItinerary')->name('onboarding.itinerary.create');
       Route::get('people/onboarding/itinerary/get-upcoming-employees', 'People\Onboarding\OnboardingController@getupcomingEmployees')->name('people.onboarding.upcoming_employees');
       Route::post('people/onboarding/convert-applicant', 'People\Onboarding\OnboardingController@convertApplicant')->name('people.onboarding.convertApplicant');
       Route::post('/get-templates-for-employees', 'People\Onboarding\OnboardingController@getTemplatesForEmployees')->name('people.onboarding.getTemplatesForEmployees');
@@ -2096,7 +2088,6 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
 
     Route::get('report/index', 'ReportController@index')->name('resort.report.index');
 
-    Route::get('report/get-table-columns', 'ReportController@getTableColumns')->name('resort.reports.get-columns');
 
     Route::get('report/create', 'ReportController@create')->name('reports.create');
 
@@ -2254,7 +2245,6 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
 
     // Curd route for Facility Tour Categories Controller name FacilityTourCategoryController
     Route::get('people/onboarding/facility-tour-categories', 'People\Onboarding\FacilityTourCategoryController@index')->name('people.onboarding.facility-tour-categories.index');
-    Route::get('people/onboarding/facility-tour-categories/create', 'People\Onboarding\FacilityTourCategoryController@create')->name('people.onboarding.facility-tour-categories.create');
     Route::post('people/onboarding/facility-tour-categories/store', 'People\Onboarding\FacilityTourCategoryController@store')->name('people.onboarding.facility-tour-categories.store');
     Route::get('people/onboarding/facility-tour-categories/view/{id}', 'People\Onboarding\FacilityTourCategoryController@show')->name('people.onboarding.facility-tour-categories.show');
     Route::post('people/onboarding/facility-tour-categories/update/{id?}', 'People\Onboarding\FacilityTourCategoryController@update')->name('people.onboarding.facility-tour-categories.update');

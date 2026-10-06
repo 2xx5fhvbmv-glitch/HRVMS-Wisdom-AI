@@ -131,6 +131,11 @@ class LearningCalendarController extends Controller
         $resort_id = $this->resort->resort_id;
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
+        // Both bounds are required for the range query (a null bound throws
+        // "Illegal operator and value combination").
+        if (!$startDate || !$endDate) {
+            return response()->json(['data' => []]);
+        }
 
         // Department-visibility scope for calendar sessions.
         $scopedEmpIds = \App\Helpers\Common::getPerformanceScopedEmpIds();

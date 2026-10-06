@@ -45,10 +45,10 @@ class ResortDataSetupController extends Controller
         return view('admin.resort_data_setup.index', compact('resorts', 'employees', 'lastImport'));
     }
 
-    public function show(Resort $resort)
+    public function show(Request $request, Resort $resort)
     {
         $this->authorizeResorts('view');
-        return $this->render($resort);
+        return $this->render($resort, [], trim((string) $request->query('lookup')));
     }
 
     public function upload(Request $request, Resort $resort)
@@ -56,7 +56,7 @@ class ResortDataSetupController extends Controller
         $this->authorizeResorts('edit');
 
         $import = $this->draft($resort);
-        if ($import->busy()) {
+        if ($this->busyImport($resort)) {
             return $this->render($resort, [['warning', 'A job is still running for this resort — wait for it to finish.']]);
         }
         $files = $request->file('files', []);
@@ -104,7 +104,7 @@ class ResortDataSetupController extends Controller
         $files = $import->files ?? [];
         $i = collect($files)->search(fn ($f) => $f['id'] === $fileId);
         abort_if($i === false, 404);
-        if ($import->busy()) {
+        if ($this->busyImport($resort)) {
             return $this->render($resort, [['warning', 'A job is still running for this resort — wait for it to finish.']]);
         }
 
@@ -135,7 +135,7 @@ class ResortDataSetupController extends Controller
         $files = collect($import->files ?? []);
         $file = $files->firstWhere('id', $fileId);
         abort_unless($file, 404);
-        if ($import->busy()) {
+        if ($this->busyImport($resort)) {
             return $this->render($resort, [['warning', 'A job is still running for this resort — wait for it to finish.']]);
         }
 
@@ -152,7 +152,7 @@ class ResortDataSetupController extends Controller
         $this->authorizeResorts('edit');
 
         $import = $this->draft($resort);
-        if ($import->busy()) {
+        if ($this->busyImport($resort)) {
             return $this->render($resort, [['warning', 'A job is still running for this resort — wait for it to finish.']]);
         }
         $ranks = array_map('strval', array_keys(config('settings.Position_Rank')));
@@ -200,6 +200,24 @@ class ResortDataSetupController extends Controller
         return $this->runJob($resort, 'import');
     }
 
+    /** Reverse the resort's latest import, from its ledger (queued). */
+    public function undo(Resort $resort, ResortDataImport $import)
+    {
+        $this->authorizeResorts('edit');
+        abort_unless((int) $import->resort_id === $resort->id, 404);
+
+        $latest = ResortDataImport::where('resort_id', $resort->id)->where('status', 'imported')->orderByDesc('id')->first();
+        if (!$latest || $latest->id !== $import->id) {
+            return $this->render($resort, [['danger', 'Only the most recent import can be undone — undo newer imports first.']]);
+        }
+        if ($this->busyImport($resort)) {
+            return $this->render($resort, [['warning', 'A job is still running for this resort — wait for it to finish.']]);
+        }
+        $this->dispatchJob($import, 'undo');
+
+        return $this->render($resort);
+    }
+
     /** The temporary passwords are kept (encrypted) only until the admin has saved them. */
     public function clearCredentials(Resort $resort)
     {
@@ -216,7 +234,7 @@ class ResortDataSetupController extends Controller
         if (!$import->exists || empty($import->files)) {
             return $this->render($resort, [['danger', 'Upload files first.']]);
         }
-        if ($import->busy()) {
+        if ($this->busyImport($resort)) {
             return $this->render($resort, [['warning', 'A job is still running for this resort — wait for it to finish.']]);
         }
         if ($action === 'import' && !$this->validated($import)) {
@@ -230,6 +248,8 @@ class ResortDataSetupController extends Controller
     private function dispatchJob(ResortDataImport $import, string $action): void
     {
         $import->forceFill(['job_action' => $action, 'job_status' => 'queued', 'job_message' => null, 'job_started_at' => null])->save();
+        // The page shows this batch's progress and result (not just "the latest one").
+        session(['rds_batch.' . $import->resort_id => $import->id]);
         RunResortDataImport::dispatch($import->id);
     }
 
@@ -239,21 +259,47 @@ class ResortDataSetupController extends Controller
         return $import->status === 'draft' && $report && ($report['mode'] ?? '') === 'dry-run' && empty($report['errors']);
     }
 
-    private function render(Resort $resort, array $notices = [])
+    /** Any of the resort's batches with a queued/running job (a job dead for too long is marked failed). */
+    private function busyImport(Resort $resort): ?ResortDataImport
     {
-        $import = $this->draft($resort);
-        if ($import->job_status === 'running' && $import->job_started_at?->lt(now()->subMinutes(self::STALE_MINUTES))) {
-            $import->forceFill(['job_status' => 'failed', 'job_message' => 'The job stopped unexpectedly (worker restarted?) — nothing was saved. Run it again.'])->save();
+        $busy = ResortDataImport::where('resort_id', $resort->id)->whereIn('job_status', ['queued', 'running'])->orderByDesc('id')->first();
+        if ($busy && $busy->job_status === 'running' && $busy->job_started_at?->lt(now()->subMinutes(self::STALE_MINUTES))) {
+            $busy->forceFill(['job_status' => 'failed', 'job_message' => 'The job stopped unexpectedly (worker restarted?) — nothing was saved. Run it again.'])->save();
+            return null;
         }
-        // An import closes its batch: show that batch's result until a new upload starts the next one.
+        return $busy;
+    }
+
+    private function render(Resort $resort, array $notices = [], string $lookup = '')
+    {
+        $busy = $this->busyImport($resort);
+        $import = $this->draft($resort);
+        // The batch whose job/report the page shows: a running job, else the one
+        // this admin last acted on, else the open draft, else the latest batch.
+        $acted = ResortDataImport::where('resort_id', $resort->id)->find(session('rds_batch.' . $resort->id));
         $last = ResortDataImport::where('resort_id', $resort->id)->orderByDesc('id')->first();
-        $shown = !$import->exists && $last ? $last : $import;
+        $shown = $busy ?? $acted ?? ($import->exists ? $import : ($last ?? $import));
+
+        // Record history: what each import did to records matching the search.
+        $history = collect();
+        if ($lookup !== '') {
+            $history = DB::table('resort_data_import_records as r')->join('resort_data_imports as i', 'i.id', '=', 'r.import_id')
+                ->where('i.resort_id', $resort->id)->where('r.label', 'like', '%' . addcslashes($lookup, '%_\\') . '%')
+                ->where('r.action', '!=', 'created_where')
+                ->orderByDesc('r.id')->limit(200)
+                ->get(['r.*', 'i.status as batch_status', 'i.imported_at']);
+        }
 
         return view('admin.resort_data_setup.show', [
             'resort'      => $resort,
             'import'      => $import,
             'shown'       => $shown,
-            'canImport'   => $this->validated($import) && !$import->busy(),
+            'busy'        => (bool) $busy,
+            'canImport'   => $this->validated($import) && !$busy,
+            'batches'     => ResortDataImport::where('resort_id', $resort->id)->where('status', '!=', 'draft')->orderByDesc('id')->limit(20)->get(),
+            'names'       => $this->idNames($resort, array_merge($shown->report['changes'] ?? [], $history->map(fn ($h) => ['changes' => json_decode($h->data ?? 'null', true)])->all())),
+            'lookup'      => $lookup,
+            'history'     => $history,
             'options'     => ResortDataImporter::options($import),
             'notices'     => $notices,
             'credentials' => ResortDataImport::where('resort_id', $resort->id)->whereNotNull('credentials')->orderByDesc('id')->first()?->credentials ?? [],
@@ -268,6 +314,27 @@ class ResortDataSetupController extends Controller
                 'employees'   => Employee::where('resort_id', $resort->id)->count(),
             ],
         ]);
+    }
+
+    /** id → name for the id fields that show up in change lists, so the page reads "Position: SOUS CHEF", not "Position_id: 412". */
+    private function idNames(Resort $resort, array $changeSets): array
+    {
+        $tables = ['Position_id' => ['resort_positions', 'position_title'], 'Dept_id' => ['resort_departments', 'name'], 'division_id' => ['resort_divisions', 'name'],
+                   'Section_id' => ['resort_sections', 'name'], 'section_id' => ['resort_sections', 'name'], 'reporting_to' => ['employees', 'Emp_id']];
+        $ids = [];
+        foreach ($changeSets as $set) {
+            foreach ((array) ($set['changes'] ?? []) as $field => $pair) {
+                if (isset($tables[$field]) && is_array($pair)) {
+                    $ids[$field] = array_merge($ids[$field] ?? [], array_filter($pair));
+                }
+            }
+        }
+        $names = [];
+        foreach ($ids as $field => $values) {
+            [$table, $column] = $tables[$field];
+            $names[$field] = DB::table($table)->where('resort_id', $resort->id)->whereIn('id', array_unique($values))->pluck($column, 'id')->all();
+        }
+        return $names;
     }
 
     /** The resort's open batch; a new one starts with the last batch's options. */

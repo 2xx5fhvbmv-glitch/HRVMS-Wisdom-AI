@@ -17,15 +17,17 @@ use Illuminate\Support\Str;
 
 /**
  * Writes a resort's parsed client files into the live tables, in dependency
- * order: divisions → departments → sections → positions → staff → attendance.
+ * order: divisions → departments → sections → positions → staff → employee
+ * details → holidays → attendance.
  *
  * One code path for both modes: a dry run performs every write inside a
  * transaction and rolls it back, so "Validate" reports exactly what
  * "Import" will do. Import commits only with zero errors — all or nothing.
  *
  * Re-runs are safe: rows are matched (case-insensitive name within the
- * resort, Emp_id for staff, employee + date for attendance) and updated
- * instead of duplicated.
+ * resort, Emp_id for staff, employee + date for attendance); only fields
+ * that differ are written. Every write goes through the ImportLedger, which
+ * gives the dry run its "what would change" list and makes an import undoable.
  *
  * Master-data tables are written with DB::table on purpose: the
  * ResortDivision/Department/Section/Position/DutyRoster saving hooks read
@@ -34,7 +36,7 @@ use Illuminate\Support\Str;
  */
 class ResortDataImporter
 {
-    const ORDER = ['divisions', 'departments', 'sections', 'positions', 'staff', 'attendance'];
+    const ORDER = ['divisions', 'departments', 'sections', 'positions', 'staff', 'employee_details', 'holidays', 'attendance'];
     const LEAVE_REASON = 'Migrated from client attendance sheet';
     const PRESENT_HOURS = 8; // a P / blank day counts as a full 8-hour duty
     const BLANK = '(blank)'; // option key for an empty attendance cell
@@ -67,6 +69,8 @@ class ResortDataImporter
     private array $newPositions = []; // id => title, created from the positions file, rank not known yet
     private array $levelledPositions = []; // id => true, rank given by the positions file's Level column
     private ?string $prefix = null;   // resort prefix for Employee IDs; '' once found invalid
+    private ImportLedger $ledger;
+    private array $missingStaff = []; // employees in the resort but not in the staff file
 
     /** Saved options merged over defaults derived from the uploaded files. */
     public static function options(ResortDataImport $import): array
@@ -141,6 +145,7 @@ class ResortDataImporter
     {
         @set_time_limit(900);
         $this->commit = $commit;
+        $this->ledger = new ImportLedger;
         $this->resortId = (int) $import->resort_id;
         $this->opt = self::options($import);
         $this->createdBy = ResortAdmin::where('resort_id', $this->resortId)->where('is_master_admin', 1)->orderBy('id')->value('id');
@@ -170,11 +175,13 @@ class ResortDataImporter
             foreach (self::ORDER as $type) {
                 foreach ($byType[$type] ?? [] as $file) {
                     match ($type) {
-                        'divisions'   => $this->importDivisions($file['parsed']),
+                        'divisions'   => $this->importDivisions($file['name'], $file['parsed']),
                         'departments' => $this->importDepartments($file['name'], $file['parsed']),
                         'sections'    => $this->importSections($file['name'], $file['parsed']),
                         'positions'   => $this->importPositions($file['name'], $file['parsed']),
                         'staff'       => $this->importStaff($file['name'], $file['parsed']),
+                        'employee_details' => $this->importEmployeeDetails($file['name'], $file['parsed']),
+                        'holidays'    => $this->importHolidays($file['name'], $file['parsed']),
                         'attendance'  => $this->importAttendance($file['name'], $file['parsed']),
                     };
                 }
@@ -185,7 +192,20 @@ class ResortDataImporter
         }
 
         $committed = $commit && !$this->errors;
-        $committed ? DB::commit() : DB::rollBack();
+        if ($committed) {
+            $this->ledger->save($import->id);
+            DB::commit();
+        } else {
+            DB::rollBack();
+        }
+
+        // What changed on records that already existed (attendance days are only counted).
+        $changes = [];
+        foreach ($this->ledger->entries() as $e) {
+            if ($e['action'] === 'updated' && $e['kind'] !== 'attendance' && count($changes) < 300) {
+                $changes[] = ['kind' => $e['kind'], 'label' => $e['label'], 'changes' => $e['data']];
+            }
+        }
 
         return [
             'mode'        => $commit ? 'import' : 'dry-run',
@@ -194,6 +214,8 @@ class ResortDataImporter
             'counts'      => $this->counts,
             'errors'      => $this->errors,
             'warnings'    => $this->warnings,
+            'changes'     => $changes,
+            'missing'     => $this->missingStaff,
             'credentials' => $committed ? $this->credentials : [],
         ];
     }
@@ -210,25 +232,26 @@ class ResortDataImporter
         foreach ($q('resort_sections')->get(['id', 'dept_id', 'name']) as $s) {
             $this->sections[$s->dept_id . '|' . self::key($s->name)] = $s->id;
         }
-        foreach ($q('resort_positions')->get(['id', 'dept_id', 'position_title']) as $p) {
-            $this->positions[$p->dept_id . '|' . self::key($p->position_title)] = $p->id;
+        foreach ($q('resort_positions')->get(['id', 'dept_id', 'position_title', 'employee_category']) as $p) {
+            $this->positions[$p->dept_id . '|' . self::key($p->position_title) . ($p->employee_category ? '|' . $p->employee_category : '')] = $p->id;
         }
     }
 
-    private function importDivisions(array $parsed): void
+    private function importDivisions(string $file, array $parsed): void
     {
         foreach ($parsed['records'] as $rec) {
             $v = $rec['v'];
+            $this->ledger->at($file, $rec['row']);
             $short = ($v['short_name'] ?? '') ?: $v['name'];
-            $data = ['short_name' => $short, 'status' => self::status($v['status'] ?? ''), 'updated_at' => now()];
+            $data = ['short_name' => $short, 'status' => self::status($v['status'] ?? '')];
+            $label = "Division {$v['name']}";
             if ($id = $this->divisions[self::key($v['name'])] ?? null) {
-                DB::table('resort_divisions')->where('id', $id)->update($data);
-                $this->count('divisions', 'updated');
+                $this->count('divisions', $this->updateRow('divisions', 'resort_divisions', $id, $data, $label) ? 'updated' : 'unchanged');
                 continue;
             }
-            $this->divisions[self::key($v['name'])] = DB::table('resort_divisions')->insertGetId($data + $this->newRow([
+            $this->divisions[self::key($v['name'])] = $this->insertRow('divisions', 'resort_divisions', $data + $this->newRow([
                 'name' => $v['name'], 'code' => $short, 'slug' => Str::slug($v['name']),
-            ]));
+            ]), $label);
             $this->count('divisions', 'created');
         }
     }
@@ -242,17 +265,18 @@ class ResortDataImporter
                 $this->error($file, $rec['row'], "Division '{$v['division']}' not found for department '{$v['name']}'.");
                 continue;
             }
+            $this->ledger->at($file, $rec['row']);
             $short = ($v['short_name'] ?? '') ?: $v['name'];
-            $data = ['division_id' => $divisionId, 'short_name' => $short, 'status' => self::status($v['status'] ?? ''), 'updated_at' => now()];
+            $data = ['division_id' => $divisionId, 'short_name' => $short, 'status' => self::status($v['status'] ?? '')];
+            $label = "Department {$v['name']}";
             if ($existing = $this->departments[self::key($v['name'])] ?? null) {
-                DB::table('resort_departments')->where('id', $existing['id'])->update($data);
+                $this->count('departments', $this->updateRow('departments', 'resort_departments', $existing['id'], $data, $label) ? 'updated' : 'unchanged');
                 $this->departments[self::key($v['name'])]['division_id'] = $divisionId;
-                $this->count('departments', 'updated');
                 continue;
             }
-            $id = DB::table('resort_departments')->insertGetId($data + $this->newRow([
+            $id = $this->insertRow('departments', 'resort_departments', $data + $this->newRow([
                 'name' => $v['name'], 'code' => $short, 'slug' => Str::slug($v['name']),
-            ]));
+            ]), $label);
             $this->departments[self::key($v['name'])] = ['id' => $id, 'division_id' => $divisionId, 'name' => $v['name']];
             $this->count('departments', 'created');
         }
@@ -268,17 +292,18 @@ class ResortDataImporter
                 $this->error($file, $rec['row'], "Department '{$deptName}' not found for section '{$v['name']}'.");
                 continue;
             }
+            $this->ledger->at($file, $rec['row']);
             $short = ($v['short_name'] ?? '') ?: $v['name'];
-            $data = ['short_name' => $short, 'status' => self::status($v['status'] ?? ''), 'updated_at' => now()];
+            $data = ['short_name' => $short, 'status' => self::status($v['status'] ?? '')];
+            $label = "Section {$v['name']} ({$dept['name']})";
             $key = $dept['id'] . '|' . self::key($v['name']);
             if ($id = $this->sections[$key] ?? null) {
-                DB::table('resort_sections')->where('id', $id)->update($data);
-                $this->count('sections', 'updated');
+                $this->count('sections', $this->updateRow('sections', 'resort_sections', $id, $data, $label) ? 'updated' : 'unchanged');
                 continue;
             }
-            $this->sections[$key] = DB::table('resort_sections')->insertGetId($data + $this->newRow([
+            $this->sections[$key] = $this->insertRow('sections', 'resort_sections', $data + $this->newRow([
                 'dept_id' => $dept['id'], 'name' => $v['name'], 'code' => $short,
-            ]));
+            ]), $label);
             $this->count('sections', 'created');
         }
     }
@@ -307,6 +332,7 @@ class ResortDataImporter
                 $this->error($file, $rec['row'], "Department '{$v['department']}' not found for position '{$v['title']}'.");
                 continue;
             }
+            $this->ledger->at($file, $rec['row']);
             $sectionId = $this->sectionId($dept['id'], $v['section'] ?? '');
             $key = $dept['id'] . '|' . self::key($v['title']);
             if ($id = $this->positions[$key] ?? null) {
@@ -320,20 +346,19 @@ class ResortDataImporter
                 if ($rank === false) {
                     continue;
                 }
-                DB::table('resort_positions')->where('id', $id)->update(array_filter(['section_id' => $sectionId, 'Rank' => $rank]) + ['updated_at' => now()]);
+                $changed = $this->updateRow('positions', 'resort_positions', $id, array_filter(['section_id' => $sectionId, 'Rank' => $rank]), self::positionLabel($v['title'], $dept['name']));
                 if ($rank) {
                     $this->levelledPositions[$id] = true;
                 }
-                $this->count('positions', 'updated');
+                $this->count('positions', $changed ? 'updated' : 'unchanged');
                 continue;
             }
             $rank = $this->positionLevelRank($file, $rec['row'], $v);
             if ($rank === false) {
                 continue;
             }
-            $id = $this->createPosition($dept['id'], $v['title'], $sectionId);
+            $id = $this->createPosition($dept['id'], $dept['name'], $v['title'], $sectionId, $rank ?: 6);
             if ($rank) {
-                DB::table('resort_positions')->where('id', $id)->update(['Rank' => $rank]);
                 $this->levelledPositions[$id] = true;
             } else {
                 $this->newPositions[$id] = $v['title'];
@@ -362,15 +387,21 @@ class ResortDataImporter
         return $rank === 1 && preg_match('/^general manager\b/i', $title) ? 8 : $rank;
     }
 
-    private function createPosition(int $deptId, string $title, ?int $sectionId): int
+    private function createPosition(int $deptId, string $deptName, string $title, ?int $sectionId, int $rank = 6, ?string $category = null): int
     {
-        // Rank 6 is provisional; importStaff() sets it from the people who hold the position.
-        $id = DB::table('resort_positions')->insertGetId($this->newRow([
-            'dept_id' => $deptId, 'section_id' => $sectionId, 'position_title' => $title, 'Rank' => 6,
-            'status' => 'active', 'is_reserved' => 'No', 'slug' => Str::slug($title),
-        ]));
-        $this->positions[$deptId . '|' . self::key($title)] = $id;
+        // Rank 6 is provisional unless the file gave a level; importStaff() sets it from the people who hold the position.
+        // Casual/Intern positions carry employee_category and rank 0, like PositionConfigController makes them.
+        $id = $this->insertRow('positions', 'resort_positions', $this->newRow([
+            'dept_id' => $deptId, 'section_id' => $sectionId, 'position_title' => $title, 'Rank' => $category ? 0 : $rank,
+            'employee_category' => $category, 'status' => 'active', 'is_reserved' => 'No', 'slug' => Str::slug($title),
+        ]), self::positionLabel($title . ($category ? " ({$category})" : ''), $deptName));
+        $this->positions[$deptId . '|' . self::key($title) . ($category ? '|' . $category : '')] = $id;
         return $id;
+    }
+
+    private static function positionLabel(string $title, string $deptName): string
+    {
+        return "Position {$title} ({$deptName})";
     }
 
     private function sectionId(int $deptId, string $name): ?int
@@ -391,6 +422,7 @@ class ResortDataImporter
             return;
         }
         $seen = [];
+        $touched = [];
         $positionRanks = [];
         $titleRanks = [];
         $legacy = 0;
@@ -400,6 +432,7 @@ class ResortDataImporter
             $v = $rec['v'];
             $row = $rec['row'];
             $empId = $this->empId($v['emp_id']);
+            $this->ledger->at($file, $row);
 
             if (isset($seen[$empId])) {
                 $this->error($file, $row, "Employee ID {$empId} appears twice (rows {$seen[$empId]} and {$row}).");
@@ -407,9 +440,17 @@ class ResortDataImporter
             }
             $seen[$empId] = $row;
 
-            $rank = (int) ($this->opt['level_ranks'][$v['level']] ?? 0);
-            if (!$rank) {
-                $this->error($file, $row, "Level '{$v['level']}' has no rank — set it under Options.");
+            $employmentType = self::employmentType($v['employment_type'] ?? '');
+            if ($employmentType === false) {
+                $this->error($file, $row, "Employment type '{$v['employment_type']}' not recognised for {$empId} — use Full-Time, Part-Time, Contract, Probationary, Temporary, Casual or Internship.");
+                continue;
+            }
+            // Casual/Intern: own position category, rank 0, no app login (same rules as the Casual/Intern importer).
+            $category = Common::manningCategory($employmentType ?? 'Full-Time');
+            $category = $category === 'Permanent' ? null : $category;
+            $rank = $category ? 0 : (int) ($this->opt['level_ranks'][$v['level'] ?? ''] ?? 0);
+            if (!$category && !$rank) {
+                $this->error($file, $row, ($v['level'] ?? '') === '' ? "Level missing for {$empId}." : "Level '{$v['level']}' has no rank — set it under Options.");
                 continue;
             }
             $deptName = ($v['department'] ?? '') ?: (string) $rec['group'];
@@ -434,7 +475,7 @@ class ResortDataImporter
                 continue;
             }
 
-            $rank = self::gmRank($rank, $v['position']);
+            $rank = $category ? 0 : self::gmRank($rank, $v['position']);
             $mainRank = $rank;
             if (in_array($rank, self::ROLE_LEVEL_RANKS, true)) {
                 $role = array_search(self::key($dept['name']), $roleDepts, true);
@@ -444,13 +485,17 @@ class ResortDataImporter
             }
 
             $sectionId = $this->sectionId($dept['id'], $v['section'] ?? '');
-            $positionId = $this->positions[$dept['id'] . '|' . self::key($v['position'])] ?? null;
+            $positionId = $this->positions[$dept['id'] . '|' . self::key($v['position']) . ($category ? '|' . $category : '')] ?? null;
             if (!$positionId) {
-                $positionId = $this->createPosition($dept['id'], $v['position'], $sectionId);
-                $this->warn("Position '{$v['position']}' ({$dept['name']}) was not in the positions file — created from the staff list.");
+                $positionId = $this->createPosition($dept['id'], $dept['name'], $v['position'], $sectionId, 6, $category);
+                if (!$category) {
+                    $this->warn("Position '{$v['position']}' ({$dept['name']}) was not in the positions file — created from the staff list.");
+                }
             }
-            $positionRanks[$positionId][] = $rank;
-            $titleRanks[self::key($v['position'])][] = $rank;
+            if (!$category) {
+                $positionRanks[$positionId][] = $rank;
+                $titleRanks[self::key($v['position'])][] = $rank;
+            }
 
             if (($v['gender'] ?? '') === '') {
                 $this->warn('Gender missing — stored as "other".');
@@ -465,6 +510,9 @@ class ResortDataImporter
                 'rank' => $rank, 'main_rank' => $mainRank, 'title' => $gender === 'female' ? 'Miss' : 'Mr',
                 'nationality' => $nationality, 'joining_date' => $hireDate, 'religion' => self::religion($v['religion'] ?? ''), 'is_employee' => 1,
             ];
+            if ($employmentType) {
+                $employeeData['employment_type'] = $employmentType;
+            }
 
             $existing = Employee::where('resort_id', $this->resortId)->where('Emp_id', $empId)->first();
             if (!$existing && $empId !== $v['emp_id']) {
@@ -506,16 +554,40 @@ class ResortDataImporter
                 $adminData += ['email' => $email, 'password' => $this->commit ? Hash::make($password) : '-',
                     'type' => 'sub', 'role_id' => 0, 'is_master_admin' => 0, 'is_employee' => 1, 'status' => 'Active'];
                 $employeeData += ['status' => 'Active', 'employment_type' => 'Full-Time', 'probation_status' => 'Confirmed'];
+                if ($category) {
+                    $password = null; // Casual/Intern have no app access: no credentials to hand out.
+                }
             }
 
-            $profile = Common::persistEmployeeProfile($adminData, $employeeData, $this->resortId, $existingAdmin);
-            if ($profile['employeeCreated']) {
-                $this->count('staff', 'created');
+            $label = "{$empId} {$v['name']}";
+            if ($existing) {
+                $touched[] = $existing->id;
+                $changed = $this->updateModel('staff', $existingAdmin, $adminData, $label);
+                $changed = $this->updateModel('staff', $existing, $employeeData, $label) || $changed;
+                $this->count('staff', $changed ? 'updated' : 'unchanged');
+                continue;
+            }
+
+            $profile = Common::persistEmployeeProfile($adminData, $employeeData, $this->resortId);
+            $touched[] = $profile['employee']->id;
+            $this->ledger->created('staff', 'resort_admins', $profile['resortAdmin']->id, $label);
+            $this->ledger->created('staff', 'employees', $profile['employee']->id, $label);
+            // The categorized folder row the Employee::created hook just made.
+            if ($folderId = DB::table('filemangement_systems')->where('resort_id', $this->resortId)->where('Folder_Name', $empId)->where('Folder_Type', 'categorized')->value('id')) {
+                $this->ledger->created('staff', 'filemangement_systems', $folderId, $label);
+            }
+            $this->count('staff', $category ? "created ({$category})" : 'created');
+            if ($password) {
                 $this->credentials[] = ['emp_id' => $empId, 'name' => $v['name'], 'email' => $adminData['email'], 'password' => $password];
-            } else {
-                $this->count('staff', 'updated');
             }
         }
+
+        // In the resort but not in this staff file: reported, never changed (resignations are handled in the portal).
+        $this->missingStaff = DB::table('employees as e')->join('resort_admins as a', 'a.id', '=', 'e.Admin_Parent_id')
+            ->where('e.resort_id', $this->resortId)->whereNull('e.deleted_at')->whereNotIn('e.id', $touched)
+            ->whereNotIn('e.status', ['Terminated', 'Resigned', 'Inactive'])
+            ->limit(200)->get(['e.Emp_id', 'a.first_name', 'a.last_name'])
+            ->map(fn ($m) => trim("{$m->Emp_id} {$m->first_name} {$m->last_name}"))->all();
 
         if ($legacy) {
             $this->warn("{$legacy} employee(s) already existed with an un-prefixed Employee ID — updated, ID kept. Their mobile login may clash with other resorts.");
@@ -529,19 +601,34 @@ class ResortDataImporter
             arsort($counts);
             return array_key_first($counts);
         };
+        $this->ledger->at($file, null);
         foreach ($positionRanks as $positionId => $ranks) {
             if (!isset($this->levelledPositions[$positionId])) {
-                DB::table('resort_positions')->where('id', $positionId)->update(['Rank' => $mode($ranks), 'updated_at' => now()]);
+                $this->updateRow('positions', 'resort_positions', $positionId, ['Rank' => $mode($ranks)], $this->positionTitle($positionId));
             }
             unset($this->newPositions[$positionId]);
         }
         foreach ($this->newPositions as $positionId => $title) {
             if ($ranks = $titleRanks[self::key($title)] ?? null) {
-                DB::table('resort_positions')->where('id', $positionId)->update(['Rank' => $mode($ranks), 'updated_at' => now()]);
+                $this->updateRow('positions', 'resort_positions', $positionId, ['Rank' => $mode($ranks)], $this->positionTitle($positionId));
                 unset($this->newPositions[$positionId]);
                 $this->warn('Vacant position took its rank from the same title in another department.');
             }
         }
+        // The HR head (EXCOM position in the HR department) gets full page
+        // access by default, so someone can work in every module from day one
+        // and hand out access to the other positions.
+        if ($hrDept = $this->departments[self::key($this->opt['roles']['hr'] ?? '')] ?? null) {
+            $heads = DB::table('resort_positions')->where('resort_id', $this->resortId)->where('dept_id', $hrDept['id'])->where('Rank', 1)->whereNull('employee_category')->pluck('id');
+            foreach ($heads as $positionId) {
+                if (Common::grantDefaultPageAccess($this->resortId, $positionId)) {
+                    $this->ledger->createdWhere('access', 'resort_interal_pages_permissions', ['resort_id' => $this->resortId, 'position_id' => $positionId],
+                        'Full page access for ' . $this->positionTitle($positionId));
+                    $this->count('positions', 'HR head given full page access');
+                }
+            }
+        }
+
         if ($this->newPositions) {
             $this->warn(count($this->newPositions) . ' vacant position(s): nobody in the staff list holds them, so their rank defaulted to Line Worker — the resort sets the right rank in Manning → Positions before hiring into them: '
                 . implode(', ', array_slice($this->newPositions, 0, 15)) . (count($this->newPositions) > 15 ? ', …' : ''));
@@ -572,6 +659,199 @@ class ResortDataImporter
     private function empId(string $clientId): string
     {
         return str_starts_with(strtoupper($clientId), $this->prefix . '-') ? $clientId : $this->prefix . '-' . $clientId;
+    }
+
+    /** Salary, bank, documents, reporting manager… for employees that already exist (staff file or earlier import). */
+    private function importEmployeeDetails(string $file, array $parsed): void
+    {
+        if (!$this->checkPrefix($file)) {
+            return;
+        }
+        $missing = [];
+        foreach ($parsed['records'] as $rec) {
+            $v = $rec['v'];
+            $row = $rec['row'];
+            $this->ledger->at($file, $row);
+            $employee = $this->findEmployee($v['emp_id']);
+            if (!$employee) {
+                $missing[] = $v['emp_id'];
+                continue;
+            }
+            $admin = ResortAdmin::find($employee->Admin_Parent_id);
+            $name = trim(($admin->first_name ?? '') . ' ' . ($admin->last_name ?? ''));
+            $label = "{$employee->Emp_id} {$name}";
+            $fail = fn ($msg) => $this->error($file, $row, "{$employee->Emp_id}: {$msg}");
+
+            $data = [];
+            $dates = ['dob' => 'dob', 'visa_expiry' => 'visa_expiry_date', 'work_permit_expiry' => 'work_permit_expiry_date'];
+            foreach ($dates as $field => $column) {
+                $date = self::parseDate($v[$field] ?? '');
+                if ($date === false) {
+                    $fail("{$field} '{$v[$field]}' is not a valid dd/mm/yyyy date.");
+                    continue 2;
+                }
+                if ($date) {
+                    $data[$column] = $date;
+                }
+            }
+            if (($v['passport_number'] ?? '') !== '') {
+                $data['passport_number'] = $v['passport_number'];
+            }
+            if (($v['employment_type'] ?? '') !== '') {
+                $type = self::employmentType($v['employment_type']);
+                if ($type === false) {
+                    $fail("employment type '{$v['employment_type']}' not recognised.");
+                    continue;
+                }
+                if (Common::manningCategory($type) !== Common::manningCategory($employee->employment_type ?? 'Full-Time')) {
+                    $fail('moving between permanent and Casual/Intern changes the position — put the employment type in the staff file instead.');
+                    continue;
+                }
+                $data['employment_type'] = $type;
+            }
+            if (($v['reporting_manager_id'] ?? '') !== '') {
+                $manager = $this->findEmployee($v['reporting_manager_id']);
+                if (!$manager || $manager->id === $employee->id) {
+                    $fail("reporting manager '{$v['reporting_manager_id']}' " . ($manager ? 'is the employee themself.' : 'not found in this resort.'));
+                    continue;
+                }
+                $data['reporting_to'] = $manager->id;
+            }
+            if (($v['basic_salary'] ?? '') !== '') {
+                $salary = str_replace([',', ' '], '', $v['basic_salary']);
+                if (!is_numeric($salary) || $salary < 0) {
+                    $fail("basic salary '{$v['basic_salary']}' is not a number.");
+                    continue;
+                }
+                $data['basic_salary'] = round((float) $salary, 2);
+            }
+            if (($v['salary_currency'] ?? '') !== '') {
+                if (!$currency = self::currency($v['salary_currency'])) {
+                    $fail("salary currency '{$v['salary_currency']}' must be USD or MVR.");
+                    continue;
+                }
+                // Stored as entered, in the currency it was entered in (see CLAUDE.md, Money).
+                $data['basic_salary_currency'] = $currency;
+            }
+            if (($v['payment_mode'] ?? '') !== '') {
+                $mode = ucfirst(strtolower($v['payment_mode']));
+                if (!in_array($mode, ['Cash', 'Bank'], true)) {
+                    $fail("payment mode '{$v['payment_mode']}' must be Cash or Bank.");
+                    continue;
+                }
+                $data['payment_mode'] = $mode;
+            }
+
+            $changed = $this->updateModel('details', $employee, $data, $label);
+            if (($v['phone'] ?? '') !== '' && $admin) {
+                $changed = $this->updateModel('details', $admin, ['personal_phone' => $v['phone']], $label) || $changed;
+            }
+            $changed = $this->importBank($employee, $name, $v, $label, $fail) || $changed;
+            $changed = $this->importVisa($employee, $v, $data, $label) || $changed;
+            $this->count('employee_details', $changed ? 'updated' : 'unchanged');
+        }
+        if ($missing) {
+            $this->warn(count($missing) . ' employee-details row(s) skipped — Employee ID not found in this resort: ' . implode(', ', array_slice($missing, 0, 20)));
+        }
+    }
+
+    /** One bank row per account number (an employee can have several). */
+    private function importBank(Employee $employee, string $name, array $v, string $label, \Closure $fail): bool
+    {
+        if (($v['account_no'] ?? '') === '' && ($v['iban'] ?? '') === '' && ($v['bank_name'] ?? '') === '') {
+            return false;
+        }
+        $currency = ($v['bank_currency'] ?? '') === '' ? 'USD' : self::currency($v['bank_currency']);
+        if (!$currency) {
+            $fail("bank currency '{$v['bank_currency']}' must be USD or MVR.");
+            return false;
+        }
+        $bank = array_filter([
+            'bank_name' => $v['bank_name'] ?? '', 'bank_branch' => $v['bank_branch'] ?? '', 'account_no' => $v['account_no'] ?? '',
+            'IBAN' => $v['iban'] ?? '', 'IFSC_BIC' => $v['swift'] ?? '',
+        ], fn ($x) => $x !== '') + ['account_holder_name' => ($v['account_holder'] ?? '') ?: $name, 'currency' => $currency];
+        $existing = DB::table('employee_bank_details')->where('employee_id', $employee->id)
+            ->when(($v['account_no'] ?? '') !== '', fn ($q) => $q->where('account_no', $v['account_no']))->orderBy('id')->value('id');
+        if ($existing) {
+            return $this->updateRow('details', 'employee_bank_details', $existing, $bank, $label);
+        }
+        $this->insertRow('details', 'employee_bank_details', $bank + ['employee_id' => $employee->id, 'created_at' => now(), 'updated_at' => now()], $label);
+        return true;
+    }
+
+    /** The Visa module's expiry screens read visa_renewals, not the employees columns. */
+    private function importVisa(Employee $employee, array $v, array $data, string $label): bool
+    {
+        if (empty($data['visa_expiry_date'])) {
+            return false;
+        }
+        $end = $data['visa_expiry_date'];
+        $start = self::parseDate($v['visa_start'] ?? '') ?: Carbon::parse($end)->subYear()->addDay()->format('Y-m-d'); // work visas run a year
+        $visa = array_filter(['Visa_Number' => $v['visa_number'] ?? '', 'WP_No' => $v['work_permit_number'] ?? ''], fn ($x) => $x !== '')
+            + ['start_date' => $start, 'end_date' => $end];
+        $existing = DB::table('visa_renewals')->where('resort_id', $this->resortId)->where('employee_id', $employee->id)
+            ->where(fn ($q) => $q->where('end_date', $end)->when(($v['visa_number'] ?? '') !== '', fn ($q2) => $q2->orWhere('Visa_Number', $v['visa_number'])))
+            ->orderByDesc('id')->value('id');
+        if ($existing) {
+            return $this->updateRow('details', 'visa_renewals', $existing, $visa, $label);
+        }
+        $this->insertRow('details', 'visa_renewals', $visa + ['resort_id' => $this->resortId, 'employee_id' => $employee->id,
+            'Amt' => 0, 'Status' => 'Paid', 'created_at' => now(), 'updated_at' => now()], $label);
+        return true;
+    }
+
+    private function importHolidays(string $file, array $parsed): void
+    {
+        foreach ($parsed['records'] as $rec) {
+            $v = $rec['v'];
+            $this->ledger->at($file, $rec['row']);
+            $date = self::parseDate($v['date']);
+            if (!$date) {
+                $this->error($file, $rec['row'], "Holiday date '{$v['date']}' is not a valid dd/mm/yyyy date.");
+                continue;
+            }
+            $label = "Holiday {$date} {$v['name']}";
+            $existing = DB::table('resortholidays')->where('resort_id', $this->resortId)->whereDate('PublicHolidaydate', $date)->value('id');
+            if ($existing) {
+                $this->count('holidays', $this->updateRow('holidays', 'resortholidays', $existing, ['PublicHolidayName' => $v['name']], $label) ? 'updated' : 'unchanged');
+                continue;
+            }
+            $this->insertRow('holidays', 'resortholidays', $this->newRow(['PublicHolidaydate' => $date, 'PublicHolidayName' => $v['name']]), $label);
+            $this->count('holidays', 'created');
+        }
+    }
+
+    private function findEmployee(string $clientId): ?Employee
+    {
+        return Employee::where('resort_id', $this->resortId)->where('Emp_id', $this->empId($clientId))->first()
+            ?? Employee::where('resort_id', $this->resortId)->where('Emp_id', $clientId)->first();
+    }
+
+    /** '' → null, a known employment type → its employees.employment_type value, else false. */
+    private static function employmentType(string $value)
+    {
+        $k = strtolower(trim($value));
+        return match (true) {
+            $k === '' => null,
+            in_array($k, ['full-time', 'full time', 'fulltime', 'permanent', 'regular'], true) => 'Full-Time',
+            in_array($k, ['part-time', 'part time', 'parttime'], true) => 'Part-Time',
+            $k === 'contract' => 'Contract',
+            in_array($k, ['probation', 'probationary'], true) => 'Probationary',
+            in_array($k, ['temporary', 'temp'], true) => 'Temporary',
+            $k === 'casual' => 'Casual',
+            in_array($k, ['intern', 'internship', 'trainee'], true) => 'Internship',
+            default => false,
+        };
+    }
+
+    private static function currency(string $value): ?string
+    {
+        $k = strtoupper(trim($value));
+        return match (true) {
+            in_array($k, ['USD', 'US$', '$', 'US DOLLAR', 'DOLLAR'], true) => 'USD',
+            in_array($k, ['MVR', 'RF', 'MRF', 'RUFIYAA'], true) => 'MVR',
+            default => null,
+        };
     }
 
     private function placeholderEmail(string $empId): ?string
@@ -650,15 +930,17 @@ class ResortDataImporter
             }
             $empId = $employee->id;
 
+            $label = "{$employee->Emp_id} attendance";
+            $this->ledger->at($file, $rec['row']);
             $roster = ['resort_id' => $this->resortId, 'Emp_id' => $empId, 'ShiftDate' => $shiftDate];
             $rosterId = DB::table('duty_rosters')->where($roster)->value('id');
             if ($rosterId) {
-                DB::table('duty_rosters')->where('id', $rosterId)->update(['Shift_id' => $shift->id, 'updated_at' => now()]);
+                $this->updateRow('attendance', 'duty_rosters', $rosterId, ['Shift_id' => $shift->id], $label);
             } else {
-                $rosterId = DB::table('duty_rosters')->insertGetId($roster + [
+                $rosterId = $this->insertRow('attendance', 'duty_rosters', $roster + [
                     'Shift_id' => $shift->id, 'Year' => Carbon::parse($start)->format('Y'),
                     'created_by' => $this->createdBy, 'created_at' => now(), 'updated_at' => now(),
-                ]);
+                ], $label);
             }
 
             $rows = [];
@@ -691,36 +973,59 @@ class ResortDataImporter
                 $this->warn('Day already recorded by app punch-in — kept, not overwritten.');
             }
 
-            $this->upsertDays('duty_roster_entries', $empId, $rows);
-            $this->upsertDays('parent_attendaces', $empId, $rows);
+            $this->upsertDays('duty_roster_entries', $empId, $rows, $label);
+            $this->upsertDays('parent_attendaces', $empId, $rows, $label);
 
             // Punch pair for present days only, matching the manual mark-present path.
             $parents = DB::table('parent_attendaces')->where('Emp_id', $empId)->whereIn('date', array_keys($rows))->pluck('id', 'date');
-            $presentIds = [];
+            $children = DB::table('child_attendaces')->whereIn('Parent_attd_id', $parents->values())->get()->keyBy('Parent_attd_id');
+            $newChildren = [];
             foreach ($rows as $date => $r) {
+                $child = $children[$parents[$date]] ?? null;
                 if ($r['Status'] === 'Present') {
-                    $presentIds[] = $parents[$date];
+                    if (!$child) {
+                        $newChildren[] = ['Parent_attd_id' => $parents[$date], 'InTime_out' => $in, 'OutTime_out' => $out, 'created_at' => now(), 'updated_at' => now()];
+                    } else {
+                        $this->updateRow('attendance', 'child_attendaces', $child->id, ['InTime_out' => $in, 'OutTime_out' => $out], $label);
+                    }
+                } elseif ($child) {
+                    DB::table('child_attendaces')->where('id', $child->id)->delete();
+                    $this->ledger->deleted('attendance', 'child_attendaces', (array) $child, $label);
                 }
             }
-            DB::table('child_attendaces')->whereIn('Parent_attd_id', $parents->values())->delete();
-            DB::table('child_attendaces')->insert(array_map(fn ($id) => [
-                'Parent_attd_id' => $id, 'InTime_out' => $in, 'OutTime_out' => $out, 'created_at' => now(), 'updated_at' => now(),
-            ], $presentIds));
+            if ($newChildren) {
+                DB::table('child_attendaces')->insert($newChildren);
+                $this->ledger->createdWhere('attendance', 'child_attendaces', ['Parent_attd_id' => array_column($newChildren, 'Parent_attd_id')], $label);
+            }
 
             // Leave days need an approved employees_leaves row too: payroll and the
             // register take the leave type and paid/unpaid from it, not from the
-            // attendance row. Earlier migrated rows for this period are replaced.
-            DB::table('employees_leaves')->where('resort_id', $this->resortId)->where('emp_id', $empId)
-                ->where('reason', self::LEAVE_REASON)->whereBetween('from_date', [$start, $end])->delete();
+            // attendance row. Earlier migrated rows for this period that no longer
+            // match the sheet are replaced; matching ones are left alone.
+            $wanted = [];
             foreach ($leaveDays as $categoryId => $days) {
                 foreach (self::runs($days) as [$from, $to, $total]) {
-                    DB::table('employees_leaves')->insert([
-                        'resort_id' => $this->resortId, 'emp_id' => $empId, 'leave_category_id' => $categoryId,
-                        'from_date' => $from, 'to_date' => $to, 'total_days' => $total, 'duration' => '',
-                        'reason' => self::LEAVE_REASON, 'status' => 'Approved', 'created_at' => now(), 'updated_at' => now(),
-                    ]);
-                    $this->count('attendance', 'leave records');
+                    $wanted["{$categoryId}|{$from}|{$to}"] = [$categoryId, $from, $to, $total];
                 }
+            }
+            $existingLeaves = DB::table('employees_leaves')->where('resort_id', $this->resortId)->where('emp_id', $empId)
+                ->where('reason', self::LEAVE_REASON)->whereBetween('from_date', [$start, $end])->get();
+            foreach ($existingLeaves as $leave) {
+                $key = "{$leave->leave_category_id}|{$leave->from_date}|{$leave->to_date}";
+                if (isset($wanted[$key])) {
+                    unset($wanted[$key]);
+                    continue;
+                }
+                DB::table('employees_leaves')->where('id', $leave->id)->delete();
+                $this->ledger->deleted('attendance', 'employees_leaves', (array) $leave, $label);
+            }
+            foreach ($wanted as [$categoryId, $from, $to, $total]) {
+                $this->insertRow('attendance', 'employees_leaves', [
+                    'resort_id' => $this->resortId, 'emp_id' => $empId, 'leave_category_id' => $categoryId,
+                    'from_date' => $from, 'to_date' => $to, 'total_days' => $total, 'duration' => '',
+                    'reason' => self::LEAVE_REASON, 'status' => 'Approved', 'created_at' => now(), 'updated_at' => now(),
+                ], $label);
+                $this->count('attendance', 'leave records');
             }
             $this->count('attendance', 'employees');
         }
@@ -730,20 +1035,25 @@ class ResortDataImporter
         }
     }
 
-    /** Insert or update one row per date for this employee. */
-    private function upsertDays(string $table, int $empId, array $rows): void
+    /** One row per date for this employee: insert the missing ones, change only days that differ. */
+    private function upsertDays(string $table, int $empId, array $rows, string $label): void
     {
         $existing = DB::table($table)->where('Emp_id', $empId)->whereIn('date', array_keys($rows))->pluck('id', 'date');
         $inserts = [];
         foreach ($rows as $date => $row) {
             if (isset($existing[$date])) {
-                DB::table($table)->where('id', $existing[$date])->update($row + ['updated_at' => now()]);
+                if ($this->updateRow('attendance', $table, $existing[$date], $row, $label) && $table === 'parent_attendaces') {
+                    $this->count('attendance', 'days changed');
+                }
             } else {
                 $inserts[] = $row + ['created_by' => $this->createdBy, 'created_at' => now(), 'updated_at' => now()];
             }
         }
         foreach (array_chunk($inserts, 500) as $chunk) {
             DB::table($table)->insert($chunk);
+        }
+        if ($inserts) {
+            $this->ledger->createdWhere('attendance', $table, ['Emp_id' => $empId, 'date' => array_column($inserts, 'date')], $label);
         }
     }
 
@@ -820,6 +1130,57 @@ class ResortDataImporter
     private static function key(?string $value): string
     {
         return mb_strtolower(trim((string) $value));
+    }
+
+    private function insertRow(string $kind, string $table, array $data, string $label): int
+    {
+        $id = DB::table($table)->insertGetId($data);
+        $this->ledger->created($kind, $table, $id, $label);
+        return $id;
+    }
+
+    /** Writes only the fields that differ; true when something changed. */
+    private function updateRow(string $kind, string $table, int $id, array $data, string $label): bool
+    {
+        if (!$data) {
+            return false;
+        }
+        $current = (array) DB::table($table)->where('id', $id)->first(array_keys($data));
+        $changes = [];
+        foreach ($data as $field => $value) {
+            if (!ImportLedger::same($current[$field] ?? null, $value)) {
+                $changes[$field] = [$current[$field] ?? null, $value];
+            }
+        }
+        if (!$changes) {
+            return false;
+        }
+        DB::table($table)->where('id', $id)->update(array_map(fn ($c) => $c[1], $changes) + ['updated_at' => now()]);
+        $this->ledger->updated($kind, $table, $id, $changes, $label);
+        return true;
+    }
+
+    /** Same, through the model, so Employee's audit observer still logs position/department changes. */
+    private function updateModel(string $kind, $model, array $data, string $label): bool
+    {
+        $changes = [];
+        foreach ($data as $field => $value) {
+            if (!ImportLedger::same($model->getRawOriginal($field), $value)) {
+                $changes[$field] = [$model->getRawOriginal($field), $value];
+            }
+        }
+        if (!$changes) {
+            return false;
+        }
+        $model->update(array_map(fn ($c) => $c[1], $changes));
+        $this->ledger->updated($kind, $model->getTable(), $model->id, $changes, $label);
+        return true;
+    }
+
+    private function positionTitle(int $positionId): string
+    {
+        $p = DB::table('resort_positions as p')->join('resort_departments as d', 'd.id', '=', 'p.dept_id')->where('p.id', $positionId)->first(['p.position_title', 'd.name']);
+        return $p ? self::positionLabel($p->position_title, $p->name) : "Position #{$positionId}";
     }
 
     private function newRow(array $data): array

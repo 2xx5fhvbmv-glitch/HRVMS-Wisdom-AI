@@ -121,6 +121,7 @@ Route::prefix(config('settings.route_prefix.admin'))->namespace('Admin')->group(
         Route::post('/resort-data-setup/{resort}/validate', 'ResortDataSetupController@validateImport')->name('admin.resort_data_setup.validate');
         Route::post('/resort-data-setup/{resort}/import', 'ResortDataSetupController@import')->middleware('admin.reauth')->name('admin.resort_data_setup.import');
         Route::post('/resort-data-setup/{resort}/credentials/clear', 'ResortDataSetupController@clearCredentials')->name('admin.resort_data_setup.clear_credentials');
+        Route::post('/resort-data-setup/{resort}/imports/{import}/undo', 'ResortDataSetupController@undo')->middleware('admin.reauth')->name('admin.resort_data_setup.undo');
         Route::get('/resort/edit-permissions/{id}', 'ResortsController@editPermissions')->name('admin.resorts.edit_permissions');
         Route::post('/resort/update-permissions/{id}', 'ResortsController@updatePermissions')->middleware('admin.reauth')->name('admin.resorts.update_permissions');
 

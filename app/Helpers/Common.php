@@ -285,6 +285,50 @@ class Common
         return ['resortAdmin' => $resortAdmin, 'employee' => $employee, 'employeeCreated' => $employeeCreated];
     }
 
+    /**
+     * The resort's HR head position: EXCOM rank in the Human Resources
+     * department. Gets full page access by default (grantDefaultPageAccess)
+     * so a new resort has one person who can work in every module and hand
+     * out access to everyone else.
+     */
+    public static function isHrHeadPosition(int $resortId, $deptId, $rank): bool
+    {
+        if ((int) $rank !== 1) {
+            return false;
+        }
+        $dept = strtolower((string) DB::table('resort_departments')->where('resort_id', $resortId)->where('id', $deptId)->value('name'));
+        return str_contains($dept, 'human resource') || $dept === 'hr';
+    }
+
+    /**
+     * Full access — view/create/edit/delete on every page of every module the
+     * resort has — exactly what "select all" on the Permission page saves
+     * (ResortInternalPermission::UpdateInternalPermissions). Only when the
+     * position has no permissions yet: access the resort set itself is never
+     * overwritten. Returns true when granted.
+     */
+    public static function grantDefaultPageAccess(int $resortId, int $positionId): bool
+    {
+        $deptId = DB::table('resort_positions')->where('resort_id', $resortId)->where('id', $positionId)->value('dept_id');
+        if (!$deptId || DB::table('resort_interal_pages_permissions')->where('resort_id', $resortId)->where('position_id', $positionId)->exists()) {
+            return false;
+        }
+
+        $modules = DB::table('resort_pagewise_permissions')->where('resort_id', $resortId)->distinct()->pluck('Module_id');
+        $pages = DB::table('module_pages')->whereIn('Module_Id', $modules)->where('status', 'Active')->whereNull('deleted_at')->pluck('id');
+        $rows = [];
+        foreach ($pages as $pageId) {
+            foreach (config('settings.resort_permissions') as $permissionId) {
+                $rows[] = ['resort_id' => $resortId, 'Dept_id' => $deptId, 'position_id' => $positionId, 'page_id' => $pageId,
+                    'Permission_id' => $permissionId, 'created_at' => now(), 'updated_at' => now()];
+            }
+        }
+        foreach (array_chunk($rows, 500) as $chunk) {
+            DB::table('resort_interal_pages_permissions')->insert($chunk);
+        }
+        return (bool) $rows;
+    }
+
     public static function isHrAdmin(): bool
 	{
 		

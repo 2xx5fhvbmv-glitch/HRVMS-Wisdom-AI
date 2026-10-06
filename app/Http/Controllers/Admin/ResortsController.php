@@ -307,6 +307,13 @@ class ResortsController extends Controller
               $resort->logo = $fileName;
           }
 
+          // Resort, its master admin, business hours and the Day Off
+          // category are saved together or not at all: a half-created
+          // resort (row saved, admin failed) blocked every retry on the
+          // now-taken email/prefix. Storage and email run after commit.
+          DB::beginTransaction();
+          $inTransaction = true;
+
           $saveResort = $resort->save();
 
           // Store the admin details
@@ -335,10 +342,10 @@ class ResortsController extends Controller
               $resortAdmin->is_employee = 0;
               $resortAdmin->password = Hash::make($password);
               $resortAdmin->type = "super";
-              // Security hardening (S4): the registration email below
-              // sends this generated password in plaintext — force a
-              // change at first login.
-              $resortAdmin->must_change_password = true;
+              // No forced change at first login: the registration email
+              // carries a "Set your password" link, not this generated
+              // password (S8), so the admin always picks their own.
+              $resortAdmin->must_change_password = false;
 
               if (isset($request->profile_picture)) {
                   $fileName = $request->profile_picture->getClientOriginalName();
@@ -347,10 +354,6 @@ class ResortsController extends Controller
               }
 
               $saveResortAdmin = $resortAdmin->save();
-
-              if ($saveResortAdmin) {
-                  $resortAdmin->sendResortRegistrationEmail($resort, $resortAdmin, $password);
-              }
 
               // Handle business hours if Support SLA is 'Business Hours only'
             if ($request->Support_SLA === 'Business Hours only' && isset($request->business_hours)) 
@@ -366,10 +369,6 @@ class ResortsController extends Controller
                 }
             }
           }
-
-
-        //   create default folder in aws
-        $folder = Common::createFolderByResort($resort->id);
 
         // Guarantee the "Day Off" leave category exists for every new
         // resort (mirrors database/migrations/2026_06_03_000002_seed_day_off_leave_category.php's
@@ -393,12 +392,34 @@ class ResortsController extends Controller
             'is_paid' => 'paid',
         ]);
 
-          $response['success'] = true;
+          DB::commit();
+          $inTransaction = false;
+
+          // The resort exists now; a storage or mail failure is reported,
+          // not turned into "creation failed".
           $response['msg'] = __('messages.addSuccess', ['name' => 'Resort']);
+          try {
+              Common::createFolderByResort($resort->id);
+          } catch (\Throwable $e) {
+              \Log::error('Resort ' . $resort->id . ': default storage folder not created: ' . $e->getMessage());
+          }
+          try {
+              if ($saveResortAdmin) {
+                  $resortAdmin->sendResortRegistrationEmail($resort, $resortAdmin, $password);
+              }
+          } catch (\Throwable $e) {
+              \Log::error('Resort ' . $resort->id . ': registration email failed: ' . $e->getMessage());
+              $response['msg'] .= ' The set-password email could not be sent — the admin can use "Forgot password" on the resort login page.';
+          }
+
+          $response['success'] = true;
           $response['redirect_url'] = route('admin.resorts.index');
           return response()->json($response);
 
-      } catch (\Exception $e) {
+      } catch (\Throwable $e) {
+          if (!empty($inTransaction)) {
+              DB::rollBack();
+          }
           \Log::emergency("File: " . $e->getFile());
           \Log::emergency("Line: " . $e->getLine());
           \Log::emergency("Message: " . $e->getMessage());

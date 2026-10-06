@@ -90,6 +90,9 @@ class ResortforgotPasswordController extends Controller
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function ($user, $password) {
                 $user->password = Hash::make($password);
+                // The account just chose its own password (e.g. the new-resort
+                // "Set your password" link) — don't force a second change.
+                $user->must_change_password = false;
                 $user->save();
 
                 // The password is already changed at this point — a failure

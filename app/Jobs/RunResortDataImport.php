@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\ResortDataImport;
+use App\Services\ResortDataSetup\ImportLedger;
 use App\Services\ResortDataSetup\ResortDataImporter;
 use App\Services\ResortDataSetup\SheetMapper;
 use Illuminate\Bus\Queueable;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Log;
  *   analyse  — read uploaded files, detect their layout (saved mapping, else AI), count records
  *   validate — full dry run, rolled back
  *   import   — the same run, committed (all or nothing)
+ *   undo     — reverse a committed import from its ledger
  *
  * Safe against a second pickup: the database queue's retry_after (90s) is
  * shorter than a large import, so a worker can reserve this job again while
@@ -48,6 +50,7 @@ class RunResortDataImport implements ShouldQueue
                 'analyse'  => $this->analyse($import),
                 'validate' => $this->run($import, false),
                 'import'   => $this->run($import, true),
+                'undo'     => $this->undo($import),
             };
             $import->forceFill(['job_status' => 'done', 'job_message' => $message])->save();
         } catch (\Throwable $e) {
@@ -102,6 +105,22 @@ class RunResortDataImport implements ShouldQueue
             $import->save();
         }
         return implode("\n", $messages);
+    }
+
+    private function undo(ResortDataImport $import): string
+    {
+        $result = ImportLedger::undo($import);
+        $report = $import->report ?? [];
+        $report['undo'] = $result + ['at' => now()->toDateTimeString()];
+        $import->report = $report;
+        if (!$result['undone']) {
+            return 'Undo refused — ' . implode(' ', $result['blockers']);
+        }
+        $import->status = 'undone';
+        $import->credentials = null;
+        Log::info('Resort data setup undone', ['import_id' => $import->id, 'resort_id' => $import->resort_id, 'rows' => $result['rows']]);
+        return "Import undone ({$result['rows']} records reversed)."
+            . ($result['conflicts'] ? ' ' . count($result['conflicts']) . ' field(s) changed after the import were kept — see below.' : '');
     }
 
     private function run(ResortDataImport $import, bool $commit): string

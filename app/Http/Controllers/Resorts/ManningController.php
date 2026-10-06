@@ -163,6 +163,26 @@ class ManningController extends Controller
             ->make(true);
     }
 
+    /**
+     * The form's Code field is optional but the code column is NOT NULL:
+     * a blank code keeps the current one (edit) or gets one generated from
+     * the name, unique within the resort — same idea as positions.
+     */
+    private function codeOrGenerated(string $table, $code, ?string $name, ?string $current = null): string
+    {
+        if (trim((string) $code) !== '') {
+            return $code;
+        }
+        if (trim((string) $current) !== '') {
+            return $current;
+        }
+        $base = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', (string) $name), 0, 5)) ?: 'CODE';
+        do {
+            $generated = $base . '_' . rand(1, 999);
+        } while (DB::table($table)->where('resort_id', $this->resort_id)->where('code', $generated)->exists());
+        return $generated;
+    }
+
     public function store_divisions(Request $request)
     {
         if ($request->filled('division_id')) {
@@ -198,7 +218,7 @@ class ManningController extends Controller
             $division = ResortDivision::create([
                 'resort_id' => $this->resort_id,
                 'name' => $request->name,
-                'code' => $request->code,
+                'code' => $this->codeOrGenerated('resort_divisions', $request->code, $request->name),
                 'short_name' => $request->filled('short_name') ? $request->short_name : '',
                 'status' => $request->status,
             ]);
@@ -272,7 +292,7 @@ class ManningController extends Controller
         try {
             // Update the division's attributes (short_name column may be NOT NULL)
             $division->name = $request->input('name');
-            $division->code = $request->input('code');
+            $division->code = $this->codeOrGenerated('resort_divisions', $request->input('code'), $division->name, $division->getRawOriginal('code'));
             $division->short_name = $request->filled('short_name') ? $request->short_name : ($division->getRawOriginal('short_name') ?? '');
             $division->status = $request->input('status');
 
@@ -456,7 +476,7 @@ class ManningController extends Controller
                 $department->resort_id = $this->resort_id;
                 $department->division_id = $request->division_id;
                 $department->name = $request->name;
-                $department->code = $request->filled('code') ? $request->code : '';
+                $department->code = $this->codeOrGenerated('resort_departments', $request->code, $request->name);
                 $department->short_name = $request->filled('short_name') ? $request->short_name : '';
                 $department->status = $request->status;
                 $department->save();
@@ -544,7 +564,7 @@ class ManningController extends Controller
             // Update the department's attributes (short_name column may be NOT NULL)
             $dept->division_id = $request->input('division');
             $dept->name = $request->input('name');
-            $dept->code = $request->input('code');
+            $dept->code = $this->codeOrGenerated('resort_departments', $request->input('code'), $dept->name, $dept->getRawOriginal('code'));
             $dept->short_name = $request->filled('short_name') ? $request->short_name : ($dept->getRawOriginal('short_name') ?? '');
             $dept->status = $request->input('status');
 
@@ -747,7 +767,7 @@ class ManningController extends Controller
             $section->resort_id = $resort_id;
             $section->dept_id = $request->dept_id;
             $section->name = $request->name;
-            $section->code = $request->code;
+            $section->code = $this->codeOrGenerated('resort_sections', $request->code, $request->name);
             $section->short_name = $request->filled('short_name') ? $request->short_name : '';
             $section->status = $request->status;
             $section->save();
@@ -848,7 +868,7 @@ class ManningController extends Controller
                 }
                 $section->dept_id = $request->input('department');
                 $section->name = $request->input('name');
-                $section->code = $request->input('code');
+                $section->code = $this->codeOrGenerated('resort_sections', $request->input('code'), $section->name, $section->getRawOriginal('code'));
                 $section->short_name = $request->filled('short_name') ? $request->short_name : ($section->getRawOriginal('short_name') ?? '');
                 $section->status = $request->input('status');
 
@@ -1063,6 +1083,11 @@ class ManningController extends Controller
             $position->benefit_grid_level = $request->filled('benefit_grid_level') ? $request->benefit_grid_level : null;
             $position->save();
 
+            // New resort's HR head gets full page access by default (only if it has none yet).
+            if (Common::isHrHeadPosition($this->resort_id, $position->dept_id, $position->Rank)) {
+                Common::grantDefaultPageAccess($this->resort_id, $position->id);
+            }
+
             try {
                 Common::notifyEmployees(
                     $this->resort_id,
@@ -1183,6 +1208,11 @@ class ManningController extends Controller
                 // wipe out an override set via the create form.
                 $update = $position->save();
 
+                // Rank or department changed to the HR head: default full access (only if it has none yet).
+                if ($update && Common::isHrHeadPosition($this->resort_id, $position->dept_id, $position->Rank)) {
+                    Common::grantDefaultPageAccess($this->resort_id, $position->id);
+                }
+
                 try {
                     Common::notifyEmployees(
                         $this->resort_id,
@@ -1198,11 +1228,12 @@ class ManningController extends Controller
 
                 // Get the updated division name
                 // W-05: resort-scoped — input is validated above, but scope defensively too.
-            $divisionName = ResortDivision::where('resort_id', $this->resort_id)->find($request->input('division'))->name;
+                // 'division' is optional in the request — fall back to the department's own division.
+                $dept = ResortDepartment::where('resort_id', $this->resort_id)->find($request->input('department'));
+                $divisionName = ResortDivision::where('resort_id', $this->resort_id)->find($request->input('division') ?: $dept?->division_id)?->name ?? '';
+                $deptName = $dept?->name ?? '';
                 // W-05: resort-scoped — see the divisionName lookup above.
-                $deptName = ResortDepartment::where('resort_id', $this->resort_id)->find($request->input('department'))->name;
-                // W-05: resort-scoped — see the divisionName lookup above.
-                $sectionName = $request->input('section') ? ResortSection::where('resort_id', $this->resort_id)->find($request->input('section'))->name : '';
+                $sectionName = $request->input('section') ? (ResortSection::where('resort_id', $this->resort_id)->find($request->input('section'))?->name ?? '') : '';
                 $Rank = config('settings.Position_Rank');
 
                 // Return success response with division name

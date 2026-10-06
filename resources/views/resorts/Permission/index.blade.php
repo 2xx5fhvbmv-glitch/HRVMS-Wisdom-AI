@@ -20,6 +20,18 @@
             </div>
         </div>
 
+        @if(request('notice') === 'employee-only')
+            <div class="alert alert-warning">That page works for employees only. As the resort admin, set up the structure and page access here — your HR Director then works in the modules.</div>
+        @endif
+        @if(isset($ResortDivision) && $ResortDivision->isEmpty())
+            <div class="alert alert-info">
+                No divisions yet. Create divisions, departments and positions in
+                <a href="{{ route('resort.manning.index') }}">Resort Configuration</a>
+                (or have them imported via Resort Data Setup), then come back here to give each position its page access.
+                The HR department's EXCOM-level position gets full access automatically.
+            </div>
+        @endif
+
         <form method="POST" id="ResortInteranlPemissionForm" class="form-horizontal">
             <div class="card">
                 <div class="card-header">

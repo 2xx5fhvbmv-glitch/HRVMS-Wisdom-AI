@@ -783,6 +783,9 @@ class DashboardController extends Controller
         $ThisWeekStartDate = Carbon::now()->startOfWeek();
         $ThisWeekEndDate   = Carbon::now()->endOfWeek();
         $Today             = Carbon::now();
+        // Defaults for a missing/unknown flag — every branch below overwrites them.
+        $TotalPaidAmt = $TotalUnpaidAmt = $MonthlyduePayment = $WeekduePayment = $TodayduePayment = Common::formatMvr(0);
+        $Totalemployees = 0;
         if($flag == "WorkPermitFee")
         {
             

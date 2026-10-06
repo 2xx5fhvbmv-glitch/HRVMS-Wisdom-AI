@@ -673,6 +673,10 @@ class LeaveController extends Controller
 
                 return view('resorts.leaves.leave.request', compact('finalLeaveRequests', 'page_title', 'resort_departments', 'hodDeptId', 'show_department_filter', 'filter_year', 'filter_years', 'ResortPositions'));
         } catch (\Exception $e) {
+            // An access check (abort 403/404) is not an unexpected error — let it through.
+            if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                throw $e;
+            }
             \Log::error('Leave Application Error', [
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
@@ -889,6 +893,10 @@ class LeaveController extends Controller
 
             return response()->json(['html' => $html]);
         } catch (\Exception $e) {
+            // An access check (abort 403/404) is not an unexpected error — let it through.
+            if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                throw $e;
+            }
             \Log::error('Filter Leave Requests Error', [
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
@@ -2295,6 +2303,10 @@ class LeaveController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+            // An access check (abort 403/404) is not an unexpected error — let it through.
+            if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                throw $e;
+            }
 
             \Log::error('Leave Application Error', [
                 'message' => $e->getMessage(),

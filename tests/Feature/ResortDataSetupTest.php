@@ -40,7 +40,14 @@ class ResortDataSetupTest extends TestCase
         'staff list.xls'      => ['staff', 10, ['emp_id' => 1, 'name' => 2, 'hire_date' => 5, 'position' => 6, 'level' => 7, 'section' => 8,
                                                 'gender' => 11, 'nationality' => 12, 'religion' => 13], 2],
         'June Attendance.xls' => ['attendance', 1, ['emp_id' => 1, 'name' => 2], 2],
+        // Small hand-made files for the extra types.
+        'mini staff.csv'      => ['staff', 0, ['emp_id' => 0, 'name' => 1, 'position' => 2, 'level' => 3, 'department' => 4, 'employment_type' => 5, 'gender' => 6], null],
+        'details.csv'         => ['employee_details', 0, ['emp_id' => 0, 'basic_salary' => 1, 'salary_currency' => 2, 'payment_mode' => 3, 'bank_name' => 4,
+                                                          'account_no' => 5, 'passport_number' => 6, 'visa_number' => 7, 'visa_expiry' => 8, 'reporting_manager_id' => 9, 'dob' => 10], null],
+        'holidays.csv'        => ['holidays', 0, ['date' => 0, 'name' => 1], null],
     ];
+
+    const DEMO_FILES = ['fusion division.xls', 'department.xls', 'section.xls', 'positions.xls', 'level.xls', 'staff list.xls', 'June Attendance.xls'];
 
     private int $resortId;
     private int $shiftId;
@@ -85,6 +92,11 @@ class ResortDataSetupTest extends TestCase
             $this->category[$k] = DB::table('leave_categories')->insertGetId(['resort_id' => $this->resortId, 'leave_type' => $type, 'number_of_days' => 30,
                 'is_paid' => $k === 'unpaid' ? 'unpaid' : 'paid', 'created_at' => now(), 'updated_at' => now()]);
         }
+        // The resort has two modules.
+        foreach (DB::table('module_pages')->where('status', 'Active')->whereNull('deleted_at')->distinct()->limit(2)->pluck('Module_Id') as $module) {
+            DB::table('resort_pagewise_permissions')->insert(['resort_id' => $this->resortId, 'Module_id' => $module,
+                'page_permission_id' => DB::table('module_pages')->where('Module_Id', $module)->value('id')]);
+        }
         $this->shiftId = DB::table('shift_settings')->insertGetId(['resort_id' => $this->resortId, 'ShiftName' => 'Morning', 'StartTime' => '07:00',
             'EndTime' => '15:00', 'TotalHours' => '8:0']);
     }
@@ -92,6 +104,85 @@ class ResortDataSetupTest extends TestCase
     private function url(string $name, ...$params): string
     {
         return route("admin.resort_data_setup.$name", array_merge([$this->resortId], $params));
+    }
+
+    /** Upload hand-made CSV files: name => contents. */
+    private function uploadCsv(array $files)
+    {
+        return $this->post($this->url('upload'), ['files' => array_map(function ($name, $content) {
+            $path = tempnam(sys_get_temp_dir(), 'rdscsv');
+            file_put_contents($path, $content);
+            return new UploadedFile($path, $name, 'text/csv', null, true);
+        }, array_keys($files), $files)]);
+    }
+
+    public function test_details_holidays_casual_changes_history_and_undo()
+    {
+        $reauth = ['admin_reauth_at' => time()];
+        $this->upload(['fusion division.xls', 'department.xls'])->assertOk();
+        $this->uploadCsv([
+            'mini staff.csv' => "Emp ID,Name,Position,Level,Department,Employment Type,Gender\n"
+                . "9001,ALICE ONE,ACCOUNTANT,SUP-3,FINANCE,Full-Time,Female\n9002,BOB TWO,FINANCE MANAGER,MGR-5,FINANCE,,Male\n"
+                . "9003,CARL THREE,STORE HELPER,,FINANCE,Casual,Male\n9004,DINA FOUR,STORE HELPER,,FINANCE,Intern,Female\n",
+            'details.csv' => "Employee ID,Basic Salary,Salary Currency,Payment Mode,Bank Name,Account No,Passport No,Visa No,Visa Expiry,Reporting Manager ID,DOB\n"
+                . "9001,1500,USD,Bank,BML,7701234567,P123456,V-55,31/12/2026,9002,05/04/1990\n9999,100,USD,,,,,,,,\n",
+            'holidays.csv' => "Date,Holiday\n01/01/2026,New Year\n26/07/2026,Independence Day\n",
+        ])->assertOk();
+        $options = $this->get($this->url('show'))->viewData('options');
+        $this->post($this->url('options'), ['email_domain' => 'rds-test.wisdom.local', 'level_ranks' => $options['level_ranks'], 'roles' => $options['roles']])->assertOk();
+        $this->post($this->url('validate'))->assertOk()->assertSee('Validation passed');
+        $this->withSession($reauth)->post($this->url('import'))->assertOk()->assertSee('Import finished.');
+
+        $r = $this->resortId;
+        $emp = fn ($id) => DB::table('employees')->where('resort_id', $r)->where('Emp_id', $id)->first();
+        // Casual / Intern: own positions (category, rank 0), no login handed out.
+        $this->assertEqualsCanonicalizing(['Casual', 'Intern'], DB::table('resort_positions')->where('resort_id', $r)->where('position_title', 'STORE HELPER')->pluck('employee_category')->all());
+        $this->assertSame([0], DB::table('resort_positions')->where('resort_id', $r)->where('position_title', 'STORE HELPER')->distinct()->pluck('Rank')->map(fn ($v) => (int) $v)->all());
+        $this->assertSame(['Casual', '0', 0], [$emp('RDST-9003')->employment_type, $emp('RDST-9003')->rank, $emp('RDST-9003')->main_rank]);
+        $this->assertSame('Internship', $emp('RDST-9004')->employment_type);
+        $this->assertEqualsCanonicalizing(['RDST-9001', 'RDST-9002'], array_column(ResortDataImport::where('resort_id', $r)->latest('id')->first()->credentials, 'emp_id'));
+        // Employee details: salary in the entered currency, bank, documents, reporting manager.
+        $alice = $emp('RDST-9001');
+        $this->assertSame(['1500.00', 'USD', 'Bank', 'P123456', '1990-04-05', $emp('RDST-9002')->id],
+            [$alice->basic_salary, $alice->basic_salary_currency, $alice->payment_mode, $alice->passport_number, $alice->dob, (int) $alice->reporting_to]);
+        $this->assertSame(['BML', '7701234567', 'ALICE ONE'], array_values((array) DB::table('employee_bank_details')->where('employee_id', $alice->id)->first(['bank_name', 'account_no', 'account_holder_name'])));
+        $this->assertSame(['V-55', '2026-12-31', '2026-01-01'], array_values((array) DB::table('visa_renewals')->where('employee_id', $alice->id)->first(['Visa_Number', 'end_date', 'start_date'])));
+        $this->assertSame(2, DB::table('resortholidays')->where('resort_id', $r)->count());
+        $import1 = ResortDataImport::where('resort_id', $r)->where('status', 'imported')->latest('id')->first();
+        $this->assertStringContainsString('9999', json_encode($import1->report['warnings']), 'unknown employee in details is reported');
+
+        // Re-import with a new salary: the dry run lists exactly that change.
+        $this->uploadCsv(['details.csv' => "Employee ID,Basic Salary,Salary Currency,Payment Mode,Bank Name,Account No,Passport No,Visa No,Visa Expiry,Reporting Manager ID,DOB\n"
+            . "9001,1800,USD,Bank,BML,7701234567,P123456,V-55,31/12/2026,9002,05/04/1990\n"])->assertOk();
+        $this->post($this->url('validate'))->assertOk()->assertSee('What will change')->assertSee('Basic salary');
+        $changes = ResortDataImport::where('resort_id', $r)->latest('id')->first()->report['changes'];
+        $this->assertEquals([['kind' => 'details', 'label' => 'RDST-9001 ALICE ONE', 'changes' => ['basic_salary' => ['1500.00', 1800]]]], $changes);
+        $this->assertSame('1500.00', $emp('RDST-9001')->basic_salary, 'dry run saved nothing');
+        $this->withSession($reauth)->post($this->url('import'))->assertOk();
+        $this->assertSame('1800.00', $emp('RDST-9001')->basic_salary);
+
+        // Record history shows who changed what, from which file and row.
+        $this->get($this->url('show') . '?lookup=RDST-9001')->assertOk()->assertSee('Basic salary')->assertSee('details.csv, row 2')->assertSee('Created');
+
+        // Undo is only offered for the latest import, and only through the identity check.
+        $import2 = ResortDataImport::where('resort_id', $r)->where('status', 'imported')->latest('id')->first();
+        $this->withSession(['admin_reauth_at' => 0])->post(route('admin.resort_data_setup.undo', [$r, $import1->id]))->assertRedirect(route('admin.reauth'));
+        $this->withSession($reauth)->post(route('admin.resort_data_setup.undo', [$r, $import1->id]))->assertOk()->assertSee('Only the most recent import can be undone');
+        $this->withSession($reauth)->post(route('admin.resort_data_setup.undo', [$r, $import2->id]))->assertOk()->assertSee('Import undone');
+        $this->assertSame('1500.00', $emp('RDST-9001')->basic_salary);
+
+        // Once imported staff use the system, the first import can no longer be undone.
+        DB::table('resort_admins')->where('id', $emp('RDST-9002')->Admin_Parent_id)->update(['must_change_password' => 0]);
+        $this->withSession($reauth)->post(route('admin.resort_data_setup.undo', [$r, $import1->id]))->assertOk()->assertSee('Undo refused')->assertSee('already logged in');
+        DB::table('resort_admins')->where('id', $emp('RDST-9002')->Admin_Parent_id)->update(['must_change_password' => 1]);
+
+        $this->withSession($reauth)->post(route('admin.resort_data_setup.undo', [$r, $import1->id]))->assertOk()->assertSee('Import undone');
+        foreach (['employees', 'resort_admins', 'resort_positions', 'resort_departments', 'resort_divisions', 'resortholidays', 'visa_renewals'] as $table) {
+            $this->assertSame(0, DB::table($table)->where('resort_id', $r)->count(), "$table emptied by undo");
+        }
+        $this->assertSame(0, DB::table('employee_bank_details')->where('employee_id', $alice->id)->count());
+        $this->assertSame(0, DB::table('filemangement_systems')->where('resort_id', $r)->where('Folder_Type', 'categorized')->count());
+        $this->assertSame('undone', $import1->fresh()->status);
     }
 
     private function upload(array $names)
@@ -107,9 +198,9 @@ class ResortDataSetupTest extends TestCase
         $this->get($this->url('show'))->assertOk()->assertSee('Upload files');
 
         // Upload: AI is asked once per file, every file is recognised.
-        $res = $this->upload(array_keys(self::AI))->assertOk();
-        foreach (self::AI as $name => [$type]) {
-            $res->assertSee("{$name}: recognised as {$type} (AI, 700 tokens).", false);
+        $res = $this->upload(self::DEMO_FILES)->assertOk();
+        foreach (self::DEMO_FILES as $name) {
+            $res->assertSee("{$name}: recognised as " . self::AI[$name][0] . ' (AI, 700 tokens).', false);
         }
         Http::assertSentCount(7);
         $import = ResortDataImport::where('resort_id', $this->resortId)->firstOrFail();
@@ -143,7 +234,7 @@ class ResortDataSetupTest extends TestCase
         $this->assertSame('dayoff', $options['codes']['DO']);
 
         // Import stays locked until a clean validation.
-        $show->assertSee('Import unlocks after a validation with no errors.');
+        $show->assertSee('Import unlocks once it passes with no errors');
 
         // Options: no shift yet → validation reports it and saves nothing.
         $form = ['email_domain' => 'rds-test.wisdom.local', 'level_ranks' => $options['level_ranks'], 'roles' => $options['roles'],
@@ -154,7 +245,7 @@ class ResortDataSetupTest extends TestCase
 
         $form['shift_id'] = $this->shiftId;
         $this->post($this->url('options'), $form)->assertOk();
-        $this->post($this->url('validate'))->assertOk()->assertSee('Validation result (nothing saved)')->assertSee('Validation passed.');
+        $this->post($this->url('validate'))->assertOk()->assertSee('Validation result — nothing saved', false)->assertSee('Validation passed');
         $report = $import->fresh()->report;
         $this->assertSame([], $report['errors']);
         $this->assertSame(252, $report['counts']['staff']['created']);
@@ -197,13 +288,20 @@ class ResortDataSetupTest extends TestCase
 
         // Re-import the same files: everything matched, nothing duplicated, no new logins.
         $before = $this->snapshot();
-        $this->upload(array_keys(self::AI))->assertOk();
+        $this->upload(self::DEMO_FILES)->assertOk();
         Http::assertSentCount(7);
         $this->get($this->url('show'))->assertOk()->assertSee('rds-test.wisdom.local'); // options carried to the new batch
-        $this->post($this->url('validate'))->assertOk()->assertSee('Validation passed.');
+        $this->post($this->url('validate'))->assertOk()->assertSee('Validation passed');
         $this->withSession(['admin_reauth_at' => time()])->post($this->url('import'))->assertOk()->assertSee('Import finished.')->assertDontSee('New logins');
         $this->assertSame($before, $this->snapshot());
-        $this->assertSame(252, ResortDataImport::where('resort_id', $this->resortId)->latest('id')->first()->report['counts']['staff']['updated']);
+        $this->assertSame(252, ResortDataImport::where('resort_id', $this->resortId)->latest('id')->first()->report['counts']['staff']['unchanged']);
+
+        // Undo both imports (latest first): the resort is back to empty, attendance and access included.
+        $reauth = ['admin_reauth_at' => time()];
+        foreach (ResortDataImport::where('resort_id', $this->resortId)->where('status', 'imported')->orderByDesc('id')->get() as $batch) {
+            $this->withSession($reauth)->post(route('admin.resort_data_setup.undo', [$this->resortId, $batch->id]))->assertOk()->assertSee('Import undone');
+        }
+        $this->assertSame(array_fill(0, 13, 0), $this->snapshot());
     }
 
     public function test_employee_ids_must_be_unique_across_resorts()
@@ -307,6 +405,14 @@ class ResortDataSetupTest extends TestCase
         $this->assertSame($expected['NP'], $leaveDays('unpaid'));
         $this->assertSame((int) $status['FullDayLeave'], (int) DB::table('employees_leaves')->where('resort_id', $r)->sum('total_days'));
         $this->assertSame(0, DB::table('employees_leaves')->where('resort_id', $r)->where('status', '!=', 'Approved')->count());
+        // HR head (EXCOM in HUMAN RESOURCES) gets full page access by default; nobody else does.
+        $pages = DB::table('module_pages')->whereIn('Module_Id', DB::table('resort_pagewise_permissions')->where('resort_id', $r)->pluck('Module_id'))
+            ->where('status', 'Active')->whereNull('deleted_at')->count();
+        $access = DB::table('resort_interal_pages_permissions')->where('resort_id', $r)->selectRaw('position_id, count(*) c')->groupBy('position_id')->pluck('c', 'position_id');
+        $hrHead = DB::table('employees')->where('resort_id', $r)->where('Emp_id', 'RDST-0635')->value('Position_id');
+        $this->assertSame('DIRECTOR HUMAN RESOURCES', DB::table('resort_positions')->where('id', $hrHead)->value('position_title'));
+        $this->assertEquals([$hrHead => $pages * 4], $access->all());
+
         $this->assertSame(DB::table('parent_attendaces')->where('resort_id', $r)->count(), DB::table('duty_roster_entries')->where('resort_id', $r)->count());
         // 1326 joined 21/06/2026: no attendance before the hire date (the sheet's own P total is 5).
         $late = $emp('RDST-1326');
@@ -334,6 +440,7 @@ class ResortDataSetupTest extends TestCase
             DB::table('child_attendaces as c')->join('parent_attendaces as p', 'p.id', '=', 'c.Parent_attd_id')->where('p.resort_id', $r)->count(),
             DB::table('employees_leaves')->where('resort_id', $r)->count(),
             DB::table('filemangement_systems')->where('resort_id', $r)->count(),
+            DB::table('resort_interal_pages_permissions')->where('resort_id', $r)->count(),
         ];
     }
 }

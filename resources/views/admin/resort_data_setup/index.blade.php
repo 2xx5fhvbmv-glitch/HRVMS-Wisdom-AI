@@ -36,6 +36,8 @@
                         <span class="badge badge-secondary">Not started</span>
                       @elseif($last->status === 'imported')
                         <span class="badge badge-success">Imported {{ optional($last->imported_at)->format('d M Y H:i') }}</span>
+                      @elseif($last->status === 'undone')
+                        <span class="badge badge-secondary">Last import undone</span>
                       @else
                         <span class="badge badge-warning">In progress</span>
                       @endif

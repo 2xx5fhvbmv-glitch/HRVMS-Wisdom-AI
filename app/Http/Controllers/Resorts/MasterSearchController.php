@@ -38,17 +38,17 @@ class MasterSearchController extends Controller
     public function index(Request $request){
 
         $search = $request->input('search_term');
-        $getEmployee = [];
-        $getVacancy = [];
-        $getDocuments = [];
-        $getAnnouncements = [];
-        $getApplicants = [];
-        $getDepartments = [];
-        $getPositions = [];
-        $getLearningPrograms = [];
-        $getHolidays = [];
-        $getEmployeeLeave = [];
-        $getShopkeeper = [];
+        $getEmployee = collect();
+        $getVacancy = collect();
+        $getDocuments = collect();
+        $getAnnouncements = collect();
+        $getApplicants = collect();
+        $getDepartments = collect();
+        $getPositions = collect();
+        $getLearningPrograms = collect();
+        $getHolidays = collect();
+        $getEmployeeLeave = collect();
+        $getShopkeeper = collect();
 
         if(!empty($search)){
             $searchValues = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY);

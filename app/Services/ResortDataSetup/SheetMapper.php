@@ -30,8 +30,15 @@ class SheetMapper
         'sections'    => ['name' => true, 'department' => false, 'division_department' => false, 'short_name' => false, 'status' => false],
         'positions'   => ['title' => true, 'department' => true, 'division' => false, 'section' => false, 'level' => false],
         'levels'      => ['name' => true],
-        'staff'       => ['emp_id' => true, 'name' => true, 'position' => true, 'level' => true, 'department' => false, 'section' => false,
-                          'hire_date' => false, 'gender' => false, 'nationality' => false, 'religion' => false, 'email' => false],
+        // level is required for permanent staff only — checked per row (casual/intern have none).
+        'staff'       => ['emp_id' => true, 'name' => true, 'position' => true, 'level' => false, 'department' => false, 'section' => false,
+                          'hire_date' => false, 'gender' => false, 'nationality' => false, 'religion' => false, 'email' => false, 'employment_type' => false],
+        // Extra per-employee data, keyed by Employee ID; every other column is optional.
+        'employee_details' => ['emp_id' => true, 'dob' => false, 'phone' => false, 'employment_type' => false, 'reporting_manager_id' => false,
+                          'basic_salary' => false, 'salary_currency' => false, 'payment_mode' => false,
+                          'bank_name' => false, 'bank_branch' => false, 'account_holder' => false, 'account_no' => false, 'iban' => false, 'swift' => false, 'bank_currency' => false,
+                          'passport_number' => false, 'visa_number' => false, 'visa_start' => false, 'visa_expiry' => false, 'work_permit_number' => false, 'work_permit_expiry' => false],
+        'holidays'    => ['date' => true, 'name' => true],
         'attendance'  => ['emp_id' => true, 'name' => false],
     ];
 
@@ -266,6 +273,11 @@ class SheetMapper
             $entry['columns_idx'] = $parsed['columns'];
             $entry['group_idx'] = $parsed['group_column'];
             $entry['count'] = count($parsed['records']);
+            // What the importer will read — shown under the file so mistakes are visible before validating.
+            $entry['sample'] = array_map(
+                fn ($r) => array_filter($r['v'] + ($r['group'] !== null ? ['group' => $r['group']] : []), fn ($x) => $x !== ''),
+                array_slice($parsed['records'], 0, 5)
+            );
             $entry['facets'] = $parsed['error'] ? [] : self::facets($entry['mapping']['type'], $parsed);
         }
         return $entry;
@@ -372,7 +384,9 @@ departments: name*, division*, short_name, status
 sections: name*, short_name, status, department, division_department (one combined "Division - Department" column)
 positions: title*, department*, division, section, level
 levels: name* (a list of grades/levels)
-staff: emp_id*, name*, position*, level*, department, section, hire_date, gender, nationality (country), religion, email
+staff: emp_id*, name*, position*, level, department, section, hire_date, gender, nationality (country), religion, email, employment_type
+employee_details: emp_id*, dob, phone, employment_type, reporting_manager_id (the manager's employee ID), basic_salary, salary_currency, payment_mode, bank_name, bank_branch, account_holder, account_no, iban, swift, bank_currency, passport_number, visa_number, visa_start, visa_expiry, work_permit_number, work_permit_expiry
+holidays: date*, name* (public holiday list)
 attendance: emp_id*, name (one row per employee, one column per day of the month)
 unknown: nothing fits; columns {}.
 Map only columns that clearly match. Never invent columns.
