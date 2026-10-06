@@ -234,9 +234,6 @@
                                     <img src="assets/images/wisdom-ai-small.svg" alt="image">
                                 </div>
                                 <div>
-                                    <h6>Lorem Ipsum is dummy text</h6>
-                                    <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting.
-                                    </P>
                                     <div>
                                         <a href="#" class="a-linkTheme">View Details</a>
                                     </div>
@@ -247,9 +244,6 @@
                                     <img src="assets/images/wisdom-ai-small.svg" alt="image">
                                 </div>
                                 <div>
-                                    <h6>Lorem Ipsum is dummy text</h6>
-                                    <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting.
-                                    </P>
                                     <div>
                                         <a href="#" class="a-linkTheme">View Details</a>
                                     </div>

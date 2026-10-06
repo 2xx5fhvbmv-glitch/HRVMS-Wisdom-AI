@@ -356,7 +356,7 @@
                         <div class="col-xl-12 col-md-6">
                             <div class="card card-talentAcqCompliances h-100">
                                 <div class="card-title">
-                                    <h3>Compliances</h3>
+                                    <h3>Compliance</h3>
                                 </div>
                                 <div class="border-bottom">
                                     <h6>Workforce Planning</h6>

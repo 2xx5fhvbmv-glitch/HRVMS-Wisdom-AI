@@ -118,7 +118,8 @@
 
     function getPromotionHistory() {
         if ($.fn.dataTable.isDataTable('#promotion-history')) {
-            $('#promotion-history').DataTable().destroy();
+            $('#promotion-history').DataTable().ajax.reload();
+            return;
         }
 
         $('#promotion-history').DataTable({

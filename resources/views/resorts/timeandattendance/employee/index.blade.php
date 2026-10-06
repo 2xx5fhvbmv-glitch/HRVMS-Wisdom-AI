@@ -109,7 +109,7 @@
                                     <th>Leave</th>
                                     <th>Absent<i class="fa-solid fa-caret-up"></i></th>
                                     <th>Present</th>
-                                    <th>Dayoff</th>
+                                    <th>Day Off</th>
                                     <th>Total Working Days<i class="fa-solid fa-caret-down"></i></th>
                                     <th>Total Day Offs<i class="fa-solid fa-caret-down"></i></th>
                                     <th>Action</th>
@@ -152,7 +152,7 @@
                                                 <p>{{ $e->Present }}</p>
                                             </div>
                                             <div>
-                                                <p>Dayoff</p>
+                                                <p>Day Off</p>
                                                 <p>{{ $e->Dayoff }}</p>
                                             </div>
                                         </div>

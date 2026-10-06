@@ -154,7 +154,7 @@
                                         <li class="form-radio">
                                             <input class="form-radio-input" type="radio" value="Permanant" id="radio-permanant" name="employee_type" {{ $vacancy->employee_type == 'Permanant' ? 'checked' : '' }}>
                                             <label class="form-radio-label" for="radio-permanant">
-                                                Permanant
+                                                Permanent
                                             </label>
                                         </li>
                                         <li class="form-radio ">

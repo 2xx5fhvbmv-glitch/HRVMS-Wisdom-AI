@@ -1401,7 +1401,7 @@
             },
             "time": "2026-09-15T15:42:51+00:00",
             "type": "library",
-            "installation-source": "source",
+            "installation-source": "dist",
             "autoload": {
                 "files": [
                     "library/HTMLPurifier.composer.php"
@@ -3630,7 +3630,7 @@
             },
             "time": "2024-07-04T07:17:40+00:00",
             "type": "library",
-            "installation-source": "source",
+            "installation-source": "dist",
             "autoload": {
                 "psr-4": {
                     "lbuchs\\WebAuthn\\": "src"
@@ -4933,7 +4933,7 @@
                     ]
                 }
             },
-            "installation-source": "source",
+            "installation-source": "dist",
             "autoload": {
                 "files": [
                     "src/helpers.php"

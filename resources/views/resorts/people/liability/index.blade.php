@@ -577,7 +577,8 @@
 
     function initializeLiabilityDataTable() {
         if ($.fn.DataTable.isDataTable('.table-liabilityOverEmpPeopleEmp')) {
-            $('.table-liabilityOverEmpPeopleEmp').DataTable().destroy();
+            $('.table-liabilityOverEmpPeopleEmp').DataTable().ajax.reload();
+            return;
         }
 
         const columns = [

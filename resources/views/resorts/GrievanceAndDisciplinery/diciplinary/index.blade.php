@@ -52,7 +52,7 @@
                                 <tr>
                                     <th class="text-nowrap"> Disciplinary Id </th>
                                     <th class="text-nowrap"> Category Name </th>
-                                    <th class="text-nowrap"> Offence </th>
+                                    <th class="text-nowrap"> Offense </th>
                                     <th> Employee Name </th>
                                     <th> Status </th>
                                     <th class="text-nowrap"> Created Date </th>

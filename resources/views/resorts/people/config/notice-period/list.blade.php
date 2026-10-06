@@ -76,7 +76,8 @@
 
     function fecth(){
         if ($.fn.dataTable.isDataTable('#ReminderTable')) {
-            $('#ReminderTable').DataTable().destroy();
+            $('#ReminderTable').DataTable().ajax.reload();
+            return;
         }
         var ReminderTable = $('#ReminderTable').DataTable({
             "searching": false,

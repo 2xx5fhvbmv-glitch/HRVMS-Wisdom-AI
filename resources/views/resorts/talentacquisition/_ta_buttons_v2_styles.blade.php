@@ -92,11 +92,14 @@
        wayfinding, not an action, so it doesn't borrow an emotional variant.
        Sits on the same teal header band Ghost was built for — its own
        rgba(255,255,255,…) contrast values left literal for the same
-       reason as Ghost above. */
-    .ta-tabnav { display: inline-flex; gap: 4px; background: var(--teal); padding: 5px; border-radius: 10px; flex-wrap: wrap; }
-    .ta-tabnav a { padding: 7px 13px; border-radius: 7px; font-size: 13px; font-weight: 500; color: rgba(255,255,255,.72); transition: background .16s ease, color .16s ease; }
-    .ta-tabnav a:hover { color: #fff; background: rgba(255,255,255,.1); }
-    .ta-tabnav a.active { background: rgba(255,255,255,.16); color: #fff; }
+       reason as Ghost above. The bar must NOT use var(--teal) as its
+       background: that is the band's own colour, so the box vanished. A
+       white wash + white hairline (same family as Ghost) keeps it visible;
+       the active tab is an opaque white pill. */
+    .ta-tabnav { display: inline-flex; gap: 4px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.3); padding: 4px; border-radius: 10px; flex-wrap: wrap; }
+    .ta-tabnav a { padding: 7px 13px; border-radius: 7px; font-size: 13px; font-weight: 500; color: #fff; text-decoration: none; transition: background .16s ease, color .16s ease; }
+    .ta-tabnav a:hover { color: #fff; background: rgba(255,255,255,.2); }
+    .ta-tabnav a.active { background: #fff; color: var(--teal); }
 
     /* Status indicator, not a button — e.g. "No Slot Found". Never
        clickable (href="javascript:void(0)" with no handler), so it must

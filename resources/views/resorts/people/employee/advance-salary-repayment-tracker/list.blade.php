@@ -169,7 +169,8 @@
 
 function initializeTable() {
         if ($.fn.dataTable.isDataTable('#repayTrackPeopleEmpTable')) {
-            $('#repayTrackPeopleEmpTable').DataTable().destroy();
+            $('#repayTrackPeopleEmpTable').DataTable().ajax.reload();
+            return;
         }
 
         $('#repayTrackPeopleEmpTable').DataTable({

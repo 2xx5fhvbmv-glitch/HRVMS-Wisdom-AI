@@ -383,7 +383,8 @@
 
     function getProbationaryData() {
         if ($.fn.dataTable.isDataTable('#probationList')) {
-            $('#probationList').DataTable().destroy();
+            $('#probationList').DataTable().ajax.reload();
+            return;
         }
         $('#probationList').DataTable({
             "searching": false,

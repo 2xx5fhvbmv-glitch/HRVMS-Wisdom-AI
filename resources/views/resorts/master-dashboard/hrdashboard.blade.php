@@ -658,12 +658,13 @@
   (function () {
     var now = new Date(), mo = now.getMonth();
     var MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    function money(v) { return '$' + Math.round(v).toLocaleString('en-US'); }
+    function money(v) { return (v < 0 ? '-' : '') + '$' + Math.round(Math.abs(v)).toLocaleString('en-US'); }
     function short(v, host) {
       host.textContent = '';
-      var cur = el('span', 'cur', '$'); host.appendChild(cur);
-      host.appendChild(document.createTextNode(v >= 1000 ? (v / 1000).toFixed(1) : String(Math.round(v))));
-      if (v >= 1000) host.appendChild(el('span', 'k', 'k'));
+      var cur = el('span', 'cur', v < 0 ? '-$' : '$'); host.appendChild(cur);
+      var a = Math.abs(v);
+      host.appendChild(document.createTextNode(a >= 1000 ? (a / 1000).toFixed(1) : String(Math.round(a))));
+      if (a >= 1000) host.appendChild(el('span', 'k', 'k'));
     }
     $('pxSub').textContent = '— ' + MN[mo] + ' · detailed view';
     $('pxLastLbl').textContent = mo > 0 ? 'Last month · ' + MN[mo - 1] : 'Last month';
@@ -675,13 +676,14 @@
       var res = r[0], est = r[1], d = res.data || {};
       var pc = d.payrollCost || [], sc = d.serviceCharge || [];
       // forecast = live estimate for the open cutoff period; once finalized, the locked figure for this month
-      var fc = est.is_estimated && +est.net > 0 ? +est.net : (+pc[mo] || 0);
+      // Forecast shows the live estimate whenever one exists — zero and negative included.
+      var fc = est.is_estimated ? (+est.net || 0) : (+pc[mo] || 0);
       var last = mo > 0 ? (+pc[mo - 1] || 0) : 0, svcPool = mo > 0 ? (+sc[mo - 1] || 0) : 0;
       var svc = TOTAL > 0 ? svcPool / TOTAL : 0, top = Math.max(fc, last);
-      if (fc) { short(fc, root.querySelector('[data-pay="fc"]')); root.querySelector('[data-px="fc"]').textContent = money(fc); }
+      if (est.is_estimated || fc) { short(fc, root.querySelector('[data-pay="fc"]')); root.querySelector('[data-px="fc"]').textContent = money(fc); }
       if (last) { short(last, root.querySelector('[data-pay="last"]')); root.querySelector('[data-px="last"]').textContent = money(last); }
       if (svc) { short(svc, root.querySelector('[data-pay="svc"]')); root.querySelector('[data-px="svc"]').textContent = money(svc); root.querySelector('[data-px="pool"]').textContent = money(svcPool); }
-      if (top) { setFill('.rc-c:nth-child(1) .rc-fill,.px-c:nth-child(1) .rc-fill', Math.round(fc / top * 100)); setFill('.rc-c:nth-child(2) .rc-fill,.px-c:nth-child(2) .rc-fill', Math.round(last / top * 100)); }
+      if (top) { setFill('.rc-c:nth-child(1) .rc-fill,.px-c:nth-child(1) .rc-fill', Math.max(0, Math.round(fc / top * 100))); setFill('.rc-c:nth-child(2) .rc-fill,.px-c:nth-child(2) .rc-fill', Math.round(last / top * 100)); }
       if (fc && last) { var dl = (fc - last) / last * 100; root.querySelector('[data-px="fcDelta"]').textContent = (dl >= 0 ? '▲ ' : '▼ ') + Math.abs(dl).toFixed(1) + '%'; }
     });
 

@@ -942,10 +942,34 @@
           }
         });
 
-        // Helper function to convert dd-mm-yyyy to a Date object
+        // Parse a date string using the page's own date format (dt_format), not a
+        // hardcoded dd-mm-yyyy. dt_format can show the month as a number (mm) or as
+        // a name (M, e.g. "Oct") depending on the admin's date format setting — the
+        // old numeric-only parser produced Invalid Date (and so silently-false
+        // comparisons) for any admin whose setting included a month name, which is
+        // why valid dates like 06-Oct-2026 were rejected as out of order.
+        var PARSE_DATE_MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
         function parseDate(input) {
-            var parts = input.split("-");
-            return new Date(parts[2], parts[1] - 1, parts[0]); // year, month (0-based), day
+            if (!input) return new Date(NaN);
+            var sepMatch = dt_format.match(/[^a-zA-Z]/);
+            var sep = sepMatch ? sepMatch[0] : '-';
+            var formatParts = dt_format.split(sep);
+            var valueParts = input.split(sep);
+            var day, month, year;
+            formatParts.forEach(function (token, i) {
+                var part = valueParts[i];
+                if (part === undefined) return;
+                if (/^d+$/i.test(token)) {
+                    day = parseInt(part, 10);
+                } else if (/^y+$/i.test(token)) {
+                    year = parseInt(part, 10);
+                } else if (token === 'mm' || token === 'm') {
+                    month = parseInt(part, 10) - 1;
+                } else if (token.indexOf('M') !== -1) {
+                    month = PARSE_DATE_MONTH_NAMES.indexOf(part.substr(0, 3).toLowerCase());
+                }
+            });
+            return new Date(year, month, day);
         }
 
         // Custom validator for ensuring end date is greater than start date

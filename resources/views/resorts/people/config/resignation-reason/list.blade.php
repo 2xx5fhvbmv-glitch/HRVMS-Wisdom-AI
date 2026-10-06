@@ -75,7 +75,8 @@
 
     function fecth(){
         if ($.fn.dataTable.isDataTable('#ResignationReasons')) {
-            $('#ResignationReasons').DataTable().destroy();
+            $('#ResignationReasons').DataTable().ajax.reload();
+            return;
         }
         var ResignationReasons = $('#ResignationReasons').DataTable({
             "searching": false,

@@ -298,20 +298,10 @@
                     }
                 }
                 emnurend();
-                // Slick (in emnurend, above) measures slide widths while this
-                // container is still display:none, so variableWidth ends up
-                // computed against zero-width slides — its internal position
-                // table is wrong from the start. Slick recalculates on window
-                // resize, so nudge it once the container has actually finished
-                // becoming visible. Without this, the carousel's position only
-                // self-corrects the first time ANY slide change forces Slick's
-                // own recompute — which is why "next" always worked (it happens
-                // to trigger that recompute) while "prev" silently used the
-                // stale zero-width table until something else had already fixed
-                // it. Safe to fire once per matched element: it's a plain
-                // resize event, not a re-init, so it can't double-bind anything.
+                // The bar is hidden until this point. Slick must start only
+                // after it is visible, so it measures real module widths.
                 $('.hrvmsshowMenu').show(10, function () {
-                    $(window).trigger('resize');
+                    initMenuCarousel();
                 });
             },
             error: function() {
@@ -319,18 +309,25 @@
             }
         });
     }
+    function initMenuCarousel() {
+        var $row = $('.carosel-menu');
+        if (!$row.length || $row.hasClass('slick-initialized') || $row.find('.text-center').length <= 3) return;
+        var $items = $row.find('.text-center');
+        var activeIndex = Math.max(0, $items.index($row.find('.dropdown-toggle.active').closest('.text-center')));
+        $row.slick({
+            variableWidth: true,
+            slidesToShow: 1,
+            // infinite off: Slick clones slides when on, which shows modules twice.
+            infinite: false,
+            slidesToScroll: 3,
+            dots: false,
+            focusOnSelect: false,
+            swipe: true
+        });
+        // Open on the current module, without an animation.
+        $row.slick('slickGoTo', activeIndex, true);
+    }
     function emnurend(){
-        var activeIndex = -1;
-  
-            // Find the index of the menu item with active class
-            $('.carosel-menu .dropdown-toggle').each(function(index) {
-                if ($(this).hasClass('active')) {
-                activeIndex = index;
-                return false; // Exit the loop once found
-                }
-            });
-            
-            
             var slideCount = $('.carosel-menu .text-center').length;
 
             if (slideCount <= 3) {
@@ -338,24 +335,8 @@
                 $('.navcarosel-box').css('max-width', 'fit-content');
                 $('.carosel-menu').addClass('d-flex').css('gap', '8px');
                 $('.carosel-menu .text-center').css('width', 'auto');
-            } else {
-                $('.carosel-menu').slick({
-                    variableWidth: true,
-                    slidesToShow: 1,
-                    // `infinite: true` makes Slick clone slides at the head/tail
-                    // so the carousel can loop seamlessly. With variableWidth +
-                    // slidesToShow:1 those clones can render adjacent to the
-                    // originals at certain viewport widths, showing each
-                    // module twice. Disable cloning — users don't need an
-                    // infinite-loop nav anyway.
-                    infinite: false,
-                    slidesToScroll: 3,
-                    initialSlide: activeIndex >= 0 ? activeIndex : 0,
-                    dots: false,
-                    focusOnSelect: false,
-                    swipe: true
-                });
             }
+            // Four or more modules: the Slick carousel starts in initMenuCarousel().
 
             // Handle active class toggle
             function updateActiveClasses() {

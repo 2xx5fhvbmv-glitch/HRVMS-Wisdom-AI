@@ -77,7 +77,7 @@
                 </tbody></table></div>
             </div>
         @else
-            <p class="m-empty">Not enough review activity to analyse yet.</p>
+            <p class="m-empty">Not enough review activity to analyze yet.</p>
         @endif
     </div>
 </div>

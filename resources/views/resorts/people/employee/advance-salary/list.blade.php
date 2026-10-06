@@ -108,7 +108,8 @@
     });
     function initializeSalaryAdvanceListTable() {
         if ($.fn.dataTable.isDataTable('#salaryAdvanceListTable')) {
-            $('#salaryAdvanceListTable').DataTable().destroy();
+            $('#salaryAdvanceListTable').DataTable().ajax.reload();
+            return;
         }
 
         $('#salaryAdvanceListTable').DataTable({

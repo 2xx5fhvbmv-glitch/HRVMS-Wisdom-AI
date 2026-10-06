@@ -161,7 +161,8 @@
 
     function fetchGradeLevels() {
         if ($.fn.dataTable.isDataTable('#GradeLevelTable')) {
-            $('#GradeLevelTable').DataTable().destroy();
+            $('#GradeLevelTable').DataTable().ajax.reload();
+            return;
         }
         $('#GradeLevelTable').DataTable({
             searching: false,

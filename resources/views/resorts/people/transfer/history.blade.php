@@ -206,7 +206,8 @@
 
     function getTransferData() {
         if ($.fn.dataTable.isDataTable('#transferHistoryTable')) {
-            $('#transferHistoryTable').DataTable().destroy();
+            $('#transferHistoryTable').DataTable().ajax.reload();
+            return;
         }
 
         $('#transferHistoryTable').DataTable({

@@ -21,7 +21,7 @@
                             <p>{{ $e->Present }}</p>
                         </div>
                         <div>
-                            <p>Dayoff</p>
+                            <p>Day Off</p>
                             <p>{{ $e->Dayoff }}</p>
                         </div>
                     </div>

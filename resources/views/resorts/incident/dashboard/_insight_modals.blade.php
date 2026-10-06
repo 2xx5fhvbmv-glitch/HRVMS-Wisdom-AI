@@ -126,7 +126,7 @@
                 </tbody></table></div>
             </div>
         @else
-            <p class="m-empty">No resolved incidents yet to analyse.</p>
+            <p class="m-empty">No resolved incidents yet to analyze.</p>
         @endif
     </div>
 </div>

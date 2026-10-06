@@ -315,7 +315,8 @@
          
      function loadDataTable() {
           if ($.fn.dataTable.isDataTable('#salaryIncrementList')) {
-               $('#salaryIncrementList').DataTable().destroy();
+               $('#salaryIncrementList').DataTable().ajax.reload();
+               return;
           }
             $('#salaryIncrementList').DataTable({
                   "searching": false,

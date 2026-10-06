@@ -998,23 +998,15 @@
                     <div class="leaveUser-main">
                         <div class="leaveUser-block">
                             <div class="date-block bg">DEC <h5>01</h5> Mon</div>
-                            <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting
-                                industry ipsum.</p>
                         </div>
                         <div class="leaveUser-block">
                             <div class="date-block bg">DEC <h5>01</h5> Mon</div>
-                            <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting
-                                industry ipsum.</p>
                         </div>
                         <div class="leaveUser-block">
                             <div class="date-block bg">DEC <h5>01</h5> Mon</div>
-                            <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting
-                                industry ipsum.</p>
                         </div>
                         <div class="leaveUser-block">
                             <div class="date-block bg">DEC <h5>01</h5> Mon</div>
-                            <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting
-                                industry ipsum.</p>
                         </div>
                     </div>
                 </div>

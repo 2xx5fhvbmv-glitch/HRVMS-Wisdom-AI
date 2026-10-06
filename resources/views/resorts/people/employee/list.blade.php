@@ -724,7 +724,8 @@
 
     function getEmpTable() {
         if ($.fn.dataTable.isDataTable('#employeeListTable')) {
-            $('#employeeListTable').DataTable().destroy();
+            $('#employeeListTable').DataTable().ajax.reload();
+            return;
         }
         
         $('#employeeListTable').DataTable({

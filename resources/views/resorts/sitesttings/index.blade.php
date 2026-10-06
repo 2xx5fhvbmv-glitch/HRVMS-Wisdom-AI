@@ -162,8 +162,8 @@
                                 <input type="text" id="city" name="city" class="form-control" placeholder="Please enter City" value="{{ old('city',isset($Resort->city) ? $Resort->city : '') }}"/>
                             </div>
                             <div class="col-md-3">
-                                <label for="emp-grade-select" class="form-label">Pincode <span class="red-mark">*</span></label>
-                                <input type="text" id="zip " name="zip" class="form-control" placeholder="Please enter Pincode " value="{{ old('zip ',isset($Resort->zip ) ? $Resort->zip : '') }}"/>
+                                <label for="emp-grade-select" class="form-label">Postal code <span class="red-mark">*</span></label>
+                                <input type="text" id="zip " name="zip" class="form-control" placeholder="Please enter postal code" value="{{ old('zip ',isset($Resort->zip ) ? $Resort->zip : '') }}"/>
                             </div>
                         </div>
                     </div>

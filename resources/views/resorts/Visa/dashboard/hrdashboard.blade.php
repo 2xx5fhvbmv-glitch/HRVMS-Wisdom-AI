@@ -227,7 +227,7 @@
                                 <div class="row g-2 doughnut-labelTop AppendMyStackBarChart">
                                     <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
                                         <div class="doughnut-label">
-                                            <span class="bg-theme"></span>Workpermit - MVR 10,000
+                                            <span class="bg-theme"></span>Work Permit - MVR 10,000
                                         </div>
                                     </div>
                                     <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
@@ -1360,7 +1360,7 @@ $(document).ready(function ()
                             var __resortCurrency = "MVR";
                             let row=  `<div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
                                     <div class="doughnut-label">
-                                        <span class="bg-theme"></span>Workpermit - ${__resortCurrency} ${workpermit.toLocaleString('en-IN')}
+                                        <span class="bg-theme"></span>Work Permit - ${__resortCurrency} ${workpermit.toLocaleString('en-IN')}
                                     </div>
                                 </div>
                                 <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
@@ -1570,7 +1570,7 @@ $(document).ready(function ()
                     labels: [],
                     datasets: [
                         {
-                            label: 'Workpermit',
+                            label: 'Work Permit',
                             data: [],
                             backgroundColor: _pVisa1.teal,
                             borderColor: _pVisa1.card,

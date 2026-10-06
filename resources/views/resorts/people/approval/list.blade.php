@@ -349,7 +349,10 @@
 
     if ($.fn.DataTable.isDataTable('#approval-request-table'))
     {
-        $('#approval-request-table').DataTable().destroy();
+        // Reuse the existing table (reload its rows) and still return it, as the function did before.
+        var existingTable = $('#approval-request-table').DataTable();
+        existingTable.ajax.reload();
+        return existingTable;
     }
 
     // Initialize DataTable with AJAX for server-side processing

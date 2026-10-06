@@ -468,13 +468,6 @@
                 <div class="leaveUser-main">
                     <div class="leaveUser-block">
                         <div>
-                            <h6>Lorem Ipsum is dummy text</h6>
-                            <p>Lorem ipsum is simply dummy text of the typesetting industry
-                                Lorem typesetting
-                                industry ipsum. Lorem ipsum is simply dummy text of the
-                                typesetting industry
-                                Lorem typesetting industry ipsum.
-                            </p>
                             <div>
                                 <a href="#" class="a-linkTheme me-1 me-md-2">Close</a>
                                 <a href="#" class="a-link">Extend</a>
@@ -484,13 +477,6 @@
                     <div class="leaveUser-block">
 
                         <div>
-                            <h6>typesetting industry Lorem typesetting industry ipsum.</h6>
-                            <p>Lorem ipsum is simply dummy text of the typesetting industry
-                                Lorem typesetting
-                                industry ipsum. Lorem ipsum is simply dummy text of the
-                                typesetting industry
-                                Lorem typesetting industry ipsum.
-                            </p>
                             <div>
                                 <a href="#" class="a-linkTheme me-1 me-md-2">Close</a>
                                 <a href="#" class="a-link">Extend</a>
@@ -500,13 +486,6 @@
                     <div class="leaveUser-block">
 
                         <div>
-                            <h6>typesetting industry Lorem typesetting industry ipsum.</h6>
-                            <p>Lorem ipsum is simply dummy text of the typesetting industry
-                                Lorem typesetting
-                                industry ipsum. Lorem ipsum is simply dummy text of the
-                                typesetting industry
-                                Lorem typesetting industry ipsum.
-                            </p>
                             <div>
                                 <a href="#" class="a-linkTheme me-1 me-md-2">Close</a>
                                 <a href="#" class="a-link">Extend</a>
@@ -516,13 +495,6 @@
                     <div class="leaveUser-block">
 
                         <div>
-                            <h6>typesetting industry Lorem typesetting industry ipsum.</h6>
-                            <p>Lorem ipsum is simply dummy text of the typesetting industry
-                                Lorem typesetting
-                                industry ipsum. Lorem ipsum is simply dummy text of the
-                                typesetting industry
-                                Lorem typesetting industry ipsum.
-                            </p>
                             <div>
                                 <a href="#" class="a-linkTheme me-1 me-md-2">Close</a>
                                 <a href="#" class="a-link">Extend</a>
@@ -551,13 +523,6 @@
                             <img src="assets/images/wisdom-ai-small.svg" alt="image">
                         </div>
                         <div>
-                            <h6>Lorem Ipsum is dummy text</h6>
-                            <p>Lorem ipsum is simply dummy text of the typesetting industry
-                                Lorem typesetting
-                                industry ipsum. Lorem ipsum is simply dummy text of the
-                                typesetting industry
-                                Lorem typesetting industry ipsum.
-                            </p>
                             <div>
                                 <a href="#" class="a-linkTheme">View Details</a>
                             </div>
@@ -568,13 +533,6 @@
                             <img src="assets/images/wisdom-ai-small.svg" alt="image">
                         </div>
                         <div>
-                            <h6>typesetting industry Lorem typesetting industry ipsum.</h6>
-                            <p>Lorem ipsum is simply dummy text of the typesetting industry
-                                Lorem typesetting
-                                industry ipsum. Lorem ipsum is simply dummy text of the
-                                typesetting industry
-                                Lorem typesetting industry ipsum.
-                            </p>
                             <div>
                                 <a href="#" class="a-linkTheme">View Details</a>
                             </div>
@@ -585,13 +543,6 @@
                             <img src="assets/images/wisdom-ai-small.svg" alt="image">
                         </div>
                         <div>
-                            <h6>typesetting industry Lorem typesetting industry ipsum.</h6>
-                            <p>Lorem ipsum is simply dummy text of the typesetting industry
-                                Lorem typesetting
-                                industry ipsum. Lorem ipsum is simply dummy text of the
-                                typesetting industry
-                                Lorem typesetting industry ipsum.
-                            </p>
                             <div>
                                 <a href="#" class="a-linkTheme">View Details</a>
                             </div>
@@ -602,13 +553,6 @@
                             <img src="assets/images/wisdom-ai-small.svg" alt="image">
                         </div>
                         <div>
-                            <h6>typesetting industry Lorem typesetting industry ipsum.</h6>
-                            <p>Lorem ipsum is simply dummy text of the typesetting industry
-                                Lorem typesetting
-                                industry ipsum. Lorem ipsum is simply dummy text of the
-                                typesetting industry
-                                Lorem typesetting industry ipsum.
-                            </p>
                             <div>
                                 <a href="#" class="a-linkTheme">View Details</a>
                             </div>

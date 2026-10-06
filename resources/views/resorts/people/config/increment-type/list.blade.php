@@ -74,7 +74,8 @@
 
     function fecth(){
         if ($.fn.dataTable.isDataTable('#IncrementType')) {
-            $('#IncrementType').DataTable().destroy();
+            $('#IncrementType').DataTable().ajax.reload();
+            return;
         }
         var IncrementType = $('#IncrementType').DataTable({
             "searching": false,
