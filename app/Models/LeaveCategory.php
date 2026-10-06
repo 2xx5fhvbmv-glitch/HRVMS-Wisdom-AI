@@ -35,7 +35,9 @@ class LeaveCategory extends Model
 
         self::saving(function ($model) {
             if (!$model->exists) {
-                $model->created_by = Auth::guard('resort-admin')->user()->id;
+                // Null when created outside a resort-admin session (e.g. the
+                // super-admin console seeding "Day Off" for a new resort).
+                $model->created_by = Auth::guard('resort-admin')->id();
             }
 
             if(Auth::guard('resort-admin')->check()) {
