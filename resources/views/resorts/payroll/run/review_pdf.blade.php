@@ -38,7 +38,7 @@
                 <th>A</th>
                 <th>Reg</th>
                 <th>Fri</th>
-                <th>Hol</th>
+                <th>Holiday OT</th>
                 <th>SC</th>
                 <th>Earned</th>
                 <th>OT Pay</th>

@@ -20,7 +20,7 @@
             <div class="row  g-3">
                 <div class="col-auto">
                     <div class="page-title">
-                        <span> Grievance And Disciplinery</span>
+                        <span> Grievance and Disciplinary</span>
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>

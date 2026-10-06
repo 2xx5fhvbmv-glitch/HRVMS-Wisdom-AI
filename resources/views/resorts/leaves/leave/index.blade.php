@@ -714,6 +714,11 @@
             updateRequestSummary();
         });
 
+        // Day Off count changes refresh the accumulation card in the summary
+        $(document).on('input change', '#day_off_quantity', function () {
+            updateRequestSummary();
+        });
+
         // When a transportation checkbox is toggled
         $(document).on('change', '.transportation-checkbox', function () {
             const checkbox = $(this);
@@ -1117,6 +1122,30 @@
             if (parseInt($dayOffQty.val(), 10) > maxDayOffQty) {
                 $dayOffQty.val(maxDayOffQty);
             }
+            // Day Off accumulation card (fifth block of the breakdown). Taking
+            // comes from the day-off count input for now; it switches to the
+            // Day Off block's dates once the block-based form lands.
+            var dayOffTaking = Math.max(0, Math.min(parseInt($dayOffQty.val(), 10) || 0, maxDayOffQty));
+            $dayOffQty.val(dayOffTaking);
+            $('#dynamic-summary').append(`
+                <div class="leave-breakdown-card">
+                    <h6 class="leave-breakdown-title">DAY OFF ACCUMULATION</h6>
+                    <div class="leave-breakdown-rows">
+                        <div class="leave-breakdown-row">
+                            <span class="row-label"><strong>Accumulated day off</strong></span>
+                            <span class="row-pill pill-purple">${window.__dayOffBalance} days</span>
+                        </div>
+                        <div class="leave-breakdown-row">
+                            <span class="row-label"><strong>Taking as day off</strong></span>
+                            <span class="row-pill pill-blue">${dayOffTaking} days</span>
+                        </div>
+                        <div class="leave-breakdown-row">
+                            <span class="row-label"><strong>Day off balance after this leave</strong></span>
+                            <span class="row-pill pill-green-soft">${window.__dayOffBalance - dayOffTaking} days</span>
+                        </div>
+                    </div>
+                </div>
+            `);
             $dayOffPrompt.removeClass('d-none');
         } else {
             $dayOffPrompt.addClass('d-none');

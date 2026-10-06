@@ -145,7 +145,7 @@
                                 <p class="fw-600" id="selectedCount">0 Employees Selected</p>
                             </div>
                             <div class="col-auto">
-                                <a href="#" class="a-linkTheme" id="unselectAll">Unselect All</a>
+                                <a href="#" class="a-linkTheme" id="unselectAll">Clear selection</a>
                             </div>
                         </div>
                     </div>

@@ -241,7 +241,8 @@
     })
     function getAnnouncement() {
         if ($.fn.dataTable.isDataTable('#announcementTable')) {
-            $('#announcementTable').DataTable().destroy();
+            $('#announcementTable').DataTable().ajax.reload();
+            return;
         }
         var announcementTable = $('#announcementTable').DataTable({
             "searching": false,

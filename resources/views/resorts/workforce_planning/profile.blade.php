@@ -153,8 +153,8 @@
                                 <input type="text" id="city" name="city" class="form-control" placeholder="Please enter City" value="{{ old('city',isset($profile->city) ? $profile->city : '') }}"/>
                             </div>
                             <div class="col-md-4">
-                                <label for="emp-grade-select" class="form-label">Pincode <span class="req_span">*</span></label>
-                                <input type="text" id="zip" required name="zip" class="form-control" placeholder="Please enter Pincode" value="{{ old('zip', isset($profile->zip) ? $profile->zip : '') }}"/>
+                                <label for="emp-grade-select" class="form-label">Postal code <span class="req_span">*</span></label>
+                                <input type="text" id="zip" required name="zip" class="form-control" placeholder="Please enter postal code" value="{{ old('zip', isset($profile->zip) ? $profile->zip : '') }}"/>
                             </div>
                         </div>
                     </div>

@@ -379,7 +379,8 @@
 
     function getExitClearanceData() {
         if ($.fn.dataTable.isDataTable('#exit-clearance-table')) {
-            $('#exit-clearance-table').DataTable().destroy();
+            $('#exit-clearance-table').DataTable().ajax.reload();
+            return;
         }
         $table = $('#exit-clearance-table').DataTable({
             "searching": false,

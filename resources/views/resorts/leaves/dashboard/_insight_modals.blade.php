@@ -98,7 +98,7 @@
                 </table></div>
             </div>
         @else
-            <p class="m-empty">No leave history yet to analyse.</p>
+            <p class="m-empty">No leave history yet to analyze.</p>
         @endif
     </div>
 </div>

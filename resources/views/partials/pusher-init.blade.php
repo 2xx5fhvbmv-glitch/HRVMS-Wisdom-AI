@@ -69,7 +69,12 @@
         ch.bind('pusher:subscription_error', function (status) {
             console.warn('[pusher-shim] subscription_error on ' + logName, status);
         });
-        return {
+        var api = {
+            // Typing indicator from other members: Echo-style whisper = 'client-' event.
+            listenForWhisper: function (eventName, cb) {
+                ch.bind('client-' + eventName, cb);
+                return this;
+            },
             listen: function (eventName, cb) {
                 // Laravel's broadcast event name varies: it can be the FQCN
                 // ("App\\Events\\NewChatMessage"), the FQCN with a leading
@@ -91,6 +96,28 @@
                 return this;
             }
         };
+        // Presence channels only: who is here, joining, leaving. Members are
+        // flattened to { id, ...user_info } so callers can read u.id.
+        if (subscribeName.indexOf('presence-') === 0) {
+            var toUser = function (m) { return Object.assign({ id: m.id }, m.info || {}); };
+            api.here = function (cb) {
+                ch.bind('pusher:subscription_succeeded', function (members) {
+                    var list = [];
+                    members.each(function (m) { list.push(toUser(m)); });
+                    cb(list);
+                });
+                return this;
+            };
+            api.joining = function (cb) {
+                ch.bind('pusher:member_added', function (m) { cb(toUser(m)); });
+                return this;
+            };
+            api.leaving = function (cb) {
+                ch.bind('pusher:member_removed', function (m) { cb(toUser(m)); });
+                return this;
+            };
+        }
+        return api;
     }
 
     window.Echo = {

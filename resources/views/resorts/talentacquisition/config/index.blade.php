@@ -437,7 +437,7 @@
                                                 <thead>
                                                     <tr>
                                                         <th scope="col">Source Name</th>
-                                                        <th scope="col">Colour</th>
+                                                        <th scope="col">Color</th>
                                                         <th scope="col">Action</th>
                                                     </tr>
                                                 </thead>

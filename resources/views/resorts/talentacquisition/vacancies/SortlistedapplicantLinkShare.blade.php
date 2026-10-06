@@ -16,53 +16,97 @@
     </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding" id="ta-shortlisted-hero">
-                <div class="row justify-content-between g-3">
+            <div class="page-hedding page-appHedding" id="ta-shortlisted-hero">
+                <div class="row justify-content-between g-md-2 g-1">
                     <div class="col-auto">
                         <div class="page-title">
                             <span>Talent Acquisition</span>
                             <h1>{{ $page_title }}</h1>
                         </div>
                     </div>
-                    {{-- <div class="col-auto ms-auto">
-                        <a href="{{ route('resort.ta.shortlistedapplicants') }}" class="btn ta-btn-secondary">Shortlisted Applicants To share Link</a>
-                    </div> --}}
-                    <!-- <div class="col-auto">
-                        <div class="d-flex justify-content-end">
-                            <a href="#" class="btn btn-theme">Request Manning</a>
-                        </div>
-                    </div> -->
+                    <div class="col-auto ms-auto">
+                        <a href="javascript:history.back()" class="btn ta-btn-ghost"><i class="fa-solid fa-arrow-left me-1"></i>Back</a>
+                    </div>
                 </div>
             </div>
 
 
+            <div id="spx">
             <div class="card">
-                <div class="card-title">
-                    <h3>All To Do List</h3>
+                <div class="card-header">
+                    <div class="row g-md-3 g-2 align-items-center">
+                        <div class="col-xl-3 col-lg-5 col-md-7 col-sm-8">
+                            <div class="input-group">
+                                <input type="search" class="form-control" id="spxSearch" placeholder="Search" autocomplete="off">
+                                <i class="fa-solid fa-search"></i>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                            <select class="form-select dd-native-select" id="spxStage">
+                                <option value="" selected>All stages</option>
+                                <option value="HR Shortlisted">HR Shortlisted</option>
+                                <option value="EXCOM Shortlisted">EXCOM Shortlisted</option>
+                            </select>
+                            <div class="dd" data-target="#spxStage">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">All stages</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Stage">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All stages</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="HR Shortlisted"><span class="dd-nm">HR Shortlisted</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="EXCOM Shortlisted"><span class="dd-nm">EXCOM Shortlisted</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                            <select class="form-select dd-native-select" id="spxIv">
+                                <option value="" selected>All interview status</option>
+                                <option value="Slot Booked">Slot booked</option>
+                                <option value="Slot Not Booked">Slot not booked</option>
+                            </select>
+                            <div class="dd" data-target="#spxIv">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">All interview status</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Interview status">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All interview status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Slot Booked"><span class="dd-nm">Slot booked</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Slot Not Booked"><span class="dd-nm">Slot not booked</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <table class="table"  id="SortlistedApplicants" >
-                    <thead>
-                        <tr>
-                            <th>Applicants</th>
-                            <th>Position</th>
-                            <th>Email</th>
-                            <th>Contact</th>
-                            <th>Applied Date</th>
-                            <th>Stage</th>
-                            <th>Nationality	</th>
-                            <th>InterViewDate</th>
-                            <th>Malidivan Time</th>
-                            <th>Applicant Time</th>
-                            <th>Interview Status</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-
-
-                </table>
-
+                <div class="table-responsive">
+                    <table class="tbl" id="SortlistedApplicants">
+                        <thead>
+                            <tr>
+                                <th style="width:26px"></th>
+                                <th>Applicant</th>
+                                <th>Stage</th>
+                                <th>Nationality</th>
+                                <th>Interview</th>
+                                <th>Interview status</th>
+                                <th class="spx-actcell" style="text-align:right">Action</th>
+                                <th></th><th></th><th></th><th></th><th></th><th></th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
             </div>
 
+            {{-- Frosted kebab menu (inside #spx, outside the table's scroll area so it is never clipped) --}}
+            <div class="kmenu" id="spxMenu" role="menu">
+                <div class="kmi userApplicants-btn" role="menuitem" data-m="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>View profile</div>
+                <div class="kmi" role="menuitem" data-m="copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>Copy meeting link</div>
+            </div>
+            </div>
 
         </div>
     </div>
@@ -294,6 +338,98 @@
 @section('import-css')
 @include('resorts._dropdown_styles')
 @include('resorts.talentacquisition._ta_buttons_v2_styles')
+<style>
+#spx{
+  --teal:#014653; --teal-2:#035b6c; --teal-3:#E6F0F1; --teal-soft:#f1f7f7;
+  --ink:#14232A; --g1:#3A4145; --g2:#6B7378; --muted:#5D6F75; --faint:#93A4A9; --g4:#C7CDCF;
+  --line:#E2EBEC; --line-2:#EEF4F4; --bg:#EEF2F2; --card:#fff;
+  --ok:#1F9D6B; --ok-bg:#E7F4EE; --warn:#B7791F; --warn-bg:#FBF0DC; --err:#E5573F; --err-bg:#FDEEEB;
+  --violet:#6B5FC7; --violet-bg:#EEE9FB; --info:#1E7A85; --info-bg:#E2F0F2; --lime:#E0FF02;
+  --shadow:0 1px 2px rgba(1,70,83,.04),0 10px 26px rgba(1,70,83,.06);
+  --spring:cubic-bezier(.34,1.56,.64,1);
+  --font:'Poppins',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+#spx .pill{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}
+#spx .pill.ok{background:var(--ok-bg);color:var(--ok)}
+#spx .pill.info{background:var(--info-bg);color:var(--info)}
+#spx .pill.warn{background:var(--warn-bg);color:var(--warn)}
+#spx .pill.teal{background:var(--teal-soft);color:var(--teal)}
+#spx .pill.muted{background:var(--line-2);color:var(--g2)}
+#spx .scrollwrap{border:1px solid var(--line);border-radius:14px;overflow:auto}
+#spx .tbl{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px;min-width:1020px}
+#spx .tbl th,#spx .tbl td{padding:12px 14px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line-2);vertical-align:middle}
+#spx .tbl thead th{position:sticky;top:0;background:var(--teal-soft);z-index:2;font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+#spx .tbl thead th.r,#spx .tbl td.r{text-align:right}
+#spx .tbl tbody tr.main{cursor:pointer}
+#spx .tbl tbody tr.main:hover td{background:#fafcfc}
+#spx .appcell{display:flex;align-items:center;gap:11px;min-width:0}
+#spx .spx-av{flex:none;width:36px;height:36px;border-radius:50%;background:#E1EBEC;color:var(--teal);font-size:11px;font-weight:600;display:grid;place-items:center;overflow:hidden;border:2px solid #fff;box-shadow:0 0 0 1.5px var(--teal-3)}
+#spx .spx-av img{width:100%;height:100%;object-fit:cover}
+#spx .appcell .nm{font-size:13.5px;font-weight:500;color:var(--ink)}
+#spx .appcell .sub{font-size:11px;color:var(--muted);margin-top:1px}
+#spx .iv .ivd{font-size:13px;font-weight:500;color:var(--g1)}
+#spx .iv .ivt{font-size:11px;color:var(--muted);margin-top:2px}
+#spx .iv .ivt b{font-weight:600;color:var(--teal);font-variant-numeric:tabular-nums}
+#spx .iv .ivt .sep{color:var(--g4);margin:0 5px}
+#spx .flg{font-size:13.5px;margin-right:5px;line-height:1;vertical-align:-1px}
+#spx .iv .none{font-size:12.5px;color:var(--faint)}
+#spx .chev{transition:transform .2s}
+#spx tr.main.open .chev{transform:rotate(90deg)}
+#spx .detail td{background:#fafcfc;border-bottom:1px solid var(--line-2)}
+#spx .detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px 26px;padding:4px 2px}
+#spx .detail-grid .d-k{font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--faint)}
+#spx .detail-grid .d-v{font-size:13px;color:var(--g1);margin-top:3px}
+#spx .actcell{display:flex;align-items:center;gap:7px;justify-content:flex-end}
+#spx .btn-s{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:9px;padding:7px 12px;border:1px solid transparent;white-space:nowrap;transition:background .15s,border-color .15s,transform .15s var(--spring)}
+#spx .btn-s:active{transform:scale(.96)}
+#spx .btn-s svg{width:13px;height:13px}
+#spx .btn-s.spx-join{background:var(--teal);color:#fff}
+#spx .btn-s.spx-join:hover{background:var(--teal-2)}
+#spx .btn-s.spx-share{background:#fff;color:var(--teal);border-color:var(--teal)}
+#spx .btn-s.spx-share:hover{background:var(--teal-soft)}
+#spx .iact{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--teal);display:grid;place-items:center}
+#spx .iact:hover{border-color:var(--teal);background:var(--teal-soft)}
+#spx .iact svg{width:14px;height:14px}
+#spx .kebab{background:none;border:none;color:var(--faint);width:30px;height:30px;border-radius:8px;display:grid;place-items:center}
+#spx .kebab:hover{background:var(--line-2);color:var(--g1)}
+#spx .kmenu{position:fixed;width:198px;border-radius:14px;padding:6px;z-index:100;display:none;
+  background:rgba(255,255,255,.9);-webkit-backdrop-filter:blur(20px) saturate(150%);backdrop-filter:blur(20px) saturate(150%);
+  border:1px solid var(--line);box-shadow:0 2px 6px rgba(1,70,83,.08),0 18px 40px rgba(1,70,83,.16)}
+#spx .kmenu.is-on{display:block;animation:kpop .14s ease}
+@keyframes kpop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+#spx .kmi{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:9px;font-size:13px;font-weight:500;color:var(--teal);cursor:pointer}
+#spx .kmi svg{width:16px;height:16px;flex:none}
+#spx .kmi:hover{background:var(--teal-soft)}
+#spx .kmi.del{color:var(--err)}
+#spx .kmi.del:hover{background:var(--err-bg)}
+#spx .kmsep{height:1px;background:var(--line-2);margin:3px 8px}
+@media (prefers-reduced-transparency:reduce){#spx .kmenu{background:#fff;-webkit-backdrop-filter:none;backdrop-filter:none}}
+#spx{font-family:var(--font)}
+#spx .pill.err{background:var(--err-bg);color:var(--err)}
+#spx .tbl{min-width:1020px;margin:0}
+#spx .tbl td.spx-chevcell{width:26px;padding-right:0}
+#spx .tbl tbody tr.main.dt-hasChild .chev{transform:rotate(90deg)}
+#spx .tbl .detail td{background:#fafcfc}
+#spx .tbl td.spx-actcell,#spx .tbl th.spx-actcell{text-align:right}
+#spx .spx-btn{text-decoration:none}
+#spx a.btn-s,#spx button.btn-s{cursor:pointer}
+#spx .btn-s.wait{background:var(--line-2);color:var(--g2);cursor:default}
+#spx .ccode{display:inline-block;font-size:9.5px;font-weight:600;letter-spacing:.3px;color:var(--teal);background:var(--teal-soft);border-radius:5px;padding:1px 5px;margin-right:6px;vertical-align:1px}
+#spx .iv .ivt .ccode{margin-right:4px}
+#spx .flagimg{width:20px;height:14px;object-fit:cover;border-radius:3px;box-shadow:0 0 0 1px rgba(1,70,83,.12);margin-right:6px;vertical-align:-2px}
+#spx .iv .ivt .flagimg{margin-right:4px}
+#spx .tbl thead th .dt-column-title{white-space:nowrap}
+#spx .tbl thead th.dt-orderable-asc span.dt-column-order:before,
+#spx .tbl thead th.dt-orderable-asc span.dt-column-order:after,
+#spx .tbl thead th.dt-orderable-desc span.dt-column-order:before,
+#spx .tbl thead th.dt-orderable-desc span.dt-column-order:after{opacity:0}
+#spx .tbl thead th.dt-ordering-asc span.dt-column-order:before,
+#spx .tbl thead th.dt-ordering-desc span.dt-column-order:after{opacity:1;color:var(--teal);font-size:.7em}
+#spx .tbl thead th.dt-ordering-asc span.dt-column-order:after,
+#spx .tbl thead th.dt-ordering-desc span.dt-column-order:before{display:none}
+@media (prefers-reduced-motion:reduce){#spx *{transition:none!important;animation:none!important}}
+
+</style>
 
 @endsection
 
@@ -303,43 +439,142 @@
 $(document).ready(function() {
 
 
-    $('#SortlistedApplicants tbody').empty();
-        var SortlistedApplicants = $('#SortlistedApplicants').DataTable({
-            searching: false,
-            bLengthChange: false,
-            bFilter: true,
-            bInfo: true,
-            bAutoWidth: false,
-            scrollX: true,
-            iDisplayLength: 6,
-            processing: true,
-            serverSide: true,
-            order:[[12, 'desc']],
-            ajax: {
-                url: '{{ route("resort.ta.shortlistedapplicants") }}',
-                type: 'GET',
-            },
-            columns: [
+    // ---- Shortlisted applicants (DataTables, server-side — same endpoint, sort and paging as before) ----
+    const escHtml = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const SPX_CODES = {Afghanistan:'AF',Albania:'AL',Algeria:'DZ',Argentina:'AR',Australia:'AU',Austria:'AT',Bangladesh:'BD',Belgium:'BE',Bhutan:'BT',Brazil:'BR',Bulgaria:'BG',Cambodia:'KH',Canada:'CA',China:'CN',Colombia:'CO',Croatia:'HR','Czech Republic':'CZ',Denmark:'DK',Egypt:'EG',Ethiopia:'ET',Fiji:'FJ',Finland:'FI',France:'FR',Germany:'DE',Ghana:'GH',Greece:'GR',Hungary:'HU',India:'IN',Indonesia:'ID',Iran:'IR',Iraq:'IQ',Ireland:'IE',Italy:'IT',Japan:'JP',Jordan:'JO',Kenya:'KE',Kuwait:'KW',Lebanon:'LB',Madagascar:'MG',Malaysia:'MY',Maldives:'MV',Mauritius:'MU',Mexico:'MX',Morocco:'MA',Myanmar:'MM',Nepal:'NP',Netherlands:'NL','New Zealand':'NZ',Nigeria:'NG',Norway:'NO',Oman:'OM',Pakistan:'PK',Peru:'PE',Philippines:'PH',Poland:'PL',Portugal:'PT',Qatar:'QA',Romania:'RO',Russia:'RU','Saudi Arabia':'SA',Serbia:'RS',Seychelles:'SC',Singapore:'SG','South Africa':'ZA','South Korea':'KR',Spain:'ES','Sri Lanka':'LK',Sweden:'SE',Switzerland:'CH',Syria:'SY',Thailand:'TH',Tunisia:'TN',Turkey:'TR',Uganda:'UG',Ukraine:'UA','United Arab Emirates':'AE','United Kingdom':'GB','United States':'US',Uzbekistan:'UZ',Vietnam:'VN',Zimbabwe:'ZW'};
+    // Real flag images (bare emoji don't render on Windows): the app's own Maldives asset, and the same flagcdn.com PNGs the app already
+    // uses for countries.flag_url. If an image can't load, it falls back to a 2-letter code chip.
+    const SPX_MV_FLAG = @json(URL::asset('resorts_assets/images/flag-maldives.webp'));
+    const spxChip = c => c ? `<span class="ccode">${c}</span>` : '';
+    const spxFlag = c => {
+        if (!c) return '';
+        const src = c === 'MV' ? SPX_MV_FLAG : 'https://flagcdn.com/w40/' + c.toLowerCase() + '.png';
+        return `<img class="flagimg" src="${src}" alt="${c}" loading="lazy" data-c="${c}" onerror="this.outerHTML='<span class=&quot;ccode&quot;>'+this.dataset.c+'</span>'">`;
+    };
+    const spxIni = n => (String(n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')) || '?';
+    const spxB64 = v => btoa(String(v));
+    const SPX_STATUS = {
+        'Slot Booked': ['Slot booked', 'teal'], 'Slot Not Booked': ['Slot not booked', 'warn'], 'Pending Review': ['Pending review', 'warn'],
+        'Invitation Sent': ['Invitation sent', 'info'], 'Invitation Rejected': ['Invitation rejected', 'err']
+    };
+    const spxStage = row => String(row.Stage || '').replace(/<[^>]*>/g, '').trim();
 
-                { data: 'Applicants', name: 'Applicants', className: 'text-nowrap' },
-                { data: 'Position', name: 'Position', className: 'text-nowrap' },
-                { data: 'Email', name: 'Email', className: 'text-nowrap' },
-                { data: 'Contact', name: 'Contact', className: 'text-nowrap' },
-                { data: 'AppliedDate', name: 'AppliedDate', className: 'text-nowrap' },
-                { data: 'Stage', name: 'Stage', className: 'text-nowrap' },
-                { data: 'Nationality', name: 'Nationality', className: 'text-nowrap' },
-                { data: 'InterViewDate', name: 'InterViewDate', className: 'text-nowrap' },
-                { data: 'MalidivanTime', name: 'MalidivanTime', className: 'text-nowrap' },
-                { data: 'ApplicantTime', name: 'ApplicantTime', className: 'text-nowrap' },
-                { data: 'InterviewStatus', name: 'InterviewStatus', className: 'text-nowrap' },
-                { data: 'Action', name: 'Action', className: 'text-nowrap' },
-                {data:'created_at', visible:false,searchable:false},
+    function spxInterview(row) {
+        if (!row.InterViewDate || row.InterViewDate === '-') return '<div class="iv"><span class="none">Not scheduled</span></div>';
+        const t = v => (v && v !== '-') ? escHtml(v) : '—';
+        const natCode = SPX_CODES[row.Nationality] || '';
+        return `<div class="iv"><div class="ivd">${escHtml(row.InterViewDate)}</div><div class="ivt"><span title="Maldives time">${spxFlag('MV')}<b>${t(row.MalidivanTime)}</b></span><span class="sep">·</span><span title="${escHtml(row.Nationality)} · applicant local time">${spxFlag(natCode)}<b>${t(row.ApplicantTime)}</b></span></div></div>`;
+    }
 
-            ],
-            drawCallback: function() {
-                $('[data-bs-toggle="tooltip"]').tooltip();
-            }
+    function spxPrimary(row) {
+        const st = row.InterviewStatus, join = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>';
+        const share = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v14"/></svg>';
+        if (st === 'Slot Booked' && row.MeetingLink) return `<a class="btn-s spx-join" href="${escHtml(row.MeetingLink)}" target="_blank" rel="noopener" title="Start interview">${join}Join</a>`;
+        if (st === 'Slot Booked') return `<button type="button" class="btn-s spx-share ApplicantShareLink" data-interview_id="${spxB64(row.Interview_id)}" title="Add the meeting link">${share}Share link</button>`;
+        if (st === 'Pending Review') return '<span class="btn-s wait" title="Pending review — email not sent yet">Awaiting</span>';
+        if (st === 'Invitation Sent') return '<span class="btn-s wait" title="Invitation sent — awaiting response">Awaiting reply</span>';
+        // Slot not booked / invitation declined → start the existing interview-request flow
+        return `<button type="button" class="btn-s spx-share SortlistedEmployee" data-resort_id="" data-applicantid="${spxB64(row.Applicant_id)}" data-applicantstatus_id="${spxB64(row.ApplicantStatus_id)}" title="Send interview request">${share}Share link</button>`;
+    }
+
+    const SpxTable = $('#SortlistedApplicants').DataTable({
+        searching: true,
+        layout: { topStart: null, topEnd: null },   // search is driven by the toolbar below, not DataTables' own box
+        bLengthChange: false,
+        bInfo: true,
+        bAutoWidth: false,
+        iDisplayLength: 6,
+        processing: true,
+        serverSide: true,
+        order: [[7, 'desc']],
+        createdRow: function (tr) { $(tr).addClass('main'); },
+        ajax: { url: '{{ route("resort.ta.shortlistedapplicants") }}', type: 'GET' },
+        columns: [
+            { data: null, orderable: false, searchable: false, className: 'spx-chevcell', defaultContent: '<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>' },
+            { data: 'first_name', name: 'first_name', render: function (d, t, row) {
+                const name = ((row.first_name || '') + ' ' + (row.last_name || '')).replace(/^./, c => c.toUpperCase()).trim();
+                const pm = /<img[^>]*src="([^"]+)"/.exec(row.Applicants || ''), photo = pm ? pm[1] : '';
+                const img = photo ? `<img src="${escHtml(photo)}" alt="${escHtml(name)}" data-i="${spxIni(name)}" onerror="this.parentNode.textContent=this.dataset.i">` : spxIni(name);
+                return `<div class="appcell"><span class="spx-av">${img}</span><div><div class="nm userApplicants-btn" data-id="${spxB64(row.ApplicantStatus_id)}" style="cursor:pointer">${escHtml(name)}</div><div class="sub">${escHtml(row.Position)}</div></div></div>`;
+            }},
+            { data: 'Stage', name: 'Stage', render: function (d, t, row) {
+                const s = spxStage(row), cls = /^EXCOM/.test(s) ? 'ok' : (/^HR/.test(s) ? 'info' : 'teal');
+                return `<span class="pill ${cls}">${escHtml(s)}</span>`;
+            }},
+            { data: 'Nationality', name: 'Nationality', render: function (d) { return spxFlag(SPX_CODES[d] || '') + escHtml(d); } },
+            { data: 'InterViewDate', name: 'InterViewDate', render: function (d, t, row) { return spxInterview(row); } },
+            { data: 'InterviewStatus', name: 'InterviewStatus', render: function (d) {
+                const s = SPX_STATUS[d] || [d || 'Slot not booked', 'muted'];
+                return `<span class="pill ${s[1]}">${escHtml(s[0])}</span>`;
+            }},
+            { data: 'Action', name: 'Action', orderable: false, searchable: false, className: 'spx-actcell', render: function (d, t, row) {
+                const sid = spxB64(row.ApplicantStatus_id);
+                return `<div class="actcell">${spxPrimary(row)}
+                    <button type="button" class="iact userApplicants-btn" title="View applicant" data-id="${sid}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                    <button type="button" class="kebab" aria-label="More actions" data-pid="${sid}" data-link="${escHtml(row.MeetingLink || '')}"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg></button>
+                </div>`;
+            }},
+            { data: 'created_at', visible: false, searchable: false },
+            // hidden, searchable-only columns so the toolbar search still matches position / contact fields shown in the row-expand
+            { data: 'Position', name: 'Position', visible: false },
+            { data: 'Email', name: 'Email', visible: false },
+            { data: 'Contact', name: 'Contact', visible: false },
+            { data: 'AppliedDate', name: 'AppliedDate', visible: false },
+            { data: 'last_name', name: 'last_name', visible: false },
+        ],
+        drawCallback: function() {
+            $('[data-bs-toggle="tooltip"]').tooltip();
+        }
     });
+
+    // Toolbar → existing DataTables request params (global search + per-column search; no new endpoint)
+    let spxDebounce;
+    $('#spxSearch').on('keyup', function () {
+        clearTimeout(spxDebounce);
+        const v = this.value;
+        spxDebounce = setTimeout(function () { SpxTable.search(v).draw(); }, 350);
+    });
+    $(document).on('change', '#spxStage', function () { SpxTable.column('Stage:name').search(this.value).draw(); });
+    $(document).on('change', '#spxIv', function () { SpxTable.column('InterviewStatus:name').search(this.value).draw(); });
+
+    // Row interactions: chevron toggles the detail row; anywhere else opens the profile (same handler as the name).
+    $(document).on('click', '#SortlistedApplicants tbody tr.main', function (e) {
+        const $t = $(e.target);
+        if ($t.closest('.spx-actcell, .userApplicants-btn, a, button').length) return;
+        if ($t.closest('.spx-chevcell').length) {
+            const row = SpxTable.row(this), d = row.data();
+            if (row.child.isShown()) { row.child.hide(); $(this).removeClass('dt-hasChild'); }
+            else {
+                const item = (k, v) => `<div><div class="d-k">${k}</div><div class="d-v">${v}</div></div>`;
+                row.child(`<div class="detail-grid">${item('Email', escHtml(d.Email) || '—')}${item('Contact', escHtml(d.Contact) || '—')}${item('Applied date', escHtml(d.AppliedDate) || '—')}</div>`, 'detail').show();
+                $(this).addClass('dt-hasChild');
+            }
+            return;
+        }
+        $(this).find('.nm.userApplicants-btn').first().trigger('click');
+    });
+
+    // Frosted kebab menu
+    const $spxMenu = $('#spxMenu');
+    function spxCloseMenu() { $spxMenu.removeClass('is-on'); }
+    $(document).on('click', '#spx .kebab', function (e) {
+        e.stopPropagation();
+        const d = this.dataset;
+        $spxMenu.find('[data-m="profile"]').attr('data-id', d.pid).data('id', d.pid);
+        $spxMenu.find('[data-m="copy"]').attr('data-link', d.link).toggle(!!d.link);
+        $spxMenu.addClass('is-on');
+        const r = this.getBoundingClientRect(), w = $spxMenu.outerWidth() || 198, h = $spxMenu.outerHeight() || 100;
+        let top = r.bottom + 6; if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+        $spxMenu.css({ left: Math.max(8, r.right - w) + 'px', top: top + 'px' });
+    });
+    $spxMenu.on('click', '[data-m="copy"]', function () {
+        const link = this.getAttribute('data-link');
+        const done = () => toastr.success('Meeting link copied.', 'Success', { positionClass: 'toast-bottom-right' });
+        if (navigator.clipboard && link) navigator.clipboard.writeText(link).then(done);
+    });
+    $(document).on('click', function (e) { if (!$(e.target).closest('#spx .kebab, #spxMenu').length || $(e.target).closest('#spxMenu .kmi').length) spxCloseMenu(); });
+    $(document).on('keydown', function (e) { if (e.key === 'Escape') spxCloseMenu(); });
+    window.addEventListener('scroll', spxCloseMenu, true);
 
     $(function () {
         var todayDate = moment().startOf('day');

@@ -251,7 +251,7 @@
                                     @endforeach
                                 @else
                                     <div>
-                                        <p>No Data Reacord</p>
+                                        <p>No Data Record</p>
 
                                     </div>
                                 @endif

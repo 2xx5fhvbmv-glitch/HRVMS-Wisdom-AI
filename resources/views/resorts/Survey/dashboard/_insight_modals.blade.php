@@ -73,7 +73,7 @@
         <div class="mt">{{ $surveyInsights['sentiment']['title'] ?? 'Sentiment / Score Pulse' }}</div>
         @if(!empty($seD) && !empty($seD['surveys']))
             <div class="m-tablewrap">
-                <div class="m-tcap">Avg {{ $seD['avg'] ?? 0 }}/5 across {{ $seD['total'] ?? 0 }} responses &middot; {{ $seD['favourable'] ?? 0 }} favourable / {{ $seD['neutral'] ?? 0 }} neutral / {{ $seD['unfavourable'] ?? 0 }} unfavourable</div>
+                <div class="m-tcap">Avg {{ $seD['avg'] ?? 0 }}/5 across {{ $seD['total'] ?? 0 }} responses &middot; {{ $seD['favourable'] ?? 0 }} Positive / {{ $seD['neutral'] ?? 0 }} neutral / {{ $seD['unfavourable'] ?? 0 }} Negative</div>
                 <div class="m-tscroll"><table class="m-table">
                     <thead><tr><th>Survey</th><th>Avg</th><th>Responses</th></tr></thead>
                     <tbody>
@@ -84,7 +84,7 @@
                 </table></div>
             </div>
         @else
-            <p class="m-empty">No rating responses yet to analyse.</p>
+            <p class="m-empty">No rating responses yet to analyze.</p>
         @endif
     </div>
 </div>
@@ -107,7 +107,7 @@
                 </table></div>
             </div>
         @else
-            <p class="m-empty">No choice responses yet to analyse.</p>
+            <p class="m-empty">No choice responses yet to analyze.</p>
         @endif
     </div>
 </div>

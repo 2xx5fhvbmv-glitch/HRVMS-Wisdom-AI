@@ -73,7 +73,8 @@
 
     function fecthAnnouncementCategories(){
         if ($.fn.dataTable.isDataTable('#AnnouncementCategory')) {
-            $('#AnnouncementCategory').DataTable().destroy();
+            $('#AnnouncementCategory').DataTable().ajax.reload();
+            return;
         }
         var AnnouncementCategory = $('#AnnouncementCategory').DataTable({
             "searching": false,

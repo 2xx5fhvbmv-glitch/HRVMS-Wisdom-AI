@@ -104,9 +104,6 @@
                             </div>
                             <div>
                                 <h6>Wisdom suggested This room for John Doe</h6>
-                                <P>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting
-                                    industry ipsum. Lorem ipsum is simply dummy text of the typesetting industry
-                                    Lorem typesetting industry ipsum.</P>
                                 <div>
                                     <a href="#" class="a-linkTheme">View Details</a>
                                     <a href="#" class="a-link">Request Leave</a>

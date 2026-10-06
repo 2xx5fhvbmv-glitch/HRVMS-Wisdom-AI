@@ -1,9 +1,6 @@
  <!-- Received Message -->
      <div class="message-wrapper mb-3">
           <div class="message received">
-               <div class="message-content">
-                    Lorem Ipsum is simply dummy text of the typesetting industry
-               </div>
                <div class="message-time">08:47 AM</div>
           </div>
      </div>

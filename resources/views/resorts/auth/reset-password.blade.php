@@ -44,13 +44,10 @@
                 </div>
                 <div class="head">
                     <h1>Start Your Journey with us</h1>
-                    <h2>Lorem ipsum dolor sit amet consect etur adipisicing elit Lorem.</h2>
                 </div>
                 <div>
                     <div class="login-slider slider">
                         <div>
-                            <p>Lorem ipsum dolor, sit amet consectetur adipisicing elit. Cupiditate officiis eaque ab
-                                mollitia reprehenderit natus repudiandae?</p>
                             <div class="d-flex">
                                 <div class="img-circle cover"><img src="{{ URL::asset('resorts_assets/images/user-2.svg')}}" alt="user">
                                 </div>
@@ -61,8 +58,6 @@
                             </div>
                         </div>
                         <div>
-                            <p>Lorem ipsum dolor, sit amet consectetur adipisicing elit. Cupiditate officiis eaque ab
-                                mollitia reprehenderit natus repudiandae?</p>
                             <div class="d-flex">
                                 <div class="img-circle cover"><img src="{{ URL::asset('resorts_assets/images/user-2.svg')}}" alt="user">
                                 </div>

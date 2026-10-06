@@ -92,7 +92,7 @@
         @if($reviewRounds->isNotEmpty())
         <div class="card mt-3">
             <div class="card-header">
-                <h5 class="mb-0">Employee Acknowledgement History</h5>
+                <h5 class="mb-0">Employee Acknowledgment History</h5>
             </div>
             <div class="card-body">
                 @foreach($reviewRounds as $round)

@@ -422,12 +422,6 @@
                     <div class="leaveUser-main">
                         <div class="leaveUser-block">
                             <div>
-                                <h6>Lorem Ipsum is dummy text</h6>
-                                <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem
-                                    typesetting
-                                    industry ipsum. Lorem ipsum is simply dummy text of the typesetting
-                                    industry
-                                    Lorem typesetting industry ipsum.</p>
                                 <div>
                                     <a href="#" class="a-linkTheme">View Details</a>
                                 </div>
@@ -435,12 +429,6 @@
                         </div>
                         <div class="leaveUser-block">
                             <div>
-                                <h6>Lorem Ipsum is dummy text</h6>
-                                <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem
-                                    typesetting
-                                    industry ipsum. Lorem ipsum is simply dummy text of the typesetting
-                                    industry
-                                    Lorem typesetting industry ipsum.</p>
                                 <div>
                                     <a href="#" class="a-linkTheme">View Details</a>
                                 </div>
@@ -448,12 +436,6 @@
                         </div>
                         <div class="leaveUser-block">
                             <div>
-                                <h6>Lorem Ipsum is dummy text</h6>
-                                <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem
-                                    typesetting
-                                    industry ipsum. Lorem ipsum is simply dummy text of the typesetting
-                                    industry
-                                    Lorem typesetting industry ipsum.</p>
                                 <div>
                                     <a href="#" class="a-linkTheme">View Details</a>
                                 </div>
@@ -461,12 +443,6 @@
                         </div>
                         <div class="leaveUser-block">
                             <div>
-                                <h6>Lorem Ipsum is dummy text</h6>
-                                <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem
-                                    typesetting
-                                    industry ipsum. Lorem ipsum is simply dummy text of the typesetting
-                                    industry
-                                    Lorem typesetting industry ipsum.</p>
                                 <div>
                                     <a href="#" class="a-linkTheme">View Details</a>
                                 </div>

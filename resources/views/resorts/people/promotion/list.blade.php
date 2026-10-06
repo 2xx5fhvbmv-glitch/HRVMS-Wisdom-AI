@@ -140,7 +140,8 @@
 
     function getPromotionData() {
         if ($.fn.dataTable.isDataTable('#promotion-table')) {
-            $('#promotion-table').DataTable().destroy();
+            $('#promotion-table').DataTable().ajax.reload();
+            return;
         }
 
         $('#promotion-table').DataTable({

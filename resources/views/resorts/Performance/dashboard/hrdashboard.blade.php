@@ -342,7 +342,6 @@
                     </div>
                     <div class="qualityMetrics-block">
                         <div>
-                            <p>Lorem Ipsum</p>
                              <span class="text-successTheme">Target Achieved</span>
                         </div>
                         <div>
@@ -356,7 +355,6 @@
                     </div>
                     <div class="qualityMetrics-block">
                         <div>
-                            <p>Lorem Ipsum</p>
                             <span class="text-successTheme">Target Achieved</span>
                         </div>
                         <div>

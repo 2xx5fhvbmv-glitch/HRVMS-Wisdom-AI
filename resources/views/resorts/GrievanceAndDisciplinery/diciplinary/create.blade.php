@@ -68,7 +68,7 @@
                         </div>
 
                         <div class="cdi-fld">
-                            <label>Offence <span class="req">*</span></label>
+                            <label>Offense <span class="req">*</span></label>
                             <select class="form-select ctrl dd-native-select" name="Offence_id" id="Offence_id"
                                 required data-parsley-required-message="Please select an offence"
                                 data-parsley-errors-container="#offence-error-list">
@@ -86,10 +86,10 @@
                             </select>
                             <div class="dd" data-target="#Offence_id">
                                 <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                    <span class="dd-lbl">Select Offence</span>
+                                    <span class="dd-lbl">Select Offense</span>
                                     <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                                 </button>
-                                <div class="dd-panel" role="listbox" aria-label="Offence">
+                                <div class="dd-panel" role="listbox" aria-label="Offense">
                                     <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an offence…"></div>
                                     <div class="dd-scroll">
                                         @foreach($Offenses ?? [] as $off)
@@ -289,7 +289,7 @@
 
                 {{-- ===== Active Offences — vertical stacked list ===== --}}
                 <div class="cdi-card cdi-ao">
-                    <div class="cdi-ao-h"><span class="ttl">Active Offences</span><span class="cnt tnum" id="aoCount">0</span></div>
+                    <div class="cdi-ao-h"><span class="ttl">Active Offenses</span><span class="cnt tnum" id="aoCount">0</span></div>
                     <div class="cdi-ao-sub" id="aoSub">Select an employee to see their active record</div>
                     <div class="cdi-ao-list" id="aoList"></div>
 
@@ -304,7 +304,7 @@
                         <thead>
                             <tr>
                                 <th>Category</th>
-                                <th>Offence</th>
+                                <th>Offense</th>
                                 <th>Action Valid Until</th>
                                 <th>Action</th>
                             </tr>
@@ -457,7 +457,7 @@
                 {
                     if (response.success) 
                     {
-                        var option = '<option value="">Select Offence</option>';
+                        var option = '<option value="">Select Offense</option>';
                         $.each(response.data, function(i, v) {
                             option += `<option value="${v.newid}" data-cat="${v.cat}">${v.OffensesName}</option>`;
                         });

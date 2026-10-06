@@ -27,6 +27,7 @@
                 </div>
             </div>
 
+            <div id="tpx">
             <div class="card">
                 <div class="card-header">
                     <div class="row g-md-3 g-2 align-items-center">
@@ -97,22 +98,18 @@
                 </div>
                 <div class="list-main d-none">
                     <div class="table-responsive">
-                        <table class="table table-collapseNew TalentPool">
+                        <table class="tbl TalentPool">
                             <thead>
                                 <tr>
-                                    <th>Applicants<i class="fa-solid fa-caret-down"></i></th>
+                                    <th style="width:26px"></th>
+                                    <th>Applicant</th>
                                     <th>Position</th>
-                                    <th>Department</th>
-                                    <th>Nationality<i class="fa-solid fa-caret-up"></i></th>
-                                    <th>Passport No.</th>
-                                    <th>Experience<i class="fa-solid fa-caret-up"></i></th>
-                                    <th>Email</th>
-                                    <th>Contact</th>
-                                    <th>Applied Date<i class="fa-solid fa-caret-down"></i></th>
-                                    <th>Stage<i class="fa-solid fa-caret-down"></i></th>
+                                    <th>Applied</th>
+                                    <th>WAI Rank</th>
                                     <th>Availability</th>
-                                    <th>Consent Expiry Date</th>
-                                    <th>Action</th>
+                                    <th>Consent expiry</th>
+                                    <th style="text-align:right">Actions</th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -122,12 +119,23 @@
                     </div>
                 </div>
                 <div class="grid-main">
-                    <div class="row g-md-4 g-3 mb-4 " id="grid_main_view">
+                    <div class="tpx-gridhost" id="grid_main_view">
 
                     </div>
 
                 </div>
 
+            </div>
+
+            {{-- Frosted kebab menu + rejection tooltip (inside #tpx but outside the table, so its scroll area never clips them) --}}
+            <div class="kmenu" id="tpxMenu" role="menu">
+                <div class="kmi userApplicants-btn" role="menuitem" data-m="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>View profile</div>
+                <div class="kmsep" data-m="sep"></div>
+                <div class="kmi RejactionReason" role="menuitem" data-m="reason"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>View rejection reason</div>
+                <div class="kmsep" data-m="sep2"></div>
+                <div class="kmi del destoryApplicant" role="menuitem" data-m="delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/></svg>Delete</div>
+            </div>
+            <div class="rtip" id="tpxTip"></div>
             </div>
 
 
@@ -256,6 +264,138 @@
 @section('import-css')
 @include('resorts._dropdown_styles')
 @include('resorts.talentacquisition._ta_buttons_v2_styles')
+<style>
+#tpx{
+  --teal:#014653; --teal-2:#035b6c; --teal-3:#E6F0F1; --teal-soft:#f1f7f7;
+  --ink:#14232A; --g1:#3A4145; --g2:#6B7378; --muted:#5D6F75; --faint:#93A4A9; --g4:#C7CDCF;
+  --line:#E2EBEC; --line-2:#EEF4F4; --bg:#EEF2F2; --card:#fff;
+  --ok:#1F9D6B; --ok-bg:#E7F4EE; --warn:#B7791F; --warn-bg:#FBF0DC; --err:#E5573F; --err-bg:#FDEEEB;
+  --violet:#6B5FC7; --violet-bg:#EEE9FB; --info:#1E7A85; --info-bg:#E2F0F2; --lime:#E0FF02;
+  --shadow:0 1px 2px rgba(1,70,83,.04),0 10px 26px rgba(1,70,83,.06);
+  --spring:cubic-bezier(.34,1.56,.64,1);
+  --font:'Poppins',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+#tpx .pill{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}
+#tpx .pill.teal{background:var(--teal-soft);color:var(--teal)}
+#tpx .pill.ok{background:var(--ok-bg);color:var(--ok)}
+#tpx .pill.warn{background:var(--warn-bg);color:var(--warn)}
+#tpx .pill.err{background:var(--err-bg);color:var(--err)}
+#tpx .pill.muted{background:var(--line-2);color:var(--g2)}
+#tpx .tpx-cs{font-size:11.5px;font-weight:600}
+#tpx .tpx-cs.ok{color:var(--ok)}
+#tpx .tpx-cs.warn{color:var(--warn)}
+#tpx .tpx-cs.err{color:var(--err)}
+#tpx .tpx-cs.muted{color:var(--faint)}
+#tpx .statuscell{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+#tpx .rejchip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--err-bg);color:var(--err);cursor:default;white-space:nowrap}
+#tpx .rejchip svg{width:12px;height:12px}
+#tpx .rtip{position:fixed;max-width:232px;background:rgba(20,35,42,.93);-webkit-backdrop-filter:blur(10px) saturate(140%);backdrop-filter:blur(10px) saturate(140%);color:#fff;padding:10px 12px;border-radius:10px;z-index:140;display:none;box-shadow:0 10px 30px rgba(1,20,25,.3)}
+#tpx .rtip.is-on{display:block}
+#tpx .rtip .rt-h{font-size:11.5px;font-weight:600}
+#tpx .rtip .rt-r{font-size:11.5px;color:rgba(255,255,255,.82);margin-top:3px;line-height:1.5}
+#tpx .rtip .rt-d{font-size:10.5px;color:rgba(255,255,255,.55);margin-top:5px}
+#tpx .tpx-av{flex:none;border-radius:50%;background:#E1EBEC;color:var(--teal);font-weight:600;display:grid;place-items:center;overflow:hidden;border:2px solid #fff;box-shadow:0 0 0 1.5px var(--teal-3)}
+#tpx .tpx-av img{width:100%;height:100%;object-fit:cover}
+#tpx .metric .ml{font-size:9.5px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+#tpx .metric .mv{font-size:16px;font-weight:600;color:var(--teal);font-variant-numeric:tabular-nums;line-height:1.1}
+#tpx .metric .mv small{font-size:10px;font-weight:500;color:var(--faint)}
+#tpx .metric .bar{height:4px;border-radius:3px;background:var(--line);margin-top:6px;overflow:hidden}
+#tpx .metric .bar i{display:block;height:100%;border-radius:3px}
+#tpx .metric.wai .bar i{background:linear-gradient(90deg,#9db800,#dff23f)}
+#tpx .metric.score .bar i{background:var(--teal)}
+#tpx .metric.wai .ml{color:var(--teal)}
+#tpx .tpx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(262px,1fr));gap:16px}
+#tpx .tp-card{position:relative;display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px;cursor:pointer;transition:box-shadow .18s,transform .18s var(--spring)}
+#tpx .tp-card:hover{box-shadow:0 4px 10px rgba(1,70,83,.07),0 16px 36px rgba(1,70,83,.09);transform:translateY(-2px)}
+#tpx .tp-top{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;padding-top:4px}
+#tpx .tp-top .tpx-av{width:64px;height:64px;font-size:19px;margin-bottom:7px}
+#tpx .tp-top .nm{font-size:15px;font-weight:600;color:var(--ink);line-height:1.25}
+#tpx .tp-top .ro{font-size:12.5px;color:var(--muted);margin-top:1px}
+#tpx .kebab{flex:none;background:none;border:none;color:var(--faint);width:28px;height:28px;border-radius:7px;display:grid;place-items:center}
+#tpx .kebab:hover{background:var(--line-2);color:var(--g1)}
+#tpx .tp-card .kebab{position:absolute;top:12px;right:12px}
+#tpx .tp-status{margin-top:10px;display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
+#tpx .tp-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+#tpx .tp-metrics .metric{background:var(--teal-soft);border-radius:10px;padding:9px 11px}
+#tpx .tp-info{margin-top:14px;display:flex;flex-direction:column;gap:7px}
+#tpx .inf{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px}
+#tpx .inf .k{color:var(--muted);flex:none}
+#tpx .inf .v{color:var(--g1);font-weight:500;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#tpx .docs{display:flex;gap:6px}
+#tpx .tpx-doc{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--teal);background:var(--teal-soft);border-radius:7px;padding:3px 8px;text-decoration:none;font-weight:500}
+#tpx .tpx-doc:hover{background:var(--teal-3)}
+#tpx .tpx-doc svg{width:11px;height:11px}
+#tpx .tp-actions{display:flex;gap:8px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line-2)}
+#tpx .tpx-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;font-weight:600;border-radius:10px;padding:9px 12px;border:1px solid transparent;transition:background .15s,border-color .15s,transform .15s var(--spring)}
+#tpx .tpx-btn:active{transform:scale(.97)}
+#tpx .tpx-btn.ghost{background:#fff;color:var(--teal);border-color:var(--line);flex:1;white-space:nowrap}
+#tpx .tpx-btn.ghost:hover{border-color:var(--teal);background:var(--teal-soft)}
+#tpx .scrollwrap{border:1px solid var(--line);border-radius:14px;overflow:auto}
+#tpx .tbl{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px;min-width:900px}
+#tpx .tbl th,#tpx .tbl td{padding:12px 14px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line-2);vertical-align:middle}
+#tpx .tbl thead th{position:sticky;top:0;background:var(--teal-soft);z-index:2;font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+#tpx .tbl tbody tr.main:hover td{background:#fafcfc}
+#tpx .tbl tbody tr.main{cursor:pointer}
+#tpx .appcell{display:flex;align-items:center;gap:11px;min-width:0}
+#tpx .appcell .tpx-av{width:36px;height:36px;font-size:11px}
+#tpx .appcell .nm{font-size:13.5px;font-weight:500;color:var(--ink)}
+#tpx .appcell .sub{font-size:11px;color:var(--muted);margin-top:1px}
+#tpx .poscell .p{font-size:13px;color:var(--g1)}
+#tpx .poscell .d{font-size:11.5px;color:var(--muted)}
+#tpx .wrank{display:flex;align-items:center;gap:9px}
+#tpx .wrank .rv{font-size:13px;font-weight:600;color:var(--teal);font-variant-numeric:tabular-nums}
+#tpx .wrank .rb{width:46px;height:4px;border-radius:3px;background:var(--line);overflow:hidden}
+#tpx .wrank .rb i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#9db800,#dff23f)}
+#tpx .actcell{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+#tpx .iact{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--teal);display:grid;place-items:center}
+#tpx .iact:hover{border-color:var(--teal);background:var(--teal-soft)}
+#tpx .iact svg{width:14px;height:14px}
+#tpx .chev{transition:transform .2s}
+#tpx tr.main.open .chev{transform:rotate(90deg)}
+#tpx .tp-detail td{background:#fafcfc;border-bottom:1px solid var(--line-2)}
+#tpx .detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px 26px;padding:4px 2px}
+#tpx .detail-grid .d-k{font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--faint)}
+#tpx .detail-grid .d-v{font-size:13px;color:var(--g1);margin-top:3px}
+#tpx .kmenu{position:fixed;width:196px;border-radius:14px;padding:6px;z-index:100;display:none;
+  background:rgba(255,255,255,.9);-webkit-backdrop-filter:blur(20px) saturate(150%);backdrop-filter:blur(20px) saturate(150%);
+  border:1px solid var(--line);box-shadow:0 2px 6px rgba(1,70,83,.08),0 18px 40px rgba(1,70,83,.16)}
+#tpx .kmenu.is-on{display:block;animation:kpop .14s ease}
+@keyframes kpop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+#tpx .kmi{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:9px;font-size:13px;font-weight:500;color:var(--teal);cursor:pointer}
+#tpx .kmi svg{width:16px;height:16px;flex:none}
+#tpx .kmi:hover{background:var(--teal-soft)}
+#tpx .kmi.del{color:var(--err)}
+#tpx .kmi.del:hover{background:var(--err-bg)}
+#tpx .kmsep{height:1px;background:var(--line-2);margin:3px 8px}
+@media (prefers-reduced-transparency:reduce){#tpx .kmenu,#tpx .rtip{background:#fff;-webkit-backdrop-filter:none;backdrop-filter:none}
+#tpx .rtip{background:#14232A}}
+#tpx{font-family:var(--font)}
+#tpx .tpx-gridhost{padding:4px 16px 8px}
+#tpx .tpx-empty{color:var(--muted);padding:30px;text-align:center;font-size:13px}
+#tpx .tp-card .tp-actions .tpx-btn{text-decoration:none}
+#tpx .tpx-btn.ghost{flex:1;white-space:nowrap}
+#tpx .tp-top .nm.userApplicants-btn:hover{color:var(--teal)}
+#tpx .tpx-doc{text-decoration:none}
+#tpx .tbl{min-width:900px;margin:0}
+#tpx .tbl thead th .dt-column-title{white-space:nowrap}
+#tpx .tbl tbody tr.tp-main{cursor:pointer}
+#tpx .tbl tbody tr.tp-main:hover td{background:#fafcfc}
+#tpx .tbl td.tpx-chevcell{width:26px;padding-right:0}
+#tpx .tbl tbody tr.tp-main.dt-hasChild .chev{transform:rotate(90deg)}
+#tpx .tbl td.tpx-actcell{text-align:right}
+#tpx .tbl .tp-detail td{background:#fafcfc}
+/* single sort indicator: hidden at rest, teal on the active column */
+#tpx .tbl thead th.dt-orderable-asc span.dt-column-order:before,
+#tpx .tbl thead th.dt-orderable-asc span.dt-column-order:after,
+#tpx .tbl thead th.dt-orderable-desc span.dt-column-order:before,
+#tpx .tbl thead th.dt-orderable-desc span.dt-column-order:after{opacity:0}
+#tpx .tbl thead th.dt-ordering-asc span.dt-column-order:before,
+#tpx .tbl thead th.dt-ordering-desc span.dt-column-order:after{opacity:1;color:var(--teal);font-size:.7em}
+#tpx .tbl thead th.dt-ordering-asc span.dt-column-order:after,
+#tpx .tbl thead th.dt-ordering-desc span.dt-column-order:before{display:none}
+@media (prefers-reduced-motion:reduce){#tpx *{transition:none!important;animation:none!important}}
+
+</style>
 @endsection
 
 @section('import-scripts')
@@ -507,60 +647,39 @@
 
         $("#Response-modal").modal('show');
     });
-    $(document).on("click", ".destoryApplicant", function() {
-            var base64_id = $(this).attr('data-id');
-            var location = $(this).attr('data-location');
-
-            // SweetAlert confirmation dialog
-            wisdomConfirm({
-                role: 'destructive',
-                title: "Are you sure?",
-                text: "This action will permanently delete the applicant.",
-                confirmText: "Yes, delete it!"
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // Proceed with AJAX request after confirmation
-                    $.ajax({
-                        url: "{{ route('resort.ta.destoryApplicant') }}",
-                        type: "POST",
-                        data: { base64_id: base64_id, "_token": "{{ csrf_token() }}" },
-                        success: function(response) {
-                            $('#respond-rejectModal').modal('hide');
-                            if (response.success) {
-                                wisdomAlert({
-                                    type: 'success',
-                                    title: "Deleted!",
-                                    text: response.message
-                                });
-                                $("#talentPool_" + location).remove();
-                                DatatableList(); DatatableGrid();
-                            } else {
-                                wisdomAlert({
-                                    type: 'error',
-                                    title: "Error!",
-                                    text: response.message
-                                });
-                            }
-                        },
-                        error: function(response) {
-                            var errors = response.responseJSON;
-                            var errs = '';
-                            $.each(errors.errors, function(key, error) { // Adjust according to your response format
-                                console.log(error);
-                                errs += error + '<br>';
-                            });
-                            wisdomAlert({
-                                type: 'error',
-                                title: "Error!",
-                                text: errs
-                            });
-                        }
-                    });
-                }
-            });
-        });
 
 
+    // ---- Talent Pool list (DataTables, server-side — same endpoint, filters, sort and paging as before) ----
+    const TPX_ASSET = @json(rtrim(URL::asset(''), '/'));
+    const tpxAsset = p => !p ? '' : (/^(https?:)?\/\//.test(p) ? p : TPX_ASSET + '/' + String(p).replace(/^\//, ''));
+    const tpxInitials = n => (String(n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')) || '?';
+    const TPX_AVAIL = { available: ['Available', 'ok'], pending: ['Pending Response', 'warn'], unavailable: ['Unavailable', 'muted'], consent_rejected: ['Consent Rejected', 'err'] };
+    const tpxPct = v => (v === null || v === '' || isNaN(v)) ? null : Math.max(0, Math.min(100, +v));
+    const tpxNum = v => +(+v).toFixed(1);
+    const tpxYears = v => (v === null || v === undefined || v === '') ? '' : v + (+v === 1 ? ' yr' : ' yrs');
+
+    function tpxConsent(row) {
+        const shown = (row.ConsentExpiryDate || '').replace(/\s*\(.*\)\s*$/, '');
+        if (!row.consent_expiry_date) return shown && shown !== 'N/A' ? escHtml(shown) : '—';
+        const d = new Date(String(row.consent_expiry_date).replace(' ', 'T'));
+        let word = 'Valid', cls = 'ok';
+        if (row.consent_status === 'pending') { word = 'Pending'; cls = 'muted'; }
+        else if (d < new Date()) { word = 'Expired'; cls = 'err'; }
+        else if ((d - new Date()) / 864e5 <= 30) { word = 'Expiring'; cls = 'warn'; }
+        return escHtml(shown) + ' · <span class="tpx-cs ' + cls + '">' + word + '</span>';
+    }
+
+    function tpxStage(row) {
+        return (row.rank_name === 'Wisdom AI' ? 'WAI' : (row.rank_name || '')) + ' Rejected';
+    }
+
+    function tpxDetail(row) {
+        const doc = (label, path) => path ? `<a class="tpx-doc" target="_blank" rel="noopener" href="${escHtml(tpxAsset(path))}">${label}</a>` : '';
+        const docs = doc('CV', row.curriculum_vitae) + doc('Passport', row.passport_img) || '—';
+        const sc = tpxPct(row.Scoring);
+        const item = (k, v) => `<div><div class="d-k">${k}</div><div class="d-v">${v}</div></div>`;
+        return `<div class="detail-grid">${item('Email', escHtml(row.email) || '—')}${item('Contact', escHtml(row.contact) || '—')}${item('Passport No.', escHtml(row.passport_no) || '—')}${item('Scoring', sc === null ? '—' : tpxNum(sc) + '/100')}<div><div class="d-k">Documents</div><div class="d-v docs" style="margin-top:5px">${docs}</div></div></div>`;
+    }
 
     function DatatableList()
     {
@@ -574,11 +693,11 @@
                     bFilter: true,
                     bInfo: true,
                     bAutoWidth: false,
-                    scrollX: true,
                     iDisplayLength: 6,
                     processing: true,
                     serverSide: true,
-                    order:[[13, 'desc']],
+                    order:[[8, 'desc']],
+                    createdRow: function (tr, row) { $(tr).addClass('tp-main'); },
                     ajax: {
                         url: "{{ route('resort.ta.TalentPool')}}",
                         type: 'GET',
@@ -589,35 +708,92 @@
                         }
                     },
                     columns: [
+                        { data: null, orderable: false, searchable: false, className: 'tpx-chevcell', defaultContent: '<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>' },
                         { data: 'first_name', name: 'first_name', render: function (data, type, row) {
-                            return `<div class="tableUser-block">
-                                <div class="img-circle"><img src="${row.profileImg}" alt="user"></div>
-                                <span class="userApplicants-btn" data-id="${row.applicant_id}">${escHtml(row.name)}</span>
+                            const sub = [row.countryName, tpxYears(row.total_work_exp)].filter(Boolean).join(' · ');
+                            const img = row.profileImg ? `<img src="${escHtml(row.profileImg)}" alt="${escHtml(row.name)}" data-i="${tpxInitials(row.name)}" onerror="this.parentNode.textContent=this.dataset.i">` : tpxInitials(row.name);
+                            return `<div class="appcell"><span class="tpx-av">${img}</span><div><div class="nm userApplicants-btn" data-id="${escHtml(row.applicant_id)}">${escHtml(row.name)}</div><div class="sub">${escHtml(sub) || '—'}</div></div></div>`;
+                        }},
+                        { data: 'Position', name: 'Position', render: function (data, type, row) {
+                            return `<div class="poscell"><div class="p">${escHtml(data) || '—'}</div><div class="d">${escHtml(row.Department)}</div></div>`;
+                        }},
+                        { data: 'Application_date', name: 'Application_date' },
+                        { data: 'AIRanking', name: 'AIRanking', render: function (data) {
+                            const v = tpxPct(data);
+                            return v === null ? '—' : `<div class="wrank"><span class="rv">${tpxNum(v)}</span><span class="rb"><i style="width:${v}%"></i></span></div>`;
+                        }},
+                        { data: 'availability_status', name: 'availability_status', render: function (data, type, row) {
+                            const a = TPX_AVAIL[data] || ['Not checked', 'muted'];
+                            return `<div class="statuscell"><span class="pill ${a[1]}">${a[0]}</span><span class="rejchip" data-stage="${escHtml(tpxStage(row))}" data-reason="${escHtml(row.Comments)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>${escHtml(tpxStage(row))}</span></div>`;
+                        }},
+                        { data: 'ConsentExpiryDate', name: 'ConsentExpiryDate', render: function (data, type, row) { return tpxConsent(row); }},
+                        { data: 'action', name: 'action', orderable: false, searchable: false, className: 'tpx-actcell', render: function (data, type, row) {
+                            // Permissions come from the d-none classes the server already put on its own action markup.
+                            const canReject = !/RejactionReason\s+d-none/.test(data || ''), canDelete = !/destoryApplicant\s+d-none/.test(data || '');
+                            const b64 = btoa(String(row.id));
+                            return `<div class="actcell">
+                                <button type="button" class="iact checkAvailabilityBtn" title="Check availability" data-id="${b64}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/></svg></button>
+                                <button type="button" class="iact sendConsentRequestBtn" title="Send consent request" data-id="${b64}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></button>
+                                <button type="button" class="kebab" aria-label="More actions" data-pid="${escHtml(row.applicant_id)}" data-rank="${escHtml(row.As_ApprovedBy)}" data-sid="${escHtml(row.applicant_status_id)}" data-comments="${escHtml(row.Comments)}" data-del-id="${b64}" data-del-loc="${escHtml(row.id)}" data-can-reject="${canReject ? 1 : 0}" data-can-delete="${canDelete ? 1 : 0}"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg></button>
                             </div>`;
                         }},
-
-                        { data: 'Position', name: 'Position' },
-                        { data: 'Department', name: 'Department' },
-                        { data: 'countryName', name: 'countryName' },
-                        { data: 'passport_no', name: 'passport_no' },
-                        { data: 'total_work_exp', name: 'total_work_exp', render: function (data) {
-                            return `${data} year`;
-                        }},
-                        { data: 'email', name: 'email' },
-                        { data: 'contact', name: 'contact' },
-                        { data: 'Application_date', name: 'Application_date' },
-                        { data: 'Stage', name: 'Stage'},
-                        { data: 'Availability', name: 'Availability'},
-                        { data: 'ConsentExpiryDate', name: 'ConsentExpiryDate'},
-                        { data: 'action', name: 'action', orderable: false, searchable: false },
-                        {data:'created_at', visible:false,searchable:false},
+                        { data: 'created_at', visible: false, searchable: false },
                     ]
 
                 });
-
-
-
+            return TalentPool;
     }
+
+    // Row interactions: chevron cell toggles the detail row; anywhere else opens the profile (same handler as the name).
+    $(document).on('click', '.TalentPool tbody tr.tp-main', function (e) {
+        const $t = $(e.target);
+        if ($t.closest('.tpx-actcell, .userApplicants-btn, a').length) return;
+        if ($t.closest('.tpx-chevcell').length) {
+            const row = $('.TalentPool').DataTable().row(this);
+            if (row.child.isShown()) { row.child.hide(); $(this).removeClass('dt-hasChild'); }
+            else { row.child('<div class="tp-detail-wrap">' + tpxDetail(row.data()) + '</div>', 'tp-detail').show(); $(this).addClass('dt-hasChild'); }
+            return;
+        }
+        $(this).find('.userApplicants-btn').first().trigger('click');
+    });
+
+    // Grid card: anywhere that isn't a control opens the profile.
+    $(document).on('click', '#tpx .tp-card', function (e) {
+        if ($(e.target).closest('a, button, .kebab, .userApplicants-btn').length) return;
+        $(this).find('.userApplicants-btn').first().trigger('click');
+    });
+
+    // Frosted kebab menu — items reuse the existing .userApplicants-btn / .RejactionReason / .destoryApplicant handlers.
+    const $tpxMenu = $('#tpxMenu');
+    function tpxCloseMenu() { $tpxMenu.removeClass('is-on'); }
+    $(document).on('click', '#tpx .kebab', function (e) {
+        e.stopPropagation();
+        const d = this.dataset;
+        $tpxMenu.find('[data-m="profile"]').attr('data-id', d.pid).data('id', d.pid);
+        $tpxMenu.find('[data-m="reason"]').attr({ 'data-Rank': d.rank, 'data-applicant_status_id': d.sid, 'data-Comments': d.comments }).toggle(d.canReject === '1');
+        $tpxMenu.find('[data-m="sep2"]').toggle(d.canReject === '1' && d.canDelete === '1');
+        $tpxMenu.find('[data-m="delete"]').attr({ 'data-id': d.delId, 'data-location': d.delLoc }).toggle(d.canDelete === '1');
+        $tpxMenu.addClass('is-on');
+        const r = this.getBoundingClientRect(), w = $tpxMenu.outerWidth() || 196, h = $tpxMenu.outerHeight() || 160;
+        let top = r.bottom + 6; if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+        $tpxMenu.css({ left: Math.max(8, r.right - w) + 'px', top: top + 'px' });
+    });
+    $(document).on('click', function (e) { if (!$(e.target).closest('#tpx .kebab, #tpxMenu').length || $(e.target).closest('#tpxMenu .kmi').length) tpxCloseMenu(); });
+    $(document).on('keydown', function (e) { if (e.key === 'Escape') tpxCloseMenu(); });
+    window.addEventListener('scroll', tpxCloseMenu, true);
+
+    // Rejection chip tooltip (frosted-dark, body-level so the table's scroll container can't clip it).
+    $(document).on('mouseover', '#tpx .rejchip', function () {
+        const tip = document.getElementById('tpxTip'), stage = this.dataset.stage, reason = this.dataset.reason;
+        tip.textContent = '';
+        const h = document.createElement('div'); h.className = 'rt-h'; h.textContent = stage; tip.appendChild(h);
+        const r = document.createElement('div'); r.className = 'rt-r'; r.textContent = reason || 'No reason recorded.'; tip.appendChild(r);
+        tip.classList.add('is-on');
+        const b = this.getBoundingClientRect(), w = tip.offsetWidth, th = tip.offsetHeight;
+        tip.style.left = Math.max(8, Math.min(b.left + b.width / 2 - w / 2, window.innerWidth - w - 8)) + 'px';
+        tip.style.top = (b.top - th - 8 < 8 ? b.bottom + 8 : b.top - th - 8) + 'px';
+    });
+    $(document).on('mouseout', '#tpx .rejchip', function () { document.getElementById('tpxTip').classList.remove('is-on'); });
 
     // Animates the circular AI Ranking/Scoring meters rendered in the grid
     // partial (gridviwe.blade.php's .progress-container). Was called here

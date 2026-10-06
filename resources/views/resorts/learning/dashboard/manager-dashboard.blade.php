@@ -81,7 +81,7 @@
                         <div class="card-title mb-md-3">
                             <div class="row justify-content-between align-items-center g-md-3 g-1">
                                 <div class="col">
-                                    <h3 class="text-nowrap mb-1">Compulsory Trainings — Action Needed</h3>
+                                    <h3 class="text-nowrap mb-1">Mandatory Training — Action Needed</h3>
                                     <p class="mb-0 small text-muted">Probationers with pending or overdue compulsory programs. Click <strong>Schedule</strong> to add a session.</p>
                                 </div>
                                 <div class="col-auto">

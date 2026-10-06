@@ -569,10 +569,6 @@
                                             <td>Hj452</td>
                                         </tr>
                                         <tr>
-                                            <th>Hotel Name</th>
-                                            <td>Loremipsum Hotel</td>
-                                        </tr>
-                                        <tr>
                                             <th>Contact No</th>
                                             <td>98548723561</td>
                                         </tr>

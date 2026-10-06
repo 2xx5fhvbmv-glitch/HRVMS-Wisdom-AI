@@ -48,7 +48,7 @@
                     <div class="row g-md-3 g-2 align-items-center">
                         <div class="col-xl-3 col-lg-5 col-md-7 col-sm-8 ">
                             <div class="input-group">
-                                <input type="search" class="form-control " placeholder="Search" />
+                                <input type="search" class="form-control " id="searchInput" placeholder="Search" />
                                 <i class="fa-solid fa-search"></i>
                             </div>
                         </div>
@@ -172,13 +172,15 @@
     $(document).ready(function () {
         $('.select2t-none').select2();
         $('.select2t-modal').select2();
-        flatpickr('#dateFilter', {
-            dateFormat: 'd/m/Y',
-            allowInput: true,
-            appendTo: document.body
-        });
         loadSupportlist();
-        $('#searchInput, #dateFilter, #statusFilter').on('keyup change', function () {
+        // Search waits 300 ms after typing stops, so each keystroke doesn't
+        // send a request. Status is handled on change only.
+        var supportSearchTimer = null;
+        $('#searchInput').on('input', function () {
+            clearTimeout(supportSearchTimer);
+            supportSearchTimer = setTimeout(loadSupportlist, 300);
+        });
+        $('#statusFilter, #dateFilter').on('change', function () {
             loadSupportlist();
         });
 
@@ -250,11 +252,14 @@
         });
     });
     function loadSupportlist() {
+        // Table is created once. Later calls just reload its rows, with the
+        // current search / status / date values (read in the ajax data below).
         if ($.fn.DataTable.isDataTable('#table-billingInvoiceSupportList')) {
-            $('#table-billingInvoiceSupportList').DataTable().destroy();
+            $('#table-billingInvoiceSupportList').DataTable().ajax.reload();
+            return;
         }
 
-        var table = $('#table-billingInvoiceSupportList').DataTable({
+        var table =$('#table-billingInvoiceSupportList').DataTable({
             "searching": false,
             "bLengthChange": false,
             "bFilter": true,

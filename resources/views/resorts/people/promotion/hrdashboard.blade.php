@@ -303,7 +303,8 @@
 
     function getPromotionTable(){
         if ($.fn.dataTable.isDataTable('#promotionTable')) {
-            $('#promotionTable').DataTable().destroy();
+            $('#promotionTable').DataTable().ajax.reload();
+            return;
         }
         let table = $('#promotionTable').DataTable({
             processing: true,

@@ -1270,7 +1270,8 @@
         {
             if ($.fn.DataTable.isDataTable('.ProbationEmailTempleteIndex'))
             {
-                $('.ProbationEmailTempleteIndex').DataTable().destroy();
+                $('.ProbationEmailTempleteIndex').DataTable().ajax.reload();
+                return;
             }
             var MailTable = $('.ProbationEmailTempleteIndex').DataTable({
             searching: false,

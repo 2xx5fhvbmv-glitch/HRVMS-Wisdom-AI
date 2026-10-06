@@ -143,7 +143,7 @@
                                         value="Lumpsum" required data-parsley-required="true" 
                                         data-parsley-required-message="Please select a payment type"
                                         data-parsley-errors-container="#payment_type_error">
-                                    <label class="form-check-label" for="payment_type_lumpsum">Lumpsum</label>
+                                    <label class="form-check-label" for="payment_type_lumpsum">Lump sum</label>
                                 </div>
                                 <div class="form-check form-check-inline">
                                     <input type="radio" name="payment_type" id="payment_type_installment" class="form-check-input"
