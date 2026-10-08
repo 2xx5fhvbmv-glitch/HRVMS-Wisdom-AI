@@ -78,6 +78,48 @@ class ResortSetupAccessTest extends TestCase
         $this->assertSame($division->code, DB::table('resort_divisions')->where('id', $division->id)->value('code'));
     }
 
+    public function test_hr_director_passes_the_accommodation_hr_gate()
+    {
+        $division = DB::table('resort_divisions')->insertGetId(['resort_id' => $this->resortId, 'name' => 'Admin', 'code' => 'ADM', 'short_name' => 'ADM']);
+        $person = function (string $deptName, int $rank, int $mainRank, ?string $title = null) use ($division) {
+            $dept = DB::table('resort_departments')->where('resort_id', $this->resortId)->where('name', $deptName)->value('id')
+                ?? DB::table('resort_departments')->insertGetId(['resort_id' => $this->resortId, 'division_id' => $division, 'name' => $deptName, 'code' => substr($deptName, 0, 3), 'short_name' => substr($deptName, 0, 3)]);
+            $position = DB::table('resort_positions')->insertGetId(['resort_id' => $this->resortId, 'dept_id' => $dept, 'position_title' => $title ?? "P{$rank}{$deptName}", 'Rank' => $rank]);
+            $admin = new ResortAdmin;
+            $admin->forceFill(['resort_id' => $this->resortId, 'first_name' => 'E', 'last_name' => (string) $rank, 'email' => uniqid('acc') . '@resort.test', 'gender' => 'male',
+                'status' => 'active', 'type' => 'sub', 'role_id' => 0, 'is_master_admin' => 0, 'is_employee' => 1, 'password' => Hash::make('x')])->save();
+            DB::table('employees')->insert(['Admin_Parent_id' => $admin->id, 'resort_id' => $this->resortId, 'Emp_id' => uniqid('ACC'), 'division_id' => $division,
+                'Dept_id' => $dept, 'Position_id' => $position, 'rank' => $rank, 'main_rank' => $mainRank, 'status' => 'Active']);
+            return $admin->fresh();
+        };
+        $hold = route('resort.accommodation.HoldMaintanaceRequest');
+        // Only the accommodation HR gate is under test here, not per-position page grants.
+        $this->withoutMiddleware(\App\Http\Middleware\CheckResortPermission::class);
+
+        // HR Director: EXCOM level (rank 1) in Human Resources, HR role in main_rank.
+        $this->actingAs($person('HUMAN RESOURCES', 1, 3), 'resort-admin');
+        $this->getJson($hold)->assertOk();
+
+        // Finance EXCOM and an HR line worker are still refused.
+        $this->actingAs($person('FINANCE', 1, 7), 'resort-admin');
+        $this->getJson($hold)->assertStatus(403)->assertJson(['message' => 'Unauthorized: HR access only.']);
+        $this->actingAs($person('HUMAN RESOURCES', 6, 3), 'resort-admin');
+        $this->getJson($hold)->assertStatus(403);
+
+        // The resort's designated HR position (Admin → Resort → HR access position) counts as HR
+        // even at MGR level — the same people the dashboard routing treats as HR.
+        $hrManager = DB::table('positions')->where('position_title', 'Human Resources Manager')->value('id');
+        DB::table('resorts')->where('id', $this->resortId)->update(['Position_access' => $hrManager]);
+        $this->actingAs($person('HUMAN RESOURCES', 4, 4, 'Human Resources Manager'), 'resort-admin');
+        $this->getJson($hold)->assertOk();
+        $this->actingAs($person('HUMAN RESOURCES', 6, 6, 'Human Resources Coordinator'), 'resort-admin');
+        $this->getJson($hold)->assertStatus(403);
+
+        // The same HR rule now drives the other gates that used a bare "rank == 3" check.
+        $this->assertTrue(\App\Helpers\Common::isHR((object) ['resort_id' => $this->resortId, 'Position_id' => null, 'rank' => '1', 'Dept_id' => DB::table('resort_departments')->where('resort_id', $this->resortId)->where('name', 'HUMAN RESOURCES')->value('id')]));
+        $this->assertFalse(\App\Helpers\Common::isHR((object) ['resort_id' => $this->resortId, 'Position_id' => null, 'rank' => '1', 'Dept_id' => DB::table('resort_departments')->where('resort_id', $this->resortId)->where('name', 'FINANCE')->value('id')]));
+    }
+
     public function test_hr_head_position_gets_full_access_by_default()
     {
         $division = DB::table('resort_divisions')->insertGetId(['resort_id' => $this->resortId, 'name' => 'Admin', 'code' => 'ADM', 'short_name' => 'ADM']);

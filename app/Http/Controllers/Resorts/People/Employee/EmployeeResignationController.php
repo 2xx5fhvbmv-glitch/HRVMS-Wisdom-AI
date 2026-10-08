@@ -58,10 +58,12 @@ class EmployeeResignationController extends Controller
                 // HOD (2) and EXCOM (1) — was HOD-only, so an EXCOM fell
                 // into neither branch and saw every resignation resort-wide
                 // unfiltered instead of just their own department's queue.
-                if (in_array((int) $employee->rank, [1, 2], true)) {
+                // HR (Common::isHR — rank 3, HR-dept HOD/EXCOM or the designated HR position) sees the
+                // resignations it is HR approver for, plus any it heads as HOD.
+                if (Common::isHR($employee)) {
+                    $empResignations = $empResignations->where(fn ($q) => $q->where('hr_id', $employee->id)->orWhere('hod_id', $employee->id));
+                } elseif (in_array((int) $employee->rank, [1, 2], true)) {
                     $empResignations = $empResignations->where('hod_id', $employee->id);
-                } elseif ($employee->rank == 3) {
-                    $empResignations = $empResignations->where('hr_id', $employee->id);
                 }
             }
 
@@ -170,12 +172,14 @@ class EmployeeResignationController extends Controller
                         $is_hod = false;
                         $is_hr = false;
 
-                        if ($user->rank == 3) {
+                        // HR / HOD of THIS resignation — an HR Director is rank 1, so rank
+                        // alone can't tell the two roles apart.
+                        if (Common::isHR($user) && (int) $employeeResignation->hr_id === (int) $user->id) {
                             $is_hr = true;
                         }
                         // HOD (2) and EXCOM (1) — was HOD-only, so EXCOM
                         // never got the "Schedule Meeting" action.
-                        if (in_array((int) $user->rank, [1, 2], true)) {
+                        if (in_array((int) $user->rank, [1, 2], true) && (int) $employeeResignation->hod_id === (int) $user->id) {
                             $is_hod = true;
                         }
                         $schedule_status = false;
@@ -350,7 +354,7 @@ class EmployeeResignationController extends Controller
         $hodStatus = $employeeResignation->hod_status ?: 'Pending';
         $hrStatus  = $employeeResignation->hr_status  ?: 'Pending';
 
-        if ($user->rank == 3 && $employeeResignation->hr_id == $user->id) {
+        if (Common::isHR($user) && $employeeResignation->hr_id == $user->id) {
             $is_hr = true;
         }
 
@@ -624,11 +628,14 @@ class EmployeeResignationController extends Controller
         // HOD (2) and EXCOM (1) — was HOD-only, so EXCOM could never
         // schedule the HOD-stage meeting even when they're the effective
         // department head.
-        if (in_array((int) $user->rank, [1, 2], true)) {
+        if (in_array((int) $user->rank, [1, 2], true) && (int) $employeeResignation->hod_id === (int) $user->id) {
             $is_hod = true;
             $meeting_type = 'HOD';
         }
-        if ($user->rank == 3) {
+        // HR approver of this resignation. When the same person is also its HOD
+        // (an HR-department resignation), the HOD meeting comes first.
+        if (Common::isHR($user) && (int) $employeeResignation->hr_id === (int) $user->id
+            && !($is_hod && $employeeResignation->hod_meeting_status !== 'Completed')) {
             $is_hr = true;
             $meeting_type = 'HR';
         }

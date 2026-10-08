@@ -4602,10 +4602,7 @@ class Common
         if ($rank === 8 || $availableRank === 'GM') {
             return $query;
         }
-        if ($rank === 3 || $availableRank === 'HR') {
-            return $query;
-        }
-        if (in_array($rank, [1, 2], true) && self::isHRDepartment($emp->Dept_id ?? null)) {
+        if ($availableRank === 'HR' || self::isHR($emp)) {
             return $query;
         }
 
@@ -4650,8 +4647,7 @@ class Common
         }
         if (!$employee) return false;
 
-        if ((int) $employee->rank === 3) return true; // HR
-        return in_array((int) $employee->rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null); // HR HOD/EXCOM
+        return self::isHR($employee);
     }
 
     /**
@@ -4676,9 +4672,8 @@ class Common
         $availableRank = $rankMap[$emp->rank ?? null] ?? '';
 
         // HR (rank 3), GM (rank 8), and HR-dept HOD/EXCOM see everything.
-        if ($rank === 3 || $availableRank === 'HR') return true;
+        if ($availableRank === 'HR' || self::isHR($emp)) return true;
         if ($rank === 8 || $availableRank === 'GM') return true;
-        if (in_array($rank, [1, 2], true) && self::isHRDepartment($emp->Dept_id ?? null)) return true;
 
         // HOD/EXCOM of the same department that REPORTED this incident.
         // If the incident already shows up on their listing (per
@@ -4864,7 +4859,7 @@ class Common
         // HR rank (3) and HR-department HOD / EXCOM (rank 1 or 2 inside HR dept)
         // are treated as HR for the L&D / Performance modules and get full
         // resort-wide visibility — same as GM and L&D Manager.
-        if ($rank === 3 || (in_array($rank, [1, 2], true) && self::isHRDepartment($emp->Dept_id ?? null))) {
+        if (self::isHR($emp)) {
             return null;
         }
 
@@ -4896,11 +4891,18 @@ class Common
     }
 
     /**
-     * Strict "HR" check — HR generalist (rank 3) or HR-department HOD/EXCOM
-     * (rank 1/2 inside the HR department), or super/master admin. Unlike
-     * hasFullDataAccess(), this deliberately EXCLUDES the GM (rank 8) — for
-     * Performance settings/config surfaces where GM can read everything but
-     * has no settings access (PF-07 decided rules).
+     * Strict "HR" check — the single rule every HR gate uses:
+     *  - HR generalist (rank 3),
+     *  - HR-department HOD/EXCOM (rank 1/2 inside the HR department), or
+     *  - the holder of the resort's designated HR position (resorts.Position_access,
+     *    e.g. "Human Resources Manager") — the same people the dashboard
+     *    routing (RedirectIfNotCorrectDashboard) sends to HR dashboards,
+     *  - or super/master admin.
+     * employees.rank is the LEVEL (an HR Director is rank 1); main_rank is not
+     * used — it is set on non-HR staff in real data (chefs, managers).
+     * Unlike hasFullDataAccess(), this deliberately EXCLUDES the GM (rank 8) —
+     * for settings/config surfaces where GM can read everything but has no
+     * settings access (PF-07 decided rules).
      */
     public static function isHR($employee = null)
     {
@@ -4915,7 +4917,26 @@ class Common
         if (!$employee) return false;
 
         $rank = (int) $employee->rank;
-        return $rank === 3 || (in_array($rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null));
+        return $rank === 3
+            || (in_array($rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null))
+            || self::holdsDesignatedHrPosition($employee);
+    }
+
+    /** Employee's position is the resort's designated HR position (Admin → Resort → HR access position). */
+    private static function holdsDesignatedHrPosition($employee): bool
+    {
+        static $cache = [];
+        $resortId = $employee->resort_id ?? null;
+        $positionId = $employee->Position_id ?? null;
+        if (!$resortId || !$positionId) return false;
+        $key = $resortId . '|' . $positionId;
+        if (!isset($cache[$key])) {
+            $hrTitle = DB::table('resorts as r')->join('positions as p', 'p.id', '=', 'r.Position_access')
+                ->where('r.id', $resortId)->value('p.position_title');
+            $title = DB::table('resort_positions')->where('id', $positionId)->value('position_title');
+            $cache[$key] = $hrTitle && $title && strcasecmp(trim($hrTitle), trim($title)) === 0;
+        }
+        return $cache[$key];
     }
 
     /**
@@ -4937,7 +4958,7 @@ class Common
         }
         if (!$employee) return false;
 
-        return in_array((int) ($employee->rank ?? 0), [3, 8], true);
+        return (int) ($employee->rank ?? 0) === 8 || self::isHR($employee); // GM or HR
     }
 
     /**
@@ -4988,8 +5009,7 @@ class Common
         }
         if (!$employee) return false;
 
-        $rank = (int) ($employee->rank ?? 0);
-        return in_array($rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null);
+        return self::isHR($employee);
     }
 
     /**
@@ -5067,7 +5087,7 @@ class Common
         if (!$employee) return false;
 
         $rank = (int) ($employee->rank ?? 0);
-        if ($rank === 3 || (in_array($rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null))) {
+        if (self::isHR($employee)) {
             return true; // HR
         }
 
@@ -5505,19 +5525,16 @@ class Common
             return true;
         }
 
-        $rank = (int) ($resort->GetEmployee->rank ?? 0);
-        $isActingHr = $rank === 3
-            || (in_array($rank, [1, 2], true) && self::isHRDepartment($resort->GetEmployee->Dept_id ?? null));
-        if (!$isActingHr) {
+        // Explicit null checks: isHR(null) means "the logged-in user".
+        $actor = $resort->GetEmployee ?? null;
+        if (!$actor || !self::isHR($actor)) {
             return false;
         }
 
         $creator = \App\Models\ResortAdmin::find($group->created_by);
         $creatorEmployee = $creator->GetEmployee ?? null;
-        $creatorRank = (int) ($creatorEmployee->rank ?? 0);
 
-        return $creatorRank === 3
-            || (in_array($creatorRank, [1, 2], true) && self::isHRDepartment($creatorEmployee->Dept_id ?? null));
+        return $creatorEmployee && self::isHR($creatorEmployee);
     }
 
     /**
@@ -6153,13 +6170,8 @@ class Common
 
         $rank = (int) $emp->rank;
 
-        // GM (8) and HR role (3)
-        if (in_array($rank, [3, 8])) return true;
-
-        // HR department HOD / EXCOM
-        if (in_array($rank, [1, 2]) && self::isHRDepartment($emp->Dept_id ?? null)) {
-            return true;
-        }
+        // GM (8) and HR (rank 3, HR-dept HOD/EXCOM, designated HR position)
+        if ($rank === 8 || self::isHR($emp)) return true;
 
         // L&D Managers (rank 4 / MGR with a learning-leadership position title)
         // need resort-wide visibility for training/attendance/schedule modules.
@@ -6197,7 +6209,7 @@ class Common
 
         if (!$employee) return false;
 
-        if ((int) $employee->rank === 3) return true;
+        if (self::isHR($employee)) return true;
 
         return self::isHRDepartment($employee->Dept_id ?? null)
             || self::isFinanceDepartment($employee->Dept_id ?? null);
@@ -6221,11 +6233,8 @@ class Common
         }
         if (!$employee) return false;
 
-        if ((int) $employee->rank === 3) return true; // HR
+        if (self::isHR($employee)) return true; // HR
         if ((int) $employee->rank === 8) return true; // GM (read-only, enforced by canWriteVisa)
-        if (in_array((int) $employee->rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null)) {
-            return true; // HR HOD/EXCOM
-        }
 
         return self::isFinanceDepartment($employee->Dept_id ?? null); // Finance
     }
@@ -6342,9 +6351,7 @@ class Common
         }
         if (!$employee) return false;
 
-        $rank = (int) $employee->rank;
-        return $rank === 3
-            || (in_array($rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null));
+        return self::isHR($employee);
     }
 
     /**
@@ -6363,10 +6370,7 @@ class Common
         }
         if (!$employee) return false;
 
-        if ((int) $employee->rank === 3) return true; // HR
-        if (in_array((int) $employee->rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null)) {
-            return true; // HR HOD/EXCOM
-        }
+        if (self::isHR($employee)) return true; // HR
 
         return self::isFinanceDepartment($employee->Dept_id ?? null); // Finance
     }
@@ -6389,9 +6393,8 @@ class Common
             }
             $employee = $user->GetEmployee ?? null;
         }
-        if (!$employee) return false;
-
-        return (int) $employee->rank === 3; // HR
+        // Was "rank === 3" only — matched nobody (an HR Director is rank 1), so every HR user was refused.
+        return self::isHR($employee);
     }
 
     /**
@@ -6416,8 +6419,7 @@ class Common
         }
         if (!$employee) return false;
 
-        if ((int) $employee->rank === 3) return true; // HR
-        return in_array((int) $employee->rank, [1, 2], true) && self::isHRDepartment($employee->Dept_id ?? null); // HR HOD/EXCOM
+        return self::isHR($employee);
     }
 
     /**
@@ -6633,7 +6635,7 @@ class Common
         $isHRLevel = $user && (
             ($user->type ?? null) === 'super'
             || ($user->is_master_admin ?? 0)
-            || (int) (optional($user->GetEmployee ?? null)->rank) === 3
+            || self::isHR($user->GetEmployee ?? null)
         );
 
         $patterns = ['passport', 'account number', 'account no', 'bank account', 'iban', 'swift'];
@@ -9396,7 +9398,7 @@ class Common
                 $filePermission = FilePermissions::where("file_id",$File_id)
                                                 ->first();
 
-               if($resort->GetEmployee->rank == 3 && isset($filePermission))
+               if(self::isHR($resort->GetEmployee) && isset($filePermission))
                {
                 $Emp_id = $resort->GetEmployee->Emp_id;
 
