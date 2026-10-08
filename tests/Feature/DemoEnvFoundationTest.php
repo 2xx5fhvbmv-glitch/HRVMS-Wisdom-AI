@@ -95,13 +95,15 @@ class DemoEnvFoundationTest extends TestCase
         DB::table('resorts')->where('id', $resortId)->update(['resort_name' => 'Client Paradise']);
         DB::table('resort_divisions')->insert(['resort_id' => $resortId, 'name' => 'Client Division', 'code' => 'CD', 'short_name' => 'CD']);
         $menu = DB::table('resort_pagewise_permissions')->where('resort_id', $resortId)->count();
+        $people = DB::table('employees')->where('resort_id', $resortId)->count();
 
         // …a reset removes their data, keeps the branding, rebuilds the rest.
         $this->withSession($reauth)->post(route('admin.demo_env.reset'), ['confirm' => 'RESET DEMO ENV'])->assertOk();
         $this->assertSame(0, DB::table('resort_divisions')->where('resort_id', $resortId)->where('name', 'Client Division')->count());
         $this->assertSame('Client Paradise', DB::table('resorts')->where('id', $resortId)->value('resort_name'));
         $this->assertSame($menu, DB::table('resort_pagewise_permissions')->where('resort_id', $resortId)->count());
-        $this->assertSame(1, DB::table('resort_admins')->where('resort_id', $resortId)->count());
+        $this->assertSame(1, DB::table('resort_admins')->where('resort_id', $resortId)->where('is_master_admin', 1)->count());
+        $this->assertSame($people, DB::table('employees')->where('resort_id', $resortId)->count(), 'rebuilt, not doubled');
         $this->assertGreaterThan(0, Cache::get('demo:last_reset')['deleted']);
 
         // No other resort lost or gained a single row.
@@ -145,6 +147,25 @@ class DemoEnvFoundationTest extends TestCase
         DemoMail::reset();
         Mail::html('<p>x</p>', fn ($m) => $m->to('someone@gmail.com')->subject('After reset'));
         $this->assertSame(['someone@gmail.com'], array_map(fn ($a) => $a->getAddress(), $sent()->last()->getOriginalMessage()->getTo()));
+    }
+
+    public function test_demo_people_can_sign_in_and_land_on_their_dashboard()
+    {
+        $this->artisan('demo:reset', ['--force' => true])->assertSuccessful();
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
+        foreach (['hr' => 'hr-dashboard', 'gm' => 'gm-dashboard', 'finance' => 'xcom-dashboard', 'hod.housekeeping' => 'hod-dashboard'] as $login => $dashboard) {
+            auth('resort-admin')->logout();
+            $to = $this->post(route('resort.login'), ['email' => "{$login}@demo.thewisdom.ai", 'password' => 'Demo#Pass2026'])->json('redirect_url');
+            $this->assertNotNull($to, "{$login} signs in");
+            $r = $this->get($to);
+            $r = $r->isRedirect() ? $this->get($r->headers->get('Location')) : $r;
+            $r->assertOk();
+            $this->assertStringEndsWith($dashboard, request()->path(), "{$login} lands on {$dashboard}");
+        }
+        // Line staff use the mobile app, signing in with their Employee ID.
+        $empId = \App\Models\Employee::whereHas('resortAdmin', fn ($q) => $q->where('email', 'employee@demo.thewisdom.ai'))->value('Emp_id');
+        $this->postJson('/api/login', ['emp_id' => $empId, 'password' => 'Demo#Pass2026', 'device_token' => 'x', 'device_type' => 'android'])
+            ->assertJson(['success' => true]);
     }
 
     public function test_wisdom_chat_is_rate_limited()

@@ -33,6 +33,8 @@ class DemoEnvSeeder
 
         $counts = ['menu pages' => $this->fullMenu($resortId)];
         $say('Resort, master login and menu ready.');
+        $counts += (new DemoOrganisationSeeder($resortId, $admin->id))->seed();
+        $say("Organisation and {$counts['employees']} employees ready.");
 
         try {
             Common::createFolderByResort($resortId);

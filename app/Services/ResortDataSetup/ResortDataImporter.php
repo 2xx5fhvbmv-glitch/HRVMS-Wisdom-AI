@@ -143,13 +143,7 @@ class ResortDataImporter
 
     public function run(ResortDataImport $import, bool $commit): array
     {
-        @set_time_limit(900);
-        $this->commit = $commit;
-        $this->ledger = new ImportLedger;
-        $this->resortId = (int) $import->resort_id;
         $this->opt = self::options($import);
-        $this->createdBy = ResortAdmin::where('resort_id', $this->resortId)->where('is_master_admin', 1)->orderBy('id')->value('id');
-
         $byType = [];
         foreach ($import->files ?? [] as $file) {
             if (empty($file['mapping'])) {
@@ -168,6 +162,28 @@ class ResortDataImporter
             }
             $byType[$file['mapping']['type']][] = ['name' => $file['name'], 'parsed' => $parsed];
         }
+        return $this->execute((int) $import->resort_id, $byType, $commit, $import->id);
+    }
+
+    /**
+     * Imports records already in SheetMapper::parse() shape, without files or an
+     * undo ledger — Demo ENV builds its organisation and people this way, so they
+     * go through exactly the writes a real client import does.
+     * $byType: type => [['name' => label, 'parsed' => ['records' => [['row', 'v', 'group']]]]].
+     */
+    public function importRecords(int $resortId, array $byType, array $options): array
+    {
+        $this->opt = $options + ['email_domain' => 'resort-' . $resortId . '.wisdom.local', 'level_ranks' => [], 'roles' => [], 'codes' => [], 'period_start' => '', 'shift_id' => ''];
+        return $this->execute($resortId, $byType, true, null);
+    }
+
+    private function execute(int $resortId, array $byType, bool $commit, ?int $importId): array
+    {
+        @set_time_limit(900);
+        $this->commit = $commit;
+        $this->ledger = new ImportLedger;
+        $this->resortId = $resortId;
+        $this->createdBy = ResortAdmin::where('resort_id', $this->resortId)->where('is_master_admin', 1)->orderBy('id')->value('id');
 
         DB::beginTransaction();
         try {
@@ -193,7 +209,9 @@ class ResortDataImporter
 
         $committed = $commit && !$this->errors;
         if ($committed) {
-            $this->ledger->save($import->id);
+            if ($importId) {
+                $this->ledger->save($importId);
+            }
             DB::commit();
         } else {
             DB::rollBack();

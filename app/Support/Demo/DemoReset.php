@@ -25,6 +25,11 @@ class DemoReset
         if (empty(config('demo.password'))) {
             throw new RuntimeException('Set DEMO_PASSWORD in .env — every demo login uses it.');
         }
+        // 100 employees through the full import path peak around 150 MB — above PHP's default 128M.
+        $limit = ini_get('memory_limit');
+        if ($limit !== '-1' && str_ends_with(strtoupper($limit), 'M') && (int) $limit < 512) {
+            ini_set('memory_limit', '512M');
+        }
         $started = microtime(true);
         $seed ??= random_int(1, 999999);
         $report = ['seed' => $seed, 'dry_run' => $dryRun, 'started_at' => now()->toDateTimeString(), 'deleted' => 0];
