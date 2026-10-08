@@ -19,7 +19,8 @@ class Kernel extends ConsoleKernel
     {
         // $schedule->command('weekly:plan_rollover')->weeklyOn(1, '00:00');
         // $schedule->command('links:JobAdvertisment-disable-expired')->everyMinute();
-        $schedule->command('learning:update-status')->dailyAt("00:00");
+        // Was 'learning:update-status' — no such command, so training statuses never updated.
+        $schedule->command('training:update-status')->dailyAt("00:00");
         $schedule->command('links:JobAdvertisment-disable-expired')->dailyAt("00:00");
         $schedule->command('links:survey-change-status')->dailyAt("00:00");
         $schedule->command('links:survey-reminder-notification')->dailyAt('09:00');

@@ -69,7 +69,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
      *   Page-permission middleware is skipped (these are widget endpoints,
      *   not menu pages). ***/
     Route::withoutMiddleware('checkResortPermission')->group(function () {
-        Route::post('/wisdom-ai/chat', [\App\Http\Controllers\Resorts\WisdomChatController::class, 'chat'])->name('resort.wisdom.chat');
+        Route::post('/wisdom-ai/chat', [\App\Http\Controllers\Resorts\WisdomChatController::class, 'chat'])->middleware('throttle:wisdom-chat')->name('resort.wisdom.chat');
         Route::get('/wisdom-ai/history', [\App\Http\Controllers\Resorts\WisdomChatController::class, 'history'])->name('resort.wisdom.history');
         Route::post('/wisdom-ai/clear', [\App\Http\Controllers\Resorts\WisdomChatController::class, 'clear'])->name('resort.wisdom.clear');
     });

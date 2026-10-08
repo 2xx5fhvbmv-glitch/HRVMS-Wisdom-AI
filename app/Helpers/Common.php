@@ -3360,6 +3360,9 @@ class Common
 	 */
 	public static function applyResortSmtpConfig($resortId)
 	{
+		// Demo ENV: mail sent from here on belongs to this resort — redirect it if it's the demo.
+		\App\Support\Demo\DemoMail::enterResort($resortId);
+
 		if (empty($resortId)) {
 			return;
 		}

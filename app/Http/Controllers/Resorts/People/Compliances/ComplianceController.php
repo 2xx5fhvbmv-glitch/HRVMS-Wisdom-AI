@@ -875,6 +875,7 @@ class ComplianceController extends Controller
                // notifications to unrelated departments (e.g. Food & Beverage).
                $notify_person = Common::FindResortHR($resort->resort_id);
           }
+          // A resort with no HR person still gets its breaches recorded; only the bell notification is skipped.
 
           
                // Payroll Service Charges Start
@@ -925,7 +926,7 @@ class ComplianceController extends Controller
                                         'received_amount' => (float) $payroll->service_charge_amount,
                                         'payroll_period'  => $startOfLastMonth . ' to ' . $endOfLastMonth,
                                    ]);
-                                   event(new ResortNotificationEvent(Common::nofitication(
+                                   if ($notify_person) event(new ResortNotificationEvent(Common::nofitication(
                                         $this->resort->resort_id,
                                         10,
                                         'Service Charge Compliance',
@@ -954,41 +955,48 @@ class ComplianceController extends Controller
 
                // Probation Compliance start
                $probationData = Employee::where('resort_id', $resort->resort_id)->where('status', 'Active')->whereIn('probation_status', ['Active','Extended'])->get();
-               if($probationData->isEmpty()) 
+               // Was `if (isEmpty())` around this loop, so the rule never ran.
+               if($probationData->isNotEmpty())
                {
                     foreach ($probationData as $probation) 
                     {
+                         // Without both dates there is no probation length to judge
+                         // (Carbon::parse(null) would silently mean "today").
+                         if (empty($probation->joining_date) || empty($probation->probation_end_date)) {
+                              continue;
+                         }
                          $probationEndDate = Carbon::parse($probation->probation_end_date);
                          $probationStartDate = Carbon::parse($probation->joining_date);
 
-                         // Calculate the difference in months
-                         $probationMonths = $probationStartDate->diffInMonths($probationEndDate);
+                         // Calculate the difference in months (shown in the message)
+                         $probationMonths = round($probationStartDate->diffInMonths($probationEndDate), 1);
 
-                         // Check if probation period is more than 3 months
-                         if ($probationMonths > 3 && $probation->probation_status == 'Active') {
+                         // Check if probation period is more than 3 calendar months
+                         if ($probationEndDate->gt($probationStartDate->copy()->addMonths(3)) && $probation->probation_status == 'Active') {
                               $row = $this->createComplianceOncePerDay([
                                    'resort_id' => $resort->resort_id,
                                    'employee_id' => $probation->id,
                                    'module_name' => 'Probation',
                                    'compliance_breached_name' => 'Extended Probation Period',
-                                   'description' => "Probation period for " . $probation->resortAdmin->full_name . "(" . $probation->position->position_title . ') is set to ' . $probationMonths . ' months. Reduce to comply with the 3-month maximum',
+                                   'description' => "Probation period for " . optional($probation->resortAdmin)->full_name . "(" . optional($probation->position)->position_title . ') is set to ' . $probationMonths . ' months. Reduce to comply with the 3-month maximum',
                                    'reported_on' => Carbon::now(),
                                    'status' => 'Breached'
                               ]);
                               if ($row) {
                               $this->enrichComplianceWithAi($row, [
                                    'position'           => optional($probation->position)->position_title,
-                                   'joining_date'       => optional($probation->joining_date)->format('Y-m-d') ?? $probation->joining_date,
-                                   'probation_end_date' => optional($probation->probation_end_date)->format('Y-m-d') ?? $probation->probation_end_date,
-                                   'probation_months'   => (int) $probationMonths,
+                                   // employees dates are plain strings (no casts) — format the parsed Carbon values.
+                                   'joining_date'       => $probationStartDate->format('Y-m-d'),
+                                   'probation_end_date' => $probationEndDate->format('Y-m-d'),
+                                   'probation_months'   => $probationMonths,
                                    'probation_status'   => $probation->probation_status,
                               ]);
 
-                              event(new ResortNotificationEvent(Common::nofitication(
+                              if ($notify_person) event(new ResortNotificationEvent(Common::nofitication(
                                    $this->resort->resort_id,
                                    10,
                                    'Extended Probation Period',
-                                   "Probation period for " . $probation->resortAdmin->full_name . "(" . $probation->position->position_title . ") is set to " . $probationMonths . " months. Reduce to comply with the 3-month maximum",
+                                   "Probation period for " . optional($probation->resortAdmin)->full_name . "(" . optional($probation->position)->position_title . ") is set to " . $probationMonths . " months. Reduce to comply with the 3-month maximum",
                                    0,
                                    $notify_person->id,
                                    'Probation'
@@ -1038,7 +1046,7 @@ class ComplianceController extends Controller
                                    'overtime_logged_at' => $today,
                               ]);
 
-                              event(new ResortNotificationEvent(Common::nofitication(
+                              if ($notify_person) event(new ResortNotificationEvent(Common::nofitication(
                                    $this->resort->resort_id,
                                    10,
                                    'Overtime Agreement Lacked',
@@ -1084,7 +1092,7 @@ class ComplianceController extends Controller
                                    'total_employees'=> $total_employees_count,
                               ]);
 
-                              event(new ResortNotificationEvent(Common::nofitication(
+                              if ($notify_person) event(new ResortNotificationEvent(Common::nofitication(
                                    $this->resort->resort_id,
                                    10,
                                    'Senior HR Non-Maldivian',
@@ -1114,7 +1122,8 @@ class ComplianceController extends Controller
 
                          $managementCount = $managementEmployees->count();
                          $maldivianCount = $managementEmployees->where('nationality', 'Maldivian')->count();
-                         $NonMaldivian = $managementEmployees->where('nationality', '!=', 'Maldivian')->whereIn('rank', ['3','1'])->get();
+                         // Already a collection — `->get()` here (no key) crashed every resort with more than 50 active employees.
+                         $NonMaldivian = $managementEmployees->where('nationality', '!=', 'Maldivian')->whereIn('rank', ['3','1']);
 
                          if ($maldivianCount < ($managementCount * $localRatioFraction)) {
                               $breachDesc = "Management positions at " . $resort->resort_name . " should have at least {$localRatioLabel}% Maldivian representation. Current ratio is " . $maldivianCount . "/" . $managementCount;
@@ -1135,7 +1144,7 @@ class ComplianceController extends Controller
                                    'current_ratio_pct'  => $managementCount > 0 ? round(($maldivianCount / $managementCount) * 100, 1) : 0,
                               ]);
 
-                              event(new ResortNotificationEvent(Common::nofitication(
+                              if ($notify_person) event(new ResortNotificationEvent(Common::nofitication(
                                    $this->resort->resort_id,
                                    10,
                                    'Management Non-Maldivian',
@@ -1166,7 +1175,7 @@ class ComplianceController extends Controller
                                    'resort_name'   => $resort->resort_name,
                               ]);
 
-                              event(new ResortNotificationEvent(Common::nofitication(
+                              if ($notify_person) event(new ResortNotificationEvent(Common::nofitication(
                                    $this->resort->resort_id,
                                    10,
                                    'Management Non-Maldivian',
@@ -1238,7 +1247,7 @@ class ComplianceController extends Controller
                                                        'payroll_period'     => $startOfLastMonth . ' to ' . $endOfLastMonth,
                                                   ]);
 
-                                                  event(new ResortNotificationEvent(Common::nofitication(
+                                                  if ($notify_person) event(new ResortNotificationEvent(Common::nofitication(
                                                        $this->resort->resort_id,
                                                        10,
                                                        'Pension Compliance',
@@ -1257,16 +1266,13 @@ class ComplianceController extends Controller
                     // Pension Compliance end
 
 
+               // Without a Workforce Planning ratio config only the expat-local ratio
+               // rule is skipped (xpat/local 0 fails its guard below). Was: return
+               // here, which silently skipped every later rule (minimum wage,
+               // breaks, weekly hours, visas, TIN…) for such resorts.
                $ManningandbudgetingConfigfiles = ManningandbudgetingConfigfiles::where('resort_id', $resort->resort_id)->first();
-               if (!$ManningandbudgetingConfigfiles) {
-                    return response()->json([
-                         'status' => 'error',
-                         'message' => 'Workforce Planning is not configured for this resort.'
-                    ]);
-               }
-
-               $xpat = $ManningandbudgetingConfigfiles->xpat;
-               $local = $ManningandbudgetingConfigfiles->local;
+               $xpat = $ManningandbudgetingConfigfiles->xpat ?? 0;
+               $local = $ManningandbudgetingConfigfiles->local ?? 0;
 
                // Get counts
                $totalEmployees = Employee::where('resort_id', $resort->resort_id)->count();
@@ -1289,7 +1295,7 @@ class ComplianceController extends Controller
                          // Check if the actual counts violate the expected ratio
                          if ($expatCount > $expected_expat || $localCount < $expected_local) {
                                // Send notification to resort admin
-                               event(new ResortNotificationEvent(Common::nofitication(
+                               if ($notify_person) event(new ResortNotificationEvent(Common::nofitication(
                                      $this->resort->resort_id,
                                      10,
                                      'Workforce Planning Expat-Local Ratio Compliance Breached',
@@ -1369,73 +1375,53 @@ class ComplianceController extends Controller
                     ->where('status', 'Present')
                     ->get();
 
-               // List of employees who didn't take a break in 5+ hours
+               // List of employees who went 5+ hours without a break. Measured on the
+               // shift's own clock: from check-in to check-out (or now, if still on
+               // shift), wrapping past midnight, with each break (Break_InTime /
+               // Break_OutTime) splitting the shift. Was: read non-existent
+               // start_time/end_time columns (so every 5h+ shift breached) and
+               // measured to "now" even after the employee had left.
                $employeesWithoutBreak = [];
+               $nowMinutes = self::clockMinutes(Carbon::now()->format('H:i'));
 
                foreach ($attendacedata as $attendance) 
                {
-                    // Get employee check in time
-                    $checkInTime = Carbon::parse($attendance->CheckingTime);
-                    
-                    $breaks = BreakAttendaces::where('Parent_attd_id', $attendance->id)
-                              ->get();
-                    
-                    if ($breaks->isEmpty()) {
-                              $hoursWorked = $checkInTime->diffInHours(Carbon::now());
-                              if ($hoursWorked >= 5) {
-                                   $employee = Employee::find($attendance->Emp_id);
-                                   $employeesWithoutBreak[] = [
-                                        'resort_id' => $resort->resort_id,
-                                        'employee_id' => $employee->id,
-                                        'module_name' => 'Time & Attendance',
-                                        'compliance_breached_name' => 'Without Mandatory Break',
-                                        'description' => "Employee {$employee->resortAdmin->full_name} ({$employee->position->position_title}) worked {$hoursWorked} hours without a break. Review schedule to ensure adherence to labor laws.",
-                                        'reported_on' => Carbon::now(),
-                                        'status' => 'Breached'
-                                   ];
-                              }
-                    } else {
-                              $lastBreakTime = $checkInTime;
-                              $hadLongPeriod = false;
-                              
-                              foreach ($breaks as $break) {
-                                   $breakStartTime = Carbon::parse($break->start_time);
-                                   $timeDifference = $lastBreakTime->diffInHours($breakStartTime);
-                                   
-                                   if ($timeDifference >= 5) {
-                                        $hadLongPeriod = true;
-                                        $employee = Employee::find($attendance->Emp_id);
-                                        $employeesWithoutBreak[] = [
-                                             'resort_id' => $resort->resort_id,
-                                             'employee_id' => $employee->id,
-                                             'module_name' => 'Time & Attendance',
-                                             'compliance_breached_name' => 'Without Mandatory Break',
-                                             'description' => "Employee {$employee->resortAdmin->full_name} ({$employee->position->position_title}) worked {$timeDifference} hours without a break. Review schedule to ensure adherence to labor laws.",
-                                             'reported_on' => Carbon::now(),
-                                             'status' => 'Breached'
-                                        ];
-                                             
-                                   }
-                                   
-                                   $lastBreakTime = Carbon::parse($break->end_time);
-                              }
+                    $start = self::clockMinutes($attendance->CheckingTime);
+                    if ($start === null) {
+                         continue;
+                    }
+                    $out = self::clockMinutes($attendance->CheckingOutTime);
+                    $shiftLength = self::spanMinutes($start, $out ?? $nowMinutes);
 
-                              // Check if there's been 5+ hours since last break
-                              $timeSinceLastBreak = $lastBreakTime->diffInHours(Carbon::now());
-                              if ($timeSinceLastBreak >= 5) {
-                                   $employee = Employee::find($attendance->Emp_id);
-                                   
-                                   $employeesWithoutBreak[] = [
-                                        'resort_id' => $resort->resort_id,
-                                        'employee_id' => $employee->id,
-                                        'module_name' => 'Time & Attendance',
-                                        'compliance_breached_name' => 'Without Mandatory Break',
-                                        'description' => "Employee {$employee->resortAdmin->full_name} ({$employee->position->position_title}) worked {$timeSinceLastBreak} hours without a break. Review schedule to ensure adherence to labor laws.",
-                                        'reported_on' => Carbon::now(),
-                                        'status' => 'Breached'
-                                   ];
-                                   
-                              }
+                    $longestStretch = 0;
+                    $cursor = 0; // minutes since check-in
+                    $breaks = BreakAttendaces::where('Parent_attd_id', $attendance->id)->get()
+                         ->map(fn ($b) => [self::clockMinutes($b->Break_InTime), self::clockMinutes($b->Break_OutTime)])
+                         ->filter(fn ($b) => $b[0] !== null)
+                         ->map(fn ($b) => [self::spanMinutes($start, $b[0]), $b[1] === null ? null : self::spanMinutes($start, $b[1])])
+                         ->filter(fn ($b) => $b[0] <= $shiftLength)
+                         ->sortBy(0);
+                    foreach ($breaks as [$breakIn, $breakOut]) {
+                         $longestStretch = max($longestStretch, $breakIn - $cursor);
+                         $cursor = max($cursor, $breakOut === null || $breakOut < $breakIn ? $shiftLength : $breakOut); // still on break → covers the rest
+                    }
+                    $longestStretch = max($longestStretch, $shiftLength - $cursor);
+
+                    if ($longestStretch >= 300) {
+                         $employee = Employee::find($attendance->Emp_id);
+                         if (!$employee) {
+                              continue;
+                         }
+                         $hours = round($longestStretch / 60, 1);
+                         $employeesWithoutBreak[] = [
+                              'resort_id' => $resort->resort_id,
+                              'employee_id' => $employee->id,
+                              'module_name' => 'Time & Attendance',
+                              'compliance_breached_name' => 'Without Mandatory Break',
+                              'description' => "Employee " . optional($employee->resortAdmin)->full_name . " (" . optional($employee->position)->position_title . ") worked {$hours} hours without a break. Review schedule to ensure adherence to labor laws.",
+                              'reported_on' => Carbon::now(),
+                              'status' => 'Breached'
+                         ];
                     }
                }
 
@@ -1449,42 +1435,54 @@ class ComplianceController extends Controller
 
                // Weekly Working Hours Compliance Start
 
-               // Check for employees scheduled to work more than 48 hours in a week (Monday to Saturday)
+               // 48-hour weekly limit on NORMAL hours (overtime is not counted —
+               // founder decision, Demo ENV spec §18). Each calendar week (Mon–Sun)
+               // is judged on its own: last week and this week. Was: one total over
+               // both weeks (two normal 45h weeks read as 90h) and overnight shifts
+               // (22:00→06:00) subtracting hours.
                $startOfWeek = Carbon::now()->subWeek()->startOfWeek();
                $endOfWeek =  Carbon::now()->copy()->endOfWeek();
                
                $overworkedEmployees = [];
-               // Get only the employee at index 3 (4th element) if it exists
                foreach($employeeIds as $empId)
                {
-                    $weeklyHours = ParentAttendace::where('resort_id', $resort->resort_id)->where('Emp_id', $empId)
+                    $days = ParentAttendace::where('resort_id', $resort->resort_id)->where('Emp_id', $empId)
                          ->where('CheckingTime', '!=', null)
                               ->whereBetween('date', [$startOfWeek->format('Y-m-d'), $endOfWeek->format('Y-m-d')])
                               ->where('Status', 'Present')
                               ->get();
-                              
-                    $totalHoursWorked = 0;
-                    foreach ($weeklyHours as $day) {
-                         if (!empty($day->CheckingTime) && !empty($day->CheckingOutTime)) {
-                              $checkIn = Carbon::parse($day->CheckingTime);
-                              $checkOut = Carbon::parse($day->CheckingOutTime);
-                              $hoursWorked = $checkIn->diffInHours($checkOut);
-                              $totalHoursWorked += $hoursWorked;
+
+                    $minutesByWeek = [];
+                    foreach ($days as $day) {
+                         $in = self::clockMinutes($day->CheckingTime);
+                         $out = self::clockMinutes($day->CheckingOutTime);
+                         if ($in === null || $out === null) {
+                              continue; // still on shift, or a malformed time
                          }
+                         $worked = self::spanMinutes($in, $out);
+                         $overtime = $day->OTStatus === 'Rejected' ? 0 : (self::clockMinutes($day->OverTime) ?? 0);
+                         $week = Carbon::parse($day->date)->startOfWeek()->format('Y-m-d');
+                         $minutesByWeek[$week] = ($minutesByWeek[$week] ?? 0) + max(0, $worked - $overtime);
                     }
-                    
-                    if ($totalHoursWorked > 48) {
-                         $employee = Employee::find($empId);
-                         $overworkedEmployees[] = [
-                              'resort_id' => $resort->resort_id,
-                              'employee_id' => $employee->id,
-                              'module_name' => 'Time & Attendance',
-                              'compliance_breached_name' => 'Weekly Working Hours Limit',
-                              'description' => "Employee {$employee->resortAdmin->full_name} ({$employee->position->position_title}) is scheduled for {$totalHoursWorked} hours this week. Adjust schedule to comply with the 48-hour weekly limit.",
-                              'reported_on' => Carbon::now(),
-                              'status' => 'Breached'
-                         ];
+                    if (!$minutesByWeek || max($minutesByWeek) <= 48 * 60) {
+                         continue;
                     }
+                    $worstWeek = array_search(max($minutesByWeek), $minutesByWeek, true);
+                    $totalHoursWorked = round($minutesByWeek[$worstWeek] / 60, 1);
+
+                    $employee = Employee::find($empId);
+                    if (!$employee) {
+                         continue;
+                    }
+                    $overworkedEmployees[] = [
+                         'resort_id' => $resort->resort_id,
+                         'employee_id' => $employee->id,
+                         'module_name' => 'Time & Attendance',
+                         'compliance_breached_name' => 'Weekly Working Hours Limit',
+                         'description' => "Employee " . optional($employee->resortAdmin)->full_name . " (" . optional($employee->position)->position_title . ") worked {$totalHoursWorked} normal hours (overtime excluded) in the week of " . Carbon::parse($worstWeek)->format('d M Y') . ". Adjust the schedule to comply with the 48-hour weekly limit.",
+                         'reported_on' => Carbon::now(),
+                         'status' => 'Breached'
+                    ];
                }
                
                if (!empty($overworkedEmployees)) {
@@ -1519,7 +1517,9 @@ class ComplianceController extends Controller
                               ]
                          );
                     }
-                    if($base_salary > $minWageUSD){
+                    // Budget is in the vacancy's own unit; 0 = not budgeted yet, not a breach.
+                    $minWage = $vacancy->amount_unit === 'MVR' ? $minWageMVR : $minWageUSD;
+                    if($base_salary > 0 && $base_salary < $minWage){
                          // Per-vacancy breach (no vacancy_id column) — keep description in the match key.
                          $compliance = Compliance::firstOrCreate(
                               [
@@ -1857,7 +1857,7 @@ class ComplianceController extends Controller
                     }
                     if($totalMonthlyEarningMvr >= 30000 && !$tin)
                     {
-                         event(new ResortNotificationEvent(Common::nofitication(
+                         if ($notify_person) event(new ResortNotificationEvent(Common::nofitication(
                               $this->resort->resort_id,
                               10,
                               'TIN Required for Employee',
@@ -1930,7 +1930,7 @@ class ComplianceController extends Controller
                               [
                                    'description' => "{$employee->Emp_name} ({$employee->Emp_id} - {$employee->Position_name}) is not eligible for overtime.",
                                    'reported_on' => Carbon::now(),
-                                   'status' => 'Compliant',
+                                   'status' => 'Breached',
                               ]
                          );
                     }
@@ -2516,4 +2516,20 @@ class ComplianceController extends Controller
 
          
      }
+
+    /** "HH:MM" or "HH:MM:SS" → minutes after midnight; null when empty or malformed (e.g. "48:00"). */
+    private static function clockMinutes(?string $time): ?int
+    {
+        if (!is_string($time) || !preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?$/', trim($time), $m)) {
+            return null;
+        }
+        [$h, $min] = [(int) $m[1], (int) $m[2]];
+        return ($h > 24 || $min > 59 || ($h === 24 && $min > 0)) ? null : $h * 60 + $min;
+    }
+
+    /** Minutes from one clock time to the next, wrapping past midnight (overnight shifts). */
+    private static function spanMinutes(int $from, int $to): int
+    {
+        return $to >= $from ? $to - $from : $to + 1440 - $from;
+    }
 }

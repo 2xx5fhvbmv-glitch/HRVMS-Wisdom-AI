@@ -122,6 +122,10 @@ Route::prefix(config('settings.route_prefix.admin'))->namespace('Admin')->group(
         Route::post('/resort-data-setup/{resort}/import', 'ResortDataSetupController@import')->middleware('admin.reauth')->name('admin.resort_data_setup.import');
         Route::post('/resort-data-setup/{resort}/credentials/clear', 'ResortDataSetupController@clearCredentials')->name('admin.resort_data_setup.clear_credentials');
         Route::post('/resort-data-setup/{resort}/imports/{import}/undo', 'ResortDataSetupController@undo')->middleware('admin.reauth')->name('admin.resort_data_setup.undo');
+
+        /** Demo ENV (DEMO_MODE only — 404 otherwise) **/
+        Route::get('/demo-env', 'DemoEnvController@index')->name('admin.demo_env.index');
+        Route::post('/demo-env/reset', 'DemoEnvController@reset')->middleware('admin.reauth')->name('admin.demo_env.reset');
         Route::get('/resort/edit-permissions/{id}', 'ResortsController@editPermissions')->name('admin.resorts.edit_permissions');
         Route::post('/resort/update-permissions/{id}', 'ResortsController@updatePermissions')->middleware('admin.reauth')->name('admin.resorts.update_permissions');
 

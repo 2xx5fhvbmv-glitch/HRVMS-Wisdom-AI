@@ -705,7 +705,7 @@ class DutyRosterController extends Controller
                                 'compliance_breached_name' => 'Over Time Not Eligibile',
                                 'description' => "{$CheckEmployees->Emp_name} ({$CheckEmployees->Emp_id} - {$CheckEmployees->Position_name}) is not eligible for overtime.",
                                 'reported_on' => Carbon::now(),
-                                'status' => 'Compliant'
+                                'status' => 'Breached'
                             ]);
                         }
                     }

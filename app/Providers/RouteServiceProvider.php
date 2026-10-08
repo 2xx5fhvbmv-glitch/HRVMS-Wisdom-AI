@@ -42,6 +42,16 @@ class RouteServiceProvider extends ServiceProvider
         // middleware runs — guard resolution from the token is on-demand,
         // not dependent on middleware order), falling back to IP only for
         // truly unauthenticated calls (login, forgot-password).
+        // Wisdom AI chat is a paid, live AI call per message — cap it per user.
+        RateLimiter::for('wisdom-chat', function ($request) {
+            $key = 'wisdom-chat:' . (optional($request->user('resort-admin'))->id ?: $request->ip());
+            $tooFast = fn () => response()->json(['success' => false, 'message' => 'You are sending messages too quickly — please wait a minute and try again.'], 429);
+            return [
+                Limit::perMinute(10)->by($key)->response($tooFast),
+                Limit::perDay(200)->by($key)->response(fn () => response()->json(['success' => false, 'message' => 'Daily Wisdom AI limit reached — please try again tomorrow.'], 429)),
+            ];
+        });
+
         RateLimiter::for('mobile-api', function ($request) {
             $key = optional($request->user('api'))->id ?: $request->ip();
             return Limit::perMinute(180)->by($key);

@@ -33,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot()
     {
         Paginator::useBootstrap();
+
+        // Demo ENV: the demo resort's email only ever reaches the demo inbox (no-op unless DEMO_MODE).
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Mail\Events\MessageSending::class, [\App\Support\Demo\DemoMail::class, 'redirect']);
+        \Illuminate\Support\Facades\Queue::before(fn () => \App\Support\Demo\DemoMail::reset());
         Schema::defaultStringLength(191);
 
         // Mobile personal access tokens defaulted to Passport's 1-year

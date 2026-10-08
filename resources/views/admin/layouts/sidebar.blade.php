@@ -57,6 +57,14 @@
 							<p>Resort Data Setup</p>
 						</a>
 					</li>
+					@if(\App\Support\Demo\Demo::enabled() && (Auth::guard('admin')->user()->type ?? null) === 'super')
+						<li class="nav-item">
+							<a href="{{route('admin.demo_env.index')}}" class="nav-link @if(Route::currentRouteName() == 'admin.demo_env.index') active @endif">
+								<i class="fas fa-flask nav-icon"></i>
+								<p>Demo ENV</p>
+							</a>
+						</li>
+					@endif
 				@endif
 
 				<li class="nav-item @if(in_array(Route::currentRouteName(), array('admin.divisions.index','admin.divisions.create', 'admin.divisions.edit','admin.department.index','admin.department.create', 'admin.department.edit','admin.sections.index','admin.sections.create', 'admin.sections.edit','admin.positions.index','admin.positions.create', 'admin.positions.edit','admin.Modules.index','admin.Modules.create','admin.Modules.edit','admin.ModulePages.index','admin.ModulePages.create','admin.ModulePages.edit'))) menu-open @endif">
