@@ -42,20 +42,20 @@
                     </tr>
                 </table>
 
-                <div class="text-center mt-2">
-                    <a href="{{route('resort.ta.Applicants',base64_encode( $v->vacancy_id)) }}" class="btn btn-sm ta-btn-secondary me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicants"><i class="fa-solid fa-eye"></i></a>
+                <div class="d-flex justify-content-center align-items-center flex-nowrap gap-1 mt-2">
+                    <a href="{{route('resort.ta.Applicants',base64_encode( $v->vacancy_id)) }}" class="btn btn-sm ta-btn-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicants"><i class="fa-solid fa-eye"></i></a>
                     @if($canSeeAction)
                     @if(!($v->is_closed ?? false))
                     <a href="javascript:void(0)" data-id="{{ $v->vacancy_id }}" data-ExpiryDate="{{ $v->link_Expiry_date }}" data-ApplicationId="{{ $v->application_id }}" class="btn btn-sm ta-btn-attention ExtendJobLink" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend the Job Ad Link"><i class="fa-solid fa-calendar-plus"></i></a>
                     @endif
-                    <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary viewJobAd ms-1" data-vacancy-id="{{ $v->vacancy_id }}" data-position="{{ $v->positionTitle }}" data-joblink="{{ $v->public_link ?? $v->jobAdLink ?? '' }}" data-alljobimages='{{ json_encode($v->allJobAdImages) }}' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-rectangle-ad"></i></a>
+                    <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary viewJobAd" data-vacancy-id="{{ $v->vacancy_id }}" data-position="{{ $v->positionTitle }}" data-joblink="{{ $v->public_link ?? $v->jobAdLink ?? '' }}" data-alljobimages='{{ json_encode($v->allJobAdImages) }}' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-rectangle-ad"></i></a>
                     @if($v->public_link ?? null)
-                    <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary copyApplyLink ms-1" data-link="{{ $v->public_link }}" data-bs-toggle="tooltip" data-bs-placement="top" title="Copy application link"><i class="fa-solid fa-copy"></i></a>
+                    <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary copyApplyLink" data-link="{{ $v->public_link }}" data-bs-toggle="tooltip" data-bs-placement="top" title="Copy application link"><i class="fa-solid fa-copy"></i></a>
                     @endif
                     @if($v->is_closed ?? false)
-                    <a href="javascript:void(0)" class="btn btn-sm ta-btn-attention reopenVacancyBtn ms-1" data-id="{{ $v->vacancy_id }}" data-bs-toggle="tooltip" data-bs-placement="top" title="Reopen vacancy"><i class="fa-solid fa-lock-open"></i></a>
+                    <a href="javascript:void(0)" class="btn btn-sm ta-btn-attention reopenVacancyBtn" data-id="{{ $v->vacancy_id }}" data-bs-toggle="tooltip" data-bs-placement="top" title="Reopen vacancy"><i class="fa-solid fa-lock-open"></i></a>
                     @else
-                    <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary closeVacancyBtn ms-1" data-id="{{ $v->vacancy_id }}" data-bs-toggle="tooltip" data-bs-placement="top" title="Close vacancy"><i class="fa-solid fa-lock"></i></a>
+                    <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary closeVacancyBtn" data-id="{{ $v->vacancy_id }}" data-bs-toggle="tooltip" data-bs-placement="top" title="Close vacancy"><i class="fa-solid fa-lock"></i></a>
                     @endif
                     @endif
                 </div>
@@ -67,7 +67,7 @@
 <div class="row g-4">
     <div class="col-sm-12">
         <div class="vacanciesGrid-block">
-                <h6>No Record Found</h6>
+                <h6>No records found</h6>
         </div>
     </div>
 </div>

@@ -38,6 +38,11 @@ if (!function_exists('safeParseDate')) {
                         </div>
                     </div>
                     <!-- <div class="col-auto  ms-auto"><a class="btn btn-theme" href="#">Add New Employee</a></div> -->
+                    <div class="col-auto ms-auto">
+                        <a href="{{ route('people.employees') }}" class="wai-btn wai-btn-back">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Back to Employees
+                        </a>
+                    </div>
                 </div>
             </div>
             <div class="card">

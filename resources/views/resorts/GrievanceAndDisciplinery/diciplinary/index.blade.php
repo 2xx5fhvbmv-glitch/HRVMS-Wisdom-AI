@@ -27,7 +27,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="{{ route('GrievanceAndDisciplinery.Disciplinary.CreateDisciplinary') }}" class=" btn eb-btn-accent @if(App\Helpers\Common::checkRouteWisePermission('GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex',config('settings.resort_permissions.create')) == false) d-none @endif">Create Disciplinary</a>
+                        <a href="{{ route('GrievanceAndDisciplinery.Disciplinary.CreateDisciplinary') }}" class="wai-btn wai-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex',config('settings.resort_permissions.create')) == false) d-none @endif">Create Disciplinary</a>
                     </div>
                 </div>
             </div>

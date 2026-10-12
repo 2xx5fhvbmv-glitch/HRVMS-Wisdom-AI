@@ -252,6 +252,7 @@
                                         <label for="number_of_days" class="form-label">NO OF DAYS <span class="red-mark">*</span></label>
                                         <input type="number" id="number_of_days" name="number_of_days" class="form-control" placeholder="NO OF DAYS" data-parsley-required="true" data-parsley-trigger="change" data-parsley-validate-script
                                         data-parsley-validate-script-message="Script tags are not allowed.">
+                                        <div class="form-text">Default only. The benefit grid sets the actual days for each rank.</div>
                                     </div>
                                     <div class="col-xl-6 col-lg-12 col-sm-6">
                                         <label for="" class="form-label">CARRY FORWARD NEXT YEAR <span class="red-mark">*</span></label>
@@ -290,7 +291,10 @@
                                                 </div>
                                             </div>
                                             <div class="col">
-                                                <input type="text" class="form-control" name="earned_max" id="earned_max" placeholder="Max Earned." disabled>
+                                                <div class="input-group">
+                                                    <input type="number" min="0" step="1" class="form-control" name="earned_max" id="earned_max" placeholder="Maximum earned leave" aria-label="Maximum earned leave in days per year" title="Maximum earned leave, in days per year" disabled>
+                                                    <span class="input-group-text">days / year</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -433,6 +437,7 @@
                             <label for="noDay" class="form-label">NO OF DAYS <span class="red-mark">*</span></label>
                             <input type="number" id="number_of_days" name="number_of_days" class="form-control" placeholder="NO OF DAYS" data-parsley-required="true" data-parsley-trigger="change" data-parsley-validate-script
                             data-parsley-validate-script-message="Script tags are not allowed.">
+                            <div class="form-text">Default only. The benefit grid sets the actual days for each rank.</div>
                         </div>
                         <div class="col-sm-6">
                             <label for="" class="form-label">CARRY FORWARD NEXT YEAR <span class="red-mark">*</span></label>
@@ -471,7 +476,10 @@
                                     </div>
                                 </div>
                                 <div class="col">
-                                    <input type="text" class="form-control" name="earned_max" id="edit_earned_max" placeholder="Max Earned." disabled>
+                                    <div class="input-group">
+                                                    <input type="number" min="0" step="1" class="form-control" name="earned_max" id="edit_earned_max" placeholder="Maximum earned leave" aria-label="Maximum earned leave in days per year" title="Maximum earned leave, in days per year" disabled>
+                                                    <span class="input-group-text">days / year</span>
+                                                </div>
                                 </div>
                             </div>
                         </div>
@@ -817,7 +825,12 @@
             }
         });
 
-        $(".addDash-block").click(function () {
+        // Delegated (not a direct .click()): the "Add Leave Category" tile lives
+        // inside #leaveCategoriesContainer, which every successful submit
+        // rebuilds from scratch (see resetAddLeaveCategoryForm/the AJAX success
+        // handler) — a direct binding would be thrown away with the old node,
+        // leaving the button dead until a full page reload.
+        $(document).on('click', '.addDash-block', function () {
             $(".leaveAdd-block").removeClass("d-none");
             var $addWrap = $('#leave-category-form #add_leave_category_wrap');
             var $addLeaveCat = $('#leave-category-form #add_leave_category');
@@ -1592,6 +1605,8 @@
                             toastr.success(response.message, "Success", {
                                 positionClass: 'toast-bottom-right'
                             });
+
+                            resetAddLeaveCategoryForm();
                         },
                         error: function(xhr) {
                             // Handle submission errors
@@ -1627,6 +1642,46 @@
                 else
                     return false; // Stop if validation fails
             });
+        }
+
+        // Put the Add form back to a clean, blank state after a successful
+        // submit, so HR can add the next leave category without a page
+        // reload. A plain form.reset() alone leaves the Select2 widgets,
+        // the custom .dd dropdown labels, the conditional wraps
+        // (carry-max, earned-max, combine-with-other) and the Parsley
+        // error state all showing the just-submitted values — resetting
+        // each of those explicitly, reusing the same handlers/helpers the
+        // page already wires up for these fields.
+        function resetAddLeaveCategoryForm() {
+            var $form = $('#leave-category-form');
+            $form[0].reset();
+
+            // Fold the form back to closed — same state as before "Add Leave
+            // Category" was ever clicked. Clicking that button again reopens
+            // it already blank (reset above), so there's no need to leave an
+            // empty form sitting open after a successful save.
+            $('.leaveAdd-block').addClass('d-none');
+
+            // Select2 multi-selects: clear the visible tags.
+            $form.find('.select2-eligibility, .select2-leave-category').val(null).trigger('change');
+
+            // Custom .dd dropdowns (frequency / paid-unpaid / combine-with-other):
+            // re-sync their label and also re-run combine-with-other's own
+            // change handler, which hides the leave-category wrap and tears
+            // down its Select2 for us.
+            $form.find('.dd-native-select').trigger('change');
+
+            // earned_max / carry_max conditional wraps follow the same
+            // change handlers the page already binds on these fields.
+            $form.find('input[name="earned_leave"]:checked').trigger('change');
+            $form.find('input[name="leave_type"]').trigger('change');
+
+            // Clear Parsley's error state without destroying the instance.
+            if ($form.parsley) {
+                var parsleyForm = $form.parsley();
+                if (parsleyForm && parsleyForm.reset) parsleyForm.reset();
+            }
+            $form.find('.select2-container .select2-selection, .form-control, .form-select').removeClass('is-invalid is-valid');
         }
 
         // Initialize All Validations and Plugins

@@ -19,7 +19,7 @@
                     </div>
                 </div>
                 <div class="col-auto ms-auto">
-                    <a href="javascript:void(0);" class="btn btn-theme" id="btn-new-doctor">Add Temporary Doctor</a>
+                    <a href="javascript:void(0);" class="wai-btn wai-btn-primary" id="btn-new-doctor">Add Temporary Doctor</a>
                 </div>
             </div>
         </div>

@@ -20,7 +20,7 @@
         <div class="page-hedding">
             <div class="row justify-content-between g-3">
                 <div class="col-auto"><div class="page-title"><span>Report</span><h1>{{ $page_title }}</h1></div></div>
-                <div class="col-auto"><a href="{{ route('resort.report.index') }}" class="btn eb-btn-secondary">Back to Reports</a></div>
+                <div class="col-auto"><a href="{{ route('resort.report.index') }}" class="wai-btn wai-btn-back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Back to Reports</a></div>
             </div>
         </div>
 
@@ -68,17 +68,17 @@
                             @endforeach
 
                             <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
-                                <button type="submit" class="btn eb-btn-primary btn-sm" id="modRunBtn">Run Report</button>
+                                <button type="submit" class="wai-btn wai-btn-primary" id="modRunBtn">Run Report</button>
                                 <div class="dropdown">
-                                    <button class="btn eb-btn-accent dropdown-toggle modActionBtn" disabled type="button" data-bs-toggle="dropdown"><i class="fa fa-download"></i> Export</button>
+                                    <button class="wai-btn wai-btn-ctx dropdown-toggle modActionBtn" disabled type="button" data-bs-toggle="dropdown"><i class="fa fa-download" aria-hidden="true"></i>Export</button>
                                     <ul class="dropdown-menu">
                                         <li><a class="dropdown-item modExport" href="javascript:void(0)" data-format="csv"><i class="fa fa-file-csv"></i> CSV</a></li>
                                         <li><a class="dropdown-item modExport" href="javascript:void(0)" data-format="excel"><i class="fa fa-file-excel"></i> Excel</a></li>
                                         <li><a class="dropdown-item modExport" href="javascript:void(0)" data-format="pdf"><i class="fa fa-file-pdf"></i> PDF</a></li>
                                     </ul>
                                 </div>
-                                <button type="button" class="btn eb-btn-accent modActionBtn" id="modInsightsBtn" disabled>WAI Insights</button>
-                                <button type="button" class="btn eb-btn-secondary d-none" id="modBackToData">Back to Data</button>
+                                <button type="button" class="wai-btn wai-btn-ctx modActionBtn" id="modInsightsBtn" disabled>WAI Insights</button>
+                                <button type="button" class="wai-btn wai-btn-back d-none" id="modBackToData"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Back to Data</button>
                             </div>
                         </form>
 

@@ -25,7 +25,7 @@
                         </div>
                     </div>
                     <div class="col-auto  ms-auto">
-                        <a class="btn btn-theme" href="{{route('people.promotion.history')}}">View History</a>
+                        <a class="wai-btn wai-btn-ctx" href="{{route('people.promotion.history')}}">View History</a>
                     </div>
                 </div>
             </div>

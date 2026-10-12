@@ -25,7 +25,7 @@
                         </div>
                     </div>
                     <div class="col-auto  ms-auto">
-                        <a class="btn btn-theme" href="{{route('people.promotion.initiate')}}">Initiate Promotion</a>
+                        <a class="wai-btn wai-btn-primary" href="{{route('people.promotion.initiate')}}">Initiate Promotion</a>
                     </div>
                 </div>
             </div>

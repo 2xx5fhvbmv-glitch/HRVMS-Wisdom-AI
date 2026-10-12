@@ -19,8 +19,8 @@
                     </div>
                 </div>
                 <div class="col-auto ms-auto">
-                    <a href="{{ route('offline-interview.create') }}" class="btn ta-btn-accent btn-sm">
-                        <i class="fa-solid fa-plus"></i> New Offline Interview
+                    <a href="{{ route('offline-interview.create') }}" class="wai-btn wai-btn-primary">
+                        <i class="fa-solid fa-plus" aria-hidden="true"></i>New Offline Interview
                     </a>
                 </div>
             </div>

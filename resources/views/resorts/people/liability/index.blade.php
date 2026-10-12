@@ -24,14 +24,18 @@
                             <h1>{{$page_title}}</h1>
                         </div>
                     </div>
+                    @php $liabCategory = $employmentType ?? 'Permanent'; @endphp
+                    <div class="col-auto ms-auto">
+                        <div class="d-flex justify-content-end align-items-center flex-wrap gap-2">
+                            @foreach (['Permanent' => 'Permanent', 'Casual' => 'Casual', 'Intern' => 'Intern', 'All' => 'All Combined'] as $catValue => $catLabel)
+                                <a href="{{ route('people.liability.index', ['employment_type' => $catValue]) }}"
+                                   class="wai-btn wai-btn-ctx {{ $liabCategory === $catValue ? 'is-active' : '' }}"
+                                   @if($liabCategory === $catValue) aria-current="page" @endif>{{ $catLabel }}</a>
+                            @endforeach
+                            <a href="{{route('people.liability.addCost')}}" class="wai-btn wai-btn-primary"><i class="fa-solid fa-plus" aria-hidden="true"></i>Add Cost</a>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            @php $liabCategory = $employmentType ?? 'Permanent'; @endphp
-            <div class="liability-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
-                @foreach (['Permanent' => 'Permanent', 'Casual' => 'Casual', 'Intern' => 'Intern', 'All' => 'All Combined'] as $catValue => $catLabel)
-                    <a href="{{ route('people.liability.index', ['employment_type' => $catValue]) }}"
-                       class="btn btn-sm {{ $liabCategory === $catValue ? 'wfp-btn-primary' : 'wfp-btn-secondary' }}">{{ $catLabel }}</a>
-                @endforeach
             </div>
             <div class="card card-liabilityOverPeopleEmp">
                 <div class="row g-3 mb-4">
@@ -276,10 +280,9 @@
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="tab3" data-bs-toggle="tab" data-bs-target="#tabPane3"
-                                type="button" role="tab" aria-controls="tabPane3" aria-selected="false">Estimation Vs
+                                type="button" role="tab" aria-controls="tabPane3" aria-selected="false">Estimation vs
                                 Actual</button>
                         </li>
-                        <a href="{{route('people.liability.addCost')}}" class="btn btn-themeSkyblue btn-sm ms-auto">+ Add Cost</a>
                     </ul>
                     <div class="tab-content" id="myTabContent">
                         <div class="tab-pane fade show active" id="tabPane1" role="tabpanel" aria-labelledby="tab1" tabindex="0">

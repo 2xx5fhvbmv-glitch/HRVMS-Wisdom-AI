@@ -25,18 +25,12 @@
 
                     <div class="talentAc-block">
                         <div class="row g-md-4 g-3">
-                            @if($profile->type == 'sub')
-                                @if($profile->GetEmployee)
+                            @if($profile->GetEmployee)
                                 <div class="col-md-12">
                                     <label class="form-label"> Department Name : @php   echo $profile->GetEmployee->department->name @endphp </label><br/>
                                     <label class="form-label"> Position Name :   @php   echo $profile->GetEmployee->position->position_title @endphp </label><br/>
                                     <label class="form-label"> Employee Id :     @php   echo $profile->GetEmployee->Emp_id @endphp </label>
                                 </div>
-
-                                @endif
-                            @else
-                                @php $type="Resort Admin"; @endphp
-
                             @endif
                         </div>
                     </div>
@@ -73,15 +67,14 @@
                             </div>
                             <div class="col-md-4">
                                 <label for="emp-grade-select" class="form-label">Role </label>
-                                @if($profile->type == 'sub')
-                                    @if($profile->GetEmployee)
-                                    @php $type=(in_array($profile->GetEmployee->rank,['HOD','HR']))  ?  $profile->GetEmployee->rank : $type="Employee"; @endphp
-                                    @else
-                                        @php $type="Employee";@endphp
-                                    @endif
+                                @if($profile->GetEmployee)
+                                    {{-- Rank is numeric (config/settings.php Position_Rank); it was being
+                                         compared against string labels directly, which never matched, so
+                                         every linked employee showed as plain "Employee" regardless of
+                                         their actual rank (HOD, HR, GM, etc). --}}
+                                    @php $type = config('settings.Position_Rank.' . $profile->GetEmployee->rank, 'Employee'); @endphp
                                 @else
                                     @php $type="Resort Admin"; @endphp
-
                                 @endif
                                 <input type="text" readonly id="type" name="type" class="form-control" value="{{ old('type',$type) }}"/>
                             </div>
@@ -248,7 +241,6 @@
 @endSection
 
 @section('import-css')
-@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 {{-- Cropper.js — lets the user trim a tall/wide image to a square avatar
      before upload. Without this, large portraits broke the page layout. --}}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" integrity="sha512-UtLOu9C7NuThQhuXXrGwx9Jb/z9zPQJctuAgNUBK3Z6kkSYT9wJ+2+dh6klS+TDBCV9kNPBbAxbVD+vCcfGPaA==" crossorigin="anonymous" referrerpolicy="no-referrer" />

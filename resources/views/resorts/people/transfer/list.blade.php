@@ -25,7 +25,7 @@
                         </div>
                     </div>
                     <div class="col-auto ms-auto">
-                        <a href="{{route('people.transfer.history')}}" class="btn btn-theme">View Transfer History</a>
+                        <a href="{{route('people.transfer.history')}}" class="wai-btn wai-btn-ctx">View Transfer History</a>
                     </div>
                 </div>
             </div>

@@ -159,14 +159,14 @@
       <!-- WAI Intelligence ask — glass -->
       <div class="wai-hero">
         <div class="wai-glass" id="waiGlass">
-          <div class="gl">WAI Intelligence</div>
+          <div class="gl"><span>WAI Intelligence</span><span class="wai-use" id="askUse" hidden></span></div>
           <input class="pin" id="askInput" type="text" placeholder="Ask about payroll, attendance, compliance…" autocomplete="off" maxlength="2000">
           <div class="hm-askrow">
             <span class="hm-askchip" role="button" tabindex="0">Who's absent today?</span>
             <span class="hm-askchip" role="button" tabindex="0">Why is F&amp;B overtime up?</span>
             <span class="hm-askchip" role="button" tabindex="0">Whose permits expire soon?</span>
             <span class="grow"></span>
-            <button type="button" class="send" id="askGo" aria-label="Ask WAI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg></button>
+            <button type="button" class="wai-orb" id="askGo" aria-label="Ask WAI"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><span class="orb-glass"></span><span class="orb-sheen"></span><svg class="orb-ar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
           </div>
         </div>
       </div>
@@ -276,10 +276,12 @@
   <div class="focus" id="focus" role="dialog" aria-modal="true" aria-label="WAI Intelligence">
     <div class="focus-panel">
       <div class="focus-glass">
-        <div class="fp-head"><span class="t">WAI Intelligence</span><span class="sub">— focused answer</span><button type="button" class="fp-close" id="fpClose" aria-label="Close">✕</button></div>
+        <div class="fp-head"><span class="t">WAI Intelligence</span><button type="button" class="fp-close" id="fpClose" aria-label="Close">✕</button></div>
         <div class="fp-body" id="fpBody"></div>
         <div class="fp-foot">
-          <div class="fp-bar"><input id="fpInput" type="text" placeholder="Ask a follow-up…" autocomplete="off" maxlength="2000"><button type="button" class="go" id="fpGo" aria-label="Ask WAI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg></button></div>
+          <div class="wai-foot-row"><label class="wai-field"><input id="fpInput" type="text" placeholder="Ask a follow-up…" autocomplete="off" maxlength="2000"></label><button type="button" class="wai-orb" id="fpGo" aria-label="Ask WAI"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><span class="orb-glass"></span><span class="orb-sheen"></span><svg class="orb-ar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
+          <div class="fp-use" id="fpUse" hidden></div>
+          <div class="wai-disclaimer">WAI is smart, not perfect yet — double-check key details. Always improving!</div>
         </div>
       </div>
     </div>
@@ -404,14 +406,67 @@
 #hrmd .wai-glass .gl{position:relative;font-size:13px;font-weight:600;color:var(--teal);margin-bottom:12px}
 #hrmd .wai-glass .pin{position:relative;width:100%;border:none;background:none;outline:none;font:inherit;font-size:15px;color:var(--ink);padding:2px}
 #hrmd .wai-glass .pin::placeholder{color:var(--muted)}
+#hrmd .wai-glass .gl{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#hrmd .wai-use,#hrmd .fp-use{font-size:11px;font-weight:400;color:var(--muted)}
+#hrmd .fp-use{padding:0 6px;text-align:right}
+#hrmd .wai-use.is-low,#hrmd .fp-use.is-low{color:var(--warn)}
+#hrmd .wai-use.is-out,#hrmd .fp-use.is-out{color:var(--err)}
+#hrmd .wai-orb:disabled{opacity:.45;cursor:not-allowed;transform:none}
+/* ===== WAI "thinking" loader — inline glow dot + pulsing letters ===== */
+#hrmd .wai-loader-wrapper{position:relative;display:flex;width:fit-content;margin-top:6px;align-items:center;gap:9px;user-select:none;color:#014653;font-size:12px;font-weight:500;letter-spacing:.3px}
+#hrmd .wai-loader{width:20px;height:20px;aspect-ratio:1/1;border-radius:50%;background:transparent;flex:none;animation:waiLoaderRotate 1.5s linear infinite;z-index:0}
+@keyframes waiLoaderRotate{
+  0%{transform:rotate(90deg);box-shadow:0 1px 1px 0 #fff inset,0 3px 5px 0 #ff5f9f inset,0 4px 4px 0 #0693ff inset}
+  50%{transform:rotate(270deg);box-shadow:0 1px 1px 0 #fff inset,0 3px 5px 0 #9f5fff inset,0 4px 4px 0 #28a9ff inset}
+  100%{transform:rotate(450deg);box-shadow:0 1px 1px 0 #fff inset,0 3px 5px 0 #ff5f9f inset,0 4px 4px 0 #28a9ff inset}}
+#hrmd .wai-letter-wrapper{display:flex;gap:1px}
+#hrmd .wai-loader-letter{display:inline-block;opacity:.4;transform:translateY(0);animation:waiLoaderLetter 2s infinite;z-index:1}
+#hrmd .wai-loader-letter:nth-child(1){animation-delay:0s}
+#hrmd .wai-loader-letter:nth-child(2){animation-delay:.1s}
+#hrmd .wai-loader-letter:nth-child(3){animation-delay:.2s}
+#hrmd .wai-loader-letter:nth-child(4){animation-delay:.3s}
+#hrmd .wai-loader-letter:nth-child(5){animation-delay:.4s}
+#hrmd .wai-loader-letter:nth-child(6){animation-delay:.5s}
+#hrmd .wai-loader-letter:nth-child(7){animation-delay:.6s}
+#hrmd .wai-loader-letter:nth-child(8){animation-delay:.7s}
+@keyframes waiLoaderLetter{0%,100%{opacity:.4;transform:translateY(0)}20%{opacity:1;transform:scale(1.15)}40%{opacity:.7;transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){#hrmd .wai-loader{animation-duration:6s}#hrmd .wai-loader-letter{animation:none;opacity:.9}}
+/* ===== WAI glass-blob orb (send button — ask card + follow-up bar) ===== */
+#hrmd .wai-orb{position:relative;width:38px;height:38px;border-radius:50%;overflow:hidden;isolation:isolate;flex:none;cursor:pointer;display:grid;place-items:center;
+  appearance:none;-webkit-appearance:none;border:none;outline:none;padding:0;
+  background:radial-gradient(circle at 50% 45%,#04576a,#02404e);
+  box-shadow:0 6px 16px rgba(1,70,83,.28);
+  transition:transform .14s cubic-bezier(.34,1.56,.64,1),box-shadow .3s,background .22s ease}
+#hrmd .wai-orb:hover{transform:scale(1.07)}
+#hrmd .wai-orb:focus-visible{box-shadow:0 0 0 3px rgba(224,255,2,.6)}
+#hrmd .wai-orb:active{transform:scale(.93);background:radial-gradient(circle at 50% 45%,#eaff6b,#c4e000)}
+#hrmd .wai-orb i{position:absolute;border-radius:50%;filter:blur(3px);transition:background .22s ease}
+#hrmd .wai-orb i.b1{width:66%;height:66%;background:#E0FF02;left:4%;top:32%;animation:waiOrbF1 2s ease-in-out infinite}
+#hrmd .wai-orb i.b2{width:54%;height:54%;background:#7FBEC6;left:48%;top:10%;animation:waiOrbF2 2.6s ease-in-out infinite}
+#hrmd .wai-orb i.b3{width:38%;height:38%;background:#E0FF02;left:52%;top:50%;animation:waiOrbF3 1.6s ease-in-out infinite}
+#hrmd .wai-orb i.b4{width:48%;height:48%;background:#2E7B86;left:14%;top:4%;animation:waiOrbF4 2.8s ease-in-out infinite}
+#hrmd .wai-orb .orb-glass{position:absolute;inset:0;z-index:4;border-radius:50%;pointer-events:none;
+  background:linear-gradient(160deg,rgba(255,255,255,.26),rgba(255,255,255,.04));
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+#hrmd .wai-orb .orb-sheen{position:absolute;inset:0;z-index:5;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle at 33% 26%,rgba(255,255,255,.5),transparent 46%)}
+#hrmd .wai-orb .orb-ar{position:relative;z-index:6;width:16px;height:16px;color:#014653;transform:rotate(38deg);
+  filter:drop-shadow(0 0 2px rgba(255,255,255,.85)) drop-shadow(0 1px 1px rgba(255,255,255,.6))}
+#hrmd .wai-orb:active .orb-ar{color:#013a46;filter:drop-shadow(0 1px 1px rgba(255,255,255,.5))}
+#hrmd .wai-orb:active i.b1,#hrmd .wai-orb:active i.b3{background:#014653}
+#hrmd .wai-orb:active i.b2{background:#013a46}
+#hrmd .wai-orb:active i.b4{background:#2E7B86}
+@keyframes waiOrbF1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(20%,-16%) scale(1.16)}}
+@keyframes waiOrbF2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-18%,14%) scale(1.1)}}
+@keyframes waiOrbF3{0%,100%{transform:translate(0,0) scale(.95)}50%{transform:translate(-14%,-12%) scale(1.2)}}
+@keyframes waiOrbF4{0%,100%{transform:translate(0,0) scale(1.05)}50%{transform:translate(16%,18%) scale(.9)}}
+@media (prefers-reduced-motion:reduce){#hrmd .wai-orb i{animation-duration:30s}}
+@media (prefers-reduced-transparency:reduce){#hrmd .wai-orb .orb-glass{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(255,255,255,.14)}}
 #hrmd .hm-askrow{display:flex;align-items:center;gap:8px;margin-top:20px;position:relative}
 #hrmd .hm-askrow .grow{flex:1}
 #hrmd .hm-askchip{display:inline-block;font-size:11.5px;color:var(--teal);background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.8);border-radius:20px;padding:7px 12px;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);white-space:nowrap}
 #hrmd .hm-askchip{transition:transform .15s ease,box-shadow .15s ease}
 #hrmd .hm-askchip:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(1,70,83,.14)}
-#hrmd .send{width:40px;height:40px;border-radius:50%;border:none;display:grid;place-items:center;cursor:pointer;flex:none;background:var(--teal);color:#fff;box-shadow:0 6px 16px rgba(1,70,83,.28)}
-#hrmd .send svg{width:18px;height:18px}
-#hrmd .send:hover{background:var(--teal-2)}
 @media (prefers-reduced-transparency:reduce){#hrmd .wai-glass{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}#hrmd .hm-askchip{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}}
 #hrmd .wi-card{overflow:hidden}
 #hrmd .wi-mh{display:flex;align-items:center;gap:8px;padding:12px 16px;color:#fff;background:linear-gradient(100deg,#013a44 0%,#025a68 44%,#2f8f72 72%,#c7ec3f 132%)}
@@ -578,6 +633,44 @@
 #hrmd .a{align-self:flex-start;max-width:88%}
 #hrmd .a .a-tag{display:inline-flex;align-items:center;gap:7px;font-size:10.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--teal);margin-bottom:8px}
 #hrmd .a p{font-size:13.5px;color:var(--g1);line-height:1.55}
+#hrmd .a-md p,#hrmd .a-md li{font-size:13.5px;color:var(--g1);line-height:1.55}
+#hrmd .a-md p+p,#hrmd .a-md ul+p,#hrmd .a-md ol+p,#hrmd .a-md ul,#hrmd .a-md ol,#hrmd .a-md p+ul,#hrmd .a-md p+ol{margin-top:8px}
+#hrmd .a-md ul,#hrmd .a-md ol{list-style:none;padding-left:20px;counter-reset:mdn}
+#hrmd .a-md ol{counter-reset:mdn calc(var(--s,1) - 1)}
+#hrmd .a-md li>ul{margin-top:4px}
+#hrmd .a-md li{position:relative;margin-top:4px}
+#hrmd .a-md ul>li::before{content:"";position:absolute;left:-14px;top:.62em;width:5px;height:5px;border-radius:50%;background:var(--teal)}
+#hrmd .a-md ol>li{counter-increment:mdn}
+#hrmd .a-md ol>li::before{content:counter(mdn) ".";position:absolute;left:-20px;color:var(--muted);font-size:12.5px}
+#hrmd .a-md .a-note{margin-top:10px;font-size:12.5px;color:var(--muted);line-height:1.55;background:var(--teal-soft);border-radius:10px;padding:9px 12px}
+#hrmd .a-md strong,#hrmd .a-md em{font-size:inherit}
+#hrmd .a-md strong{font-weight:600;color:var(--ink)}
+#hrmd .a-md .a-tbl{margin-top:10px;border:1px solid rgba(255,255,255,.9);border-radius:12px;overflow:auto;background:rgba(255,255,255,.62)}
+#hrmd .a-md .a-tbl:first-child{margin-top:0}
+#hrmd .a-md .a-tbl strong{font-weight:400;color:inherit}
+#hrmd .a-md .a-tbl em{font-style:normal}
+#hrmd .a-md .a-tbl td.k strong{font-weight:500;color:var(--ink)}
+#hrmd .a-md .a-th{background:var(--teal-soft);font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);padding:9px 12px}
+#hrmd .a-md .a-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+#hrmd .a-md .a-td{font-size:12.5px;color:var(--ink);padding:9px 12px;border-top:1px solid var(--line-2)}
+#hrmd .a-md .a-tbl+p,#hrmd .a-md .a-tbl+ul,#hrmd .a-md .a-tbl+ol{margin-top:10px}
+#hrmd .a-md table{width:100%;border-collapse:collapse}
+#hrmd .a-md th{background:var(--teal-soft);font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);text-align:left;padding:9px 12px;white-space:nowrap}
+#hrmd .a-md td{font-size:12.5px;color:var(--g1);padding:9px 12px;border-top:1px solid var(--line-2);vertical-align:top}
+#hrmd .a-md td.k{color:var(--ink);font-weight:500}
+#hrmd .a-md .a-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}
+#hrmd .a-md .a-pill.ok{background:var(--ok-bg);color:var(--ok)}
+#hrmd .a-md .a-pill.warn{background:var(--warn-bg);color:var(--warn)}
+#hrmd .a-md .a-pill.err{background:var(--err-bg);color:var(--err)}
+#hrmd .a-md .a-pill.muted{background:var(--line-2);color:var(--g2)}
+#hrmd .a-md .a-notelist{margin-top:10px;font-size:12.5px;color:var(--muted);background:var(--teal-soft);border-radius:10px;padding:10px 14px 10px 32px}
+#hrmd .a-md .a-notelist li{font-size:12.5px;color:var(--muted)}
+#hrmd .a-md .a-notelist strong{color:var(--ink)}
+#hrmd .a-md .a-kv td{padding:8px 12px}
+#hrmd .a-md .a-kv td.k{width:34%;color:var(--muted);font-weight:400}
+#hrmd .a-md .a-kv td.k strong{color:var(--muted)}
+#hrmd .a-md .a-kv td:last-child{color:var(--ink)}
+#hrmd .a-md code{font-size:12.5px;background:var(--teal-soft);padding:1px 5px;border-radius:5px}
 #hrmd .a-list{margin-top:12px;border:1px solid rgba(255,255,255,.9);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.62)}
 #hrmd .a-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(1,70,83,.07)}
 #hrmd .a-row:last-child{border-bottom:none}
@@ -587,15 +680,16 @@
 #hrmd .a-row .ac{font-size:11.5px;color:var(--muted);margin-top:1px}
 #hrmd .a-row .atag{font-size:10.5px;font-weight:600;border-radius:20px;padding:2px 9px;flex:none;background:var(--warn-bg);color:var(--warn)}
 #hrmd .a-more{padding:10px 14px;font-size:12px;color:var(--muted);background:rgba(255,255,255,.42)}
-#hrmd .fp-foot{padding:16px 22px;border-top:1px solid rgba(1,70,83,.09)}
-#hrmd .fp-bar{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.9)}
-#hrmd .fp-bar input{flex:1;border:none;background:none;outline:none;font:inherit;font-size:14px;color:var(--ink)}
-#hrmd .fp-bar input::placeholder{color:var(--muted)}
-#hrmd .fp-bar .go{width:38px;height:38px;border-radius:50%;background:var(--teal);border:none;display:grid;place-items:center;color:#fff;cursor:pointer;flex:none;box-shadow:0 6px 16px rgba(1,70,83,.28)}
-#hrmd .fp-bar .go:hover{background:var(--teal-2)}
-#hrmd .fp-bar .go svg{width:18px;height:18px}
+#hrmd .fp-foot{padding:16px 22px;border-top:1px solid rgba(1,70,83,.09);display:flex;flex-direction:column;gap:9px}
+/* footer: input row + AI disclaimer */
+#hrmd .wai-foot-row{display:flex;align-items:center;gap:10px}
+#hrmd .wai-field{display:flex;align-items:center;flex:1;border-radius:999px;background:#f1f7f7;border:1px solid #E2EBEC;padding:12px 18px;transition:background .18s,border-color .18s,box-shadow .18s}
+#hrmd .wai-field:focus-within{border-color:#014653;box-shadow:0 0 0 3px rgba(1,70,83,.08)} /* keeps the soft fill on focus — the popup auto-focuses the field, so a white focus state read as "always white" and flickered when the tab lost focus */
+#hrmd .wai-field>input{flex:1;border:none;outline:none;background:none;font:inherit;font-size:14px;color:#14232A}
+#hrmd .wai-field>input::placeholder{color:#5D6F75}
+#hrmd .wai-disclaimer{display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;color:#93A4A9;text-align:center}
 @media (prefers-reduced-transparency:reduce){#hrmd .focus-glass{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
-#hrmd .fp-close,#hrmd .fp-bar,#hrmd .a-list,#hrmd .a-more{background:#fff}}#hrmd{--lime:#D9FF33;font-family:var(--font);color:var(--ink);font-size:14px;line-height:1.5;letter-spacing:-.005em}
+#hrmd .fp-close,#hrmd .a-list,#hrmd .a-more{background:#fff}}#hrmd{--lime:#D9FF33;font-family:var(--font);color:var(--ink);font-size:14px;line-height:1.5;letter-spacing:-.005em}
 #hrmd .cols{align-items:start}
 #hrmd .col-left,#hrmd .col-right{position:sticky;top:20px;height:calc(100vh - 40px);min-height:520px}
 @media(max-width:1100px){#hrmd .col-left,#hrmd .col-right{height:auto;min-height:420px}}
@@ -635,7 +729,8 @@
     taDash: @json(route('resort.recruitement.hrdashboard')),
     compliance: @json(route('people.compliance.list')),
     compliancePage: @json(route('people.compliance.index')),
-    wai: @json(route('resort.wisdom.chat'))
+    wai: @json(route('resort.wisdom.chat')),
+    waiHistory: @json(route('resort.wisdom.history'))
   };
   var CSRF = document.querySelector('meta[name="csrf-token"]');
   CSRF = CSRF ? CSRF.content : '';
@@ -772,16 +867,175 @@
   /* ---------- WAI ask → existing Wisdom chat endpoint ---------- */
   (function () {
     var focus = $('focus'), body = $('fpBody'), askInput = $('askInput'), fpInput = $('fpInput');
+    // Minimal Markdown for WAI answers (bold, italic, code, bullet / numbered lists, headings). Built with DOM
+    // nodes + textContent only, so the model's text can never inject HTML.
+    // Display-only: 2026-10-07 -> 07 Oct 2026 (day, short month, year)
+    var MD_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    function mdDates(s) {
+      return s.replace(/\b(\d{4})[-‐-―−](0[1-9]|1[0-2])[-‐-―−](0[1-9]|[12]\d|3[01])\b/g, function (m, y, mo, d) { return d + ' ' + MD_MON[+mo - 1] + ' ' + y; });
+    }
+    function mdInline(parent, s) {
+      s = mdDates(s);
+      var re = /\*\*([^*]+)\*\*|`([^`]+)`|\*([^*\s][^*]*)\*/g, last = 0, m;
+      while ((m = re.exec(s))) {
+        if (m.index > last) parent.appendChild(document.createTextNode(s.slice(last, m.index)));
+        parent.appendChild(m[1] != null ? el('strong', '', m[1]) : m[2] != null ? el('code', '', m[2]) : el('em', '', m[3]));
+        last = re.lastIndex;
+      }
+      if (last < s.length) parent.appendChild(document.createTextNode(s.slice(last)));
+    }
+    function mdCells(ln) { return ln.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); }); }
+    function mdTable(box, head, rows, cls) {
+      var wrap = el('div', 'a-tbl' + (cls ? ' ' + cls : '')), t = el('table'), tr, tb = el('tbody');
+      if (head) { var th = el('thead'); tr = el('tr'); head.forEach(function (h) { var c = el('th'); mdInline(c, h); tr.appendChild(c); }); th.appendChild(tr); t.appendChild(th); }
+      rows.forEach(function (r) { tr = el('tr'); r.forEach(function (c, i) { var td = el('td', i === 0 ? 'k' : ''); if (c && c.pill) td.appendChild(el('span', 'a-pill ' + c.pill, c.text)); else mdInline(td, c == null ? '\u2014' : c); tr.appendChild(td); }); tb.appendChild(tr); });
+      t.appendChild(tb); wrap.appendChild(t); box.appendChild(wrap);
+    }
+    // "Name – Dept – Reason: x – Resignation date 2026-08-01 – Pending" bullets -> one table row each.
+    // Labelled parts ("Label: value", "Label <date>", "No <label> recorded") become columns; the first plain part is the
+    // name and a trailing status word (Pending, Approved, …) becomes a coloured label. Returns null when the list isn't
+    // consistently record-shaped, so ordinary bullets are left alone.
+    var MD_STATUS = { pending: 'warn', 'in progress': 'warn', open: 'warn', approved: 'ok', active: 'ok', completed: 'ok', resolved: 'ok', done: 'ok', accepted: 'ok', withdrawn: 'muted', cancelled: 'muted', closed: 'muted', inactive: 'muted', rejected: 'err', overdue: 'err', expired: 'err', terminated: 'err', declined: 'err' };
+    function mdPlain(t) { return t.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/(^|[^*])\*([^*]+)\*/g, '$1$2').replace(/`([^`]+)`/g, '$1').trim(); }
+    function mdRecords(items) {
+      var cols = [], idx = {}, rows = [];
+      // the model sometimes writes date dashes as special Unicode hyphens; normalise so dates parse as dates
+      items = items.map(function (t) { return t.replace(/(\d{4})[\u2010-\u2015\u2212](\d{2})[\u2010-\u2015\u2212](\d{2})/g, '$1-$2-$3'); });
+      function col(k, head) { if (!(k in idx)) { idx[k] = cols.length; cols.push({ k: k, head: head }); } return idx[k]; }
+      var ok = items.every(function (t) {
+        var segs = t.split(/\s+[—–-]\s+/), row = {}, u = 0;
+        if (segs.length < 4) return false;
+        segs.forEach(function (sg) {
+          var p = mdPlain(sg), m, key;
+          if ((m = /^([A-Za-z][A-Za-z &\/]{1,28}):\s*(.+)$/.exec(p))) { key = 'l:' + m[1].toLowerCase(); row[col(key, m[1])] = sg.replace(/^\**\s*[^:]+:\s*/, ''); }
+          else if ((m = /^([A-Za-z][A-Za-z &\/]{1,28}?)\s+(\d{4}-\d{2}-\d{2})$/.exec(p))) { key = 'l:' + m[1].toLowerCase(); row[col(key, m[1])] = m[2]; }
+          else if ((m = /^No (.{3,40}?) (?:recorded|provided|available|set|found)$/i.exec(p))) { key = 'l:' + m[1].toLowerCase(); row[col(key, m[1].charAt(0).toUpperCase() + m[1].slice(1))] = '—'; }
+          else { row[col('u:' + u, '')] = sg; u++; }
+        });
+        rows.push(row); return true;
+      });
+      if (!ok || rows.length < 2 || cols.filter(function (c) { return c.k.charAt(0) === 'l'; }).length < 2) return null;
+      var unl = cols.filter(function (c) { return c.k.charAt(0) === 'u'; }), last = unl.length > 2 ? unl[unl.length - 1] : null, statusCol = -1;
+      if (last) {
+        var hits = rows.filter(function (r) { var v = r[idx[last.k]]; return v && MD_STATUS[mdPlain(v).toLowerCase()]; }).length;
+        if (hits >= rows.length * 0.6) { statusCol = idx[last.k]; last.head = 'Status'; }
+      }
+      unl.forEach(function (c, i) { if (!c.head) c.head = i === 0 ? 'Name' : 'Details'; });
+      return {
+        head: cols.map(function (c) { return c.head; }),
+        rows: rows.map(function (r) {
+          return cols.map(function (c, ci) {
+            var v = r[ci];
+            if (v == null) return '—';
+            if (ci === statusCol) { var st = mdPlain(v).toLowerCase(); return MD_STATUS[st] ? { pill: MD_STATUS[st], text: mdPlain(v) } : v; }
+            return v;
+          });
+        })
+      };
+    }
+    // "- **Building:** Building B", "- **Floor:** 2" ... : facts about ONE thing, shown as a label / value table (no row count).
+    function mdKv(items) {
+      var rows = [];
+      var ok = items.every(function (t) { var m = /^\s*\**\s*([^:*]{1,32}?)\s*:\s*\**\s*(.+)$/.exec(t); if (m) rows.push([m[1], m[2]]); return !!m; });
+      return ok && rows.length >= 2 ? rows : null;
+    }
+    // A long plain list (e.g. 20 names) is shown as a compact multi-column table instead of one tall column.
+    function mdGrid(box, items) {
+      var wrap = el('div', 'a-tbl'), head = el('div', 'a-th', items.length + ' results'), g = el('div', 'a-grid');
+      items.forEach(function (t) { var c = el('div', 'a-td'); mdInline(c, t); g.appendChild(c); });
+      wrap.appendChild(head); wrap.appendChild(g); box.appendChild(wrap);
+    }
+    // Markdown tables render as tables. A bullet list whose every line splits the same way ("Name — detail — date")
+    // is a list of records, so it is shown as an aligned table too; anything else stays a normal list.
+    function renderMd(box, text) {
+      var lines = String(text).split('\n'), i = 0, ul = [], ol = [];
+      function flush() {
+        var l;
+        if (ul.length) {
+          var parts = ul.map(function (t) { return t.split(/\s+[—–|]\s+|\s+-\s+/); }), n = parts[0].length;
+          var rec = ul.length >= 2 && mdRecords(ul);
+          var kv = !rec && ul.length >= 2 && mdKv(ul);
+          if (rec) mdTable(box, rec.head, rec.rows);
+          else if (kv) mdTable(box, null, kv, 'a-kv');
+          else if (ul.length >= 2 && n >= 2 && n <= 4 && parts.every(function (p) { return p.length === n; })) mdTable(box, null, parts);
+          else if (ul.length >= 4 && parts.every(function (p) { return p.length === 1; })) mdGrid(box, ul);
+          else { l = el('ul', ul.every(function (t) { return /^\*\*/.test(t) && t.length > 60; }) ? 'a-notelist' : ''); ul.forEach(function (t) { var li = el('li'); mdInline(li, t); l.appendChild(li); }); box.appendChild(l); }
+          ul = [];
+        }
+        if (ol.length) {
+          // numbered list: starts at the number the model wrote, and keeps the bullets that follow an item nested under it
+          l = el('ol'); l.style.setProperty('--s', ol[0].n);
+          ol.forEach(function (it) {
+            var li = el('li'); mdInline(li, it.t);
+            if (it.kids.length) { var k = el('ul'); it.kids.forEach(function (t) { var ki = el('li'); mdInline(ki, t); k.appendChild(ki); }); li.appendChild(k); }
+            l.appendChild(li);
+          });
+          box.appendChild(l); ol = [];
+        }
+      }
+      while (i < lines.length) {
+        var ln = lines[i];
+        if (/^\s*\|/.test(ln) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
+          flush(); var head = mdCells(ln), rows = []; i += 2;
+          while (i < lines.length && /^\s*\|/.test(lines[i])) { rows.push(mdCells(lines[i])); i++; }
+          mdTable(box, head, rows); continue;
+        }
+        var u = /^\s*[-*•]\s+(.*)/.exec(ln), o = /^\s*(\d+)[.)]\s+(.*)/.exec(ln), h = /^\s{0,3}#{1,6}\s+(.*)/.exec(ln);
+        if (u) {
+          if (ol.length && !ul.length) ol[ol.length - 1].kids.push(u[1]); // bullets directly under a numbered item belong to it
+          else ul.push(u[1]);
+        }
+        else if (o) { if (ul.length) flush(); ol.push({ n: o[1], t: o[2], kids: [] }); }
+        else if (!ln.trim()) flush();
+        else {
+          flush();
+          // A line that is entirely italic (*...* or _..._) is the model's footnote: show it as a quiet note box, not slanted text.
+          var nt = !h && /^\s*[*_](?![*_\s])(.+?)[*_]\s*$/.exec(ln), p = el('p', nt ? 'a-note' : '');
+          mdInline(p, h ? '**' + h[1].replace(/\*\*/g, '') + '**' : (nt ? nt[1] : ln)); box.appendChild(p);
+        }
+        i++;
+      }
+      flush();
+    }
+    // "Thinking" placeholder: glow dot + pulsing letters (pure CSS). Replaced by the answer via a.replaceChild(md, p).
+    function thinking() {
+      var w = el('div', 'wai-loader-wrapper'), l = el('div', 'wai-letter-wrapper');
+      w.setAttribute('role', 'status'); w.setAttribute('aria-label', 'Thinking');
+      w.appendChild(el('div', 'wai-loader'));
+      'Thinking'.split('').forEach(function (c) { l.appendChild(el('span', 'wai-loader-letter', c)); });
+      w.appendChild(l);
+      return w;
+    }
+    // Daily allowance: server sends `usage: {limit, used, remaining}` on chat + history; nothing is shown without it.
+    var askUse = $('askUse'), fpUse = $('fpUse'), askGo = $('askGo'), fpGo = $('fpGo'), usageOut = false;
+    function applyUsage(u, fromEvent) {
+      if (!u || !(u.limit > 0)) return;
+      var rem = Math.max(0, u.remaining != null ? u.remaining : u.limit - (u.used || 0));
+      var low = rem > 0 && rem <= Math.max(5, Math.ceil(u.limit * 0.2));
+      var txt = rem === 0 ? 'Daily limit reached. It resets at midnight.'
+        : low ? 'Only ' + rem + ' message' + (rem === 1 ? '' : 's') + ' left today'
+        : rem + ' of ' + u.limit + ' messages left today';
+      usageOut = rem === 0;
+      [askUse, fpUse].forEach(function (n) { n.hidden = false; n.textContent = txt; n.className = (n.id === 'askUse' ? 'wai-use' : 'fp-use') + (usageOut ? ' is-out' : low ? ' is-low' : ''); });
+      [askInput, fpInput, askGo, fpGo].forEach(function (n) { n.disabled = usageOut; });
+      if (!fromEvent) document.dispatchEvent(new CustomEvent('wai:usage', { detail: u })); // keep the chat panel in step
+    }
+    document.addEventListener('wai:usage', function (e) { applyUsage(e.detail, true); });
+    fetch(URLS.waiHistory, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) { if (j && j.usage) applyUsage(j.usage); })
+      .catch(function () {});
     function open() { focus.classList.add('open'); document.body.style.overflow = 'hidden'; setTimeout(function () { fpInput.focus(); }, 60); }
     function close() { focus.classList.remove('open'); document.body.style.overflow = ''; askInput.value = ''; }
     function ask(q) {
+      if (usageOut) return;
       body.appendChild(el('div', 'q', q));
-      var a = el('div', 'a'); a.appendChild(el('div', 'a-tag', 'WAI')); var p = el('p', '', 'Thinking…'); a.appendChild(p); body.appendChild(a);
+      var a = el('div', 'a'); a.appendChild(el('div', 'a-tag', 'WAI')); var p = thinking(); a.appendChild(p); body.appendChild(a);
       body.scrollTop = body.scrollHeight;
       fetch(URLS.wai, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', body: JSON.stringify({ message: q }) })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
-        .then(function (j) { p.style.whiteSpace = 'pre-wrap'; p.textContent = j.success ? j.reply : (j.message || 'Something went wrong. Please try again.'); body.scrollTop = body.scrollHeight; })
-        .catch(function () { p.textContent = 'Something went wrong. Please try again.'; });
+        .then(function (j) { if (j && j.usage) applyUsage(j.usage); var md = el('div', 'a-md'); renderMd(md, j.success ? j.reply : (j.message || 'Something went wrong. Please try again.')); a.replaceChild(md, p); body.scrollTop = body.scrollHeight; })
+        .catch(function () { if (p.parentNode) a.replaceChild(el('p', '', 'Something went wrong. Please try again.'), p); });
     }
     function submitAsk() { var v = askInput.value.trim(); if (!v) return; body.textContent = ''; ask(v); open(); }
     function submitFp() { var v = fpInput.value.trim(); if (!v) return; ask(v); fpInput.value = ''; }

@@ -65,7 +65,7 @@
 @media (prefers-reduced-motion:reduce){#calsidebar .cal-empty-scene{animation:none}}
 #calsidebar .cal-empty-title{font-size:15px;font-weight:600;color:var(--ink);margin-top:18px}
 #calsidebar .cal-empty-sub{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.55}
-#calsidebar .cal-empty-btn{margin-top:18px}
+#calsidebar .cal-empty-btn{margin-top:18px;align-self:center}
 </style>
 @endsection
 
@@ -137,7 +137,7 @@ $(document).ready(function () {
                             </div>
                             <div class="cal-empty-title">Nothing on the calendar yet</div>
                             <div class="cal-empty-sub">Meetings you schedule for incident reviews will appear here.</div>
-                            <a href="{{ route('incident.meeting') }}" class="btn eb-btn-primary btn-sm cal-empty-btn">Schedule a meeting</a>
+                            <a href="{{ route('incident.meeting') }}" class="wai-btn wai-btn-primary cal-empty-btn">Schedule a meeting</a>
                         </div>
                     `;
                     $('#calsidebar').html(sidebarHTML);

@@ -110,7 +110,7 @@
                         </nav>
                      </div>
                      <div class="col-auto">
-                        <button type="button" class="btn eb-btn-accent btn-sm" id="MoveDoc">Move</button>
+                        <button type="button" class="wai-btn wai-btn-ctx" id="MoveDoc">Move</button>
                      </div>
                   </div>
                </div>

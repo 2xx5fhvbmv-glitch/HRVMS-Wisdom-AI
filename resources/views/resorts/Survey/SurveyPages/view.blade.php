@@ -25,11 +25,11 @@
                          on Survey.view instead, which has no response data
                          of its own, so there was no way to see who
                          answered what from this page at all. --}}
-                    <a href="{{ route('Survey.GetSurveyResults', base64_encode($parent->id)) }}" class="btn btn-themeSkyblue" target="_blank">
-                        <i class="fa-regular fa-chart-bar me-1"></i> View Responses
+                    <a href="{{ route('Survey.GetSurveyResults', base64_encode($parent->id)) }}" class="wai-btn wai-btn-ctx" target="_blank">
+                        <i class="fa-regular fa-chart-bar" aria-hidden="true"></i>View Responses
                     </a>
-                    <a href="{{ route('Survey.DownloadQuestionAndAns', base64_encode($parent->id)) }}" class="btn eb-btn-secondary DownloadQuestionAndAns" data-id="{{ base64_encode($parent->id) }}">
-                        <i class="fa-regular fa-download me-1"></i> Download
+                    <a href="{{ route('Survey.DownloadQuestionAndAns', base64_encode($parent->id)) }}" class="wai-btn wai-btn-ctx DownloadQuestionAndAns" data-id="{{ base64_encode($parent->id) }}">
+                        <i class="fa-regular fa-download" aria-hidden="true"></i>Download
                     </a>
                 </div>
             </div>
@@ -176,7 +176,7 @@
                                     <span id="statusError" class="text-danger small"></span>
                                 </div>
                                 <div class="col-auto">
-                                    <button class="btn eb-btn-primary btn-sm" type="submit">Update status</button>
+                                    <button class="wai-btn wai-btn-primary" type="submit">Update status</button>
                                 </div>
                             </form>
                         </div>

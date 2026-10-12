@@ -25,8 +25,8 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('resort.budget.config') }}" class="btn btn-sm wfp-btn-neutral">
-                        <i class="fa-solid fa-arrow-left"></i> Back to Configuration
+                    <a href="{{ route('resort.budget.config') }}" class="wai-btn wai-btn-back">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Back to Configuration
                     </a>
                 </div>
             </div>
@@ -45,8 +45,8 @@
                                 </div>
                                 <div class="col-auto">
                                     <div class="d-flex justify-content-sm-end align-items-center">
-                                        <a href="{{route('resort.benifitgrid.create')}}" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.benifitgrid.index',config('settings.resort_permissions.create')) == false) d-none @endif">
-                                            <i class="fa-solid fa-plus me-2"></i>Add New
+                                        <a href="{{route('resort.benifitgrid.create')}}" class="wai-btn wai-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.benifitgrid.index',config('settings.resort_permissions.create')) == false) d-none @endif">
+                                            <i class="fa-solid fa-plus" aria-hidden="true"></i>Add New
                                         </a>
                                     </div>
                                 </div>
@@ -74,7 +74,6 @@
 @endsection
 
 @section('import-css')
-@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

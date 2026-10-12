@@ -1,0 +1,245 @@
+/*
+ * Global button system (the "emotional buttons") — ONE file for every module.
+ *
+ * History: each module shipped its own copy of these rules in a Blade partial
+ * (_wfp_/_ta_/_payroll_/_taa_/_leave_/_performance_/_learning_/_emotional_buttons_v2_styles),
+ * identical apart from the class prefix. Markup keeps its class names (wfp-btn-primary,
+ * ta-btn-secondary, …); this file styles them for every module that has been migrated.
+ *
+ * Why explicit prefixes and not a "[class*=-btn-primary]" wildcard: the app also has small bespoke
+ * button systems (ma-, pyslip-, ciom-, fvm-, x-btn-*) that must NOT pick up these hover/lift rules.
+ *
+ * Phase 2 migration (one module at a time). To migrate a module: add its prefix next to .wfp- in every
+ * selector below, verify its pages, then delete its _<module>_buttons_v2_styles partial and the @include
+ * lines that pull it in.
+ *   done:    Workforce Planning (wfp-)
+ *   pending: Talent Acquisition (ta-), Payroll (payroll-), Time & Attendance (taa-), Leave (leave-),
+ *            Performance (perf-), Learning (lnd-), shared (eb-)
+ *
+ * Variants shared by every module: primary, secondary, positive, neutral, critical.
+ * Only some modules: attention, celebrate. Variants that DIFFER between module groups, to reconcile
+ * when those modules migrate: accent (lime header CTA in wfp/ta/payroll vs teal accent in
+ * leave/perf/learning/eb), ghost (white-on-teal in ta/payroll vs grey in eb), and the [disabled] states
+ * (leave/perf/learning/eb/taa only).
+ *
+ * Presentation only. Box-shadows stay literal rgba(20,35,42,…) (a neutral ink, not a theme surface).
+ * :active rules are declared LAST, after every :hover rule: during a real click :hover and :active are
+ * both true, and at equal specificity the later rule wins per property.
+ */
+
+/* ---- base: motion + keyboard focus ------------------------------------------------------------ */
+.wfp-btn-primary,
+.wfp-btn-secondary,
+.wfp-btn-positive,
+.wfp-btn-attention,
+.wfp-btn-accent,
+.wfp-btn-neutral,
+.wfp-btn-critical,
+.wfp-icon-positive {
+    transition: transform .16s cubic-bezier(.2,.8,.2,1), box-shadow .16s ease, background .16s ease, border-color .16s ease;
+}
+.wfp-btn-primary:focus-visible,
+.wfp-btn-secondary:focus-visible,
+.wfp-btn-positive:focus-visible,
+.wfp-btn-attention:focus-visible,
+.wfp-btn-accent:focus-visible,
+.wfp-btn-neutral:focus-visible,
+.wfp-btn-critical:focus-visible,
+.wfp-icon-positive:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 2px;
+}
+
+/* Everyday action — Submit, Save, Send. Text stays literal #fff (contrast on solid teal). */
+.wfp-btn-primary { background: var(--teal); color: #fff; }
+.wfp-btn-primary:hover {
+    background: var(--teal);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px -8px rgba(20,35,42,.35);
+}
+
+/* Low-stakes, recedes on purpose — Cancel, Download, Back. Hover is a light paper tint, never a solid
+   fill. #C9D6D7 border has no token match — left literal. */
+.wfp-btn-secondary {
+    background: transparent;
+    color: var(--teal);
+    border: 1.5px solid #C9D6D7;
+}
+.wfp-btn-secondary:hover {
+    background: var(--paper);
+    border-color: var(--teal);
+    color: var(--teal);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px -8px rgba(20,35,42,.18);
+}
+
+/* Additive action — Import, Add. */
+.wfp-btn-positive { background: var(--positive-bg); color: var(--positive); }
+.wfp-btn-positive:hover {
+    background: var(--positive);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);
+}
+
+/* Additive icon action — the small "+" square (Workforce Planning "Add Occupancy").
+   rgba(31,157,107,.09) is --positive's RGB as a tint — no --positive-rgb token exists, left literal. */
+.wfp-icon-positive {
+    width: 25px;
+    height: 25px;
+    border-radius: 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--positive);
+    background: rgba(31, 157, 107, .09);
+}
+.wfp-icon-positive:hover {
+    color: #fff;
+    background: var(--positive);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);
+}
+
+/* Waiting on someone else — Send Reminder. */
+.wfp-btn-attention { background: var(--warning-bg); color: var(--warning); }
+.wfp-btn-attention:hover {
+    background: var(--warning);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);
+}
+
+/* Rare, single header-level CTA — Request Manning. The only lime button on a page; it stands out against
+   the teal header band where a solid-teal button vanishes. */
+.wfp-btn-accent { background: var(--lime); color: #17260a; }
+.wfp-btn-accent:hover {
+    background: var(--lime);
+    color: #17260a;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px -8px rgba(20,35,42,.35);
+}
+
+/* Saved, not final — Save As Draft. Its own neutral weight. */
+.wfp-btn-neutral { background: var(--neutral-bg); color: var(--darkblack); }
+.wfp-btn-neutral:hover {
+    background: var(--teal-soft);
+    color: var(--darkblack);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px -8px rgba(20,35,42,.18);
+}
+
+/* Can't be undone — Remove / Delete. Same soft-tint-at-rest / solid-on-hover pattern as positive. */
+.wfp-btn-critical { background: var(--critical-bg); color: var(--critical); }
+.wfp-btn-critical:hover {
+    background: var(--critical);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);
+}
+
+/* The one true "we did it" moment — brand gradient, reserved for a final whole-cycle completion
+   (e.g. Approve Budget). Only ever one per page. */
+.wfp-btn-celebrate { background: var(--grad-celebrate); color: #fff; }
+.wfp-btn-celebrate:hover {
+    background: var(--grad-celebrate-hover);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px -8px rgba(var(--teal-rgb),.45);
+}
+
+/* Buttons on the teal page-header band (.page-hedding) are handled for every prefix by header-band.css. */
+
+/* ---- press feedback — declared after every :hover rule on purpose ------------------------------
+   transition-duration is shortened so a fast click's press-in is still visible. */
+.wfp-btn-primary:active,
+.wfp-btn-secondary:active,
+.wfp-btn-positive:active,
+.wfp-btn-attention:active,
+.wfp-btn-accent:active,
+.wfp-btn-neutral:active,
+.wfp-btn-critical:active,
+.wfp-btn-celebrate:active,
+.wfp-icon-positive:active {
+    transition-duration: .07s;
+    transform: translateY(0) scale(.94);
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+/* =================================================================================================
+ * WAI button system — three roles (primary / contextual / back). Final design from the design team.
+ *
+ *   .wai-btn-primary  THE action on a screen (lime, teal→lime glow on hover). Max ONE per screen.
+ *   .wai-btn-ctx      a secondary module action (frosted pill; lime underglow on hover).
+ *   .wai-btn-back     navigation back, lowest weight (same frosted pill + left chevron).
+ *
+ * Always combine with the base class:  <a class="wai-btn wai-btn-primary">…</a>.
+ * Prefixed (wai-) on purpose: Bootstrap owns .btn / .btn-primary for every other button in the app.
+ * Icons: a 17px leading <svg> or Font Awesome <i>, 8px gap (set below). Size: 15px text, 13px 18px padding.
+ *
+ * Surfaces: ctx / back default to the LIGHT look. They switch to the frosted-glass look automatically
+ * inside the teal page-header row (.page-hedding) — and anywhere else on the teal band by adding
+ * class="wai-on-dark" to the wrapping element. Primary looks the same on both.
+ *
+ * Migration: role → old class. primary ← *-btn-accent (lime header CTA); ctx ← header *-btn-secondary;
+ * back ← "Back …" header buttons. Other roles (Cancel, Delete, Approve…) keep their current classes.
+ * ================================================================================================= */
+.wai-btn {
+    position: relative; display: inline-flex; align-items: center; gap: 8px;
+    align-self: flex-start; /* never stretch to the row height when the parent is a flex row — one fixed height everywhere */
+    font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1; white-space: nowrap;
+    text-decoration: none; border-radius: 13px; padding: 13px 18px; cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: background .15s, border-color .15s, color .15s, transform .12s, box-shadow .15s;
+}
+.wai-btn:hover { text-decoration: none; }
+.wai-btn:active { transform: scale(.97); }
+.wai-btn:focus-visible { outline: 2px solid #014653; outline-offset: 2px; }
+.wai-btn:disabled, .wai-btn.disabled, .wai-btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; pointer-events: none; transform: none; }
+.wai-btn svg { width: 17px; height: 17px; flex: none; }
+.wai-btn i { width: 17px; font-size: 17px; text-align: center; flex: none; }
+
+/* PRIMARY — lime; the glow only animates while hovered (no idle GPU work) */
+.wai-btn-primary { background: #E0FF02; color: #014653; z-index: 0; }
+.wai-btn-primary:hover, .wai-btn-primary:focus { color: #014653; }
+.wai-btn-primary::before {
+    content: ""; position: absolute; inset: -2.5px; border-radius: 13px; z-index: -2; opacity: 0;
+    background: linear-gradient(60deg, #E0FF02, #9fe6c0, #2E7B86, #035b6c, #1E7A85, #7FBEC6, #E0FF02);
+    background-size: 300%; filter: blur(7px); transition: opacity .35s ease;
+}
+.wai-btn-primary::after { content: ""; position: absolute; inset: 0; border-radius: 12px; background: #E0FF02; z-index: -1; }
+.wai-btn-primary:hover::before { opacity: 1; animation: wai-btn-glow 16s linear infinite; }
+
+/* CONTEXTUAL + BACK — light surfaces (default) */
+.wai-btn-ctx, .wai-btn-back { background: #f1f7f7; color: #014653; border-color: #E2EBEC; }
+.wai-btn-ctx:hover, .wai-btn-back:hover { color: #014653; }
+.wai-btn-back:hover { background: #E6F0F1; border-color: #cfdcde; }
+.wai-btn-ctx:hover { border-color: #014653; background: #f7ffd1; box-shadow: 0 4px 14px rgba(224,255,2,.35); }
+
+/* CONTEXTUAL + BACK — teal surfaces: the page-header row, or any wrapper marked .wai-on-dark */
+.page-hedding .wai-btn-ctx, .page-hedding .wai-btn-back,
+.wai-on-dark .wai-btn-ctx, .wai-on-dark .wai-btn-back {
+    background: rgba(255,255,255,.08); color: #fff; border-color: rgba(255,255,255,.24);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.page-hedding .wai-btn-ctx:hover, .page-hedding .wai-btn-back:hover,
+.wai-on-dark .wai-btn-ctx:hover, .wai-on-dark .wai-btn-back:hover { color: #fff; }
+.page-hedding .wai-btn-back:hover, .wai-on-dark .wai-btn-back:hover { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.4); }
+.page-hedding .wai-btn-ctx:hover, .wai-on-dark .wai-btn-ctx:hover {
+    border-color: rgba(224,255,2,.7); background: rgba(224,255,2,.12); box-shadow: 0 4px 16px rgba(224,255,2,.25);
+}
+.page-hedding .wai-btn:focus-visible, .wai-on-dark .wai-btn:focus-visible { outline-color: #E0FF02; }
+
+/* SELECTED state for contextual buttons used as tabs / segmented filters (add .is-active + aria-current="page") */
+.wai-btn-ctx.is-active, .wai-btn-ctx.is-active:hover { background: #014653; color: #fff; border-color: #014653; box-shadow: none; }
+.page-hedding .wai-btn-ctx.is-active, .wai-on-dark .wai-btn-ctx.is-active,
+.page-hedding .wai-btn-ctx.is-active:hover, .wai-on-dark .wai-btn-ctx.is-active:hover { background: #fff; color: #014653; border-color: #fff; box-shadow: none; }
+
+@keyframes wai-btn-glow { 0% { background-position: 0 0; } 50% { background-position: 300% 0; } 100% { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .wai-btn-primary:hover::before { animation: none; } .wai-btn { transition: none; } }
+@media (prefers-reduced-transparency: reduce) {
+    .page-hedding .wai-btn-ctx, .page-hedding .wai-btn-back, .wai-on-dark .wai-btn-ctx, .wai-on-dark .wai-btn-back {
+        -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(255,255,255,.12);
+    }
+}

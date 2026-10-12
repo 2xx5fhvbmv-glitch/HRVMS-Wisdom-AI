@@ -34,7 +34,18 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <div class="d-flex justify-content-end">
+                    <div class="d-flex justify-content-end align-items-center flex-wrap gap-3">
+                        <div class="vm-category-tabs d-flex gap-2" role="navigation" aria-label="Budget category">
+                            @foreach ([
+                                'permanent'    => 'Permanent',
+                                'nonpermanent' => 'Casual & Intern',
+                                'all'          => 'All Combined',
+                            ] as $tabValue => $tabLabel)
+                                <a href="{{ route('resort.budget.manning', ['year' => $year, 'category_view' => $tabValue]) }}"
+                                   class="wai-btn wai-btn-ctx {{ ($categoryView ?? 'permanent') === $tabValue ? 'is-active' : '' }}"
+                                   @if(($categoryView ?? 'permanent') === $tabValue) aria-current="page" @endif>{{ $tabLabel }}</a>
+                            @endforeach
+                        </div>
                         <form id="SendToFinance" method="POST"  >
                             @csrf
                             <input type="hidden" name="year" id="SendToFinanceYear" value="{{ $year }}">
@@ -75,8 +86,8 @@
                             @endif
                             @if(!empty($deptData->Budget_id))
                                 <a href="{{ route('resort.budget.downloadApprovalPdf', $deptData->Budget_id) }}"
-                                   target="_blank" class="btn btn-white ms-3">
-                                    <i class="fa-regular fa-file-pdf"></i> Download Approval Record
+                                   target="_blank" class="wai-btn wai-btn-ctx ms-3">
+                                    <i class="fa-regular fa-file-pdf" aria-hidden="true"></i>Download Approval Record
                                 </a>
                             @endif
                             {{-- @if($employeeRankPosition['position'] == 'Corporate Office')
@@ -88,17 +99,6 @@
             </div>
         </div>
 
-        {{-- Category tabs sit on the teal band above the card (same as View Budget): lime = active, opaque grey = the others. --}}
-        <div class="vm-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
-            @foreach ([
-                'permanent'    => 'Permanent',
-                'nonpermanent' => 'Casual & Intern',
-                'all'          => 'All Combined',
-            ] as $tabValue => $tabLabel)
-                <a href="{{ route('resort.budget.manning', ['year' => $year, 'category_view' => $tabValue]) }}"
-                   class="btn btn-sm {{ ($categoryView ?? 'permanent') === $tabValue ? 'wfp-btn-accent' : 'wfp-btn-neutral' }}">{{ $tabLabel }}</a>
-            @endforeach
-        </div>
 
     <div>
 
@@ -283,7 +283,6 @@
 @endsection
 
 @section('import-css')
-@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @include('resorts._dropdown_styles')
 @include('resorts.budget._view_manning_styles')
 @endsection

@@ -1,0 +1,25 @@
+/*
+ * Buttons that sit on the teal page-header band (.page-hedding).
+ *
+ * Every module ships its own copy of the "emotional button" classes (wfp-, ta-, payroll-, taa-, leave-,
+ * eb-, perf-, learning-btn-*). Their *-btn-secondary is transparent with teal text, which is invisible on
+ * the teal band (only the faint border shows). One global rule fixes all of them, whatever the prefix:
+ * white text, white hairline, soft white wash on hover (same values the eb-/perf-/learning- copies already
+ * use). Loaded once from layouts/css.blade.php; per-module partials no longer need their own hero fix.
+ *
+ * Specificity is intentionally higher than the module rules (.x-btn-secondary / .x-btn-secondary:hover).
+ */
+.page-hedding [class*="-btn-secondary"] {
+    color: #fff;
+    border-color: rgba(255, 255, 255, .55);
+}
+.page-hedding [class*="-btn-secondary"]:hover,
+.page-hedding [class*="-btn-secondary"]:focus-visible {
+    background: rgba(255, 255, 255, .14);
+    border-color: #fff;
+    color: #fff;
+}
+.page-hedding [class*="-btn-secondary"]:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}

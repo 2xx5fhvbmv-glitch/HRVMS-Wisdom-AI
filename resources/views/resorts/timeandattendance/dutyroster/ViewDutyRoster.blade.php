@@ -25,8 +25,8 @@
                         </div>
                     </div>
                     <div class="col-auto">
-                        <a href="{{ route('resort.timeandattendance.CreateDutyRoster') }}" class="btn btn-sm taa-btn-positive @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.CreateDutyRoster',config('settings.resort_permissions.view')) == false) d-none @endif">
-                            <i class="fa-solid fa-plus"></i> Create Duty Roster
+                        <a href="{{ route('resort.timeandattendance.CreateDutyRoster') }}" class="wai-btn wai-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.CreateDutyRoster',config('settings.resort_permissions.view')) == false) d-none @endif">
+                            <i class="fa-solid fa-plus" aria-hidden="true"></i>Create Duty Roster
                         </a>
                     </div>
                 </div>

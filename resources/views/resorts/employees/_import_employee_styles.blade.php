@@ -35,29 +35,12 @@
     .ie-step .ie-d{ font-size:12.5px; color:var(--g2); margin-top:2px; }
     .ie-controls{ margin-top:14px; }
 
-    /* buttons */
-    .ie-btn{ display:inline-flex; align-items:center; gap:8px; font:inherit; font-size:14px; font-weight:500;
-        border-radius:10px; padding:11px 18px; cursor:pointer; border:1px solid transparent;
-        transition:background .15s,border-color .15s; text-decoration:none; }
-    .ie-btn.ie-ghost{ background:#fff; border-color:var(--line); color:var(--teal); }
-    .ie-btn.ie-ghost:hover{ background:var(--teal-3); border-color:#cfe0e1; }
-    .ie-btn.ie-primary{ background:var(--teal); color:#fff; }
-    .ie-btn.ie-primary:hover{ background:var(--teal-2); }
-    .ie-btn.ie-primary:disabled{ background:var(--g4); cursor:not-allowed; }
-
     /* file picker — no drag & drop */
     .ie-filepick{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-    .ie-choose{ display:inline-flex; align-items:center; gap:8px; font:inherit; font-size:13px; font-weight:500;
-        color:var(--teal); background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 15px;
-        cursor:pointer; flex:none; }
-    .ie-choose:hover{ background:var(--teal-3); border-color:#cfe0e1; }
     .ie-fname{ font-size:13px; color:var(--g3); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .ie-fname.ie-set{ color:var(--g1); font-weight:500; }
 
     /* footer */
     .ie-foot{ display:flex; justify-content:flex-end; border-top:1px solid var(--line-2); padding:18px 0; margin-top:0; }
 
-    @media (prefers-reduced-motion: reduce){
-        .ie-btn, .ie-choose{ transition:none; }
-    }
 </style>

@@ -19,7 +19,9 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('shopkeepers.index') }}" class="btn payroll-btn-ghost btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Back to shopkeepers</a>
+                    <a href="{{ route('shopkeepers.index') }}" class="wai-btn wai-btn-back">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Back to shopkeepers
+                    </a>
                 </div>
             </div>
         </div>
@@ -66,7 +68,7 @@
                         </div>
                     </div>
                 </div>
-                <button type="button" id="payment-download-btn" class="sk-ghostbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download</button>
+                <button type="button" id="payment-download-btn" class="wai-btn wai-btn-ctx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download</button>
                 <span class="sk-spacer-flex"></span>
                 @if(!empty($canUpdatePaymentStatus))
                 <label class="sk-chkall"><input type="checkbox" class="sk-chk" id="payment-check-all" aria-label="Check all">Check all</label>

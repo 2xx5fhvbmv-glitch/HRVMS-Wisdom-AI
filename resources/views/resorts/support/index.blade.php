@@ -36,7 +36,7 @@
                         </div>
                     </div>
                     <div class="col-auto ms-auto">
-                        <a class="btn eb-btn-accent @if(Common::checkRouteWisePermission('support.index',config('settings.resort_permissions.create')) == false) d-none @endif" href="#raiseATicket-modal" data-bs-toggle="modal">
+                        <a class="wai-btn wai-btn-primary @if(Common::checkRouteWisePermission('support.index',config('settings.resort_permissions.create')) == false) d-none @endif" href="#raiseATicket-modal" data-bs-toggle="modal">
                             Raise a Ticket
                         </a>
                     </div>

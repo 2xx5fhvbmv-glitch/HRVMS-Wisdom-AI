@@ -24,6 +24,12 @@
                             <h1>{{ $page_title }}</h1>
                         </div>
                     </div>
+                    <div class="col-auto ms-auto">
+                        <a href="{{ route('people.announcement.create') }}"
+                           class="wai-btn wai-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('people.announcements', config('settings.resort_permissions.create')) == false) d-none @endif">
+                            <i class="fa-solid fa-plus" aria-hidden="true"></i>Create Announcement
+                        </a>
+                    </div>
                 </div>
             </div>
 

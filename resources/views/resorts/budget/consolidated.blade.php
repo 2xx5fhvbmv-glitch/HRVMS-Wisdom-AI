@@ -119,10 +119,33 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <div class="d-flex justify-content-end">
+                    <div class="d-flex justify-content-end align-items-center flex-wrap gap-3">
+                        <div class="cb-category-tabs d-flex gap-2 align-items-center flex-wrap" role="navigation" aria-label="Budget category">
+                            @foreach ([
+                                'permanent'    => 'Permanent',
+                                'nonpermanent' => 'Casual & Intern',
+                                'all'          => 'All Combined',
+                            ] as $tabValue => $tabLabel)
+                                <button type="button" class="wai-btn wai-btn-ctx cb-tab-btn {{ $tabValue === 'permanent' ? 'is-active' : '' }}"
+                                        data-tab="{{ $tabValue }}" @if($tabValue === 'permanent') aria-current="page" @endif onclick="cbSwitchTab('{{ $tabValue }}', this)">{{ $tabLabel }}</button>
+                            @endforeach
+                            {{-- Casual/Intern sub-toggle — this page fetches its whole tree
+                                 in one AJAX call (unlike View Budget's lazy per-node
+                                 system), but the rendered partial/JS still assumes exactly
+                                 one category at a time, so "Casual & Intern" shows one of
+                                 the two rather than both stacked, same reduced-risk
+                                 pattern as View Budget's identical tab. --}}
+                            <div class="vb-sub-toggle d-none" id="cbSubToggle" style="display:flex;gap:8px;padding-left:12px;border-left:1px solid rgba(255,255,255,.24);">
+                                @foreach (['Casual' => 'Casual', 'Intern' => 'Intern'] as $subValue => $subLabel)
+                                    <button type="button" class="wai-btn wai-btn-ctx cb-sub-btn {{ $subValue === 'Casual' ? 'is-active' : '' }}"
+                                            data-sub="{{ $subValue }}" @if($subValue === 'Casual') aria-current="page" @endif onclick="cbSwitchSub('{{ $subValue }}', this)">{{ $subLabel }}</button>
+                                @endforeach
+                            </div>
+                        </div>
                         <form id="SendToFinance" method="POST"  >
                             @csrf
                             <input type="hidden" name="year" id="SendToFinanceYear" value="">
+
                             {{-- WP7(D4) — without this the controller had no
                                  idea which tab was open and forwarded EVERY
                                  category for every department at once,
@@ -160,28 +183,6 @@
                         </form>
                     </div>
                 </div>
-            </div>
-        </div>
-        <div class="cb-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;align-items:center;">
-            @foreach ([
-                'permanent'    => 'Permanent',
-                'nonpermanent' => 'Casual & Intern',
-                'all'          => 'All Combined',
-            ] as $tabValue => $tabLabel)
-                <button type="button" class="btn btn-sm cb-tab-btn {{ $tabValue === 'permanent' ? 'wfp-btn-accent' : 'wfp-btn-neutral' }}"
-                        data-tab="{{ $tabValue }}" onclick="cbSwitchTab('{{ $tabValue }}', this)">{{ $tabLabel }}</button>
-            @endforeach
-            {{-- Casual/Intern sub-toggle — this page fetches its whole tree
-                 in one AJAX call (unlike View Budget's lazy per-node
-                 system), but the rendered partial/JS still assumes exactly
-                 one category at a time, so "Casual & Intern" shows one of
-                 the two rather than both stacked, same reduced-risk
-                 pattern as View Budget's identical tab. --}}
-            <div class="vb-sub-toggle d-none" id="cbSubToggle" style="display:flex;gap:4px;margin-left:8px;padding-left:8px;border-left:1px solid var(--line,#EEF2F2);">
-                @foreach (['Casual' => 'Casual', 'Intern' => 'Intern'] as $subValue => $subLabel)
-                    <button type="button" class="btn btn-xs cb-sub-btn {{ $subValue === 'Casual' ? 'wfp-btn-accent' : 'wfp-btn-neutral' }}"
-                            data-sub="{{ $subValue }}" onclick="cbSwitchSub('{{ $subValue }}', this)">{{ $subLabel }}</button>
-                @endforeach
             </div>
         </div>
         <div class="card">
@@ -245,7 +246,6 @@
 @endsection
 
 @section('import-css')
-@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -295,11 +295,11 @@
     function cbSwitchTab(tab, btn) {
         cbTab = tab;
         document.querySelectorAll('.cb-tab-btn').forEach(b => {
-            b.classList.remove('wfp-btn-accent');
-            b.classList.add('wfp-btn-neutral');
+            b.classList.remove('is-active');
+            b.removeAttribute('aria-current');
         });
-        btn.classList.remove('wfp-btn-neutral');
-        btn.classList.add('wfp-btn-accent');
+        btn.classList.add('is-active');
+        btn.setAttribute('aria-current', 'page');
         document.getElementById('cbSubToggle').classList.toggle('d-none', tab !== 'nonpermanent');
         cbSyncEmploymentTypeField();
         fetchConsolidatedBudget(document.getElementById('year').value);
@@ -308,11 +308,11 @@
     function cbSwitchSub(sub, btn) {
         cbSub = sub;
         document.querySelectorAll('.cb-sub-btn').forEach(b => {
-            b.classList.remove('wfp-btn-accent');
-            b.classList.add('wfp-btn-neutral');
+            b.classList.remove('is-active');
+            b.removeAttribute('aria-current');
         });
-        btn.classList.remove('wfp-btn-neutral');
-        btn.classList.add('wfp-btn-accent');
+        btn.classList.add('is-active');
+        btn.setAttribute('aria-current', 'page');
         cbSyncEmploymentTypeField();
         fetchConsolidatedBudget(document.getElementById('year').value);
     }

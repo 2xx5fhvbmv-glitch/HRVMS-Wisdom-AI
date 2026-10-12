@@ -459,6 +459,16 @@
 
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
+        @php
+            // 3 tabs (Permanent / Casual & Intern / All Combined) — same
+            // category model as View Manning, but this page's drill-down
+            // is a single AJAX-driven accordion controller, not a simple
+            // JSON-templated grid (see build spec item 2.1's controller
+            // comment). "Casual & Intern" therefore reuses that one
+            // accordion pointed at whichever of Casual/Intern the small
+            // sub-toggle beside the tabs picks, rather than rendering both at once.
+            $vbCategoryView = $categoryView ?? 'permanent';
+        @endphp
         <div class="page-hedding" id="view-budget-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
@@ -467,37 +477,33 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
+                <div class="col-auto">
+                    <div class="d-flex justify-content-end align-items-center flex-wrap gap-3">
+                        <div class="vb-category-tabs d-flex gap-2" role="navigation" aria-label="Budget category">
+                            @foreach ([
+                                'permanent'    => 'Permanent',
+                                'nonpermanent' => 'Casual & Intern',
+                                'all'          => 'All Combined',
+                            ] as $tabValue => $tabLabel)
+                                <a href="{{ route('resort.budget.viewbudget', ['year' => request()->get('year', date('Y')), 'category_view' => $tabValue]) }}"
+                                   class="wai-btn wai-btn-ctx {{ $vbCategoryView === $tabValue ? 'is-active' : '' }}"
+                                   @if($vbCategoryView === $tabValue) aria-current="page" @endif>{{ $tabLabel }}</a>
+                            @endforeach
+                        </div>
+                        @if($vbCategoryView === 'nonpermanent')
+                            <div class="vb-sub-toggle d-flex gap-2" role="navigation" aria-label="Casual or Intern" style="padding-left:12px;border-left:1px solid rgba(255,255,255,.24);">
+                                @foreach (['Casual' => 'Casual', 'Intern' => 'Intern'] as $subValue => $subLabel)
+                                    <a href="{{ route('resort.budget.viewbudget', ['year' => request()->get('year', date('Y')), 'category_view' => 'nonpermanent', 'sub' => $subValue]) }}"
+                                       class="wai-btn wai-btn-ctx {{ ($activeSub ?? 'Casual') === $subValue ? 'is-active' : '' }}"
+                                       @if(($activeSub ?? 'Casual') === $subValue) aria-current="true" @endif>{{ $subLabel }}</a>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </div>
             </div>
         </div>
 
-        @php
-            // 3 tabs (Permanent / Casual & Intern / All Combined) — same
-            // category model as View Manning, but this page's drill-down
-            // is a single AJAX-driven accordion controller, not a simple
-            // JSON-templated grid (see build spec item 2.1's controller
-            // comment). "Casual & Intern" therefore reuses that one
-            // accordion pointed at whichever of Casual/Intern the small
-            // sub-toggle below picks, rather than rendering both at once.
-            $vbCategoryView = $categoryView ?? 'permanent';
-        @endphp
-        <div class="vb-category-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
-            @foreach ([
-                'permanent'    => 'Permanent',
-                'nonpermanent' => 'Casual & Intern',
-                'all'          => 'All Combined',
-            ] as $tabValue => $tabLabel)
-                <a href="{{ route('resort.budget.viewbudget', ['year' => request()->get('year', date('Y')), 'category_view' => $tabValue]) }}"
-                   class="btn btn-sm {{ $vbCategoryView === $tabValue ? 'wfp-btn-accent' : 'wfp-btn-neutral' }}">{{ $tabLabel }}</a>
-            @endforeach
-            @if($vbCategoryView === 'nonpermanent')
-                <div class="vb-sub-toggle" style="display:flex;gap:4px;margin-left:8px;padding-left:8px;border-left:1px solid var(--line,#EEF2F2);">
-                    @foreach (['Casual' => 'Casual', 'Intern' => 'Intern'] as $subValue => $subLabel)
-                        <a href="{{ route('resort.budget.viewbudget', ['year' => request()->get('year', date('Y')), 'category_view' => 'nonpermanent', 'sub' => $subValue]) }}"
-                           class="btn btn-xs {{ ($activeSub ?? 'Casual') === $subValue ? 'wfp-btn-accent' : 'wfp-btn-neutral' }}">{{ $subLabel }}</a>
-                    @endforeach
-                </div>
-            @endif
-        </div>
         <div class="card">
             <div class="card-header">
                 <div class="row g-md-3 g-2 align-items-center justify-content-between">
@@ -707,7 +713,6 @@
 @endsection
 
 @section('import-css')
-@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

@@ -117,7 +117,7 @@
        separation from the fields above; no background/shadow/sticky, since
        it's just the tail end of the same card surface now. Buttons use the
        shared wfp-btn-secondary/wfp-btn-primary classes (from
-       _wfp_buttons_v2_styles, included alongside this file) so they share
+       the global buttons.css) so they share
        the same hover-lift/press motion and teal fill as every other
        Cancel/Submit pair in the app. */
     .bg-actionbar{ margin-top:20px; padding-top:16px; border-top:1px solid var(--line-2);

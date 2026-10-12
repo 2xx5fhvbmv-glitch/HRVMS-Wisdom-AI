@@ -37,12 +37,12 @@
                          </div>
                          </div>
                          <div class="col-auto ms-auto d-flex gap-2 flex-wrap @if(App\Helpers\Common::checkRouteWisePermission('people.compliance.index',config('settings.resort_permissions.create')) == false) d-none @endif">
-                              <a class="btn eb-btn-hero" href="{{route('people.compliance.run')}}">Run Compliance Check Now</a>
-                              <button type="button" class="btn eb-btn-accent cc-ai-btn" id="ai-anomaly-scan-btn" title="Run an AI-only anomaly scan that catches issues the rule-based engine can't (salary outliers, ratio drifts, etc.)">
+                              <a class="wai-btn wai-btn-primary" href="{{route('people.compliance.run')}}">Run Compliance Check Now</a>
+                              <button type="button" class="wai-btn wai-btn-ctx cc-ai-btn" id="ai-anomaly-scan-btn" title="Run an AI-only anomaly scan that catches issues the rule-based engine can't (salary outliers, ratio drifts, etc.)">
                                   @include('resorts.renderfiles.ai_spark', ['class' => 'me-1'])Run AI Anomaly Scan
                               </button>
-                              <button type="button" class="btn eb-btn-accent" id="ai-regenerate-btn" title="Re-run the AI explanation + remediation on the next batch of 15 breached compliance rows. Picks never-enriched rows first, then the oldest enrichments. Click again for the next batch.">
-                                  <i class="fa-solid fa-rotate me-1"></i>Regenerate AI
+                              <button type="button" class="wai-btn wai-btn-ctx" id="ai-regenerate-btn" title="Re-run the AI explanation + remediation on the next batch of 15 breached compliance rows. Picks never-enriched rows first, then the oldest enrichments. Click again for the next batch.">
+                                  <i class="fa-solid fa-rotate" aria-hidden="true"></i>Regenerate AI
                               </button>
                          </div>
                     </div>
@@ -121,7 +121,7 @@
                                 </div>
                             </div>
 
-                            <a id="compliance-download-btn" href="{{route('people.compliance.download')}}" class="btn eb-btn-secondary">
+                            <a id="compliance-download-btn" href="{{route('people.compliance.download')}}" class="wai-btn wai-btn-ctx">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                                 Download
                             </a>

@@ -57,7 +57,7 @@
                             </div>
                         </div>
                         <div class="col-auto">
-                            <a href="#" class="btn btn-themeBlue btn-sm" id="submitBtn">Submit</a>
+                            <a href="#" class="wai-btn wai-btn-primary" id="submitBtn">Submit</a>
                         </div>
                         <!-- <div class="col-auto ms-auto pe-0">
                             <a href="#" class="btn btn-themeSkyblue btn-sm" id="exportPdfBtn">Export</a>
@@ -66,7 +66,7 @@
                             <a href="#" class="btn btn-themeSkyblue btn-sm" id="exportPdfAlternativeBtn" title="HTML2PDF Export">HTML2PDF</a>
                         </div> -->
                          <div class="col-auto  ms-auto pe-0">
-                            <a href="#" class="btn btn-themeSkyblue btn-sm" id="exportPdfCanvasBtn" title="Canvas Export (Most Reliable)">Export To PDF</a>
+                            <a href="#" class="wai-btn wai-btn-ctx" id="exportPdfCanvasBtn" title="Canvas Export (Most Reliable)">Export to PDF</a>
                         </div>
                         <div class="col-auto">
                             <a href="#" class="btn btn-themeBlue btn-sm" id="refreshBtn">Refresh</a>

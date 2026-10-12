@@ -27,13 +27,13 @@
                       <div class="col-auto  ms-auto">
                         
                         <div class="dropdown @if($downloadBtn ==false) d-none @endif">
-                            <button class="btn btn-theme dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <button class="wai-btn wai-btn-ctx dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 Download
                             </button>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{{ route('people.salary-increment.download',['file'=>'pdf']) }}">Pdf
+                                <li><a class="dropdown-item" href="{{ route('people.salary-increment.download',['file'=>'pdf']) }}">PDF
                              </a></li>
-                                <li><a class="dropdown-item" href="{{ route('people.salary-increment.download',['file'=>'excel']) }}">Excel 
+                                <li><a class="dropdown-item" href="{{ route('people.salary-increment.download',['file'=>'excel']) }}">Excel
                              </a></li>
                             </ul>
                             </div>
