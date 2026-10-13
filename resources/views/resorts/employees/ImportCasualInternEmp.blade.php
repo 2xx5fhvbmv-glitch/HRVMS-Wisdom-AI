@@ -17,8 +17,8 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('resort.Add.Employee') }}" class="btn btn-sm wfp-btn-neutral">
-                        <i class="fa-solid fa-arrow-left"></i> Back to Import Employee
+                    <a href="{{ route('resort.Add.Employee') }}" class="wai-btn wai-btn-back">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Back to Import Employee
                     </a>
                 </div>
             </div>
@@ -34,7 +34,7 @@
                                 <div class="ie-t">Download Template</div>
                                 <div class="ie-d">For Casual/Agency and Intern/Trainee staff already on-site — a lighter template than the Master Employee Import (name, ID, nationality, mobile, department, position, reporting manager, employment type, and an optional work permit number).</div>
                                 <div class="ie-controls">
-                                    <a href="{{ route('resort.employee.downloadCasualInternTemplate') }}" class="ie-btn ie-ghost">
+                                    <a href="{{ route('resort.employee.downloadCasualInternTemplate') }}" class="wai-btn wai-btn-ctx">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                                         Download Template
                                     </a>
@@ -48,7 +48,7 @@
                                 <div class="ie-t">Upload Completed File</div>
                                 <div class="ie-d">Reporting Manager is required — that person marks this employee's attendance/leave going forward, since Casual/Intern staff have no mobile app of their own.</div>
                                 <div class="ie-controls ie-filepick uploadFile-block">
-                                    <label class="ie-choose">
+                                    <label class="wai-btn wai-btn-ctx">
                                         <input type="file" name="Employeefile" id="CIEmployeefile" hidden accept=".xls,.xlsx">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M13 2v7h7"/></svg>
                                         <span id="ciChooseTxt">Choose File</span>
@@ -61,7 +61,7 @@
                     </div>
 
                     <div class="ie-foot">
-                        <button type="submit" class="ie-btn ie-primary">Submit</button>
+                        <button type="submit" class="wai-btn wai-btn-primary">Submit</button>
                     </div>
                 </form>
 
@@ -86,7 +86,6 @@
 @endsection
 
 @section('import-css')
-@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @include('resorts.employees._import_employee_styles')
 @endsection
 

@@ -27,7 +27,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="#createTask-modal" data-bs-toggle="modal" class="btn eb-btn-accent @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.event',config('settings.resort_permissions.create')) == false) d-none @endif">Create Task</a>
+                        <a href="#createTask-modal" data-bs-toggle="modal" class="wai-btn wai-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.event',config('settings.resort_permissions.create')) == false) d-none @endif">Create Task</a>
                     </div>
                 </div>
             </div>

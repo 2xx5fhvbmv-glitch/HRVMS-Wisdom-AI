@@ -1,6 +1,6 @@
 {{--
     Presentation-only CSS for the Payroll emotional-button pass — same
-    system and reasoning as workforce_planning/_wfp_buttons_v2_styles.blade.php,
+    system and reasoning as public/resorts_assets/css/buttons.css (originally the Workforce Planning partial),
     scoped to payroll- prefixed classes so nothing here can leak onto the
     380+ other files still using btn-theme/btn-themeBlue/etc.
 

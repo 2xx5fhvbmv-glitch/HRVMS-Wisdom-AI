@@ -675,7 +675,6 @@
 @endSection
 
 @section('import-css')
-@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @include('resorts.benifitgrid._benefit_grid_form_styles')
 @endsection
 

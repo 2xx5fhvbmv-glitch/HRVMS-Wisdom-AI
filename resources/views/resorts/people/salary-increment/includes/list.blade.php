@@ -24,7 +24,7 @@
                                  <h1>{{ $page_title }}</h1>
                             </div>
                       </div>
-                      <div class="col-auto  ms-auto"><a class="btn btn-theme @if(Common::checkRouteWisePermission('people.salary-increment.index',config('settings.resort_permissions.create')) == false) d-none @endif" href="{{ route('people.salary-increment.grid-index') }}">Initiate Increment 
+                      <div class="col-auto  ms-auto"><a class="wai-btn wai-btn-primary @if(Common::checkRouteWisePermission('people.salary-increment.index',config('settings.resort_permissions.create')) == false) d-none @endif" href="{{ route('people.salary-increment.grid-index') }}">Initiate Increment 
                              </a></div>
                  </div>
             </div>

@@ -33,7 +33,7 @@
                     <div class="row g-md-3 g-2 align-items-center">
 
                         <div class="col-auto ms-auto">
-                            <a href="#" class="btn eb-btn-secondary btn-sm">Download</a>
+                            <a href="#" class="wai-btn wai-btn-ctx">Download</a>
                         </div>
                     </div>
                 </div>

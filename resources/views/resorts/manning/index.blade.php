@@ -34,8 +34,8 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('resort.budget.config') }}" class="btn btn-sm wfp-btn-neutral">
-                        <i class="fa-solid fa-arrow-left"></i> Back to Configuration
+                    <a href="{{ route('resort.budget.config') }}" class="wai-btn wai-btn-back">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Back to Configuration
                     </a>
                 </div>
             </div>
@@ -73,9 +73,9 @@
                             <input type="search" class="form-control" id="divisions-search" placeholder="Search divisions…" />
                             <i class="fa-solid fa-search"></i>
                         </div>
-                        <a href="#" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif " data-bs-toggle="modal"
+                        <a href="#" class="wai-btn wai-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif " data-bs-toggle="modal"
                             data-bs-target="#add-divisionmodal">
-                            <i class="fa-solid fa-plus me-2"></i>New Division
+                            <i class="fa-solid fa-plus" aria-hidden="true"></i>New Division
                         </a>
                     </div>
                     <div class="manning-thwrap">
@@ -98,9 +98,9 @@
                             <input type="search" class="form-control" id="departments-search" placeholder="Search departments…" />
                             <i class="fa-solid fa-search"></i>
                         </div>
-                        <a href="#departments-modal" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif"
+                        <a href="#departments-modal" class="wai-btn wai-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif"
                             data-bs-toggle="modal" data-bs-target="#departments-modal">
-                            <i class="fa-solid fa-plus me-2"></i>New Department
+                            <i class="fa-solid fa-plus" aria-hidden="true"></i>New Department
                         </a>
                     </div>
                     <div class="manning-thwrap">
@@ -123,9 +123,9 @@
                             <input type="search" class="form-control" id="sections-search" placeholder="Search sections…" />
                             <i class="fa-solid fa-search"></i>
                         </div>
-                        <a href="#" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif" data-bs-toggle="modal"
+                        <a href="#" class="wai-btn wai-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif" data-bs-toggle="modal"
                             data-bs-target="#sections-modal">
-                            <i class="fa-solid fa-plus me-2"></i>New Section
+                            <i class="fa-solid fa-plus" aria-hidden="true"></i>New Section
                         </a>
                     </div>
                     <div class="manning-thwrap">
@@ -150,9 +150,9 @@
                             <input type="search" class="form-control" id="positions-search" placeholder="Search positions…" />
                             <i class="fa-solid fa-search"></i>
                         </div>
-                        <a href="#" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif" data-bs-toggle="modal"
+                        <a href="#" class="wai-btn wai-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif" data-bs-toggle="modal"
                             data-bs-target="#positions-modal">
-                            <i class="fa-solid fa-plus me-2"></i>New Position
+                            <i class="fa-solid fa-plus" aria-hidden="true"></i>New Position
                         </a>
                     </div>
                     <div class="manning-thwrap">
@@ -480,7 +480,6 @@
 @endsection
 
 @section('import-css')
-@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @include('resorts.manning._manning_styles')
 <style>
     /* The People > Employees search box gets its pill shape + teal icon from

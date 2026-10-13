@@ -36,8 +36,8 @@
                         <h1>Dashboard</h1>
                     </div>
                 </div>
-                <div class="col-auto ms-auto"><a class="btn eb-btn-secondary AddFolderButton" href="javascript:void(0)">+ Add Folder</a></div>
-                <div class="col-auto"><a class="btn eb-btn-accent UploadDocumentbutton " href="javascript:void(0)"  >Upload Document</a></div>
+                <div class="col-auto ms-auto"><a class="wai-btn wai-btn-ctx AddFolderButton" href="javascript:void(0)"><i class="fa-solid fa-plus" aria-hidden="true"></i>Add Folder</a></div>
+                <div class="col-auto"><a class="wai-btn wai-btn-primary UploadDocumentbutton" href="javascript:void(0)">Upload Document</a></div>
             </div>
         </div>
 

@@ -36,7 +36,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="{{ route('resort.vacancies.create') }}" class="btn ta-btn-accent @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.create')) == false) d-none @endif">New Hire</a>
+                        <a href="{{ route('resort.vacancies.create') }}" class="wai-btn wai-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.create')) == false) d-none @endif">New Hire</a>
                     </div>
                 </div>
             </div>
@@ -738,7 +738,7 @@
                     </button>
                 </div>
                 <div class="text-center mb-sm-4 mb-3">
-                    <a href="javascript:void(0)" class="DowloadAdvertisement btn ta-btn-secondary btn-sm">Download</a>
+                    <a href="javascript:void(0)" class="DowloadAdvertisement wai-btn wai-btn-ctx">Download</a>
                 </div>
                 <div class="input-group mb-sm-4 mb-3">
                     <input type="text" class="form-control datepicker" name="link_Expiry_date" id="link_Expiry_date" placeholder="Expiry Date" />

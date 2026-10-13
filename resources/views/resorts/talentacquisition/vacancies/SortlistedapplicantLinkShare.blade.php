@@ -25,7 +25,7 @@
                         </div>
                     </div>
                     <div class="col-auto ms-auto">
-                        <a href="javascript:history.back()" class="btn ta-btn-ghost"><i class="fa-solid fa-arrow-left me-1"></i>Back</a>
+                        <a href="javascript:history.back()" class="wai-btn wai-btn-back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Back</a>
                     </div>
                 </div>
             </div>

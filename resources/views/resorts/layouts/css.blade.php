@@ -13,6 +13,8 @@
 <link href="{{ URL::asset('resorts_assets/css/default.css')}}?v={{ @filemtime(public_path('resorts_assets/css/default.css')) }}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/developer.min.css')}}" rel="stylesheet">
 <link href="{{ URL::asset('resorts_assets/css/media.css')}}" rel=stylesheet>
+<link href="{{ URL::asset('resorts_assets/css/buttons.css')}}?v={{ @filemtime(public_path('resorts_assets/css/buttons.css')) }}" rel=stylesheet>
+<link href="{{ URL::asset('resorts_assets/css/header-band.css')}}?v={{ @filemtime(public_path('resorts_assets/css/header-band.css')) }}" rel=stylesheet>
 <link rel="apple-touch-icon" sizes="180x180" href="{{ URL::asset('resorts_assets/images/apple-touch-icon.png')}}">
 <link href="{{ URL::asset('resorts_assets/css/toastr.min.css')}}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/toastr-theme.css')}}" rel=stylesheet>

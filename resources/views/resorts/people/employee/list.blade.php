@@ -25,20 +25,28 @@
                         </div>
                     </div>
                     <div class="col-auto  ms-auto">
-                        <a class="btn btn-theme" href="{{route('people.employees.create')}}">Add New Employee</a>
+                        <a class="wai-btn wai-btn-primary" href="{{route('people.employees.create')}}">Add New Employee</a>
                     </div>
                 </div>
             </div>
+            <style>
+    /* Filter toolbar: one wrapping flex row instead of Bootstrap columns, so Location no longer
+       drops onto its own line. Items shrink to a minimum width, then wrap on narrow screens. */
+    .emp-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+    .emp-filter-search { flex: 1 1 220px; min-width: 0; }
+    .emp-filter { flex: 1 1 130px; min-width: 0; }
+    .emp-filter-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+</style>
             <div class="card card-empListPeopleEmp">
                 <div class="card-header">
-                    <div class="row g-md-3 g-2 align-items-center">
-                        <div class="col-xl-3 col-lg-5 col-md-7 col-sm-8 ">
+                    <div class="emp-filter-row">
+                        <div class="emp-filter-search">
                             <div class="input-group">
                                 <input type="search" class="form-control" id="search-input" placeholder="Search" />
                                 <i class="fa-solid fa-search"></i>
                             </div>
                         </div>
-                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                        <div class="emp-filter">
                             <select class="form-select dd-native-select" id="deptFilter">
                                 <option value="">Departments</option>
                                 @if($departments)
@@ -65,7 +73,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                        <div class="emp-filter">
                             <select class="form-select dd-native-select" id="positionFilter">
                                 <option value="">Positions</option>
                                 @if($positions)
@@ -92,7 +100,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                        <div class="emp-filter">
                             <select class="form-select dd-native-select" id="statusFilter">
                                 <option value="">Status</option>
                                 <option value="Onboarding">Onboarding</option>
@@ -122,7 +130,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                        <div class="emp-filter">
                             {{-- §24 — People Management category badge/filter: same
                                  Permanent/Casual/Intern bucket as Manning/Budget/
                                  Workforce Planning (Common::manningCategory()). --}}
@@ -147,7 +155,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                        <div class="emp-filter">
                             <select class="form-select dd-native-select" id="locationFilter">
                                 <option value="">Location</option>
                                 <option value="Malé">Malé</option>
@@ -167,20 +175,12 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-1 col-md-2 col-sm-3 col-6">
-                            <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear Filter</button>
-                        </div>
-                        
-
-                        
-                        <div class="col-auto ms-auto">
+                        <div class="emp-filter-actions">
+                            <button class="wai-btn wai-btn-ctx" id="clearFilter">Clear Filter</button>
                             {{-- Bulk Delete intentionally hidden — destructive employee
                                  removal must go through Resignation / Exit Clearance.
                                  The selection-driven Export action stays. --}}
-                            <button id="exportSelectedEmployees" class="btn btn-themeBlue btn-sm">Export</button>
-                        </div>
-                       
-                        <div class="col-auto">
+                            <button id="exportSelectedEmployees" class="wai-btn wai-btn-ctx">Export</button>
                             <a href="javascript:void();" class="btn btn-grid active">
                                 <img src="{{ URL::asset('resorts_assets/images/grid.svg')}}" alt="icon">
                             </a>

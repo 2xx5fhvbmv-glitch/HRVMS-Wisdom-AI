@@ -12,20 +12,17 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
+                <div class="col-auto">
+                    <div class="d-flex justify-content-end align-items-center flex-wrap gap-2" id="pcCategoryTabs" role="navigation" aria-label="Position category">
+                        <button type="button" class="wai-btn wai-btn-ctx is-active" id="pc-tab-casual" data-pc-category="Casual" aria-current="page">Casual</button>
+                        <button type="button" class="wai-btn wai-btn-ctx" id="pc-tab-intern" data-pc-category="Intern">Intern</button>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="card">
             <div class="card-body">
-                <ul class="nav nav-tabs mb-3" id="pcCategoryTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="pc-tab-casual" data-pc-category="Casual" type="button">Casual</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="pc-tab-intern" data-pc-category="Intern" type="button">Intern</button>
-                    </li>
-                </ul>
-
                 <form id="positionConfigForm" class="row g-3 align-items-end mb-4">
                     @csrf
                     <input type="hidden" name="employee_category" id="pc_employee_category" value="Casual">
@@ -55,7 +52,7 @@
                         <input type="text" class="form-control" id="pc_position_title" name="position_title" placeholder="e.g. Gardener" required>
                     </div>
                     <div class="col-md-12">
-                        <button type="submit" class="btn wfp-btn-primary" id="pcSaveBtn">Add Position</button>
+                        <button type="submit" class="wai-btn wai-btn-primary" id="pcSaveBtn">Add Position</button>
                     </div>
                 </form>
 
@@ -97,15 +94,14 @@
 @endsection
 
 @section('import-css')
-@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
 <script>
     $(function () {
         $('#pcCategoryTabs button').on('click', function () {
-            $('#pcCategoryTabs button').removeClass('active');
-            $(this).addClass('active');
+            $('#pcCategoryTabs button').removeClass('is-active').removeAttr('aria-current');
+            $(this).addClass('is-active').attr('aria-current', 'page');
             var category = $(this).data('pc-category');
             $('#pc_employee_category').val(category);
             $('#pc-list-title').text(category + ' positions');

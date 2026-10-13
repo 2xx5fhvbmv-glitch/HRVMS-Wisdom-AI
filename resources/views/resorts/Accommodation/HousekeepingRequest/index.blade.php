@@ -19,9 +19,9 @@
             <form id="HousekeepingRequestForm" data-parsley-validate>
                 <div class="card-body">
                     <div class="mb-3">
-                        <div class="btn-group" role="group" aria-label="Request against">
-                            <button type="button" class="btn eb-btn-secondary active" id="modeEmployeeBtn">By Employee</button>
-                            <button type="button" class="btn eb-btn-secondary" id="modeRoomBtn">By Building / Room</button>
+                        <div class="d-flex flex-wrap gap-2" role="group" aria-label="Request against">
+                            <button type="button" class="wai-btn wai-btn-ctx is-active" id="modeEmployeeBtn" aria-current="page">By Employee</button>
+                            <button type="button" class="wai-btn wai-btn-ctx" id="modeRoomBtn">By Building / Room</button>
                         </div>
                     </div>
 
@@ -177,7 +177,7 @@
                     </div>
                 </div>
                 <div class="card-footer text-end">
-                    <button type="submit" class="btn eb-btn-primary ms-1 btn-sm">Submit Request</button>
+                    <button type="submit" class="wai-btn wai-btn-primary">Submit Request</button>
                 </div>
             </form>
         </div>
@@ -217,8 +217,8 @@ $(document).ready(function () {
     $('#HousekeepingRequestForm').parsley();
 
     function switchMode(toRoom) {
-        $('#modeEmployeeBtn').toggleClass('active', !toRoom);
-        $('#modeRoomBtn').toggleClass('active', toRoom);
+        $('#modeEmployeeBtn').toggleClass('is-active', !toRoom).attr('aria-current', toRoom ? null : 'page');
+        $('#modeRoomBtn').toggleClass('is-active', toRoom).attr('aria-current', toRoom ? 'page' : null);
         $('#employeeModeBlock').toggleClass('d-none', toRoom);
         $('#roomModeBlock').toggleClass('d-none', !toRoom);
 
@@ -342,7 +342,7 @@ $(document).ready(function () {
             toastr.error('Please select at least one service.', 'Error', { positionClass: 'toast-bottom-right' });
             return false;
         }
-        var isRoomMode = $('#modeRoomBtn').hasClass('active');
+        var isRoomMode = $('#modeRoomBtn').hasClass('is-active');
         if (isRoomMode && !$('#building_1').val()) {
             toastr.error('Please select a building.', 'Error', { positionClass: 'toast-bottom-right' });
             return false;

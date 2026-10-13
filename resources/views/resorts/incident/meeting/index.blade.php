@@ -26,8 +26,8 @@
                     </div>
                     @if($canCreate)
                     <div class="col-auto">
-                        <a href="javascript:void(0)" class="btn eb-btn-accent" data-bs-toggle="modal" data-bs-target="#selectIncidentForMeetingModal">
-                            <i class="fa-solid fa-plus me-1"></i> Create Meeting
+                        <a href="javascript:void(0)" class="wai-btn wai-btn-primary" data-bs-toggle="modal" data-bs-target="#selectIncidentForMeetingModal">
+                            <i class="fa-solid fa-plus" aria-hidden="true"></i>Create Meeting
                         </a>
                     </div>
                     @endif

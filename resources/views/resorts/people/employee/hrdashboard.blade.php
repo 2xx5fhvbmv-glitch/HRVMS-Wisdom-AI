@@ -34,7 +34,7 @@
                         </div>
                     </div>
                     <div class="col-auto ms-auto">
-                        <a class="btn btn-theme @if(App\Helpers\Common::checkRouteWisePermission('people.employees',config('settings.resort_permissions.view')) == false) d-none @endif" href="{{route('people.employees')}}" >View Employees</a>
+                        <a class="wai-btn wai-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('people.employees',config('settings.resort_permissions.view')) == false) d-none @endif" href="{{route('people.employees')}}" >View Employees</a>
                     </div>
                 </div>
             </div>

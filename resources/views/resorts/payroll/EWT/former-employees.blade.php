@@ -265,7 +265,7 @@
                             setTimeout(() => {
                                 let newMonthColumns = json.months.map(month => ({
                                     data: 'monthly_data.' + month,
-                                    title: month,
+                                    title: month.replace(/\s\d{4}$/, ''),
                                     render: function(data) {
                                         if (!data || data.earnings === 0) return '<div class="text-center">-</div>';
                                         

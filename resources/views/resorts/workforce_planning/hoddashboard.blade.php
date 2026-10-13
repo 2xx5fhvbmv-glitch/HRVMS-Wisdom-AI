@@ -209,8 +209,7 @@
                                         </div>
                                     </div>
                                     <div class="text-center">
-                                        <a href="#sendRespond-modal" data-bs-toggle="modal" class="btn btn-sm wfp-btn-primary">Send
-                                            Response</a>
+                                        <a href="#sendRespond-modal" data-bs-toggle="modal" class="wai-btn wai-btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>Send Response</a>
                                     </div>
                                 </div>
                                 @endif
@@ -269,8 +268,7 @@
                                         </div>
                                     </div>
                                     <div class="text-center mb-2">
-                                        <a href="#sendRespond-modal" data-message_id="{{ $rejected->message_id ?? '' }}" data-Budget_id="{{ $rejected->Budget_id ?? '' }}" data-employment_type="{{ $rejected->employment_type ?? 'Permanent' }}" data-bs-toggle="modal" class="btn btn-sm wfp-btn-primary">Revise
-                                            Response</a>
+                                        <a href="#sendRespond-modal" data-message_id="{{ $rejected->message_id ?? '' }}" data-Budget_id="{{ $rejected->Budget_id ?? '' }}" data-employment_type="{{ $rejected->employment_type ?? 'Permanent' }}" data-bs-toggle="modal" class="wai-btn wai-btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>Revise Response</a>
                                     </div>
                                     @endforeach
                                 </div>
@@ -567,7 +565,6 @@
 @endsection
 
 @section('import-css')
-@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 <style>
     /* Manning modal header — two-line title + muted subtitle, close stays top-right */
     .manning-modal-header { align-items: flex-start; }

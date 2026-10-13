@@ -79,7 +79,7 @@
                                 </div>
                             </div>
                         </div>
-                        <a href="{{ route('reports.create') }}" class="btn eb-btn-accent @if(Common::checkRouteWisePermission('resort.report.index',config('settings.resort_permissions.create')) == false) d-none @endif">Custom Report</a>
+                        <a href="{{ route('reports.create') }}" class="wai-btn wai-btn-primary @if(Common::checkRouteWisePermission('resort.report.index',config('settings.resort_permissions.create')) == false) d-none @endif">Custom Report</a>
                     </div>
                 </div>  
             </div>  

@@ -26,7 +26,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('resort.accommodation.inventory') }}"  class="btn eb-btn-accent  @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.Inventory',config('settings.resort_permissions.create')) == false) d-none @endif">Add New
+                    <a href="{{ route('resort.accommodation.inventory') }}"  class="wai-btn wai-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.Inventory',config('settings.resort_permissions.create')) == false) d-none @endif">Add New
                         Inventory</a>
                 </div>
             </div>

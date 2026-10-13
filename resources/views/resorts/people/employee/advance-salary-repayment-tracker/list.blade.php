@@ -174,9 +174,9 @@ function initializeTable() {
         }
 
         $('#repayTrackPeopleEmpTable').DataTable({
-            "searching": true,
+            "searching": false,
             "bLengthChange": false,
-            "bFilter": true,
+            "bFilter": false,
             "bInfo": true,
             "bAutoWidth": false,
             "scrollX": true,

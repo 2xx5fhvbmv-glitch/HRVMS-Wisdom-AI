@@ -25,11 +25,11 @@
                     </div>
                 </div>
                 <div class="col-auto d-flex gap-2">
-                    <a href="{{ route('resort.employee.importCasualIntern') }}" class="btn btn-sm wfp-btn-secondary">
-                        Import Casual &amp; Intern Staff
+                    <a href="{{ route('resort.employee.importCasualIntern') }}" class="wai-btn wai-btn-ctx">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Import Casual &amp; Intern Staff
                     </a>
-                    <a href="{{ route('resort.budget.config') }}" class="btn btn-sm wfp-btn-neutral">
-                        <i class="fa-solid fa-arrow-left"></i> Back to Configuration
+                    <a href="{{ route('resort.budget.config') }}" class="wai-btn wai-btn-back">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Back to Configuration
                     </a>
                 </div>
             </div>
@@ -45,7 +45,7 @@
                                 <div class="ie-t">Export Department &amp; Position File</div>
                                 <div class="ie-d">Download the template, then fill in your employees against each department and position.</div>
                                 <div class="ie-controls">
-                                    <a href="{{ route('resort.export.Employee')}}" class="ie-btn ie-ghost">
+                                    <a href="{{ route('resort.export.Employee')}}" class="wai-btn wai-btn-ctx">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                                         Download Template
                                     </a>
@@ -59,7 +59,7 @@
                                 <div class="ie-t">Upload Completed File</div>
                                 <div class="ie-d">Upload the completed Excel file exported from the template.</div>
                                 <div class="ie-controls ie-filepick uploadFile-block">
-                                    <label class="ie-choose">
+                                    <label class="wai-btn wai-btn-ctx">
                                         <input type="file" name="Employeefile" id="Employeefile" hidden accept=".xls,.xlsx">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M13 2v7h7"/></svg>
                                         <span id="chooseTxt">Choose File</span>
@@ -72,7 +72,7 @@
                     </div>
 
                     <div class="ie-foot">
-                        <button type="submit" class="ie-btn ie-primary">Submit</button>
+                        <button type="submit" class="wai-btn wai-btn-primary">Submit</button>
                     </div>
                 </form>
 
@@ -106,11 +106,6 @@
 @endsection
 
 @section('import-css')
-{{-- _wfp_buttons_v2_styles is still needed here for the "Back to
-     Configuration" button in the page header above (wfp-btn-neutral) —
-     dropping it makes that button lose its background and disappear
-     against the teal header band. --}}
-@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @include('resorts.employees._import_employee_styles')
 @endsection
 

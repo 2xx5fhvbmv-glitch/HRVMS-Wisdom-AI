@@ -24,7 +24,7 @@
                             <h1>{{ $page_title }}</h1>
                         </div>
                     </div>
-                    <div class="col-auto ms-auto"><a href="#" class="btn btn-theme">Export</a></div>
+                    <div class="col-auto ms-auto"><a href="#" class="wai-btn wai-btn-ctx">Export</a></div>
                 </div>
             </div>
 

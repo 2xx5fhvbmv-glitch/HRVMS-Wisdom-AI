@@ -36,7 +36,7 @@
                     </div>
                 </div>
                 <div class="col-auto ms-auto">
-                    <a href="{{ route('Survey.create') }}" class="btn eb-btn-accent @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.create')) == false) d-none @endif">Create Survey</a>
+                    <a href="{{ route('Survey.create') }}" class="wai-btn wai-btn-primary @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.create')) == false) d-none @endif">Create Survey</a>
                 </div>
                 <!-- <div class="col-xxl-2 col-auto ms-auto">
                     <select class="form-select select2t-none" id="select-budgeted"

@@ -110,7 +110,12 @@
             <textarea id="wai-text" rows="1" placeholder="Ask WAI…" maxlength="2000"></textarea>
             <button type="button" id="wai-send" aria-label="Send" disabled><i class="fa-solid fa-paper-plane"></i></button>
         </div>
-        <div class="wai-foot">WAI can make mistakes. Verify important decisions.</div>
+        {{-- Daily message allowance. Hidden until the server sends a `usage` object ({limit, used, remaining}). --}}
+        <div class="wai-usage" id="wai-usage" hidden aria-live="polite">
+            <div class="u-row"><span id="wai-usage-txt"></span></div>
+            <div class="u-bar"><i id="wai-usage-bar"></i></div>
+        </div>
+        <div class="wai-foot">WAI is smart, not perfect yet — double-check key details. Always improving!</div>
     </div>
 
     <!-- Users chat panel -->
@@ -312,6 +317,8 @@
     display: flex; align-items: center; justify-content: center; overflow: hidden;
 }
 .wai-bot-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+/* the app's global <strong> rule sets its own (larger) size; keep bold text the same size as the sentence around it */
+.wai-bubble strong { font-size: inherit; }
 
 /* ================= WAI panel body ================= */
 .wai-messages { flex: 1; overflow-y: auto; padding: 24px 20px 6px; display: flex; flex-direction: column; gap: 12px; background: #fff; }
@@ -390,7 +397,18 @@
 #wai-send:hover, #uc-send:hover { transform: scale(1.05); }
 #wai-send:active, #uc-send:active { transform: scale(.96); }
 #wai-send:disabled, #uc-send:disabled { background: var(--wai-g6); color: var(--wai-g4); cursor: default; transform: none; }
-.wai-foot { text-align: center; font-size: 10px; color: var(--wai-g4); padding: 0 16px 14px; flex: none; }
+/* Daily message allowance (shown only when the server reports it) */
+.wai-usage { flex: none; margin: -4px 20px 10px; }
+.wai-usage .u-row { font-size: 11px; color: var(--muted); text-align: center; }
+.wai-usage .u-bar { height: 3px; border-radius: 3px; background: var(--line); margin-top: 6px; overflow: hidden; }
+.wai-usage .u-bar i { display: block; height: 100%; width: 100%; border-radius: 3px; background: var(--teal); transition: width .3s ease; }
+.wai-usage.is-low .u-row { color: #B7791F; }
+.wai-usage.is-low .u-bar i { background: #B7791F; }
+.wai-usage.is-out .u-row { color: #E5573F; }
+.wai-usage.is-out .u-bar i { background: #E5573F; }
+#wai-text:disabled { cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) { .wai-usage .u-bar i { transition: none; } }
+.wai-foot { display: flex; align-items: center; justify-content: center; gap: 5px; text-align: center; font-size: 11px; color: #93A4A9; padding: 0 16px 14px; flex: none; }
 
 @media (max-width: 480px) {
     .wai-float { top: 8px; right: 8px; width: calc(100vw - 16px); height: calc(100vh - 90px); }
@@ -560,7 +578,27 @@
     var input    = document.getElementById('wai-text');
     var sendBtn  = document.getElementById('wai-send');
 
-    var loaded = false, busy = false;
+    var loaded = false, busy = false, usageOut = false;
+
+    // ---- daily allowance (server sends `usage: {limit, used, remaining}`; nothing is shown without it) ----
+    var usageEl = document.getElementById('wai-usage'), usageTxt = document.getElementById('wai-usage-txt'), usageBar = document.getElementById('wai-usage-bar');
+    function applyUsage(u, fromEvent) {
+        if (!u || !(u.limit > 0) || !usageEl) return;
+        var rem = Math.max(0, u.remaining != null ? u.remaining : u.limit - (u.used || 0));
+        var low = rem > 0 && rem <= Math.max(5, Math.ceil(u.limit * 0.2));
+        usageOut = rem === 0;
+        usageEl.hidden = false;
+        usageEl.className = 'wai-usage' + (usageOut ? ' is-out' : low ? ' is-low' : '');
+        usageTxt.textContent = usageOut ? 'Daily limit reached. It resets at midnight.'
+            : low ? 'Only ' + rem + ' message' + (rem === 1 ? '' : 's') + ' left today'
+            : rem + ' of ' + u.limit + ' messages left today';
+        usageBar.style.width = (rem / u.limit * 100) + '%';
+        input.disabled = usageOut;
+        input.placeholder = usageOut ? 'Daily limit reached' : 'Ask WAI\u2026';
+        sendBtn.disabled = usageOut || !input.value.trim();
+        if (!fromEvent) document.dispatchEvent(new CustomEvent('wai:usage', { detail: u })); // keep the dashboard in step
+    }
+    document.addEventListener('wai:usage', function (e) { applyUsage(e.detail, true); });
 
     // ---- helpers -------------------------------------------------------
     function escapeHtml(s) {
@@ -667,6 +705,7 @@
         fetch(HISTORY_URL, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(function (r) { return r.json(); })
             .then(function (data) {
+                if (data && data.usage) applyUsage(data.usage);
                 if (data && data.success && data.messages && data.messages.length) {
                     msgs.innerHTML = '';
                     data.messages.forEach(function (m) { addMessage(m.role, m.content); });
@@ -680,7 +719,7 @@
 
     function sendMessage() {
         var text = input.value.trim();
-        if (!text || busy) return;
+        if (!text || busy || usageOut) return;
         busy = true; sendBtn.disabled = true;
         addMessage('user', text);
         input.value = ''; autoGrow(); toggleSuggestions(false); showTyping();
@@ -693,6 +732,7 @@
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
         .then(function (res) {
             hideTyping();
+            if (res.body && res.body.usage) applyUsage(res.body.usage);
             if (res.ok && res.body.success) {
                 addMessage('assistant', res.body.reply);
             } else {
@@ -700,7 +740,7 @@
             }
         })
         .catch(function () { hideTyping(); addMessage('assistant', '⚠️ Network error. Please try again.'); })
-        .finally(function () { busy = false; sendBtn.disabled = !input.value.trim(); input.focus(); });
+        .finally(function () { busy = false; sendBtn.disabled = usageOut || !input.value.trim(); if (!usageOut) input.focus(); });
     }
 
     function clearChat() {
@@ -729,7 +769,7 @@
 
     function autoGrow() {
         input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 110) + 'px';
-        sendBtn.disabled = !input.value.trim();
+        sendBtn.disabled = usageOut || !input.value.trim();
     }
 
     // The dock (see the second script block below) opens this panel

@@ -25,7 +25,7 @@
                         </div>
                     </div>
                     <div class="col-auto">
-                        <a href="{{ route('resort.timeandattendance.nonpermanent.index') }}" class="btn btn-sm wfp-btn-secondary">
+                        <a href="{{ route('resort.timeandattendance.nonpermanent.index') }}" class="wai-btn wai-btn-ctx">
                             Casual &amp; Intern Attendance
                         </a>
                     </div>
@@ -138,7 +138,7 @@
                         </div> -->
 
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <button class="btn taa-btn-secondary btn-sm" id="clearFilters">Clear Filter</button>
+                            <button class="wai-btn wai-btn-ctx" id="clearFilters">Clear Filter</button>
                         </div>
                         <div class="col-auto ms-auto">
                             <div class="view-toggle-group">
