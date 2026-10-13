@@ -358,6 +358,10 @@ class Employee extends Model
     {
         return $this->hasMany(EmployeePromotion::class, 'employee_id', 'id');
     }
+    public function finalSettlements()
+    {
+        return $this->hasMany(FinalSettlement::class, 'employee_id', 'id');
+    }
     public function resignation()
     {
         return $this->hasOne(EmployeeResignation::class, 'employee_id', 'id')

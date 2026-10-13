@@ -2761,9 +2761,10 @@ class VacancyController extends Controller
                             ->get()
                             ->map(function ($item) use($config) {
                                 $item->profileImg = $this->applicantPhotoUrl($item->passport_photo);
+                                // Raw dates so the table can sort chronologically (formatted d M Y sorts as text).
+                                $item->applied_date_raw = $item->Application_date;
                                 $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
 
-                                // Raw date so the table can sort chronologically (formatted d M Y sorts as text).
                                 $item->interview_date_raw = $item->InterViewDate;
                                 $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d M Y') : '-';
 

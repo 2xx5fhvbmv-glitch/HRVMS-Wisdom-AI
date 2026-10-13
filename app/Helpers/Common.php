@@ -5218,6 +5218,66 @@ class Common
     }
 
     /**
+     * Free every bed / room / villa an exiting employee still holds (all
+     * unit types live in assing_accommodations, GM Villa included), so
+     * occupancy stats update on their own. Same steps as the manual
+     * unassign (InventoryController): inventory Occupied -1, history row,
+     * emp_id=0 — in one transaction, so a unit is never half-released.
+     * HR is notified after commit; a notice failure never undoes the release.
+     * Throws on DB failure (caller logs it). Returns the freed unit labels.
+     */
+    public static function releaseAccommodationForEmployee(Employee $employee): array
+    {
+        $today = date('Y-m-d');
+        $released = DB::transaction(function () use ($employee, $today) {
+            $rows = \App\Models\AssingAccommodation::where('resort_id', $employee->resort_id)
+                ->where('emp_id', $employee->id)
+                ->with('availableAccommodation.accommodationType', 'availableAccommodation.building', 'availableAccommodation.availableAccommodationInvItem.inventoryModule')
+                ->lockForUpdate()
+                ->get();
+
+            $released = [];
+            foreach ($rows as $row) {
+                $unit = $row->availableAccommodation;
+                foreach ($unit->availableAccommodationInvItem ?? [] as $item) {
+                    if ($item->inventoryModule && $item->inventoryModule->Occupied > 0) {
+                        $item->inventoryModule->decrement('Occupied');
+                    }
+                }
+                self::recordAccommodationHistory($employee->resort_id, $employee->id, $row->id, null, $row->effected_date, $today, 'Vacated - resignation/termination');
+                $row->update(['emp_id' => 0, 'effected_date' => null]);
+
+                $released[$row->id] = trim(implode(' ', array_filter([
+                    $unit->accommodationType->AccommodationName ?? null,
+                    $unit->building->BuildingName ?? null,
+                    $unit && $unit->RoomNo ? 'Room ' . $unit->RoomNo : null,
+                    $row->BedNo,
+                ])));
+            }
+            return $released;
+        });
+
+        if ($released) {
+            try {
+                $name = $employee->resortAdmin->full_name ?? ('Employee #' . $employee->Emp_id);
+                self::notifyEmployees(
+                    $employee->resort_id,
+                    self::getResortHrEmployeeIds($employee->resort_id),
+                    'Accommodation Released',
+                    $name . ' has exited. Freed on ' . date('d M Y', strtotime($today)) . ': ' . implode(', ', $released) . '. Available for next hire.',
+                    'Accommodation',
+                    array_key_first($released),
+                    'accommodation-released'
+                );
+            } catch (\Throwable $e) {
+                \Log::warning("releaseAccommodationForEmployee notify failed for emp #{$employee->id}: " . $e->getMessage());
+            }
+        }
+
+        return array_values($released);
+    }
+
+    /**
      * Failed-login audit trail (security hardening review S10) — writes
      * one row per login attempt (success or failure) on any of the four
      * login surfaces. Wrapped in try/catch: a logging failure must never

@@ -1044,29 +1044,13 @@ class LeaveController extends Controller
         // dd($leaveDetail);
 
         if ($leaveDetail) {
-            // L-01: checkRouteWisePermission() above only checks the
-            // caller's ROLE has "view" access to the Leave Requests page in
-            // general — nothing here checked that THIS specific leave
-            // belongs to them, their department, or their approval queue.
-            // Any employee with page access could open any other
-            // employee's leave (incl. the sick-note attachment) by id.
-            $isOwner = (int) $employee->id === (int) $leaveDetail->emp_id;
-            $isApprover = DB::table('employees_leaves_status')
-                ->where('leave_request_id', $decodedId)
-                ->where('approver_id', $employee->id)
-                ->exists();
-            // getScopedDepartmentIds() returns the caller's OWN department
-            // for anyone without hasFullDataAccess — with no rank check of
-            // its own, it would let an ordinary same-department colleague
-            // (not just their HOD/EXCOM) through here, which is the exact
-            // "colleague can open colleague's leave" gap this fix closes.
-            // Gate it to HOD/EXCOM tier explicitly, matching every other
-            // "HOD sees own dept" call site's assumption that only
-            // HOD/EXCOM-rank callers ever reach it.
-            $isHodTier = in_array((int) $employee->rank, [1, 2], true);
-            $scopedDeptIds = Common::getScopedDepartmentIds($employee);
-            $inScopedDept = $isHodTier && ($scopedDeptIds === null || in_array((int) $leaveDetail->employee_dept_id, $scopedDeptIds, true));
-            if (!$isOwner && !$isApprover && !$inScopedDept) {
+            // L-01: checkRouteWisePermission() above only checks the caller's
+            // ROLE has "view" access to Leave Requests in general. Same shared
+            // gate as the mobile/web history endpoints: applicant, anyone in
+            // this leave's approval chain, HR/GM (full data access), or a
+            // HOD/EXCOM/MGR whose scoped departments include the applicant's.
+            // A plain same-department colleague is not let through.
+            if (!Common::canViewLeave($leaveDetail, $employee)) {
                 $page_title = 'Leave';
                 $msg = 'You are not authorized to view this leave request.';
                 return view('resorts.error', compact('page_title', 'msg'));

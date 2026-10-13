@@ -32,7 +32,7 @@ class ComplianceRunTest extends TestCase
         Http::fake(['*' => Http::response(['description' => 'x', 'severity' => 'low', 'remediation' => 'x', 'anomalies' => []])]);
         Event::fake([\App\Events\ResortNotificationEvent::class]);
 
-        $this->emp = DB::table('employees')->where('resort_id', $this->resortId)->where('status', 'Active')->orderBy('id')->limit(8)->pluck('id')->all();
+        $this->emp = DB::table('employees')->where('resort_id', $this->resortId)->where('status', 'Active')->orderBy('id')->limit(9)->pluck('id')->all();
         $window = [Carbon::now()->subWeek()->startOfWeek()->format('Y-m-d'), Carbon::now()->endOfWeek()->format('Y-m-d')];
         DB::table('parent_attendaces')->whereIn('Emp_id', $this->emp)->whereBetween('date', $window)->delete();
         DB::table('compliances')->whereIn('employee_id', $this->emp)->delete();
@@ -40,10 +40,17 @@ class ComplianceRunTest extends TestCase
         $this->rosterId = DB::table('duty_rosters')->insertGetId(['resort_id' => $this->resortId, 'Shift_id' => $this->shiftId, 'Emp_id' => $this->emp[0]]);
     }
 
-    private function day(int $emp, string $date, string $in, ?string $out, ?string $overtime = null): int
+    private function day(int $emp, string $date, string $in, ?string $out, ?string $overtime = null, ?string $otStatus = null): int
     {
         return DB::table('parent_attendaces')->insertGetId(['roster_id' => $this->rosterId, 'resort_id' => $this->resortId, 'Shift_id' => $this->shiftId,
-            'Emp_id' => $emp, 'date' => $date, 'Status' => 'Present', 'CheckingTime' => $in, 'CheckingOutTime' => $out, 'OverTime' => $overtime]);
+            'Emp_id' => $emp, 'date' => $date, 'Status' => 'Present', 'CheckingTime' => $in, 'CheckingOutTime' => $out, 'OverTime' => $overtime, 'OTStatus' => $otStatus]);
+    }
+
+    /** As the app stores it: Break_OutTime = break start, Break_InTime = break end ('' while still on break). */
+    private function breakOn(int $attendanceId, string $start, ?string $end): void
+    {
+        DB::table('break_attendaces')->insert(['Parent_attd_id' => $attendanceId, 'Break_OutTime' => $start, 'Break_InTime' => $end ?? '',
+            'Total_Break_Time' => '', 'InTime_Location' => '-', 'OutTime_Location' => '-']);
     }
 
     private function breach(int $emp, string $name)
@@ -53,7 +60,7 @@ class ComplianceRunTest extends TestCase
 
     public function test_run_completes_and_each_rule_judges_correctly()
     {
-        [$probation, $withBreak, $noBreak, $leftEarly, $long, $twoWeeks, $overnight, $overtime] = $this->emp;
+        [$probation, $withBreak, $noBreak, $leftEarly, $long, $twoWeeks, $overnight, $overtime, $earlyBreak] = $this->emp;
         $today = Carbon::today()->format('Y-m-d');
         $lastMonday = Carbon::now()->subWeek()->startOfWeek();
         $thisMonday = Carbon::now()->startOfWeek();
@@ -63,9 +70,9 @@ class ComplianceRunTest extends TestCase
         DB::table('employees')->whereIn('id', array_slice($this->emp, 1))->update(['probation_status' => 'Confirmed']);
 
         // Breaks (today): 6.5h with a 30-min break → fine; 6h with none → breach; 4h then left → fine.
-        $id = $this->day($withBreak, $today, '07:00', '13:30');
-        DB::table('break_attendaces')->insert(['Parent_attd_id' => $id, 'Break_InTime' => '10:00', 'Break_OutTime' => '10:30', 'Total_Break_Time' => '00:30',
-            'InTime_Location' => '-', 'OutTime_Location' => '-']);
+        $this->breakOn($this->day($withBreak, $today, '07:00', '13:30'), '10:00', '10:30');
+        // A break taken at 08:00 doesn't cover the 5h stretch after it (08:30 → 14:00): breach.
+        $this->breakOn($this->day($earlyBreak, $today, '07:00', '14:00'), '08:00', '08:30');
         $this->day($noBreak, $today, '07:00', '13:00');
         $this->day($leftEarly, $today, '08:00', '12:00');
 
@@ -74,8 +81,8 @@ class ComplianceRunTest extends TestCase
             $this->day($long, $lastMonday->copy()->addDays($d)->format('Y-m-d'), '07:00', '16:00');
             // 6 overnight shifts 22:00→06:00 = 48h → fine (used to subtract).
             $this->day($overnight, $lastMonday->copy()->addDays($d)->format('Y-m-d'), '22:00', '06:00');
-            // 6 × 9h with 1h overtime each = 48 normal hours → fine (overtime not counted).
-            $this->day($overtime, $lastMonday->copy()->addDays($d)->format('Y-m-d'), '07:00', '16:00', '01:00');
+            // 6 × 9h with 1h APPROVED overtime each = 48 normal hours → fine.
+            $this->day($overtime, $lastMonday->copy()->addDays($d)->format('Y-m-d'), '07:00', '16:00', '01:00', 'Approved');
         }
         // 5 × 9h last week + 3 × 9h this week: 45h and 27h → fine (used to add up to 72h).
         for ($d = 0; $d < 5; $d++) {
@@ -96,12 +103,43 @@ class ComplianceRunTest extends TestCase
         $this->assertNotNull($row = $this->breach($noBreak, 'Without Mandatory Break'));
         $this->assertStringContainsString('6 hours without a break', $row->description);
         $this->assertNull($this->breach($leftEarly, 'Without Mandatory Break'), 'measured to check-out, not to now');
+        $this->assertNotNull($row = $this->breach($earlyBreak, 'Without Mandatory Break'), 'a break early in the shift does not cover the rest');
+        $this->assertStringContainsString('5.5 hours without a break', $row->description);
 
         $this->assertNotNull($row = $this->breach($long, 'Weekly Working Hours Limit'));
         $this->assertStringContainsString('54 normal hours', $row->description);
         $this->assertNull($this->breach($twoWeeks, 'Weekly Working Hours Limit'), 'each week judged on its own');
         $this->assertNull($this->breach($overnight, 'Weekly Working Hours Limit'), 'overnight shifts count forwards');
-        $this->assertNull($this->breach($overtime, 'Weekly Working Hours Limit'), 'overtime excluded');
+        $this->assertNull($this->breach($overtime, 'Weekly Working Hours Limit'), 'approved overtime excluded');
+    }
+
+    public function test_weekly_hours_subtract_breaks_and_only_approved_overtime()
+    {
+        [$withBreaks, $pendingOt, $openBreak] = array_slice($this->emp, 1, 3);
+        $lastMonday = Carbon::now()->subWeek()->startOfWeek();
+        for ($d = 0; $d < 6; $d++) {
+            $date = $lastMonday->copy()->addDays($d)->format('Y-m-d');
+            // 9h span with a 1h break = 8 worked hours → 6 days = 48 → fine (was 54 → breach).
+            $this->breakOn($this->day($withBreaks, $date, '07:00', '16:00'), '12:00', '13:00');
+            // 1h overtime still Pending counts as normal time: 54h → breach.
+            $this->day($pendingOt, $date, '07:00', '16:00', '01:00', 'Pending');
+            // A break with no end (never closed) is not subtracted: 54h → breach.
+            $this->breakOn($this->day($openBreak, $date, '07:00', '16:00'), '12:00', null);
+        }
+
+        $this->actingAs(ResortAdmin::where('resort_id', $this->resortId)->where('is_master_admin', 1)->first(), 'resort-admin');
+        $this->assertLessThan(500, $this->get(route('people.compliance.run'))->status());
+
+        $this->assertNull($this->breach($withBreaks, 'Weekly Working Hours Limit'), 'a 9h shift with a 1h break counts as 8h');
+        $this->assertNotNull($row = $this->breach($pendingOt, 'Weekly Working Hours Limit'), 'pending overtime counts until approved');
+        $this->assertStringContainsString('54 normal hours', $row->description);
+        $this->assertNotNull($this->breach($openBreak, 'Weekly Working Hours Limit'), 'an unfinished break is not subtracted');
+
+        // Approving the overtime clears the breach on the next run.
+        DB::table('parent_attendaces')->where('Emp_id', $pendingOt)->update(['OTStatus' => 'Approved']);
+        DB::table('compliances')->where('employee_id', $pendingOt)->update(['reported_on' => Carbon::yesterday()]);
+        $this->get(route('people.compliance.run'));
+        $this->assertSame('Resolved', $this->breach($pendingOt, 'Weekly Working Hours Limit')->status);
     }
 
     public function test_vacancy_minimum_wage_overtime_status_and_a_resort_without_hr()

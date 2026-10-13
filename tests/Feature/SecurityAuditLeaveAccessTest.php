@@ -145,4 +145,49 @@ class SecurityAuditLeaveAccessTest extends TestCase
         if (!$pass) $this->markTestSkipped('no passes');
         $this->assertSame(200, $this->web($this->hr())->getJson(route('resort.boardingpass.detail', ['id' => $pass->id]))->status());
     }
+
+    // Web leave detail page: same shared gate (Common::canViewLeave) as mobile —
+    // HR/GM are not limited to leaves in their own approval queue, a plain
+    // colleague / unrelated HOD never gets in.
+    private function webDetails(Employee $viewer, $leave)
+    {
+        return $this->web($viewer)->get(route('leave.details', base64_encode($leave->id)));
+    }
+
+    private function leaveOutsideChainOf(Employee $viewer)
+    {
+        return DB::table('employees_leaves as l')->where('l.resort_id', $viewer->resort_id)->where('l.emp_id', '!=', $viewer->id)
+            ->whereNotExists(fn($q) => $q->select(DB::raw(1))->from('employees_leaves_status')->whereColumn('leave_request_id', 'l.id')->where('approver_id', $viewer->id))
+            ->orderByDesc('l.id')->select('l.*')->first();
+    }
+
+    public function test_web_leave_details_gm_allowed_outside_own_chain()
+    {
+        $gm = Employee::where('resort_id', $this->leave->resort_id)->where('rank', 8)->where('status', 'Active')->first();
+        $leave = $gm ? $this->leaveOutsideChainOf($gm) : null;
+        if (!$leave) $this->markTestSkipped('no GM / leave outside GM chain');
+        $this->webDetails($gm, $leave)->assertViewIs('resorts.leaves.leave.details');
+    }
+
+    public function test_web_leave_details_unrelated_hod_denied()
+    {
+        $hod = $this->unrelatedHod();
+        $leave = $hod ? $this->leaveOutsideChainOf($hod) : null;
+        if (!$leave) $this->markTestSkipped('no unrelated HOD');
+        // only meaningful when the leave is in a department the HOD does not scope
+        $dept = Employee::where('id', $leave->emp_id)->value('Dept_id');
+        if ((int) $dept === (int) $hod->Dept_id) $this->markTestSkipped('leave is in HOD dept');
+        $this->webDetails($hod, $leave)->assertViewIs('resorts.error');
+    }
+
+    public function test_web_leave_details_ordinary_employee_denied()
+    {
+        $colleague = Employee::where('resort_id', $this->leave->resort_id)->where('status', 'Active')->whereIn('rank', [5, 6])->first();
+        $leave = $colleague ? $this->leaveOutsideChainOf($colleague) : null;
+        if (!$leave) $this->markTestSkipped('no colleague');
+        // Ordinary staff are usually stopped earlier by the page permission (403);
+        // if they get past it, the per-record gate must render the error view.
+        $r = $this->webDetails($colleague, $leave);
+        $r->original instanceof \Illuminate\View\View ? $r->assertViewIs('resorts.error') : $this->assertContains($r->status(), [302, 403]);
+    }
 }

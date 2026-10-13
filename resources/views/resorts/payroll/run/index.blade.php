@@ -290,6 +290,7 @@
                                             <th>Friday OT Hours</th>
                                             <th>Holiday OT Hours</th>
                                             <th>Total OT</th>
+                                            <th title="Days in the period with no attendance record (future dates excluded) — why Present + Day Off + Unpaid may not add up to the full period">Unaccounted</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -2711,6 +2712,7 @@
                             <td class="editable">${employee.friday_ot || 0}</td>
                             <td class="editable">${employee.holiday_ot}</td>
                             <td>${employee.total_ot}</td>
+                            <td class="${employee.unaccounted_days > 0 ? 'text-danger fw-bold' : ''}">${employee.unaccounted_days || 0}</td>
                         </tr>`;
                         $tableBody.append(row);
                     });

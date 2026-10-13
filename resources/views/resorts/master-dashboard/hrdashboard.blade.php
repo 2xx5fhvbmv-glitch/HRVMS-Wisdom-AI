@@ -578,6 +578,12 @@
 #hrmd .a{align-self:flex-start;max-width:88%}
 #hrmd .a .a-tag{display:inline-flex;align-items:center;gap:7px;font-size:10.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--teal);margin-bottom:8px}
 #hrmd .a p{font-size:13.5px;color:var(--g1);line-height:1.55}
+#hrmd .a .md{font-size:13.5px;color:var(--g1);line-height:1.55}
+#hrmd .a .md p{margin:0 0 6px}
+#hrmd .a .md ul,#hrmd .a .md ol{margin:0 0 6px;padding-left:20px}
+#hrmd .a .md li{margin:2px 0}
+#hrmd .a .md code{font-size:12px;background:var(--g4);padding:1px 5px;border-radius:4px}
+#hrmd .a .md>:last-child{margin-bottom:0}
 #hrmd .a-list{margin-top:12px;border:1px solid rgba(255,255,255,.9);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.62)}
 #hrmd .a-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(1,70,83,.07)}
 #hrmd .a-row:last-child{border-bottom:none}
@@ -774,13 +780,33 @@
     var focus = $('focus'), body = $('fpBody'), askInput = $('askInput'), fpInput = $('fpInput');
     function open() { focus.classList.add('open'); document.body.style.overflow = 'hidden'; setTimeout(function () { fpInput.focus(); }, 60); }
     function close() { focus.classList.remove('open'); document.body.style.overflow = ''; askInput.value = ''; }
+    // Minimal Markdown → HTML for bot replies. Escapes first, so only the tags emitted below can appear.
+    function md(t) {
+      var s = String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>');
+      var out = '', list = null;
+      function end() { if (list) { out += '</' + list + '>'; list = null; } }
+      s.split('\n').forEach(function (ln) {
+        var ul = /^\s*[-*•]\s+/.test(ln), ol = /^\s*\d+\.\s+/.test(ln);
+        if (ul || ol) {
+          var tag = ul ? 'ul' : 'ol';
+          if (list !== tag) { end(); out += '<' + tag + '>'; list = tag; }
+          out += '<li>' + ln.replace(/^\s*(?:[-*•]|\d+\.)\s+/, '') + '</li>';
+        } else if (ln.trim() === '') { end(); }
+        else { end(); out += '<p>' + ln + '</p>'; }
+      });
+      end();
+      return out;
+    }
     function ask(q) {
       body.appendChild(el('div', 'q', q));
-      var a = el('div', 'a'); a.appendChild(el('div', 'a-tag', 'WAI')); var p = el('p', '', 'Thinking…'); a.appendChild(p); body.appendChild(a);
+      var a = el('div', 'a'); a.appendChild(el('div', 'a-tag', 'WAI')); var p = el('div', 'md', 'Thinking…'); a.appendChild(p); body.appendChild(a);
       body.scrollTop = body.scrollHeight;
       fetch(URLS.wai, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', body: JSON.stringify({ message: q }) })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
-        .then(function (j) { p.style.whiteSpace = 'pre-wrap'; p.textContent = j.success ? j.reply : (j.message || 'Something went wrong. Please try again.'); body.scrollTop = body.scrollHeight; })
+        .then(function (j) { p.innerHTML = md(j.success ? j.reply : (j.message || 'Something went wrong. Please try again.')); body.scrollTop = body.scrollHeight; })
         .catch(function () { p.textContent = 'Something went wrong. Please try again.'; });
     }
     function submitAsk() { var v = askInput.value.trim(); if (!v) return; body.textContent = ''; ask(v); open(); }

@@ -1377,12 +1377,15 @@ class ComplianceController extends Controller
 
                // List of employees who went 5+ hours without a break. Measured on the
                // shift's own clock: from check-in to check-out (or now, if still on
-               // shift), wrapping past midnight, with each break (Break_InTime /
-               // Break_OutTime) splitting the shift. Was: read non-existent
+               // shift), wrapping past midnight, with each break splitting the shift.
+               // The app's names are inverted: Break_OutTime = left work (break START),
+               // Break_InTime = came back (break END, '' while still on break). Was: read non-existent
                // start_time/end_time columns (so every 5h+ shift breached) and
                // measured to "now" even after the employee had left.
                $employeesWithoutBreak = [];
                $nowMinutes = self::clockMinutes(Carbon::now()->format('H:i'));
+               $breaksByAttendance = BreakAttendaces::whereIn('Parent_attd_id', $attendacedata->pluck('id'))
+                    ->get(['Parent_attd_id', 'Break_InTime', 'Break_OutTime'])->groupBy('Parent_attd_id');
 
                foreach ($attendacedata as $attendance) 
                {
@@ -1395,15 +1398,15 @@ class ComplianceController extends Controller
 
                     $longestStretch = 0;
                     $cursor = 0; // minutes since check-in
-                    $breaks = BreakAttendaces::where('Parent_attd_id', $attendance->id)->get()
-                         ->map(fn ($b) => [self::clockMinutes($b->Break_InTime), self::clockMinutes($b->Break_OutTime)])
+                    $breaks = ($breaksByAttendance[$attendance->id] ?? collect())
+                         ->map(fn ($b) => [self::clockMinutes($b->Break_OutTime), self::clockMinutes($b->Break_InTime)])
                          ->filter(fn ($b) => $b[0] !== null)
                          ->map(fn ($b) => [self::spanMinutes($start, $b[0]), $b[1] === null ? null : self::spanMinutes($start, $b[1])])
                          ->filter(fn ($b) => $b[0] <= $shiftLength)
                          ->sortBy(0);
-                    foreach ($breaks as [$breakIn, $breakOut]) {
-                         $longestStretch = max($longestStretch, $breakIn - $cursor);
-                         $cursor = max($cursor, $breakOut === null || $breakOut < $breakIn ? $shiftLength : $breakOut); // still on break → covers the rest
+                    foreach ($breaks as [$breakStart, $breakEnd]) {
+                         $longestStretch = max($longestStretch, $breakStart - $cursor);
+                         $cursor = max($cursor, $breakEnd === null || $breakEnd < $breakStart ? $shiftLength : $breakEnd); // still on break → covers the rest
                     }
                     $longestStretch = max($longestStretch, $shiftLength - $cursor);
 
@@ -1435,32 +1438,41 @@ class ComplianceController extends Controller
 
                // Weekly Working Hours Compliance Start
 
-               // 48-hour weekly limit on NORMAL hours (overtime is not counted —
-               // founder decision, Demo ENV spec §18). Each calendar week (Mon–Sun)
-               // is judged on its own: last week and this week. Was: one total over
-               // both weeks (two normal 45h weeks read as 90h) and overnight shifts
-               // (22:00→06:00) subtracting hours.
+               // 48-hour weekly limit on NORMAL hours. Each calendar week (Mon–Sun),
+               // last week and this week, is judged on its own. A day counts check-in →
+               // check-out (overnight-safe) minus its completed breaks minus its
+               // Approved overtime (Demo ENV spec §18) — Pending overtime still counts
+               // until approved; the breach auto-resolves on the next run once it is.
                $startOfWeek = Carbon::now()->subWeek()->startOfWeek();
                $endOfWeek =  Carbon::now()->copy()->endOfWeek();
-               
-               $overworkedEmployees = [];
-               foreach($employeeIds as $empId)
-               {
-                    $days = ParentAttendace::where('resort_id', $resort->resort_id)->where('Emp_id', $empId)
-                         ->where('CheckingTime', '!=', null)
-                              ->whereBetween('date', [$startOfWeek->format('Y-m-d'), $endOfWeek->format('Y-m-d')])
-                              ->where('Status', 'Present')
-                              ->get();
 
+               // Two queries for the whole resort instead of one per employee and day.
+               $days = ParentAttendace::where('resort_id', $resort->resort_id)->whereIn('Emp_id', $employeeIds)
+                    ->whereNotNull('CheckingTime')->where('Status', 'Present')
+                    ->whereBetween('date', [$startOfWeek->format('Y-m-d'), $endOfWeek->format('Y-m-d')])
+                    ->get(['id', 'Emp_id', 'date', 'CheckingTime', 'CheckingOutTime', 'OverTime', 'OTStatus']);
+               // Break_OutTime = break start, Break_InTime = break end ('' while still on break → not subtracted).
+               $breakMinutes = BreakAttendaces::whereIn('Parent_attd_id', $days->pluck('id'))
+                    ->get(['Parent_attd_id', 'Break_InTime', 'Break_OutTime'])
+                    ->groupBy('Parent_attd_id')
+                    ->map(fn ($breaks) => $breaks->sum(function ($b) {
+                         $start = self::clockMinutes($b->Break_OutTime);
+                         $end = self::clockMinutes($b->Break_InTime);
+                         return $start === null || $end === null ? 0 : self::spanMinutes($start, $end);
+                    }));
+
+               $overworkedEmployees = [];
+               foreach ($days->groupBy('Emp_id') as $empId => $employeeDays)
+               {
                     $minutesByWeek = [];
-                    foreach ($days as $day) {
+                    foreach ($employeeDays as $day) {
                          $in = self::clockMinutes($day->CheckingTime);
                          $out = self::clockMinutes($day->CheckingOutTime);
                          if ($in === null || $out === null) {
                               continue; // still on shift, or a malformed time
                          }
-                         $worked = self::spanMinutes($in, $out);
-                         $overtime = $day->OTStatus === 'Rejected' ? 0 : (self::clockMinutes($day->OverTime) ?? 0);
+                         $worked = self::spanMinutes($in, $out) - ($breakMinutes[$day->id] ?? 0);
+                         $overtime = $day->OTStatus === 'Approved' ? (self::clockMinutes($day->OverTime) ?? 0) : 0;
                          $week = Carbon::parse($day->date)->startOfWeek()->format('Y-m-d');
                          $minutesByWeek[$week] = ($minutesByWeek[$week] ?? 0) + max(0, $worked - $overtime);
                     }
@@ -1479,12 +1491,12 @@ class ComplianceController extends Controller
                          'employee_id' => $employee->id,
                          'module_name' => 'Time & Attendance',
                          'compliance_breached_name' => 'Weekly Working Hours Limit',
-                         'description' => "Employee " . optional($employee->resortAdmin)->full_name . " (" . optional($employee->position)->position_title . ") worked {$totalHoursWorked} normal hours (overtime excluded) in the week of " . Carbon::parse($worstWeek)->format('d M Y') . ". Adjust the schedule to comply with the 48-hour weekly limit.",
+                         'description' => "Employee " . optional($employee->resortAdmin)->full_name . " (" . optional($employee->position)->position_title . ") worked {$totalHoursWorked} normal hours (breaks and approved overtime excluded) in the week of " . Carbon::parse($worstWeek)->format('d M Y') . ". Adjust the schedule to comply with the 48-hour weekly limit.",
                          'reported_on' => Carbon::now(),
                          'status' => 'Breached'
                     ];
                }
-               
+
                if (!empty($overworkedEmployees)) {
                     $this->insertComplianceOncePerDay($overworkedEmployees);
                }

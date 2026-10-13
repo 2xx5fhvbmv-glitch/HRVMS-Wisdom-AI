@@ -219,7 +219,7 @@ $(document).ready(function() {
                 { data: 'Position', name: 'Position', className: 'text-nowrap' },
                 { data: 'Email', name: 'Email', className: 'text-nowrap' },
                 { data: 'Contact', name: 'Contact', className: 'text-nowrap' },
-                { data: 'AppliedDate', name: 'AppliedDate', className: 'text-nowrap' },
+                { data: 'AppliedDate', name: 'applied_date_raw', className: 'text-nowrap' }, // sort on the raw date
                 { data: 'Stage', name: 'Stage', className: 'text-nowrap' },
                 { data: 'Nationality', name: 'Nationality', className: 'text-nowrap' },
                 { data: 'InterViewDate', name: 'interview_date_raw', className: 'text-nowrap' }, // sort on the raw date, not the d M Y text
