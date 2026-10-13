@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Resorts;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use App\Services\Wisdom\WisdomAccess;
 use App\Services\Wisdom\OpenRouterClient;
 
@@ -21,6 +22,15 @@ class WisdomChatController extends Controller
 
     /** Keep only the most recent N messages to bound prompt size. */
     const MAX_HISTORY = 20;
+
+    /** Messages per user per rolling 24h — enforced by the 'wisdom-chat' limiter (RouteServiceProvider). */
+    const DAILY_LIMIT = 200;
+
+    /** Per-user key for the 'wisdom-chat' limiter; the daily cap uses this + ':day'. */
+    public static function limiterKey(Request $request): string
+    {
+        return 'wisdom-chat:' . (optional($request->user('resort-admin'))->id ?: $request->ip());
+    }
 
     public function chat(Request $request, OpenRouterClient $client)
     {
@@ -51,6 +61,7 @@ class WisdomChatController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $result['error'] ?? 'Something went wrong.',
+                'usage'   => $this->usage($request),
             ], 502);
         }
 
@@ -62,6 +73,7 @@ class WisdomChatController extends Controller
             'reply'      => $result['reply'],
             'tier'       => $ctx['tier'],
             'tier_label' => $ctx['tier_label'],
+            'usage'      => $this->usage($request),
         ]);
     }
 
@@ -80,6 +92,7 @@ class WisdomChatController extends Controller
             'user_name'  => $ctx['user_name'],
             'can_db'     => $ctx['can_db'],
             'can_payroll'=> $ctx['can_payroll'],
+            'usage'      => $this->usage($request),
         ]);
     }
 
@@ -91,6 +104,13 @@ class WisdomChatController extends Controller
 
         session()->forget(self::SESSION_KEY);
         return response()->json(['success' => true]);
+    }
+
+    /** Today's allowance for the chat screens. Reads the counter ThrottleRequests keeps: md5(limiter name . key). */
+    private function usage(Request $request): array
+    {
+        $used = min(self::DAILY_LIMIT, RateLimiter::attempts(md5('wisdom-chat' . self::limiterKey($request) . ':day')));
+        return ['limit' => self::DAILY_LIMIT, 'used' => $used, 'remaining' => self::DAILY_LIMIT - $used];
     }
 
     private function trim(array $history): array

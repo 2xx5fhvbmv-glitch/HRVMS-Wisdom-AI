@@ -317,8 +317,6 @@
     display: flex; align-items: center; justify-content: center; overflow: hidden;
 }
 .wai-bot-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
-/* the app's global <strong> rule sets its own (larger) size; keep bold text the same size as the sentence around it */
-.wai-bubble strong { font-size: inherit; }
 
 /* ================= WAI panel body ================= */
 .wai-messages { flex: 1; overflow-y: auto; padding: 24px 20px 6px; display: flex; flex-direction: column; gap: 12px; background: #fff; }
@@ -355,15 +353,11 @@
 .wai-bot .wai-mini-avatar { background: var(--teal); }
 .wai-user .wai-mini-avatar { background: var(--neutral-bg); color: var(--muted); }
 .uc-msg-avatar-ghost { visibility: hidden; }
-.wai-bubble p { margin: 0 0 8px; } .wai-bubble p:last-child { margin-bottom: 0; }
-.wai-bubble ul, .wai-bubble ol { margin: 6px 0; padding-left: 20px; }
-.wai-bubble li { margin: 2px 0; }
-.wai-bubble code { background: rgba(1,70,83,.08); padding: 1px 5px; border-radius: 5px; font-size: 12.5px; }
-.wai-bubble pre { background: var(--ink); color: #f3f0ff; padding: 10px; border-radius: 10px; overflow-x: auto; font-size: 12.5px; }
-.wai-bubble pre code { background: none; padding: 0; }
-.wai-bubble table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin: 6px 0; }
-.wai-bubble th, .wai-bubble td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; }
 .wai-bubble a { color: var(--teal-2); }
+/* WAI answers are formatted by the shared wai-markdown.js/.css; only bubble-specific spacing here */
+.wai-bubble.a-md > :first-child { margin-top: 0; }
+.wai-bubble.a-md > :last-child { margin-bottom: 0; }
+.wai-bot .wai-bubble:has(.a-tbl) { max-width: calc(100% - 37px); } /* tables get the full row (minus avatar + gap) */
 .uc-bt { font-size: 10px; margin-top: 4px; opacity: .65; }
 .wai-user .uc-bt { text-align: right; }
 
@@ -589,7 +583,7 @@
         usageOut = rem === 0;
         usageEl.hidden = false;
         usageEl.className = 'wai-usage' + (usageOut ? ' is-out' : low ? ' is-low' : '');
-        usageTxt.textContent = usageOut ? 'Daily limit reached. It resets at midnight.'
+        usageTxt.textContent = usageOut ? 'Daily limit reached. Try again later.'
             : low ? 'Only ' + rem + ' message' + (rem === 1 ? '' : 's') + ' left today'
             : rem + ' of ' + u.limit + ' messages left today';
         usageBar.style.width = (rem / u.limit * 100) + '%';
@@ -604,39 +598,6 @@
     function escapeHtml(s) {
         return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
-
-    // Minimal, safe Markdown → HTML (escape first, then format).
-    function renderMarkdown(text) {
-        var src = escapeHtml(text);
-        // fenced code blocks
-        src = src.replace(/```([\s\S]*?)```/g, function (m, c) { return '<pre><code>' + c.replace(/^\n/, '') + '</code></pre>'; });
-        // inline code
-        src = src.replace(/`([^`]+)`/g, '<code>$1</code>');
-        // bold / italic
-        src = src.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-        src = src.replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
-        // links [text](url)
-        src = src.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-
-        var lines = src.split('\n'), html = '', listType = null;
-        function closeList() { if (listType) { html += '</' + listType + '>'; listType = null; } }
-        for (var i = 0; i < lines.length; i++) {
-            var ln = lines[i];
-            if (/^\s*[-*]\s+/.test(ln)) {
-                if (listType !== 'ul') { closeList(); html += '<ul>'; listType = 'ul'; }
-                html += '<li>' + ln.replace(/^\s*[-*]\s+/, '') + '</li>';
-            } else if (/^\s*\d+\.\s+/.test(ln)) {
-                if (listType !== 'ol') { closeList(); html += '<ol>'; listType = 'ol'; }
-                html += '<li>' + ln.replace(/^\s*\d+\.\s+/, '') + '</li>';
-            } else if (ln.trim() === '') {
-                closeList();
-            } else {
-                closeList(); html += '<p>' + ln + '</p>';
-            }
-        }
-        closeList();
-        return html;
     }
 
     var WAI_BOT_ICON = "{{ URL::asset('resorts_assets/images/wisdom-ai-icon.jpeg') }}";
@@ -655,8 +616,16 @@
         clearWelcome();
         var row = document.createElement('div');
         row.className = 'wai-row ' + (role === 'user' ? 'wai-user' : 'wai-bot');
-        var bubble = '<div class="wai-bubble">' + (role === 'user' ? escapeHtml(text).replace(/\n/g, '<br>') : renderMarkdown(text)) + '</div>';
-        row.innerHTML = (role === 'user' ? userAvatar() : botAvatar()) + bubble;
+        if (role === 'user') {
+            row.innerHTML = userAvatar() + '<div class="wai-bubble">' + escapeHtml(text).replace(/\n/g, '<br>') + '</div>';
+        } else {
+            // Same formatter as the dashboard's WAI box (resorts_assets/js/wai-markdown.js)
+            row.innerHTML = botAvatar();
+            var bubble = document.createElement('div');
+            bubble.className = 'wai-bubble a-md';
+            WaiMd.render(bubble, text);
+            row.appendChild(bubble);
+        }
         msgs.appendChild(row);
         scrollDown();
     }

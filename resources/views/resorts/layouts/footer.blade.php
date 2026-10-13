@@ -77,5 +77,7 @@
     </div>
 </div>
 
+{{-- WAI answer formatter, used by the floating chat below and the HR dashboard's WAI box --}}
+<script src="{{ URL::asset('resorts_assets/js/wai-markdown.js') }}?v={{ @filemtime(public_path('resorts_assets/js/wai-markdown.js')) }}"></script>
 {{-- Wisdom AI — floating HR assistant (self-gates by access tier) --}}
 @include('resorts.partials.wisdom-chat')

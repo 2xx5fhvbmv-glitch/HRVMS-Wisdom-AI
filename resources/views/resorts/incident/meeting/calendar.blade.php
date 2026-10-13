@@ -65,7 +65,7 @@
 @media (prefers-reduced-motion:reduce){#calsidebar .cal-empty-scene{animation:none}}
 #calsidebar .cal-empty-title{font-size:15px;font-weight:600;color:var(--ink);margin-top:18px}
 #calsidebar .cal-empty-sub{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.55}
-#calsidebar .cal-empty-btn{margin-top:18px;align-self:center}
+#calsidebar .cal-empty-btn{margin-top:18px}
 </style>
 @endsection
 

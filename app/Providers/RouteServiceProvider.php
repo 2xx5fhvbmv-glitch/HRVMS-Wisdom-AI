@@ -6,6 +6,7 @@ use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvi
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Cache\RateLimiting\Limit;
+use App\Http\Controllers\Resorts\WisdomChatController;
 
 class RouteServiceProvider extends ServiceProvider
 {
@@ -44,11 +45,18 @@ class RouteServiceProvider extends ServiceProvider
         // truly unauthenticated calls (login, forgot-password).
         // Wisdom AI chat is a paid, live AI call per message — cap it per user.
         RateLimiter::for('wisdom-chat', function ($request) {
-            $key = 'wisdom-chat:' . (optional($request->user('resort-admin'))->id ?: $request->ip());
+            $key = WisdomChatController::limiterKey($request);
             $tooFast = fn () => response()->json(['success' => false, 'message' => 'You are sending messages too quickly — please wait a minute and try again.'], 429);
+            $limit = WisdomChatController::DAILY_LIMIT;
             return [
                 Limit::perMinute(10)->by($key)->response($tooFast),
-                Limit::perDay(200)->by($key)->response(fn () => response()->json(['success' => false, 'message' => 'Daily Wisdom AI limit reached — please try again tomorrow.'], 429)),
+                // Own key: sharing $key with the per-minute limit made both share one counter that
+                // expired every minute (and counted each message twice), so this cap never applied.
+                Limit::perDay($limit)->by($key . ':day')->response(fn () => response()->json([
+                    'success' => false,
+                    'message' => 'Daily Wisdom AI limit reached — please try again later.',
+                    'usage'   => ['limit' => $limit, 'used' => $limit, 'remaining' => 0],
+                ], 429)),
             ];
         });
 

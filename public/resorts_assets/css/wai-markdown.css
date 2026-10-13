@@ -1,0 +1,46 @@
+/*
+ * WAI answer formatting — styles for the markup built by resorts_assets/js/wai-markdown.js (container class
+ * .a-md). Shared by the HR dashboard ask box and the floating chat. Loaded once from layouts/css.
+ * Colour fallbacks are the dashboard's values, for pages that don't define those tokens.
+ */
+.a-md p,.a-md li{font-size:13.5px;color:var(--g1,#3A4145);line-height:1.55}
+.a-md p+p,.a-md ul+p,.a-md ol+p,.a-md ul,.a-md ol,.a-md p+ul,.a-md p+ol{margin-top:8px}
+.a-md ul,.a-md ol{list-style:none;padding-left:20px;counter-reset:mdn}
+.a-md ol{counter-reset:mdn calc(var(--s,1) - 1)}
+.a-md li>ul{margin-top:4px}
+.a-md li{position:relative;margin-top:4px}
+.a-md ul>li::before{content:"";position:absolute;left:-14px;top:.62em;width:5px;height:5px;border-radius:50%;background:var(--teal,#014653)}
+.a-md ol>li{counter-increment:mdn}
+.a-md ol>li::before{content:counter(mdn) ".";position:absolute;left:-20px;color:var(--muted,#5D6F75);font-size:12.5px}
+.a-md .a-note{margin-top:10px;font-size:12.5px;color:var(--muted,#5D6F75);line-height:1.55;background:var(--teal-soft,#f1f7f7);border-radius:10px;padding:9px 12px}
+.a-md strong,.a-md em{font-size:inherit}
+.a-md strong{font-weight:600;color:var(--ink,#14232A)}
+.a-md .a-tbl{margin-top:10px;border:1px solid rgba(255,255,255,.9);border-radius:12px;overflow:auto;background:rgba(255,255,255,.62)}
+.a-md .a-tbl:first-child{margin-top:0}
+.a-md .a-tbl strong{font-weight:400;color:inherit}
+.a-md .a-tbl em{font-style:normal}
+.a-md .a-tbl td.k strong{font-weight:500;color:var(--ink,#14232A)}
+.a-md .a-th{background:var(--teal-soft,#f1f7f7);font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted,#5D6F75);padding:9px 12px}
+.a-md .a-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.a-md .a-td{font-size:12.5px;color:var(--ink,#14232A);padding:9px 12px;border-top:1px solid var(--line-2,#EEF4F4)}
+.a-md .a-tbl+p,.a-md .a-tbl+ul,.a-md .a-tbl+ol{margin-top:10px}
+.a-md table{width:100%;border-collapse:collapse}
+.a-md th{background:var(--teal-soft,#f1f7f7);font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted,#5D6F75);text-align:left;padding:9px 12px;white-space:nowrap}
+.a-md td{font-size:12.5px;color:var(--g1,#3A4145);padding:9px 12px;border-top:1px solid var(--line-2,#EEF4F4);vertical-align:top}
+.a-md td.k{color:var(--ink,#14232A);font-weight:500}
+.a-md .a-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.a-md .a-pill.ok{background:var(--ok-bg,#E7F4EC);color:var(--ok,#1F9D6B)}
+.a-md .a-pill.warn{background:var(--warn-bg,#FBF0DC);color:var(--warn,#B7791F)}
+.a-md .a-pill.err{background:var(--err-bg,#FDEEEB);color:var(--err,#E5573F)}
+.a-md .a-pill.muted{background:var(--line-2,#EEF4F4);color:var(--g2,#6B7378)}
+.a-md .a-notelist{margin-top:10px;font-size:12.5px;color:var(--muted,#5D6F75);background:var(--teal-soft,#f1f7f7);border-radius:10px;padding:10px 14px 10px 32px}
+.a-md .a-notelist li{font-size:12.5px;color:var(--muted,#5D6F75)}
+.a-md .a-notelist strong{color:var(--ink,#14232A)}
+.a-md .a-kv td{padding:8px 12px}
+.a-md .a-kv td.k{width:34%;color:var(--muted,#5D6F75);font-weight:400}
+.a-md .a-kv td.k strong{color:var(--muted,#5D6F75)}
+.a-md .a-kv td:last-child{color:var(--ink,#14232A)}
+.a-md code{font-size:12.5px;background:var(--teal-soft,#f1f7f7);padding:1px 5px;border-radius:5px}
+.a-md a{color:var(--teal-2,#035b6c)}
+.a-md pre{margin-top:8px;background:var(--ink,#14232A);color:#f3f0ff;padding:10px;border-radius:10px;overflow-x:auto;font-size:12.5px}
+.a-md pre code{background:none;padding:0;color:inherit}

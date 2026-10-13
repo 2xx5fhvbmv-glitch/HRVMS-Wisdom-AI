@@ -403,10 +403,9 @@
   border:1px solid rgba(255,255,255,.72);
   box-shadow:inset 0 0 24px rgba(255,255,255,.18),0 10px 28px rgba(1,45,54,.16)}
 #hrmd .wai-glass::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(220px 150px at var(--mx,75%) var(--my,-10%),rgba(255,255,255,.4),transparent 60%);opacity:.9;transition:opacity .3s}
-#hrmd .wai-glass .gl{position:relative;font-size:13px;font-weight:600;color:var(--teal);margin-bottom:12px}
+#hrmd .wai-glass .gl{position:relative;font-size:13px;font-weight:600;color:var(--teal);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
 #hrmd .wai-glass .pin{position:relative;width:100%;border:none;background:none;outline:none;font:inherit;font-size:15px;color:var(--ink);padding:2px}
 #hrmd .wai-glass .pin::placeholder{color:var(--muted)}
-#hrmd .wai-glass .gl{display:flex;align-items:center;justify-content:space-between;gap:10px}
 #hrmd .wai-use,#hrmd .fp-use{font-size:11px;font-weight:400;color:var(--muted)}
 #hrmd .fp-use{padding:0 6px;text-align:right}
 #hrmd .wai-use.is-low,#hrmd .fp-use.is-low{color:var(--warn)}
@@ -632,45 +631,7 @@
 #hrmd .q{align-self:flex-end;max-width:75%;background:var(--teal);color:#fff;border-radius:14px 14px 4px 14px;padding:11px 15px;font-size:13.5px}
 #hrmd .a{align-self:flex-start;max-width:88%}
 #hrmd .a .a-tag{display:inline-flex;align-items:center;gap:7px;font-size:10.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--teal);margin-bottom:8px}
-#hrmd .a p{font-size:13.5px;color:var(--g1);line-height:1.55}
-#hrmd .a-md p,#hrmd .a-md li{font-size:13.5px;color:var(--g1);line-height:1.55}
-#hrmd .a-md p+p,#hrmd .a-md ul+p,#hrmd .a-md ol+p,#hrmd .a-md ul,#hrmd .a-md ol,#hrmd .a-md p+ul,#hrmd .a-md p+ol{margin-top:8px}
-#hrmd .a-md ul,#hrmd .a-md ol{list-style:none;padding-left:20px;counter-reset:mdn}
-#hrmd .a-md ol{counter-reset:mdn calc(var(--s,1) - 1)}
-#hrmd .a-md li>ul{margin-top:4px}
-#hrmd .a-md li{position:relative;margin-top:4px}
-#hrmd .a-md ul>li::before{content:"";position:absolute;left:-14px;top:.62em;width:5px;height:5px;border-radius:50%;background:var(--teal)}
-#hrmd .a-md ol>li{counter-increment:mdn}
-#hrmd .a-md ol>li::before{content:counter(mdn) ".";position:absolute;left:-20px;color:var(--muted);font-size:12.5px}
-#hrmd .a-md .a-note{margin-top:10px;font-size:12.5px;color:var(--muted);line-height:1.55;background:var(--teal-soft);border-radius:10px;padding:9px 12px}
-#hrmd .a-md strong,#hrmd .a-md em{font-size:inherit}
-#hrmd .a-md strong{font-weight:600;color:var(--ink)}
-#hrmd .a-md .a-tbl{margin-top:10px;border:1px solid rgba(255,255,255,.9);border-radius:12px;overflow:auto;background:rgba(255,255,255,.62)}
-#hrmd .a-md .a-tbl:first-child{margin-top:0}
-#hrmd .a-md .a-tbl strong{font-weight:400;color:inherit}
-#hrmd .a-md .a-tbl em{font-style:normal}
-#hrmd .a-md .a-tbl td.k strong{font-weight:500;color:var(--ink)}
-#hrmd .a-md .a-th{background:var(--teal-soft);font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);padding:9px 12px}
-#hrmd .a-md .a-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
-#hrmd .a-md .a-td{font-size:12.5px;color:var(--ink);padding:9px 12px;border-top:1px solid var(--line-2)}
-#hrmd .a-md .a-tbl+p,#hrmd .a-md .a-tbl+ul,#hrmd .a-md .a-tbl+ol{margin-top:10px}
-#hrmd .a-md table{width:100%;border-collapse:collapse}
-#hrmd .a-md th{background:var(--teal-soft);font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);text-align:left;padding:9px 12px;white-space:nowrap}
-#hrmd .a-md td{font-size:12.5px;color:var(--g1);padding:9px 12px;border-top:1px solid var(--line-2);vertical-align:top}
-#hrmd .a-md td.k{color:var(--ink);font-weight:500}
-#hrmd .a-md .a-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}
-#hrmd .a-md .a-pill.ok{background:var(--ok-bg);color:var(--ok)}
-#hrmd .a-md .a-pill.warn{background:var(--warn-bg);color:var(--warn)}
-#hrmd .a-md .a-pill.err{background:var(--err-bg);color:var(--err)}
-#hrmd .a-md .a-pill.muted{background:var(--line-2);color:var(--g2)}
-#hrmd .a-md .a-notelist{margin-top:10px;font-size:12.5px;color:var(--muted);background:var(--teal-soft);border-radius:10px;padding:10px 14px 10px 32px}
-#hrmd .a-md .a-notelist li{font-size:12.5px;color:var(--muted)}
-#hrmd .a-md .a-notelist strong{color:var(--ink)}
-#hrmd .a-md .a-kv td{padding:8px 12px}
-#hrmd .a-md .a-kv td.k{width:34%;color:var(--muted);font-weight:400}
-#hrmd .a-md .a-kv td.k strong{color:var(--muted)}
-#hrmd .a-md .a-kv td:last-child{color:var(--ink)}
-#hrmd .a-md code{font-size:12.5px;background:var(--teal-soft);padding:1px 5px;border-radius:5px}
+#hrmd .a>p{font-size:13.5px;color:var(--g1);line-height:1.55}
 #hrmd .a-list{margin-top:12px;border:1px solid rgba(255,255,255,.9);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.62)}
 #hrmd .a-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(1,70,83,.07)}
 #hrmd .a-row:last-child{border-bottom:none}
@@ -867,136 +828,6 @@
   /* ---------- WAI ask → existing Wisdom chat endpoint ---------- */
   (function () {
     var focus = $('focus'), body = $('fpBody'), askInput = $('askInput'), fpInput = $('fpInput');
-    // Minimal Markdown for WAI answers (bold, italic, code, bullet / numbered lists, headings). Built with DOM
-    // nodes + textContent only, so the model's text can never inject HTML.
-    // Display-only: 2026-10-07 -> 07 Oct 2026 (day, short month, year)
-    var MD_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    function mdDates(s) {
-      return s.replace(/\b(\d{4})[-‐-―−](0[1-9]|1[0-2])[-‐-―−](0[1-9]|[12]\d|3[01])\b/g, function (m, y, mo, d) { return d + ' ' + MD_MON[+mo - 1] + ' ' + y; });
-    }
-    function mdInline(parent, s) {
-      s = mdDates(s);
-      var re = /\*\*([^*]+)\*\*|`([^`]+)`|\*([^*\s][^*]*)\*/g, last = 0, m;
-      while ((m = re.exec(s))) {
-        if (m.index > last) parent.appendChild(document.createTextNode(s.slice(last, m.index)));
-        parent.appendChild(m[1] != null ? el('strong', '', m[1]) : m[2] != null ? el('code', '', m[2]) : el('em', '', m[3]));
-        last = re.lastIndex;
-      }
-      if (last < s.length) parent.appendChild(document.createTextNode(s.slice(last)));
-    }
-    function mdCells(ln) { return ln.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); }); }
-    function mdTable(box, head, rows, cls) {
-      var wrap = el('div', 'a-tbl' + (cls ? ' ' + cls : '')), t = el('table'), tr, tb = el('tbody');
-      if (head) { var th = el('thead'); tr = el('tr'); head.forEach(function (h) { var c = el('th'); mdInline(c, h); tr.appendChild(c); }); th.appendChild(tr); t.appendChild(th); }
-      rows.forEach(function (r) { tr = el('tr'); r.forEach(function (c, i) { var td = el('td', i === 0 ? 'k' : ''); if (c && c.pill) td.appendChild(el('span', 'a-pill ' + c.pill, c.text)); else mdInline(td, c == null ? '\u2014' : c); tr.appendChild(td); }); tb.appendChild(tr); });
-      t.appendChild(tb); wrap.appendChild(t); box.appendChild(wrap);
-    }
-    // "Name – Dept – Reason: x – Resignation date 2026-08-01 – Pending" bullets -> one table row each.
-    // Labelled parts ("Label: value", "Label <date>", "No <label> recorded") become columns; the first plain part is the
-    // name and a trailing status word (Pending, Approved, …) becomes a coloured label. Returns null when the list isn't
-    // consistently record-shaped, so ordinary bullets are left alone.
-    var MD_STATUS = { pending: 'warn', 'in progress': 'warn', open: 'warn', approved: 'ok', active: 'ok', completed: 'ok', resolved: 'ok', done: 'ok', accepted: 'ok', withdrawn: 'muted', cancelled: 'muted', closed: 'muted', inactive: 'muted', rejected: 'err', overdue: 'err', expired: 'err', terminated: 'err', declined: 'err' };
-    function mdPlain(t) { return t.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/(^|[^*])\*([^*]+)\*/g, '$1$2').replace(/`([^`]+)`/g, '$1').trim(); }
-    function mdRecords(items) {
-      var cols = [], idx = {}, rows = [];
-      // the model sometimes writes date dashes as special Unicode hyphens; normalise so dates parse as dates
-      items = items.map(function (t) { return t.replace(/(\d{4})[\u2010-\u2015\u2212](\d{2})[\u2010-\u2015\u2212](\d{2})/g, '$1-$2-$3'); });
-      function col(k, head) { if (!(k in idx)) { idx[k] = cols.length; cols.push({ k: k, head: head }); } return idx[k]; }
-      var ok = items.every(function (t) {
-        var segs = t.split(/\s+[—–-]\s+/), row = {}, u = 0;
-        if (segs.length < 4) return false;
-        segs.forEach(function (sg) {
-          var p = mdPlain(sg), m, key;
-          if ((m = /^([A-Za-z][A-Za-z &\/]{1,28}):\s*(.+)$/.exec(p))) { key = 'l:' + m[1].toLowerCase(); row[col(key, m[1])] = sg.replace(/^\**\s*[^:]+:\s*/, ''); }
-          else if ((m = /^([A-Za-z][A-Za-z &\/]{1,28}?)\s+(\d{4}-\d{2}-\d{2})$/.exec(p))) { key = 'l:' + m[1].toLowerCase(); row[col(key, m[1])] = m[2]; }
-          else if ((m = /^No (.{3,40}?) (?:recorded|provided|available|set|found)$/i.exec(p))) { key = 'l:' + m[1].toLowerCase(); row[col(key, m[1].charAt(0).toUpperCase() + m[1].slice(1))] = '—'; }
-          else { row[col('u:' + u, '')] = sg; u++; }
-        });
-        rows.push(row); return true;
-      });
-      if (!ok || rows.length < 2 || cols.filter(function (c) { return c.k.charAt(0) === 'l'; }).length < 2) return null;
-      var unl = cols.filter(function (c) { return c.k.charAt(0) === 'u'; }), last = unl.length > 2 ? unl[unl.length - 1] : null, statusCol = -1;
-      if (last) {
-        var hits = rows.filter(function (r) { var v = r[idx[last.k]]; return v && MD_STATUS[mdPlain(v).toLowerCase()]; }).length;
-        if (hits >= rows.length * 0.6) { statusCol = idx[last.k]; last.head = 'Status'; }
-      }
-      unl.forEach(function (c, i) { if (!c.head) c.head = i === 0 ? 'Name' : 'Details'; });
-      return {
-        head: cols.map(function (c) { return c.head; }),
-        rows: rows.map(function (r) {
-          return cols.map(function (c, ci) {
-            var v = r[ci];
-            if (v == null) return '—';
-            if (ci === statusCol) { var st = mdPlain(v).toLowerCase(); return MD_STATUS[st] ? { pill: MD_STATUS[st], text: mdPlain(v) } : v; }
-            return v;
-          });
-        })
-      };
-    }
-    // "- **Building:** Building B", "- **Floor:** 2" ... : facts about ONE thing, shown as a label / value table (no row count).
-    function mdKv(items) {
-      var rows = [];
-      var ok = items.every(function (t) { var m = /^\s*\**\s*([^:*]{1,32}?)\s*:\s*\**\s*(.+)$/.exec(t); if (m) rows.push([m[1], m[2]]); return !!m; });
-      return ok && rows.length >= 2 ? rows : null;
-    }
-    // A long plain list (e.g. 20 names) is shown as a compact multi-column table instead of one tall column.
-    function mdGrid(box, items) {
-      var wrap = el('div', 'a-tbl'), head = el('div', 'a-th', items.length + ' results'), g = el('div', 'a-grid');
-      items.forEach(function (t) { var c = el('div', 'a-td'); mdInline(c, t); g.appendChild(c); });
-      wrap.appendChild(head); wrap.appendChild(g); box.appendChild(wrap);
-    }
-    // Markdown tables render as tables. A bullet list whose every line splits the same way ("Name — detail — date")
-    // is a list of records, so it is shown as an aligned table too; anything else stays a normal list.
-    function renderMd(box, text) {
-      var lines = String(text).split('\n'), i = 0, ul = [], ol = [];
-      function flush() {
-        var l;
-        if (ul.length) {
-          var parts = ul.map(function (t) { return t.split(/\s+[—–|]\s+|\s+-\s+/); }), n = parts[0].length;
-          var rec = ul.length >= 2 && mdRecords(ul);
-          var kv = !rec && ul.length >= 2 && mdKv(ul);
-          if (rec) mdTable(box, rec.head, rec.rows);
-          else if (kv) mdTable(box, null, kv, 'a-kv');
-          else if (ul.length >= 2 && n >= 2 && n <= 4 && parts.every(function (p) { return p.length === n; })) mdTable(box, null, parts);
-          else if (ul.length >= 4 && parts.every(function (p) { return p.length === 1; })) mdGrid(box, ul);
-          else { l = el('ul', ul.every(function (t) { return /^\*\*/.test(t) && t.length > 60; }) ? 'a-notelist' : ''); ul.forEach(function (t) { var li = el('li'); mdInline(li, t); l.appendChild(li); }); box.appendChild(l); }
-          ul = [];
-        }
-        if (ol.length) {
-          // numbered list: starts at the number the model wrote, and keeps the bullets that follow an item nested under it
-          l = el('ol'); l.style.setProperty('--s', ol[0].n);
-          ol.forEach(function (it) {
-            var li = el('li'); mdInline(li, it.t);
-            if (it.kids.length) { var k = el('ul'); it.kids.forEach(function (t) { var ki = el('li'); mdInline(ki, t); k.appendChild(ki); }); li.appendChild(k); }
-            l.appendChild(li);
-          });
-          box.appendChild(l); ol = [];
-        }
-      }
-      while (i < lines.length) {
-        var ln = lines[i];
-        if (/^\s*\|/.test(ln) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
-          flush(); var head = mdCells(ln), rows = []; i += 2;
-          while (i < lines.length && /^\s*\|/.test(lines[i])) { rows.push(mdCells(lines[i])); i++; }
-          mdTable(box, head, rows); continue;
-        }
-        var u = /^\s*[-*•]\s+(.*)/.exec(ln), o = /^\s*(\d+)[.)]\s+(.*)/.exec(ln), h = /^\s{0,3}#{1,6}\s+(.*)/.exec(ln);
-        if (u) {
-          if (ol.length && !ul.length) ol[ol.length - 1].kids.push(u[1]); // bullets directly under a numbered item belong to it
-          else ul.push(u[1]);
-        }
-        else if (o) { if (ul.length) flush(); ol.push({ n: o[1], t: o[2], kids: [] }); }
-        else if (!ln.trim()) flush();
-        else {
-          flush();
-          // A line that is entirely italic (*...* or _..._) is the model's footnote: show it as a quiet note box, not slanted text.
-          var nt = !h && /^\s*[*_](?![*_\s])(.+?)[*_]\s*$/.exec(ln), p = el('p', nt ? 'a-note' : '');
-          mdInline(p, h ? '**' + h[1].replace(/\*\*/g, '') + '**' : (nt ? nt[1] : ln)); box.appendChild(p);
-        }
-        i++;
-      }
-      flush();
-    }
     // "Thinking" placeholder: glow dot + pulsing letters (pure CSS). Replaced by the answer via a.replaceChild(md, p).
     function thinking() {
       var w = el('div', 'wai-loader-wrapper'), l = el('div', 'wai-letter-wrapper');
@@ -1012,7 +843,7 @@
       if (!u || !(u.limit > 0)) return;
       var rem = Math.max(0, u.remaining != null ? u.remaining : u.limit - (u.used || 0));
       var low = rem > 0 && rem <= Math.max(5, Math.ceil(u.limit * 0.2));
-      var txt = rem === 0 ? 'Daily limit reached. It resets at midnight.'
+      var txt = rem === 0 ? 'Daily limit reached. Try again later.'
         : low ? 'Only ' + rem + ' message' + (rem === 1 ? '' : 's') + ' left today'
         : rem + ' of ' + u.limit + ' messages left today';
       usageOut = rem === 0;
@@ -1027,26 +858,6 @@
       .catch(function () {});
     function open() { focus.classList.add('open'); document.body.style.overflow = 'hidden'; setTimeout(function () { fpInput.focus(); }, 60); }
     function close() { focus.classList.remove('open'); document.body.style.overflow = ''; askInput.value = ''; }
-    // Minimal Markdown → HTML for bot replies. Escapes first, so only the tags emitted below can appear.
-    function md(t) {
-      var s = String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>');
-      var out = '', list = null;
-      function end() { if (list) { out += '</' + list + '>'; list = null; } }
-      s.split('\n').forEach(function (ln) {
-        var ul = /^\s*[-*•]\s+/.test(ln), ol = /^\s*\d+\.\s+/.test(ln);
-        if (ul || ol) {
-          var tag = ul ? 'ul' : 'ol';
-          if (list !== tag) { end(); out += '<' + tag + '>'; list = tag; }
-          out += '<li>' + ln.replace(/^\s*(?:[-*•]|\d+\.)\s+/, '') + '</li>';
-        } else if (ln.trim() === '') { end(); }
-        else { end(); out += '<p>' + ln + '</p>'; }
-      });
-      end();
-      return out;
-    }
     function ask(q) {
       if (usageOut) return;
       body.appendChild(el('div', 'q', q));
@@ -1054,7 +865,7 @@
       body.scrollTop = body.scrollHeight;
       fetch(URLS.wai, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', body: JSON.stringify({ message: q }) })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
-        .then(function (j) { if (j && j.usage) applyUsage(j.usage); var md = el('div', 'a-md'); renderMd(md, j.success ? j.reply : (j.message || 'Something went wrong. Please try again.')); a.replaceChild(md, p); body.scrollTop = body.scrollHeight; })
+        .then(function (j) { if (j && j.usage) applyUsage(j.usage); var md = el('div', 'a-md'); WaiMd.render(md, j.success ? j.reply : (j.message || 'Something went wrong. Please try again.')); a.replaceChild(md, p); body.scrollTop = body.scrollHeight; })
         .catch(function () { if (p.parentNode) a.replaceChild(el('p', '', 'Something went wrong. Please try again.'), p); });
     }
     function submitAsk() { var v = askInput.value.trim(); if (!v) return; body.textContent = ''; ask(v); open(); }
