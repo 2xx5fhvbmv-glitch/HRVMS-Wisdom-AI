@@ -12,7 +12,8 @@ use Carbon\Carbon;
 /**
  * Daily housekeeping for resignations.
  *
- * When an employee's `last_working_day` arrives:
+ * When an employee's last working day arrives (their Approved
+ * resignation's `last_working_day`, or `employees.last_working_day`):
  *   1. Flip their `employees.status` from Active to Inactive so they no
  *      longer appear in lists / approval pools / org chart.
  *   2. Adjust the Workforce Manning numbers for their dept + position
@@ -38,9 +39,8 @@ class ApplyEmployeeLastWorkingDay extends Command
         $today = Carbon::today()->toDateString();
 
         $due = Employee::where('status', 'Active')
-            ->whereNotNull('last_working_day')
-            ->whereDate('last_working_day', '<=', $today)
-            ->get(['id', 'resort_id', 'Dept_id', 'Position_id', 'Emp_id', 'last_working_day', 'Admin_Parent_id']);
+            ->where(fn ($q) => $this->lastWorkingDayReached($q, $today))
+            ->get(['id', 'resort_id', 'Dept_id', 'Position_id', 'Emp_id', 'Admin_Parent_id']);
 
         $processed = 0;
         foreach ($due as $emp) {
@@ -62,7 +62,7 @@ class ApplyEmployeeLastWorkingDay extends Command
                     -1
                 );
 
-                $this->line(" Deactivated {$emp->Emp_id} (LWD {$emp->last_working_day}); manning freed.");
+                $this->line(" Deactivated {$emp->Emp_id}; manning freed.");
                 $processed++;
 
                 // Fires once: they're no longer Active on the next run.
@@ -81,15 +81,14 @@ class ApplyEmployeeLastWorkingDay extends Command
 
     /**
      * Holders whose LWD has passed, who are no longer Active/Probationary
-     * (guards a withdrawn resignation whose LWD wasn't cleared), and whose
+     * (e.g. Inactive, Offboarding after failed probation), and whose
      * FFS is finalized.
      */
     private function releaseAccommodation(string $today): void
     {
         $leavers = Employee::whereIn('id', AssingAccommodation::where('emp_id', '!=', 0)->select('emp_id'))
             ->whereNotIn('status', ['Active', 'Probationary'])
-            ->whereNotNull('last_working_day')
-            ->whereDate('last_working_day', '<=', $today)
+            ->where(fn ($q) => $this->lastWorkingDayReached($q, $today))
             ->whereHas('finalSettlements', fn ($q) => $q->where('status', 'finalized'))
             ->get();
 
@@ -107,6 +106,17 @@ class ApplyEmployeeLastWorkingDay extends Command
                     'could not be released automatically. Please unassign it manually.');
             }
         }
+    }
+
+    /**
+     * LWD lives on the Approved resignation (employee_resignation) — the
+     * app never writes employees.last_working_day, which is still honoured
+     * if set. A Withdrawn/Pending resignation never matches.
+     */
+    private function lastWorkingDayReached($q, string $today): void
+    {
+        $q->whereDate('last_working_day', '<=', $today)
+          ->orWhereHas('resignation', fn ($r) => $r->whereDate('last_working_day', '<=', $today));
     }
 
     private function notifyHrIfHeldPendingSettlement(Employee $emp): void
