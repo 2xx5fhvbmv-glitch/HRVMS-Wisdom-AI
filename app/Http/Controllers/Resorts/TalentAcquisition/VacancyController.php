@@ -2590,6 +2590,8 @@ class VacancyController extends Controller
         ->map(function ($item) {
             $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
 
+            // Raw date so the table can sort chronologically (formatted d M Y sorts as text).
+            $item->interview_date_raw = $item->InterViewDate;
             $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d M Y') : '-';
 
             $item->MalidivanTime = $item->ResortInterviewtime ?? '-';

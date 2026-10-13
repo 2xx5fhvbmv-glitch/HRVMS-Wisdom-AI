@@ -1630,19 +1630,10 @@ class LeaveController extends Controller
                                                                 )) as transportation_details'))->groupBy('el.id')->first();
 
                 if ($leaveDetail) {
-                    // L-01: no ownership/authorization check at all — any
-                    // authenticated employee could view any colleague's
-                    // leave detail (incl. the sick-note attachment) just by
-                    // incrementing the id. Allow: the leave's own employee,
-                    // HR/GM (hasFullDataAccess), or an employee holding an
-                    // approval slot anywhere in this leave's chain.
-                    $callerEmployee = $user->GetEmployee;
-                    $isOwner = $callerEmployee && (int) $callerEmployee->id === (int) $leaveDetail->emp_id;
-                    $isApprover = $callerEmployee && DB::table('employees_leaves_status')
-                        ->where('leave_request_id', $decodedId)
-                        ->where('approver_id', $callerEmployee->id)
-                        ->exists();
-                    if (!$isOwner && !$isApprover && !Common::hasFullDataAccess($callerEmployee)) {
+                    // L-01: applicant, approval chain, HR/GM or scoped HOD only —
+                    // same gate as viewLeaveHistory(). Runs before the sick-note
+                    // attachment URL is resolved below.
+                    if (!Common::canViewLeave($leaveDetail, $user->GetEmployee)) {
                         return response()->json(['success' => false, 'message' => 'You are not authorized to view this leave.'], 403);
                     }
 

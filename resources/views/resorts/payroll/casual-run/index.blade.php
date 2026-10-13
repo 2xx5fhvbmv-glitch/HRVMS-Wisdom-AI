@@ -70,10 +70,10 @@
       <div class="scrollwrap">
         <table class="etbl wide" id="cp-earnings-table">
           <thead>
-            <tr class="grp"><th class="emp" rowspan="2">Employee</th><th colspan="3">Attendance (days)</th><th colspan="3" class="gsep">Overtime (hrs)</th><th colspan="5" class="gsep">Pay · {{ $currency }}</th></tr>
-            <tr class="sub"><th>Present</th><th>Day off</th><th>Unpaid</th><th class="gsep">Regular</th><th>Friday</th><th>Holiday</th><th class="gsep">Basic</th><th>Earned</th><th>Total OT pay</th><th>Commission<span class="io">info only</span></th><th>Gross pay</th></tr>
+            <tr class="grp"><th class="emp" rowspan="2">Employee</th><th colspan="4">Attendance (days)</th><th colspan="3" class="gsep">Overtime (hrs)</th><th colspan="5" class="gsep">Pay · {{ $currency }}</th></tr>
+            <tr class="sub"><th>Present</th><th>Day off</th><th>Unpaid</th><th title="Days in the period with no attendance record (future dates excluded) — why Present + Day off + Unpaid may not add up to the full period">Unaccounted</th><th class="gsep">Regular</th><th>Friday</th><th>Holiday</th><th class="gsep">Basic</th><th>Earned</th><th>Total OT pay</th><th>Commission<span class="io">info only</span></th><th>Gross pay</th></tr>
           </thead>
-          <tbody><tr><td colspan="12" class="empty">Load earnings to see attendance and pay for the selected casuals.</td></tr></tbody>
+          <tbody><tr><td colspan="13" class="empty">Load earnings to see attendance and pay for the selected casuals.</td></tr></tbody>
           <tfoot></tfoot>
         </table>
       </div>
@@ -381,14 +381,14 @@
         const rows = cpEmployeesData, z = v => (Number(v) ? '' : ' z');
         $('#cp-earnings-table tbody').html(rows.map(function (e) {
             return `<tr data-emp-code="${cpEsc(e.id)}" data-employee-id="${cpEsc(e.employee_id)}">${cpEmpCell(e.name, e.position)}
-                <td class="cpx-num">${e.present}</td><td class="cpx-num">${e.day_offs}</td><td class="cpx-num${z(e.unpaid_days)}">${e.unpaid_days}</td>
+                <td class="cpx-num">${e.present}</td><td class="cpx-num">${e.day_offs}</td><td class="cpx-num${z(e.unpaid_days)}">${e.unpaid_days}</td><td class="cpx-num${z(e.unaccounted_days)}">${e.unaccounted_days || 0}</td>
                 <td class="cpx-num gsep${z(e.regular_ot)}">${e.regular_ot}</td><td class="cpx-num${z(e.friday_ot)}">${e.friday_ot}</td><td class="cpx-num${z(e.holiday_ot)}">${e.holiday_ot}</td>
                 <td class="cpx-num gsep">${cpMoney(e.basic_salary)}</td><td class="cpx-num">${cpMoney(e.earned_salary)}</td><td class="cpx-num">${cpMoney(e.total_ot_pay)}</td>
                 <td class="cpx-num comm">${cpMoney(e.service_provider_commission)}</td><td class="np">${cpMoney(e.normal_pay)}</td></tr>`;
-        }).join('') || '<tr><td colspan="12" class="empty">No earnings to show.</td></tr>');
+        }).join('') || '<tr><td colspan="13" class="empty">No earnings to show.</td></tr>');
         const t = f => cpSum(rows, f);
         $('#cp-earnings-table tfoot').html(rows.length ? `<tr><td class="emp">Totals · ${rows.length}</td>
-            <td class="cpx-num">${t(e => e.present)}</td><td class="cpx-num">${t(e => e.day_offs)}</td><td class="cpx-num">${t(e => e.unpaid_days)}</td>
+            <td class="cpx-num">${t(e => e.present)}</td><td class="cpx-num">${t(e => e.day_offs)}</td><td class="cpx-num">${t(e => e.unpaid_days)}</td><td class="cpx-num">${t(e => e.unaccounted_days || 0)}</td>
             <td class="cpx-num gsep">${+t(e => e.regular_ot).toFixed(2)}</td><td class="cpx-num">${+t(e => e.friday_ot).toFixed(2)}</td><td class="cpx-num">${+t(e => e.holiday_ot).toFixed(2)}</td>
             <td class="cpx-num gsep">${cpMoney(t(e => e.basic_salary))}</td><td class="cpx-num">${cpMoney(t(e => e.earned_salary))}</td><td class="cpx-num">${cpMoney(t(e => e.total_ot_pay))}</td>
             <td class="cpx-num comm">${cpMoney(t(e => e.service_provider_commission))}</td><td class="np">${cpMoney(t(e => e.normal_pay))}</td></tr>` : '');

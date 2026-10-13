@@ -502,7 +502,7 @@ $(document).ready(function() {
                 return `<span class="pill ${cls}">${escHtml(s)}</span>`;
             }},
             { data: 'Nationality', name: 'Nationality', render: function (d) { return spxFlag(SPX_CODES[d] || '') + escHtml(d); } },
-            { data: 'InterViewDate', name: 'InterViewDate', render: function (d, t, row) { return spxInterview(row); } },
+            { data: 'InterViewDate', name: 'interview_date_raw', render: function (d, t, row) { return spxInterview(row); } },
             { data: 'InterviewStatus', name: 'InterviewStatus', render: function (d) {
                 const s = SPX_STATUS[d] || [d || 'Slot not booked', 'muted'];
                 return `<span class="pill ${s[1]}">${escHtml(s[0])}</span>`;
