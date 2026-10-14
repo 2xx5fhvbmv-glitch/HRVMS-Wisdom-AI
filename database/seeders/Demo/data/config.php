@@ -250,7 +250,7 @@ return array (
   array (
     0 => 
     array (
-      'cutoff_day' => 25,
+      'cutoff_day' => 31, // calendar-month runs: every payslip and report lines up with one month
     ),
   ),
   'attendance_parameters' => 

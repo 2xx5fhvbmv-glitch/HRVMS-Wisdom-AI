@@ -2323,6 +2323,10 @@ class PayrollController extends Controller
                 'message' => 'Cannot proceed. The following employees have Present records with missing check-in/out times: ' . $employeeNames
             ], 422);
         }
+
+        // Day-offs and no-shows live in the roster, not in attendance rows.
+        $rosterContext = Common::payrollRosterContext($resortId, $scopedEmployeeIds, $request->startDate, $request->endDate, $attendanceRecords->pluck('id'));
+
         // Check if next month is Ramadan (based on start date)
         $nextMonthDate = Carbon::parse($request->startDate)->addMonthNoOverflow()->startOfMonth();
         $response = Http::get("https://api.aladhan.com/v1/gToH", [
@@ -2344,7 +2348,8 @@ class PayrollController extends Controller
             $settings,
             $latestAttendanceUpdates,
             $request,
-            $isNextMonthRamadan
+            $isNextMonthRamadan,
+            $rosterContext
         ) {
             if (!isset($employees[$empId])) return null;
 
@@ -2352,7 +2357,8 @@ class PayrollController extends Controller
 
             // Clone records array to prevent Laravel Collection where() mutation
             $recordsArray = $records->values()->all();
-            $dayOffCount = collect($recordsArray)->where('Status', 'DayOff')->count();
+            $dayMarks = Common::payrollDayMarks($recordsArray, $rosterContext, $empId);
+            $dayOffCount = $dayMarks['day_off_dates']->count();
             $periodStart = Carbon::parse($request->startDate);
             $periodEnd = Carbon::parse($request->endDate);
             $totalDaysInPeriod = $periodStart->diffInDays($periodEnd) + 1;
@@ -2382,12 +2388,10 @@ class PayrollController extends Controller
                     $presentDayEquivalent += 1.0;
                     continue;
                 }
-                $dParts = explode(':', $presentRec->DayWiseTotalHours);
-                $dayHours = (int) ($dParts[0] ?? 0) + ((int) ($dParts[1] ?? 0) / 60);
-                $presentDayEquivalent += min(1.0, $dayHours / 8);
+                $presentDayEquivalent += Common::payrollDayFraction($presentRec, $rosterContext);
             }
 
-            $absentRecords = collect($recordsArray)->where('Status', 'Absent');
+            $absentRecords = collect($recordsArray)->where('Status', 'Absent')->concat($dayMarks['no_shows']);
             // Split absent into regular absent and unpaid leave (based on note field)
             $unpaidLeaveRecords = $absentRecords->filter(function($r) {
                 return stripos($r->note ?? '', 'Unpaid Leave') !== false;
@@ -2581,7 +2585,10 @@ class PayrollController extends Controller
             // recorded — see above). Day-offs are unaffected, no work is
             // expected on them.
             $earnedSalary = round($perDay * ($presentDayEquivalent + $dayOffCount), 2); // present (hour-prorated) + paid leave + day-off
-            $absentDeduct = round($perDay * ($absentCount + $unpaidAbsentCount), 2); // both absent and unpaid leave get deducted
+            // Absent and unpaid days are already unpaid: earned salary counts only
+            // present, paid-leave and day-off days. Deducting them again here took
+            // two days' pay per absence.
+            $absentDeduct = 0;
 
             // OT formula: (monthly salary / total days in period / 8 hours) = per hour salary
             // Normal OT = per hour × 1.25, Friday OT = per hour × 1.50, Holiday OT = per hour × 1.50
@@ -2662,7 +2669,9 @@ class PayrollController extends Controller
                 'absent' => $absentCount,
                 'day_off' => $dayOffCount,
                 'unpaid_absent' => $unpaidAbsentCount,
-                'unaccounted_days' => Common::unaccountedDays($recordsArray, $periodStart, $periodEnd),
+                'unaccounted_days' => Common::unaccountedDays(
+                    array_merge($recordsArray, $dayMarks['no_shows']->all(), $dayMarks['day_off_dates']->map(fn ($d) => (object) ['date' => $d, 'Status' => 'DayOff'])->all()),
+                    $periodStart, $periodEnd),
                 'absent_deduction' => round($absentDeduct, 2),
                 'section' => 'N/A',
                 'total_ot' => $totalHours,

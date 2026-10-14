@@ -187,6 +187,8 @@ class CasualPayrollController extends Controller
             ->whereBetween('date', [$request->startDate, $request->endDate])
             ->get()
             ->groupBy('Emp_id');
+        // Day-offs live in the roster, not in attendance rows.
+        $rosterContext = Common::payrollRosterContext($resort_id, $scopedEmployeeIds, $request->startDate, $request->endDate, $attendanceByEmp->flatten()->pluck('id'));
 
         // Paid/unpaid override for each FullDayLeave day — set per
         // application at Leave apply time (LeaveController::store()), since
@@ -240,7 +242,7 @@ class CasualPayrollController extends Controller
 
             $records = ($attendanceByEmp->get($empId) ?? collect())->values();
 
-            $dayOffCount = $records->where('Status', 'DayOff')->count();
+            $dayOffCount = Common::payrollDayMarks($records->all(), $rosterContext, $empId)['day_off_dates']->count();
             // Casual/Intern have no paid-leave-category entitlement the way
             // Permanent does (§1 of the founder's own spec: supervisor marks
             // the full daily status, no benefit-grid leave allocation
@@ -256,9 +258,7 @@ class CasualPayrollController extends Controller
                     $presentDayEquivalent += 1.0;
                     continue;
                 }
-                $parts = explode(':', $rec->DayWiseTotalHours);
-                $dayHours = (int) ($parts[0] ?? 0) + ((int) ($parts[1] ?? 0) / 60);
-                $presentDayEquivalent += min(1.0, $dayHours / 8);
+                $presentDayEquivalent += Common::payrollDayFraction($rec, $rosterContext);
             }
             $presentCount = $records->where('Status', 'Present')->count();
 
@@ -302,7 +302,7 @@ class CasualPayrollController extends Controller
 
             $perDay = $totalDaysInPeriod > 0 ? $basic / $totalDaysInPeriod : 0;
             $earnedSalary = round($perDay * ($presentDayEquivalent + $dayOffCount), 2);
-            $absentDeduction = round($perDay * $unpaidCount, 2);
+            $absentDeduction = 0; // unpaid days are already left out of earned salary — deducting them again doubled the loss
 
             $perHourSalary = $totalDaysInPeriod > 0 ? $basic / $totalDaysInPeriod / 8 : 0;
             $regularOTPay = round($perHourSalary * 1.25 * $regularOT, 2);

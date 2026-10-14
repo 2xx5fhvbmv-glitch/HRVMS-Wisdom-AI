@@ -56,7 +56,8 @@ class DemoTimeSeeder
             }
         }
 
-        $from = $this->today->copy()->subMonthsNoOverflow(12)->startOfWeek();
+        // From the first day of the oldest payroll run (DemoPayrollSeeder::RUNS months back).
+        $from = $this->today->copy()->startOfMonth()->subMonths(DemoPayrollSeeder::RUNS)->startOfWeek();
         $until = $this->today->copy()->addWeek()->endOfWeek(); // this week and next are planned ahead
         foreach ($staff as $e) {
             $isOffice = in_array($depts[$e->Dept_id] ?? '', self::OFFICE_DEPTS, true) || !in_array((int) $e->rank, self::OT_RANKS, true);

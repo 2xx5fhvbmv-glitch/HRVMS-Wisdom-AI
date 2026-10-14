@@ -90,6 +90,19 @@ class DemoVerifier
             return ($pending > 0 && $approved > 0) ?: "{$approved} approved, {$pending} pending";
         });
 
+        // Slice 4: payroll.
+        $this->check('12 locked payroll runs, last month waiting on Finance → HR → GM', function () use ($resortId) {
+            $locked = DB::table('payroll')->where('resort_id', $resortId)->where('status', 'locked')->count();
+            $pending = DB::table('payroll')->where('resort_id', $resortId)->where('status', 'pending_approval')->pluck('id');
+            $steps = DB::table('payroll_approvals')->whereIn('payroll_id', $pending)->where('status', 'pending')->orderBy('step_order')->pluck('role_title')->all();
+            return ($locked === 12 && $pending->count() === 1 && $steps === ['Finance EXCOM', 'HR EXCOM', 'GM']) ?: "{$locked} locked, {$pending->count()} pending";
+        });
+        $this->check('Every locked run totals its payslips', function () use ($resortId) {
+            $off = DB::table('payroll as p')->where('p.resort_id', $resortId)->where('p.status', 'locked')
+                ->whereRaw('ABS(p.total_payroll - (SELECT COALESCE(SUM(r.net_salary), 0) FROM payroll_reviews r WHERE r.payroll_id = p.id)) > 0.01')->count();
+            return $off === 0 ?: "{$off} runs don't add up";
+        });
+
         return ['passed' => !collect($this->checks)->contains('ok', false), 'checks' => $this->checks];
     }
 

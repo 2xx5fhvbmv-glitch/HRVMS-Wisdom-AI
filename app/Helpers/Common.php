@@ -12566,6 +12566,73 @@ class Common
      * period's total days is explained; mirrors the register's `not_marked`.
      * $records: attendance rows (models/objects/arrays with date + Status) for ONE employee.
      */
+    /**
+     * Roster lookups a payroll calculation needs, loaded once per run.
+     * A check-in always writes 'Present' and nothing writes DayOff/Absent
+     * attendance rows, so pay code that counted only those rows never paid a
+     * day off nor saw a no-show; the roster (duty_roster_entries) has both.
+     * $attendanceIds: the run's parent_attendaces ids (for their breaks).
+     */
+    public static function payrollRosterContext($resortId, $empIds, $start, $end, $attendanceIds): array
+    {
+        $toMinutes = function ($hm) {
+            [$h, $m] = array_pad(explode(':', (string) $hm), 2, 0);
+            return (int) $h * 60 + (int) $m;
+        };
+        return [
+            'roster' => DB::table('duty_roster_entries')->whereIn('Emp_id', $empIds)
+                ->whereBetween('date', [Carbon::parse($start)->format('Y-m-d'), Carbon::parse($end)->format('Y-m-d')])
+                ->get(['Emp_id', 'date', 'Status'])->groupBy('Emp_id'),
+            'shift_minutes' => DB::table('shift_settings')->where('resort_id', $resortId)->pluck('TotalHours', 'id')->map($toMinutes),
+            'break_minutes' => DB::table('break_attendaces')->whereIn('Parent_attd_id', $attendanceIds)->where('Total_Break_Time', '!=', '')
+                ->get(['Parent_attd_id', 'Total_Break_Time'])->groupBy('Parent_attd_id')
+                ->map(fn ($rows) => $rows->sum(fn ($b) => $toMinutes($b->Total_Break_Time))),
+        ];
+    }
+
+    /**
+     * One employee's paid day-offs and no-shows in a run, from attendance
+     * rows plus the roster. Day off = marked DayOff anywhere, unless they
+     * worked it (then it's a present day). No-show = a rostered workday that
+     * has passed with no attendance row at all (approved leave writes its
+     * own FullDayLeave row), returned shaped like an Absent attendance row.
+     */
+    public static function payrollDayMarks(array $records, array $context, $empId): array
+    {
+        $ymd = fn ($d) => Carbon::parse($d)->format('Y-m-d');
+        $present = ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDay'];
+        $records = collect($records);
+        $marked = $records->map(fn ($r) => $ymd(data_get($r, 'date')))->flip();
+        $worked = $records->whereIn('Status', $present)->map(fn ($r) => $ymd(data_get($r, 'date')))->flip();
+        $roster = collect($context['roster'][$empId] ?? []);
+        $today = Carbon::today()->format('Y-m-d');
+
+        return [
+            'day_off_dates' => $records->where('Status', 'DayOff')->pluck('date')->merge($roster->where('Status', 'DayOff')->pluck('date'))
+                ->map($ymd)->unique()->reject(fn ($d) => isset($worked[$d]))->values(),
+            'no_shows' => $roster->where('Status', '!=', 'DayOff')->pluck('date')->map($ymd)->unique()
+                ->reject(fn ($d) => isset($marked[$d]) || $d >= $today)
+                ->map(fn ($d) => (object) ['date' => $d, 'Status' => 'Absent', 'note' => null])->values(),
+        ];
+    }
+
+    /**
+     * Share of a day's pay one present attendance row earns. DayWiseTotalHours
+     * is net of breaks while a shift's length includes its break, so time on
+     * shift (net + breaks) is compared with the shift itself: a completed
+     * shift is a full day. No recorded hours = a data gap, paid as a full day.
+     */
+    public static function payrollDayFraction($rec, array $context): float
+    {
+        $hours = data_get($rec, 'DayWiseTotalHours');
+        if (empty($hours) || in_array($hours, ['0', '0:0', '0:00', '00:00'], true)) {
+            return 1.0;
+        }
+        [$h, $m] = array_pad(explode(':', (string) $hours), 2, 0);
+        $onShift = (int) $h * 60 + (int) $m + ($context['break_minutes'][data_get($rec, 'id')] ?? 0);
+        return min(1.0, $onShift / max(1, $context['shift_minutes'][data_get($rec, 'Shift_id')] ?? 480));
+    }
+
     public static function unaccountedDays($records, $start, $end): int
     {
         $marked = [];
