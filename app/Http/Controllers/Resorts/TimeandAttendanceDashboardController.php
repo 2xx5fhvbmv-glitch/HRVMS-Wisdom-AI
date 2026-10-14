@@ -262,19 +262,11 @@ class TimeandAttendanceDashboardController extends Controller
                 ->whereNotNull('working_hrs_per_week')
                 ->pluck('working_hrs_per_week', 'emp_grade');
 
-            $weeklyRows = ParentAttendace::where('resort_id', $resortId)
-                ->whereIn('Emp_id', $empIds)
-                ->whereBetween('date', [$startOfWeek, $endOfWeek])
-                ->where('Status', 'Present')
-                ->whereNotNull('CheckingTime')
-                ->whereNotNull('CheckingOutTime')
-                ->get(['Emp_id', 'CheckingTime', 'CheckingOutTime']);
-
+            // Normal hours only, same rule as the 48-hour compliance check (Mon–Sat,
+            // breaks and approved overtime excluded, overnight-safe).
             $weeklyTotals = [];
-            foreach ($weeklyRows as $row) {
-                $in  = Carbon::parse($row->CheckingTime);
-                $out = Carbon::parse($row->CheckingOutTime);
-                $weeklyTotals[$row->Emp_id] = ($weeklyTotals[$row->Emp_id] ?? 0) + $in->diffInHours($out);
+            foreach (Common::weeklyNormalMinutes($resortId, $empIds, $startOfWeek, $endOfWeek) as $eid => $byWeek) {
+                $weeklyTotals[$eid] = round(array_sum($byWeek) / 60, 1);
             }
             foreach ($weeklyTotals as $eid => $hours) {
                 $emp = $empById->get($eid);
@@ -287,7 +279,7 @@ class TimeandAttendanceDashboardController extends Controller
                     $limit = 48;
                 }
                 if ($hours > $limit) {
-                    $weeklyHoursEmp[] = $person($emp, $hours . ' hrs / ' . $limit . ' hr limit');
+                    $weeklyHoursEmp[] = $person($emp, $hours . ' normal hrs / ' . $limit . ' hr limit');
                 }
             }
 

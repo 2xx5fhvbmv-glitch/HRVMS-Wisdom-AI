@@ -14053,6 +14053,55 @@ class Common
         return $map;
     }
 
+    /**
+     * NORMAL minutes worked per employee per Mon–Sat working week (Sunday is
+     * not counted): check-in → check-out (overnight-safe) minus completed
+     * breaks minus Approved overtime. Days still on shift are skipped.
+     * Shared by the 48-hour compliance rule and the T&A dashboard insight.
+     * Break_OutTime = break start, Break_InTime = break end ('' while open).
+     *
+     * @return array<int, array<string, int>> [Emp_id => [week-start Y-m-d => minutes]]
+     */
+    public static function weeklyNormalMinutes($resortId, array $empIds, string $from, string $to): array
+    {
+        $clock = function ($time): ?int {
+            if (!is_string($time) || !preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?$/', trim($time), $m)) {
+                return null;
+            }
+            [$h, $min] = [(int) $m[1], (int) $m[2]];
+            return ($h > 24 || $min > 59 || ($h === 24 && $min > 0)) ? null : $h * 60 + $min;
+        };
+        $span = fn (int $a, int $b) => $b >= $a ? $b - $a : $b + 1440 - $a;
+
+        $days = ParentAttendace::where('resort_id', $resortId)->whereIn('Emp_id', $empIds)
+            ->whereNotNull('CheckingTime')->where('Status', 'Present')
+            ->whereBetween('date', [$from, $to])
+            ->get(['id', 'Emp_id', 'date', 'CheckingTime', 'CheckingOutTime', 'OverTime', 'OTStatus']);
+        $breakMinutes = \App\Models\BreakAttendaces::whereIn('Parent_attd_id', $days->pluck('id'))
+            ->get(['Parent_attd_id', 'Break_InTime', 'Break_OutTime'])
+            ->groupBy('Parent_attd_id')
+            ->map(fn ($breaks) => $breaks->sum(function ($b) use ($clock, $span) {
+                $start = $clock($b->Break_OutTime);
+                $end = $clock($b->Break_InTime);
+                return $start === null || $end === null ? 0 : $span($start, $end);
+            }));
+
+        $result = [];
+        foreach ($days as $day) {
+            $date = Carbon::parse($day->date);
+            $in = $clock($day->CheckingTime);
+            $out = $clock($day->CheckingOutTime);
+            if ($date->isSunday() || $in === null || $out === null) {
+                continue;
+            }
+            $worked = $span($in, $out) - ($breakMinutes[$day->id] ?? 0);
+            $overtime = $day->OTStatus === 'Approved' ? ($clock($day->OverTime) ?? 0) : 0;
+            $week = $date->startOfWeek()->format('Y-m-d');
+            $result[$day->Emp_id][$week] = ($result[$day->Emp_id][$week] ?? 0) + max(0, $worked - $overtime);
+        }
+        return $result;
+    }
+
 }
 
 ?>

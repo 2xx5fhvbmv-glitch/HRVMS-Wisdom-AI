@@ -1447,39 +1447,9 @@ class ComplianceController extends Controller
                $startOfWeek = Carbon::now()->subWeek()->startOfWeek();
                $endOfWeek =  Carbon::now()->copy()->endOfWeek();
 
-               // Two queries for the whole resort instead of one per employee and day.
-               $days = ParentAttendace::where('resort_id', $resort->resort_id)->whereIn('Emp_id', $employeeIds)
-                    ->whereNotNull('CheckingTime')->where('Status', 'Present')
-                    ->whereBetween('date', [$startOfWeek->format('Y-m-d'), $endOfWeek->format('Y-m-d')])
-                    ->get(['id', 'Emp_id', 'date', 'CheckingTime', 'CheckingOutTime', 'OverTime', 'OTStatus']);
-               // Break_OutTime = break start, Break_InTime = break end ('' while still on break → not subtracted).
-               $breakMinutes = BreakAttendaces::whereIn('Parent_attd_id', $days->pluck('id'))
-                    ->get(['Parent_attd_id', 'Break_InTime', 'Break_OutTime'])
-                    ->groupBy('Parent_attd_id')
-                    ->map(fn ($breaks) => $breaks->sum(function ($b) {
-                         $start = self::clockMinutes($b->Break_OutTime);
-                         $end = self::clockMinutes($b->Break_InTime);
-                         return $start === null || $end === null ? 0 : self::spanMinutes($start, $end);
-                    }));
-
                $overworkedEmployees = [];
-               foreach ($days->groupBy('Emp_id') as $empId => $employeeDays)
+               foreach (Common::weeklyNormalMinutes($resort->resort_id, $employeeIds, $startOfWeek->format('Y-m-d'), $endOfWeek->format('Y-m-d')) as $empId => $minutesByWeek)
                {
-                    $minutesByWeek = [];
-                    foreach ($employeeDays as $day) {
-                         if (Carbon::parse($day->date)->isSunday()) {
-                              continue;
-                         }
-                         $in = self::clockMinutes($day->CheckingTime);
-                         $out = self::clockMinutes($day->CheckingOutTime);
-                         if ($in === null || $out === null) {
-                              continue; // still on shift, or a malformed time
-                         }
-                         $worked = self::spanMinutes($in, $out) - ($breakMinutes[$day->id] ?? 0);
-                         $overtime = $day->OTStatus === 'Approved' ? (self::clockMinutes($day->OverTime) ?? 0) : 0;
-                         $week = Carbon::parse($day->date)->startOfWeek()->format('Y-m-d');
-                         $minutesByWeek[$week] = ($minutesByWeek[$week] ?? 0) + max(0, $worked - $overtime);
-                    }
                     if (!$minutesByWeek || max($minutesByWeek) <= 48 * 60) {
                          continue;
                     }
