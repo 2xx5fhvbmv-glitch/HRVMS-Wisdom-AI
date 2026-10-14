@@ -1099,7 +1099,6 @@
 
     function confirmations(flag, itemId) {
         const action = flag === "approve" ? "approved" : "rejected"; // Determine action based on flag
-        alert(action);
         wisdomConfirm({
             role: flag === "approve" ? 'positive' : 'destructive',
             title: `Are you sure you want to ${flag} this OT?`,
@@ -1118,11 +1117,14 @@
                         CheckoutTime: $("#CheckoutTime").val(),
                     },
                     success: function (response) {
-                        // Show success message
+                        if (!response.success) {
+                            wisdomAlert({ type: 'error', title: "Error!", text: response.message });
+                            return;
+                        }
                         wisdomAlert({
                             type: 'success',
                             title: `${action.charAt(0).toUpperCase() + action.slice(1)}!`,
-                            text: `The OT has been successfully ${action}.`
+                            text: response.message
                         });
                         window.location.reload(); // Reload the page
                     },
@@ -1131,7 +1133,7 @@
                         wisdomAlert({
                             type: 'error',
                             title: "Error!",
-                            text: "An error occurred while processing the request."
+                            text: xhr.responseJSON?.message || "An error occurred while processing the request."
                         });
                         console.error(error);
                     },

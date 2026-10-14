@@ -1481,7 +1481,12 @@ class TimeAndAttendanceController extends Controller
             $positionRankConfig                             =   config('settings.Position_Rank', []);
             $isSupervisorOrLineWorker                       =   in_array($employeeRank, ['5', '6']); // '5' => 'SUP', '6' => 'LINE WORKERS'
 
-            $rosterData                                      =  DutyRoster::where('resort_id', $user->resort_id)->where('Emp_id', $emp_id)->first();
+            // The roster covering today, as check-out uses — this took the
+            // employee's oldest roster, so a zone set on a later week never
+            // applied at check-in. Falls back to any roster as before.
+            $rosterData                                      =  DutyRoster::where('resort_id', $user->resort_id)->where('Emp_id', $emp_id)
+                ->whereIn('id', DutyRosterEntry::where('Emp_id', $emp_id)->whereDate('date', $date)->select('roster_id'))->first()
+                ?? DutyRoster::where('resort_id', $user->resort_id)->where('Emp_id', $emp_id)->first();
             $inTimeGeofence                                 =   $this->resolveGeofenceCheck($inTimeLocationRaw, $rosterData);
             $timeAttendance                                 =   [];
             $childAttendace = null;

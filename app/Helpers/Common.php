@@ -13750,6 +13750,43 @@ class Common
     }
 
     /**
+     * Payroll pays overtime from parent_attendaces.OverTime/OTStatus, but the
+     * T&A overtime screens approve employee_overtimes rows — so OT approved
+     * there was never paid. Call after any status decision on the entries a
+     * punch generated: mirrors them onto that attendance day. Approved total
+     * → 'Approved'; all decided, none approved → rejected total, 'Rejected';
+     * nothing decided yet → left blank, as before. Pre-planned entries (no
+     * parent_attendance_id) are a plan, not worked time, and never count.
+     */
+    public static function syncAttendanceOvertime($parentAttendanceId, $approverAdminId): void
+    {
+        if (!$parentAttendanceId) {
+            return;
+        }
+        $entries = \App\Models\EmployeeOvertime::where('parent_attendance_id', $parentAttendanceId)->get(['status', 'total_time']);
+        if ($entries->isEmpty()) {
+            return; // OT on this day, if any, came from the older attendance-row flows — leave it to them
+        }
+        $minutes = fn ($status) => $entries->where('status', $status)->sum(function ($e) {
+            [$h, $m] = array_pad(explode(':', (string) $e->total_time), 2, 0);
+            return (int) $h * 60 + (int) $m;
+        });
+        $approved = $minutes('approved');
+        $ot = null;
+        $status = null;
+        if ($approved > 0) {
+            [$ot, $status] = [$approved, 'Approved'];
+        } elseif (!$entries->contains('status', 'pending')) {
+            [$ot, $status] = [$minutes('rejected'), 'Rejected'];
+        }
+        \App\Models\ParentAttendace::where('id', $parentAttendanceId)->update([
+            'OverTime' => $ot === null ? null : sprintf('%02d:%02d', intdiv($ot, 60), $ot % 60),
+            'OTStatus' => $status,
+            'OTApproved_By' => $status ? $approverAdminId : null,
+        ]);
+    }
+
+    /**
      * Resolve all template placeholders for offer letter / contract
      */
     public static function resolveTemplatePlaceholders($applicantId, $resortId)

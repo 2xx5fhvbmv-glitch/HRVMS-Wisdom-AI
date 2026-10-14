@@ -35,6 +35,8 @@ class DemoEnvSeeder
         $say('Resort, master login and menu ready.');
         $counts += (new DemoOrganisationSeeder($resortId, $admin->id))->seed();
         $say("Organisation and {$counts['employees']} employees ready.");
+        $counts += (new DemoTimeSeeder($resortId, $admin->id))->seed();
+        $say("Rosters and {$counts['attendance days']} attendance days ready.");
 
         try {
             Common::createFolderByResort($resortId);

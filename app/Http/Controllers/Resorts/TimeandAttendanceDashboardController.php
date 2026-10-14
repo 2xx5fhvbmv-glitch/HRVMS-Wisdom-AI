@@ -2555,6 +2555,7 @@ class TimeandAttendanceDashboardController extends Controller
                 }
 
                 $overtime->update($updateData);
+                Common::syncAttendanceOvertime($overtime->parent_attendance_id, $approvedBy);
             }
 
             DB::commit();
