@@ -500,6 +500,12 @@ class ResortAllNotificationController extends Controller
     {
         $resort = Auth::guard('resort-admin')->user();
         $employeeRankPosition = Common::getEmployeeRankPosition($resort->getEmployee);
+        // 'position' comes from the department name, and a GM's department is usually
+        // "Executive Office" — so the GM was refused here (403) while approveBudget(),
+        // which checks the rank, let them approve. Same rank check as approveBudget().
+        if (($employeeRankPosition['rank'] ?? null) === 'GM') {
+            $employeeRankPosition['position'] = 'GM';
+        }
         $resort_id = $resort->resort_id;
         $Budget_id = $request->budget_id;
         $Department_id =  $request->department_id;
@@ -543,7 +549,8 @@ class ResortAllNotificationController extends Controller
             $typeofCommet = 'Sent back to department for revision';
             $budgetProcessStatus = 'GM';
         }elseif($employeeRankPosition['position'] == 'GM') {
-            $typeofCommet = $typeofCommets[3];
+            // Was $typeofCommets[3] ("forwarded to GM"), wrong for the GM sending it back.
+            $typeofCommet = 'Sent back to department for revision';
             // $budgetProcessStatus = 'GM';
         }else{
             $typeofCommet = "";

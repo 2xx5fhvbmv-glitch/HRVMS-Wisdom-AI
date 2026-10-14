@@ -1543,9 +1543,11 @@ class PayrollController extends Controller
     }
 
     /**
-     * Determine which approval step a user can approve based on their role
+     * Determine which approval step a user can approve based on their role.
+     * Public + static so the centralized Approvals inbox lists exactly the
+     * payrolls this endpoint will let the user act on.
      */
-    private function getApprovalStepForUser($rankPosition, $employee)
+    public static function getApprovalStepForUser($rankPosition, $employee)
     {
         if (!$rankPosition || !$employee) return null;
 

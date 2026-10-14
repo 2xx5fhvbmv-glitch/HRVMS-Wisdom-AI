@@ -5687,6 +5687,14 @@ class Common
             || in_array($code, $aliases, true);
     }
 
+    /** L&D Manager: an L&D leadership title, or anyone in the L&D department (the rule learning requests are approved under). */
+    public static function isLdManager($employee): bool
+    {
+        if (!$employee) return false;
+        return in_array(optional($employee->position)->position_title, self::ldLeadershipTitles(), true)
+            || self::isLDDepartment($employee->Dept_id ?? null);
+    }
+
     /**
      * Active admin-broadcast notifications the current resort-admin user
      * should see in the header banner. Filters by:
