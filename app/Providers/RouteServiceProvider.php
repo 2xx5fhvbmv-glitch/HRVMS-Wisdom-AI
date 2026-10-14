@@ -44,19 +44,20 @@ class RouteServiceProvider extends ServiceProvider
         // not dependent on middleware order), falling back to IP only for
         // truly unauthenticated calls (login, forgot-password).
         // Wisdom AI chat is a paid, live AI call per message — cap it per user.
+        // Burst cap only; the daily allowance (successful calls only) lives in the controller.
         RateLimiter::for('wisdom-chat', function ($request) {
-            $key = WisdomChatController::limiterKey($request);
-            $tooFast = fn () => response()->json(['success' => false, 'message' => 'You are sending messages too quickly — please wait a minute and try again.'], 429);
-            $limit = WisdomChatController::DAILY_LIMIT;
+            $tooFast = fn ($request, array $headers) => WisdomChatController::limited(
+                'rate_limited',
+                "You're sending messages too quickly. Please wait a few seconds.",
+                WisdomChatController::usage(),
+                (int) ($headers['Retry-After'] ?? 60)
+            );
             return [
-                Limit::perMinute(10)->by($key)->response($tooFast),
-                // Own key: sharing $key with the per-minute limit made both share one counter that
-                // expired every minute (and counted each message twice), so this cap never applied.
-                Limit::perDay($limit)->by($key . ':day')->response(fn () => response()->json([
-                    'success' => false,
-                    'message' => 'Daily Wisdom AI limit reached — please try again later.',
-                    'usage'   => ['limit' => $limit, 'used' => $limit, 'remaining' => 0],
-                ], 429)),
+                Limit::perMinute(config('services.wisdom_ai.per_minute', 15))
+                    ->by('wisdom-chat:' . (optional($request->user('resort-admin'))->id ?: $request->ip()))
+                    ->response($tooFast),
+                // Generous second guard per source IP (a whole resort may share one NAT address).
+                Limit::perMinute(120)->by('wisdom-chat-ip:' . $request->ip())->response($tooFast),
             ];
         });
 

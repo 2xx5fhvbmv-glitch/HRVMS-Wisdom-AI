@@ -78,6 +78,16 @@ trait PredefinedReportActions
         $payload = ['resort_data' => ['additionalProp1' => ['columns' => $columns, 'data' => $formatted]]];
         $json    = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
+        // Cache like ReportController::aiAnalysisText(). The payload already
+        // carries resort, report name, the filtered + department-scoped rows
+        // and the viewer's sensitive-column strip, so hashing it gives each
+        // distinct (report, filters, scope) its own entry.
+        $cacheKey = 'report_ai_insight:predefined:' . md5($json);
+        $cached   = (string) \Cache::get($cacheKey, '');
+        if ($cached !== '') {
+            return $cached;
+        }
+
         $curl = curl_init();
         curl_setopt_array($curl, [
             CURLOPT_URL            => $url,
@@ -101,8 +111,12 @@ trait PredefinedReportActions
             return '';
         }
 
-        $decoded = json_decode($response, true);
-        return $this->sanitizeInsights(is_array($decoded) ? (string) ($decoded['analysis'] ?? '') : '');
+        $decoded  = json_decode($response, true);
+        $analysis = $this->sanitizeInsights(is_array($decoded) ? (string) ($decoded['analysis'] ?? '') : '');
+        if ($analysis !== '') {
+            \Cache::put($cacheKey, $analysis, now()->addDay());
+        }
+        return $analysis;
     }
 
     /**

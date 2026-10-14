@@ -1438,8 +1438,8 @@ class ComplianceController extends Controller
 
                // Weekly Working Hours Compliance Start
 
-               // 48-hour weekly limit on NORMAL hours. Each calendar week (Mon–Sun),
-               // last week and this week, is judged on its own. A day counts check-in →
+               // 48-hour weekly limit on NORMAL hours. Each Mon–Sat working week (Sunday
+               // hours are not counted), last week and this week, is judged on its own. A day counts check-in →
                // check-out (overnight-safe) minus its completed breaks minus its
                // Approved overtime (Demo ENV spec §18) — Pending overtime still counts
                // until approved; the breach auto-resolves on the next run once it is.
@@ -1466,6 +1466,9 @@ class ComplianceController extends Controller
                {
                     $minutesByWeek = [];
                     foreach ($employeeDays as $day) {
+                         if (Carbon::parse($day->date)->isSunday()) {
+                              continue;
+                         }
                          $in = self::clockMinutes($day->CheckingTime);
                          $out = self::clockMinutes($day->CheckingOutTime);
                          if ($in === null || $out === null) {
