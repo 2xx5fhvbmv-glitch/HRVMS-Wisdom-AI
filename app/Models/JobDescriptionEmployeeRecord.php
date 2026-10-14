@@ -60,6 +60,71 @@ class JobDescriptionEmployeeRecord extends Model
             }
             $model->modified_by = $user->id;
         });
+
+        // Compliance flag follows the record immediately (issue, sign,
+        // decline, resend) — the People > Compliance run re-checks too.
+        self::saved(function ($model) {
+            if ($model->wasRecentlyCreated || $model->wasChanged('status')) {
+                try {
+                    self::syncCompliance($model->resort_id, $model->employee_id);
+                } catch (\Throwable $e) {
+                    \Log::warning('Job description compliance sync failed: ' . $e->getMessage());
+                }
+            }
+        });
+    }
+
+    public const COMPLIANCE_RULES = [
+        'Pending'  => ['Job Description Not Signed', 'has not signed'],
+        'Declined' => ['Job Description Declined', 'has declined'],
+    ];
+
+    /**
+     * Open one "Job Description Not Signed" / "Job Description Declined"
+     * breach per employee while any of their records is Pending / Declined;
+     * resolve it once none is. A manually dismissed row is not re-raised.
+     * Returns the breach names still active (for the compliance run's
+     * auto-resolve sweep).
+     */
+    public static function syncCompliance($resortId, $employeeId): array
+    {
+        $active = [];
+        foreach (self::COMPLIANCE_RULES as $status => [$breach, $verb]) {
+            $open = Compliance::where('resort_id', $resortId)->where('employee_id', $employeeId)
+                ->where('module_name', 'Job Description')->where('compliance_breached_name', $breach)
+                ->where('status', 'Breached');
+            $record = self::with(['employee.resortAdmin', 'employee.position'])
+                ->where('resort_id', $resortId)->where('employee_id', $employeeId)
+                ->where('status', $status)->latest('id')->first();
+
+            if (!$record) {
+                // Same resolved marking as ComplianceController::resolveStaleBreaches().
+                foreach ($open->where('Dismissal_status', 'Pending')->get() as $row) {
+                    $row->status = 'Resolved';
+                    $row->Dismissal_status = 'Resolved';
+                    $row->save();
+                }
+                continue;
+            }
+
+            $active[] = $breach;
+            if ($open->exists()) {
+                continue;
+            }
+            $emp = $record->employee;
+            $name = trim(($emp->resortAdmin->first_name ?? '') . ' ' . ($emp->resortAdmin->last_name ?? '')) ?: $record->employee_full_name;
+            $issued = ($record->sent_at ?? $record->created_at)->format('d M Y');
+            Compliance::create([
+                'resort_id'                => $resortId,
+                'employee_id'              => $employeeId,
+                'module_name'              => 'Job Description',
+                'compliance_breached_name' => $breach,
+                'description'              => "Employee {$name} (" . ($emp->position->position_title ?? '-') . ") {$verb} the job description issued on {$issued}.",
+                'reported_on'              => now(),
+                'status'                   => 'Breached',
+            ]);
+        }
+        return $active;
     }
 
     public function jobDescription()

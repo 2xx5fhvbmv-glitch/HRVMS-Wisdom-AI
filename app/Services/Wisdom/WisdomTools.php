@@ -104,7 +104,7 @@ class WisdomTools
             self::fn('get_pending_leave_approvals',
                 'Leave requests that are still awaiting approval (employee, leave type, dates, days, status). Use for "which leave requests are pending approval", "pending leave". Do NOT confuse with who is on leave today.', []),
             self::fn('get_leave_balance',
-                'Leave balance for ONE employee by name: per leave type, the entitlement, days taken this year and remaining balance. Use for "what is X\'s leave balance", "how much leave does X have left".',
+                'Leave balance for ONE employee by name, from their Benefit Grid: grade/rank, then per eligible leave type the allocated days (prorated if they joined this year), approved days taken this year, carry-forward and remaining balance. Reply briefly: who, grade/rank, then one line per type e.g. "Annual Leave: 60 allocated, 12 taken, 48 left". If no balances are returned, say no benefit grid entitlement is configured — never invent a number. Use for "what is X\'s leave balance", "how much leave does X have left".',
                 [
                     'name' => ['type' => 'string', 'description' => 'Employee full/partial name or Emp_id.'],
                 ], ['name']),
@@ -3633,22 +3633,24 @@ class WisdomTools
         if (!$emp) {
             return ['query' => $args['name'] ?? '', 'found' => false, 'message' => 'No matching employee found.'];
         }
-        $yearStart = Carbon::today()->startOfYear()->toDateString();
-        $cats = DB::table('leave_categories')->where('resort_id', $rid)->get(['id', 'leave_type', 'number_of_days']);
-        $taken = DB::table('employees_leaves')->where('resort_id', $rid)->where('emp_id', $emp->id)
-            ->whereRaw("LOWER(COALESCE(status,'')) = 'approved'")
-            ->whereDate('from_date', '>=', $yearStart)
-            ->select('leave_category_id', DB::raw('SUM(total_days) t'))
-            ->groupBy('leave_category_id')->pluck('t', 'leave_category_id')->all();
-
-        $balances = [];
-        foreach ($cats as $c) {
-            $entitled = (float) $c->number_of_days;
-            $used     = (float) ($taken[$c->id] ?? 0);
-            $balances[] = ['leave_type' => $c->leave_type, 'entitled' => $entitled, 'taken' => $used,
-                           'balance' => round($entitled - $used, 1)];
+        // Benefit Grid is the source of truth — same numbers the apply-leave
+        // check enforces (Common::getEmployeeLeaveBalance).
+        $rows = \App\Helpers\Common::getEmployeeLeaveBalance($emp->id, $rid);
+        $out = ['employee' => self::empName($emp), 'found' => true, 'year' => (int) date('Y'),
+                'rank' => config('settings.Position_Rank')[$emp->rank] ?? $emp->rank];
+        if (!$rows) {
+            return $out + ['balances' => [], 'message' => 'This employee has no benefit grid entitlement configured for their grade/rank, so no leave balance can be quoted.'];
         }
-        return ['employee' => self::empName($emp), 'found' => true, 'year' => (int) date('Y'), 'balances' => $balances];
+        $balances = [];
+        foreach ($rows as $r) {
+            $b = ['leave_type' => $r['leave_type'], 'allocated' => $r['prorated'], 'taken' => $r['used'], 'balance' => $r['balance']];
+            if ($r['carry_forward'] > 0) $b['carry_forward'] = $r['carry_forward'];
+            if ($r['prorated'] != $r['allocated']) $b['full_year_allocation'] = $r['allocated'];
+            $balances[] = $b;
+        }
+        $grade = reset($rows)['grade'];
+        return $out + ['grade' => \App\Models\ResortBenefitGradeLevel::where('resort_id', $rid)->where('id', $grade)->value('name') ?? $grade,
+                       'balances' => $balances];
     }
 
     /** Employees with more than one disciplinary case (repeat offenders). */

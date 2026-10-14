@@ -256,18 +256,7 @@ class DashboardController extends Controller
             $annualCat = \App\Models\LeaveCategory::where('resort_id', $resortId)
                 ->where('leave_type', 'Annual Leave')->first();
             $backlogEmployees = [];
-            $entitlement = $annualCat ? (float) ($annualCat->number_of_days ?? 0) : 0.0;
             if ($annualCat) {
-                $takenQ = DB::table('employees_leaves')
-                    ->where('resort_id', $resortId)
-                    ->where('leave_category_id', $annualCat->id)
-                    ->where('status', 'Approved')
-                    ->whereYear('from_date', $now->year);
-                if ($deptEmpIds !== null) { $takenQ->whereIn('emp_id', $deptEmpIds); }
-                $takenByEmp = $takenQ->groupBy('emp_id')
-                    ->select('emp_id', DB::raw('SUM(total_days) as days'))
-                    ->pluck('days', 'emp_id');
-
                 $activeQ = DB::table('employees as e')
                     ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
                     ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
@@ -276,14 +265,16 @@ class DashboardController extends Controller
                     ->select('e.id', DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as name"), 'd.name as dept');
                 if ($deptId) { $activeQ->where('e.Dept_id', $deptId); }
                 foreach ($activeQ->get() as $emp) {
-                    $used = (float) ($takenByEmp[$emp->id] ?? 0);
-                    $remaining = $entitlement - $used;
-                    if ($remaining > 0) {
+                    // Each employee's own Benefit Grid balance, not the
+                    // category default — no grid row = no entitlement.
+                    $bal = Common::getEmployeeLeaveBalance($emp->id, $resortId, $annualCat->id)[$annualCat->id] ?? null;
+                    if ($bal && $bal['balance'] > 0) {
                         $backlogEmployees[] = [
-                            'name'      => trim((string) $emp->name) !== '' ? $emp->name : ('Employee #' . $emp->id),
-                            'dept'      => $emp->dept ?: '—',
-                            'used'      => $used,
-                            'remaining' => $remaining,
+                            'name'        => trim((string) $emp->name) !== '' ? $emp->name : ('Employee #' . $emp->id),
+                            'dept'        => $emp->dept ?: '—',
+                            'entitlement' => $bal['prorated'] + $bal['carry_forward'],
+                            'used'        => $bal['used'],
+                            'remaining'   => $bal['balance'],
                         ];
                     }
                 }
@@ -304,7 +295,7 @@ class DashboardController extends Controller
                 $leaveInsights['occupancy']['body'] = "Occupancy data for the next 3 months isn't available yet." . $backlogNote;
             }
             // Attach detail data AFTER the band branches above (they replace the array).
-            $leaveInsights['occupancy']['details'] = ['entitlement' => $entitlement, 'employees' => $backlogEmployees];
+            $leaveInsights['occupancy']['details'] = ['employees' => $backlogEmployees];
 
             // Card 2 — peak leave period (best 3-consecutive-month window).
             $byMonth = array_fill(1, 12, 0.0);

@@ -38,6 +38,8 @@ use App\Models\EmployeeTravelQuota;
 use App\Models\ProbationLetterTemplate;
 use App\Models\PayrollAdvance;
 use App\Models\Resort;
+use App\Models\ImportHistory;
+use App\Jobs\SendPendingCredentialsJob;
 use App\Mail\ProbationLetterMail;
 use Illuminate\Support\Facades\Mail;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -76,6 +78,21 @@ class EmployeeController extends Controller
         return null;
     }
 
+    /**
+     * Bulk "send credentials to everyone pending" — founder: HR department
+     * HOD/EXCOM only (narrower than requireHrAccess()). Resort master
+     * admin allowed, same as canManageEmployeeRecords().
+     */
+    private function canBulkSendCredentials(): bool
+    {
+        $user = $this->resort;
+        if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+            return true;
+        }
+        $employee = $user->GetEmployee ?? null;
+        return $employee && in_array((int) $employee->rank, [1, 2], true) && Common::isHRDepartment($employee->Dept_id);
+    }
+
     public function index()
     {
         $page_title ='Employees';
@@ -94,7 +111,11 @@ class EmployeeController extends Controller
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->latest()
             ->get();
-        return view('resorts.people.employee.list',compact('page_title','resort_id','resort_divisions','employees','departments','positions','teams','roles'));
+        // Bulk credential button (People > Employees): shown to HR HOD/EXCOM
+        // while anyone is still waiting for first-time credentials.
+        $canBulkSendCredentials = $this->canBulkSendCredentials();
+        $pendingCredentialCount = $canBulkSendCredentials ? SendPendingCredentialsJob::pendingEmployees($resort_id)->count() : 0;
+        return view('resorts.people.employee.list',compact('page_title','resort_id','resort_divisions','employees','departments','positions','teams','roles','canBulkSendCredentials','pendingCredentialCount'));
     }
 
 
@@ -1708,49 +1729,11 @@ class EmployeeController extends Controller
                 ], 404);
             }
 
-            if (!$employee->resortAdmin || !$employee->resortAdmin->email) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Employee does not have a valid email address.'
-                ]);
-            }
-
-            // Casual/Intern staff get no mobile app access at all — their
-            // reporting manager marks attendance/leave on their behalf.
-            // Derived from employment_type rather than a stored flag so a
-            // later conversion (e.g. Casual -> Full-Time) grants access
-            // automatically. The ResortAdmin record itself still exists
-            // (name/photo/email resolution throughout the app depends on
-            // it) — only the credential dispatch is skipped.
-            if (Common::manningCategory($employee->employment_type) !== 'Permanent') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Mobile app credentials are not issued for Casual/Intern employees.'
-                ]);
-            }
-
-            $plainPassword = Common::generateUniquePassword(8);
-            $hashedPassword = Hash::make($plainPassword);
-
-            $resortAdmin = $employee->resortAdmin;
-            $resortAdmin->password = $hashedPassword;
-            $resortAdmin->save();
-            // Revoke every live mobile token — a reset password means the
-            // old one must stop working everywhere, same as self-service
-            // password change (S4-03).
-            try {
-                Common::revokeAllApiTokens($resortAdmin);
-            } catch (\Exception $e) {
-                \Log::warning('revokeAllApiTokens failed on HR password reset: ' . $e->getMessage());
-            }
-            // Hydrate GetEmployee so the notification template can read
-            // Emp_id for the mobile-app login section of the email.
-            $resortAdmin->setRelation('GetEmployee', $employee);
-            $resortAdmin->sendResortemployee($this->resort->resort, $resortAdmin, $plainPassword);
+            $result = Common::issueLoginCredentials($employee, $this->resort->resort);
 
             return response()->json([
-                'success' => true,
-                'message' => 'Credentials sent successfully.'
+                'success' => $result['ok'],
+                'message' => $result['message']
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -1758,6 +1741,44 @@ class EmployeeController extends Controller
                 'message' => 'Failed to send credentials: ' . $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Queue first-time credentials for every Permanent employee whose
+     * account has never been sent a password. Poll resort.import.status
+     * with the returned history_id: total_rows / created_count (sent) /
+     * error_report (failures) / status ('completed' = done).
+     */
+    public function sendAllCredentials()
+    {
+        if (!$this->canBulkSendCredentials()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+
+        $resortId = $this->resort->resort_id;
+        $total = SendPendingCredentialsJob::pendingEmployees($resortId)->count();
+        if ($total === 0) {
+            return response()->json(['success' => false, 'message' => 'No employees are waiting for login credentials.'], 422);
+        }
+
+        $history = ImportHistory::create([
+            'resort_id' => $resortId,
+            'module' => 'employee_credentials',
+            'file_name' => 'Send login credentials',
+            'status' => 'queued',
+            'total_rows' => $total,
+            'created_by' => $this->resort->id,
+        ]);
+
+        SendPendingCredentialsJob::dispatch($history->id, $resortId, $this->resort->id);
+
+        return response()->json([
+            'success' => true,
+            'processing' => true,
+            'history_id' => $history->id,
+            'total' => $total,
+            'status_url' => route('resort.import.status', $history->id),
+        ]);
     }
 
     /**

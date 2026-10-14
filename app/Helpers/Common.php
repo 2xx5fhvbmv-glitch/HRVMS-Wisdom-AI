@@ -231,6 +231,50 @@ class Common
     }
 
     /**
+     * Issue (or re-issue) an employee's first-time login credentials: fresh
+     * password, revoke live API tokens, email it. Shared by the profile's
+     * Send Credentials tab (People\Employee\EmployeeController::sendCredentials)
+     * and the bulk SendPendingCredentialsJob so both behave identically.
+     * Caller owns the resort scoping of $employee.
+     */
+    public static function issueLoginCredentials(Employee $employee, $resort): array
+    {
+        $resortAdmin = $employee->resortAdmin;
+        if (!$resortAdmin || !$resortAdmin->email) {
+            return ['ok' => false, 'message' => 'Employee does not have a valid email address.'];
+        }
+
+        // Casual/Intern staff get no mobile app access at all — their
+        // reporting manager marks attendance/leave on their behalf.
+        // Derived from employment_type rather than a stored flag so a
+        // later conversion (e.g. Casual -> Full-Time) grants access
+        // automatically. The ResortAdmin record itself still exists
+        // (name/photo/email resolution throughout the app depends on
+        // it) — only the credential dispatch is skipped.
+        if (self::manningCategory($employee->employment_type) !== 'Permanent') {
+            return ['ok' => false, 'message' => 'Mobile app credentials are not issued for Casual/Intern employees.'];
+        }
+
+        $plainPassword = self::generateUniquePassword(8);
+        $resortAdmin->password = \Hash::make($plainPassword);
+        $resortAdmin->save();
+        // Revoke every live mobile token — a reset password means the
+        // old one must stop working everywhere, same as self-service
+        // password change (S4-03).
+        try {
+            self::revokeAllApiTokens($resortAdmin);
+        } catch (\Exception $e) {
+            \Log::warning('revokeAllApiTokens failed on HR password reset: ' . $e->getMessage());
+        }
+        // Hydrate GetEmployee so the notification template can read
+        // Emp_id for the mobile-app login section of the email.
+        $resortAdmin->setRelation('GetEmployee', $employee);
+        $resortAdmin->sendResortemployee($resort, $resortAdmin, $plainPassword);
+
+        return ['ok' => true, 'message' => 'Credentials sent successfully.'];
+    }
+
+    /**
      * Single write path for "create or update an employee's core profile,"
      * shared by the manual Add Employee wizard (People\Employee\
      * EmployeeController::store()) and the Master Import bulk importer
@@ -7134,6 +7178,92 @@ class Common
             'current_pending_rank'  => $currentPendingRank,
             'overall_status'        => $overallStatus,
         ];
+    }
+
+    /**
+     * Employee's real leave balance per category, Benefit Grid as the single
+     * source of truth (leave_categories.number_of_days is only a default).
+     * Same steps as the web apply-leave check (Leave\LeaveController):
+     * grade -> grid allocated days for grade+rank -> eligibility -> prorate
+     * by joining date -> minus Approved days this year (Pending not
+     * subtracted) -> plus capped carry-forward. Only categories the
+     * employee is eligible for AND has a grid row for are returned (no row
+     * = no entitlement), keyed by leave_cat_id.
+     */
+    public static function getEmployeeLeaveBalance($empId, $resortId, $categoryId = null): array
+    {
+        // Memoised per request so a dashboard looping a whole department
+        // doesn't re-read the same grid/category rows per employee.
+        static $gridCache = [], $catCache = [];
+
+        $emp = DB::table('employees')->where('id', $empId)->where('resort_id', $resortId)
+            ->first(['id', 'rank', 'benefit_grid_level', 'joining_date']);
+        if (!$emp) {
+            return [];
+        }
+        $grade = self::resolveEmpGrade($resortId, $emp->rank, $emp->benefit_grid_level);
+        if ($grade === null || $grade === '') {
+            return [];
+        }
+
+        $gridKey = $resortId . '|' . $grade . '|' . $emp->rank;
+        $gridCache[$gridKey] ??= DB::table('resort_benifit_grid as rbg')
+            ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
+            ->where('rbg.resort_id', $resortId)
+            ->where('rbg.emp_grade', $grade)
+            ->where('rbgc.rank', $emp->rank)
+            ->orderBy('rbgc.id')
+            ->get(['rbgc.leave_cat_id', 'rbgc.allocated_days'])
+            ->unique('leave_cat_id')   // same first() row the apply check picks
+            ->pluck('allocated_days', 'leave_cat_id');
+        $catCache[$resortId] ??= DB::table('leave_categories')->where('resort_id', $resortId)
+            ->get(['id', 'leave_type', 'eligibility', 'carry_forward', 'carry_max'])->keyBy('id');
+
+        $catIds = $gridCache[$gridKey]->keys()
+            ->when($categoryId, fn($c) => $c->intersect([(int) $categoryId]))
+            ->filter(function ($id) use ($catCache, $resortId, $emp) {
+                $cat = $catCache[$resortId][$id] ?? null;
+                return $cat && (!$cat->eligibility || in_array((string) $emp->rank, explode(',', $cat->eligibility)));
+            })->values();
+        if ($catIds->isEmpty()) {
+            return [];
+        }
+
+        $usedIn = fn($start, $end) => DB::table('employees_leaves')
+            ->where('emp_id', $empId)->where('status', 'Approved')
+            ->whereIn('leave_category_id', $catIds)
+            ->where(fn($q) => $q->whereBetween('from_date', [$start, $end])->orWhereBetween('to_date', [$start, $end]))
+            ->groupBy('leave_category_id')
+            ->selectRaw('leave_category_id, SUM(total_days) as d')
+            ->pluck('d', 'leave_category_id');
+        $now = Carbon::now();
+        $used = $usedIn($now->copy()->startOfYear()->toDateString(), $now->copy()->endOfYear()->toDateString());
+        $usedLastYear = $usedIn($now->copy()->subYear()->startOfYear()->toDateString(), $now->copy()->subYear()->endOfYear()->toDateString());
+
+        $out = [];
+        foreach ($catIds as $id) {
+            $cat = $catCache[$resortId][$id];
+            $allocated = (float) $gridCache[$gridKey][$id];
+            $prorated = (float) self::prorateLeaveByJoiningDate($allocated, $emp->joining_date);
+            $taken = (float) ($used[$id] ?? 0);
+            $carry = 0.0;
+            if (!empty($cat->carry_forward) && $cat->carry_forward != '0') {
+                $unused = max($prorated - (float) ($usedLastYear[$id] ?? 0), 0);
+                $carry = ($cat->carry_max !== null && $cat->carry_max !== '') ? min($unused, (int) $cat->carry_max) : $unused;
+            }
+            $out[$id] = [
+                'leave_cat_id'  => (int) $id,
+                'leave_type'    => $cat->leave_type,
+                'grade'         => $grade,
+                'rank'          => $emp->rank,
+                'allocated'     => $allocated,
+                'prorated'      => $prorated,
+                'used'          => $taken,
+                'carry_forward' => $carry,
+                'balance'       => round($prorated - $taken + $carry, 1),
+            ];
+        }
+        return $out;
     }
 
     /**

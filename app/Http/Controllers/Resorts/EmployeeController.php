@@ -294,6 +294,7 @@ class EmployeeController extends Controller
 
         return response()->json([
             'status' => $history->status,
+            'total_rows' => $history->total_rows,
             'created_count' => $history->created_count,
             'updated_count' => $history->updated_count,
             'error_report' => $history->error_report ?? [],

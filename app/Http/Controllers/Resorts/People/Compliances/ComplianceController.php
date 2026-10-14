@@ -35,6 +35,7 @@ use Carbon\Carbon;
 use App\Models\EmployeeOnboardingAcknowledgements;
 use App\Models\EmployeePromotion;
 use App\Models\JobDescription;
+use App\Models\JobDescriptionEmployeeRecord;
 use App\Models\ResortSiteSettings;
 use App\Models\ResortHoliday;
 
@@ -2041,6 +2042,16 @@ class ComplianceController extends Controller
                                              return $employee;
                                         });
 
+          // Job Description not signed / declined (also synced live on every
+          // record status change — JobDescriptionEmployeeRecord::saved).
+          $jdEmpIds = JobDescriptionEmployeeRecord::where('resort_id', $resort->resort_id)->distinct()->pluck('employee_id');
+          foreach ($jdEmpIds as $jdEmpId) {
+               foreach (JobDescriptionEmployeeRecord::syncCompliance($resort->resort_id, $jdEmpId) as $breach) {
+                    $this->markBreachActive(['resort_id' => $resort->resort_id, 'employee_id' => $jdEmpId,
+                         'module_name' => 'Job Description', 'compliance_breached_name' => $breach]);
+               }
+          }
+
           // Auto-close breaches that were NOT re-detected this run (now fixed).
           $this->resolveStaleBreaches($resort->resort_id);
 
@@ -2068,6 +2079,8 @@ class ComplianceController extends Controller
           'Over Time Not Eligibile',
           'Overtime Agreement Lacked',
           'Job Description Not Received',
+          'Job Description Not Signed',
+          'Job Description Declined',
           'Without Mandatory Break',
           'Weekly Working Hours Limit',
      ];
