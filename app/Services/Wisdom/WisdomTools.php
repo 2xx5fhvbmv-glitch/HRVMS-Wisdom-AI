@@ -3643,6 +3643,12 @@ class WisdomTools
         }
         $balances = [];
         foreach ($rows as $r) {
+            if ($r['leave_type'] === 'Day Off') {
+                // Day Off is earned weekly (employee_day_off_credits), not a
+                // grid allowance — same balance the leave forms use.
+                $balances[] = ['leave_type' => 'Day Off', 'balance' => \App\Helpers\Common::getDayOffBalance($emp->id, $rid), 'note' => 'accumulated day-off credits'];
+                continue;
+            }
             $b = ['leave_type' => $r['leave_type'], 'allocated' => $r['prorated'], 'taken' => $r['used'], 'balance' => $r['balance']];
             if ($r['carry_forward'] > 0) $b['carry_forward'] = $r['carry_forward'];
             if ($r['prorated'] != $r['allocated']) $b['full_year_allocation'] = $r['allocated'];

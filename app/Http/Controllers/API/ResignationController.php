@@ -348,6 +348,46 @@ class ResignationController extends Controller
             if (!$resignation) {
                 return response()->json(['success' => false, 'message' => 'Resignation not found or already processed'], 200);
             }
+            // Accepted by both HOD/XCOM and HR (employee is Offboarding):
+            // the withdrawal needs HOD then HR approval before it takes
+            // effect (founder, 2026-10-05) — decided on the web
+            // (EmployeeResignationController::withdrawDecision).
+            if ($resignation->hod_status === 'Approved' && $resignation->hr_status === 'Approved' && $resignation->status === 'Approved') {
+                if ($resignation->withdraw_hod_status === 'Pending' || $resignation->withdraw_hr_status === 'Pending') {
+                    DB::rollBack();
+                    return response()->json(['success' => false, 'message' => 'Your withdrawal request is already waiting for approval.'], 200);
+                }
+                $resignation->withdraw_reason           =   $request->input('withdraw_reason');
+                $resignation->withdraw_requested_at     =   now();
+                $resignation->withdraw_hod_status       =   'Pending';
+                $resignation->withdraw_hr_status        =   'Pending';
+                $resignation->withdraw_hod_by = $resignation->withdraw_hod_at = null;
+                $resignation->withdraw_hr_by = $resignation->withdraw_hr_at = null;
+                $resignation->withdraw_rejected_reason  =   null;
+                $resignation->save();
+                DB::commit();
+
+                $empName = trim(($this->user->first_name ?? '') . ' ' . ($this->user->last_name ?? '')) ?: 'an employee';
+                try {
+                    Common::notifyEmployees(
+                        $this->resort_id,
+                        array_values(array_filter([$resignation->hod_id, $resignation->hr_id, $resignation->employee_id])),
+                        'Resignation Withdrawal Requested',
+                        "{$empName} has asked to withdraw their accepted resignation. HOD approval is needed first, then HR. Exit clearance continues until then.",
+                        'Resignation',
+                        $resignation->id
+                    );
+                } catch (\Throwable $e) {
+                    \Log::warning('Withdrawal request notification failed: ' . $e->getMessage());
+                }
+
+                return response()->json([
+                    'success'                           =>  true,
+                    'message'                           =>  'Withdrawal request sent to your HOD and HR for approval.',
+                    'data'                              =>  $resignation,
+                ], 200);
+            }
+
             // Update resignation status to Withdraw
             $resignation->status                        =   'Withdraw';
             $resignation->withdraw_reason               =   $request->input('withdraw_reason');

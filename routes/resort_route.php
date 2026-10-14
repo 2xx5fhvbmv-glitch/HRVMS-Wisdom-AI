@@ -103,6 +103,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
          Route::get('accommodation/hr-dashboard', 'Accommodation\AccommodationDashboardController@HR_Dashobard')->name('resort.accommodation.dashboard');
          Route::get('accommodation/hod-dashboard', 'Accommodation\AccommodationDashboardController@Hod_dashboard')->name('resort.accommodation.hoddashboard');
          Route::get('accommodation/admin-dashboard', 'Accommodation\AccommodationDashboardController@Admin_dashboard')->name('resort.accommodation.admindashboard');
+         Route::get('accommodation/release-decisions', 'Accommodation\ReleaseDecisionController@index')->name('resort.accommodation.release-decisions');
+         Route::post('accommodation/release-decisions/{id}', 'Accommodation\ReleaseDecisionController@decide')->name('resort.accommodation.release-decisions.decide');
 
          //Payroll Module
          Route::get('payroll/hr-dashboard', 'Payroll\DashboardController@HR_Dashobard')->name('payroll.dashboard');
@@ -689,6 +691,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::post('/transportation-options/submit', 'Leave\ConfigController@submitTransportationOptions')->name('submit.transportation');
 
     Route::get('/leave/apply','Leave\LeaveController@index')->name('leave.apply');
+    Route::get('/leave/apply-data','Leave\LeaveController@applyLeaveData')->name('leave.apply-data');
     // Airport search (Select2 remote-data) — used by Apply Leave's
     // DESTINATION dropdown and the Employee Detail "Leave Destination" field.
     Route::get('/airports/search', 'AirportController@search')->name('resort.airports.search');
@@ -1849,7 +1852,8 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
        // wrongly-uploaded picture (DR-485 on live, PDF saved as photo).
        Route::post('/people/employees/update-profile-picture', 'People\Employee\EmployeeController@updateProfilePicture')->name('people.employees.updateProfilePicture');
        Route::post('/people/employees/activate', 'People\Employee\EmployeeController@activate')->name('people.employees.activate');
-      Route::post('/people/employees/bulk-delete', 'People\Employee\EmployeeController@bulkDelete')->name('employee.bulk.delete');
+      // Disabled 2026-10-14: employee records are never deleted, and bulk delete is removed (founder, batch-2 notes Part 7 §1). Single delete stays pending the founder's wipe-scope decision.
+      // Route::post('/people/employees/bulk-delete', 'People\Employee\EmployeeController@bulkDelete')->name('employee.bulk.delete');
       Route::post('/people/employees/send-credentials', 'People\Employee\EmployeeController@sendCredentials')->name('people.employee.send-credentials');
       Route::post('/people/employees/send-all-credentials', 'People\Employee\EmployeeController@sendAllCredentials')->name('people.employee.send-all-credentials');
       Route::post('/people/employees/{id}/send-employment-verification-letter', 'People\Employee\EmployeeController@sendEmploymentVerificationLetter')->name('people.employees.sendEmploymentVerificationLetter');
@@ -1995,6 +1999,7 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
       Route::get('/people/employee-resignation', 'People\Employee\EmployeeResignationController@index')->name('people.employee-resignation.index');
       Route::get('/people/employee-resignation/show/{id}', 'People\Employee\EmployeeResignationController@show')->name('people.employee-resignation.show');
       Route::post('people/employee-resignation/status-update', 'People\Employee\EmployeeResignationController@updateStatus')->name('people.employee-resignation.status-update');
+      Route::post('people/employee-resignation/withdraw-decision', 'People\Employee\EmployeeResignationController@withdrawDecision')->name('people.employee-resignation.withdraw-decision');
       Route::get('people/employee-resignation/{id}/download-approval-pdf', 'People\Employee\EmployeeResignationController@downloadApprovalPdf')->name('people.employee-resignation.downloadApprovalPdf');
       Route::post('/people/employee-resignation/schedule-meeting', 'People\Employee\EmployeeResignationController@scheduleMeeting')->name('people.employee-resignation.schedule-meeting');
 

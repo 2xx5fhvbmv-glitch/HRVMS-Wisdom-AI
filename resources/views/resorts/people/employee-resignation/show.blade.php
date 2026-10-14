@@ -379,6 +379,31 @@
                     );
                 @endphp
 
+                {{-- Withdrawal requested after both acceptances (employee is
+                     Offboarding): HOD/XCOM approves first, then HR. --}}
+                @if($employeeResignation->withdraw_hod_status !== null)
+                    <div class="alert alert-warning mb-3">
+                        <strong>Withdrawal requested</strong>
+                        @if($employeeResignation->withdraw_requested_at) on {{ \Carbon\Carbon::parse($employeeResignation->withdraw_requested_at)->format('d M Y') }}@endif.
+                        Reason: {{ $employeeResignation->withdraw_reason ?: '—' }}<br>
+                        HOD: <strong>{{ $employeeResignation->withdraw_hod_status }}</strong>
+                        · HR: <strong>{{ $employeeResignation->withdraw_hr_status ?? '—' }}</strong>
+                        @if($employeeResignation->withdraw_rejected_reason)
+                            <br>Rejection reason: {{ $employeeResignation->withdraw_rejected_reason }}
+                        @endif
+                        @if(!empty($withdrawStage) && $hasEditPerm)
+                            <div class="mt-2">
+                                <a href="javascript:void(0);" class="btn btn-themeDanger btn-sm withdraw-decision me-2" data-decision="Rejected">
+                                    <i class="fa-solid fa-circle-xmark me-1"></i>Reject withdrawal
+                                </a>
+                                <a href="javascript:void(0);" class="btn btn-themeBlue btn-sm withdraw-decision" data-decision="Approved">
+                                    <i class="fa-solid fa-circle-check me-1"></i>Approve withdrawal{{ $withdrawStage === 'hr' ? ' (final)' : '' }}
+                                </a>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
                 @if(!$canAct && !$isTerminal && $hasEditPerm)
                     <div class="alert alert-info mb-3">
                         <i class="fa-solid fa-circle-info me-1"></i>
@@ -496,6 +521,29 @@
 
 @section('import-scripts')
 <script>
+    $(document).on('click', '.withdraw-decision', function () {
+        var decision = $(this).data('decision');
+        var reason = '';
+        if (decision === 'Rejected') {
+            reason = (prompt('Reason for rejecting the withdrawal:') || '').trim();
+            if (!reason) { return; }
+        } else if (!confirm('Approve this resignation withdrawal?')) {
+            return;
+        }
+        $.ajax({
+            url: "{{ route('people.employee-resignation.withdraw-decision') }}",
+            type: 'POST',
+            data: { _token: "{{ csrf_token() }}", resignation_id: "{{ base64_encode($employeeResignation->id) }}", decision: decision, reason: reason },
+            success: function (r) {
+                toastr.success(r.message || 'Done.', 'Success', { positionClass: 'toast-bottom-right' });
+                setTimeout(function () { location.reload(); }, 500);
+            },
+            error: function (xhr) {
+                toastr.error(xhr.responseJSON?.message || 'Something went wrong', 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
+
     $(document).ready(function() {
         let statusComment = '';
 

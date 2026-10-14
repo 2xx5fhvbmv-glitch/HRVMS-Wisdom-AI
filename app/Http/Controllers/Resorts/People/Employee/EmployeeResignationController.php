@@ -324,8 +324,10 @@ class EmployeeResignationController extends Controller
             }
         }
 
+        $withdrawStage = $this->withdrawalStage($employeeResignation, $user);
+
         $page_title = 'Employee Resignation Details';
-        return view('resorts.people.employee-resignation.show', compact('page_title', 'employeeResignation','is_hr','is_hod'));
+        return view('resorts.people.employee-resignation.show', compact('page_title', 'employeeResignation','is_hr','is_hod','withdrawStage'));
     }
 
 
@@ -485,6 +487,12 @@ class EmployeeResignationController extends Controller
                     $employeeResignation->hold_reason = null;
                 }
                 $employeeResignation->save();
+
+                // Both acceptances in (HOD/XCOM, then HR) → exit process
+                // starts: employee moves to Offboarding (founder, 2026-10-05).
+                if (!$isOnHold && $status === 'Approved') {
+                    $this->startOffboarding($employeeResignation);
+                }
             }else{
                 return response()->json(['success' => false, 'message' => 'HOD approval is required before HR can approve.'], 403);
             }
@@ -681,5 +689,134 @@ class EmployeeResignationController extends Controller
         } else {
             return response()->json(['success' => false, 'message' => 'Failed to schedule meeting.']);
         }        
+    }
+
+    /**
+     * HR accepted after HOD/XCOM: employee → Offboarding and HR is told the
+     * exit clearance has started (the employee already gets "Resignation
+     * Approved, proceed with exit clearance" further down updateStatus()).
+     */
+    private function startOffboarding(EmployeeResignation $resignation): void
+    {
+        $employee = $resignation->employee;
+        if (!$employee || $employee->status !== 'Active') {
+            return;
+        }
+        $employee->update(['status' => 'Offboarding']);
+
+        try {
+            $empName = optional($employee->resortAdmin)->full_name ?: 'An employee';
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                Common::getResortHrEmployeeIds($this->resort->resort_id),
+                'Exit Clearance Started',
+                "{$empName}'s resignation has been accepted by HOD and HR. The employee is now Offboarding; exit clearance has started.",
+                'People',
+                $resignation->id
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('Offboarding notification failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Which step of a pending withdrawal (after both acceptances) $user may
+     * decide: 'hod' (HOD/XCOM first), then 'hr', else null. Same actors as
+     * updateStatus(): the assigned HOD/HR, their delegate, or GM/EXCOM.
+     */
+    private function withdrawalStage(EmployeeResignation $resignation, $user): ?string
+    {
+        if (!$user || $resignation->withdraw_hod_status === null) {
+            return null;
+        }
+        $senior = in_array((int) $user->rank, [1, 8], true);
+        $actsFor = fn($id) => $id && ($user->id == $id
+            || Common::hasDelegationAuthority($user->id, $id, $this->resort->resort_id));
+
+        if ($resignation->withdraw_hod_status === 'Pending') {
+            return ($actsFor($resignation->hod_id) || $senior) ? 'hod' : null;
+        }
+        if ($resignation->withdraw_hod_status === 'Approved' && $resignation->withdraw_hr_status === 'Pending') {
+            return ($actsFor($resignation->hr_id) || $senior) ? 'hr' : null;
+        }
+        return null;
+    }
+
+    /**
+     * HOD then HR decision on a withdrawal requested while Offboarding.
+     * HR's approval is final: employee back to Active, resignation marked
+     * Withdraw, open exit-clearance forms removed — one transaction.
+     * A rejection at either step leaves everything as it is (Offboarding).
+     */
+    public function withdrawDecision(Request $request)
+    {
+        $decision = $request->decision;
+        if (!in_array($decision, ['Approved', 'Rejected'], true)) {
+            return response()->json(['success' => false, 'message' => 'Invalid decision.'], 422);
+        }
+        if ($decision === 'Rejected' && !trim((string) $request->reason)) {
+            return response()->json(['success' => false, 'message' => 'Please give a reason for rejecting the withdrawal.'], 422);
+        }
+
+        $resignation = EmployeeResignation::where('resort_id', $this->resort->resort_id)
+            ->findOrFail(base64_decode($request->resignation_id));
+        $user = $this->resort->GetEmployee;
+        $stage = $this->withdrawalStage($resignation, $user);
+        if (!$stage) {
+            return response()->json(['success' => false, 'message' => 'You cannot decide this withdrawal request at its current stage.'], 403);
+        }
+
+        $employee = $resignation->employee;
+        $final = $stage === 'hr' && $decision === 'Approved';
+
+        DB::transaction(function () use ($resignation, $stage, $decision, $user, $employee, $final, $request) {
+            $resignation->{"withdraw_{$stage}_status"} = $decision;
+            $resignation->{"withdraw_{$stage}_by"} = $user->id;
+            $resignation->{"withdraw_{$stage}_at"} = now();
+            if ($decision === 'Rejected') {
+                $resignation->withdraw_rejected_reason = $request->reason;
+                if ($stage === 'hod') {
+                    $resignation->withdraw_hr_status = null; // never reaches HR
+                }
+            }
+            if ($final) {
+                $resignation->status = 'Withdraw';
+                ExitClearanceFormAssignment::where('emp_resignation_id', $resignation->id)
+                    ->where('resort_id', $resignation->resort_id)
+                    ->where('status', 'Pending')
+                    ->delete();
+                if ($employee && $employee->status === 'Offboarding') {
+                    $employee->update(['status' => 'Active']); // audit-logged by EmployeeEmploymentAuditObserver
+                }
+            }
+            $resignation->save();
+        });
+
+        try {
+            $empName = optional(optional($employee)->resortAdmin)->full_name ?: 'the employee';
+            if ($final) {
+                Common::notifyEmployees($this->resort->resort_id,
+                    array_merge([$resignation->employee_id, $resignation->hod_id], Common::getResortHrEmployeeIds($this->resort->resort_id)),
+                    'Resignation Withdrawn',
+                    "The resignation withdrawal for {$empName} has been approved. The employee is Active again and the exit clearance is cancelled.",
+                    'People', $resignation->id);
+            } elseif ($decision === 'Approved') {
+                Common::notifyEmployees($this->resort->resort_id, [$resignation->hr_id],
+                    'Resignation Withdrawal Awaiting HR',
+                    "The HOD approved {$empName}'s request to withdraw their resignation. Please give the final approval.",
+                    'People', $resignation->id);
+            } else {
+                Common::notifyEmployees($this->resort->resort_id, [$resignation->employee_id],
+                    'Resignation Withdrawal Rejected',
+                    "Your request to withdraw your resignation was not approved. Reason: {$request->reason}",
+                    'People', $resignation->id);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Withdrawal decision notification failed: ' . $e->getMessage());
+        }
+
+        return response()->json(['success' => true, 'message' => $final
+            ? 'Withdrawal approved. The employee is Active again.'
+            : ($decision === 'Approved' ? 'Withdrawal approved; it now needs HR approval.' : 'Withdrawal rejected.')]);
     }
 }

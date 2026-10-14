@@ -2984,6 +2984,9 @@ class EmployeeController extends Controller
         return response()->json(['message' => 'Employee deleted successfully.']);
     }
 
+    // Disabled 2026-10-14: employee records are never deleted, and bulk delete is removed
+    // (founder, batch-2 notes Part 7 §1). Single delete() stays pending the wipe-scope decision.
+    /*
     public function bulkDelete(Request $request)
     {
         if ($guard = $this->requireHrAccess()) return $guard;
@@ -3020,6 +3023,7 @@ class EmployeeController extends Controller
             return response()->json(['message' => 'Failed to delete employees.'], 500);
         }
     }
+    */
 
 }
 

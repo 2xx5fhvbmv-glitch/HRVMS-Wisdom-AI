@@ -9315,6 +9315,9 @@ class Common
             // here at all — every one of them silently fell through to the
             // generic notification list instead of the module itself.
             case 'accommodation':
+                if (($notification->page_id ?? null) === 'accommodation-release') {
+                    return route('resort.accommodation.release-decisions');
+                }
                 return url('resort/accommodation/maintenance-request/list');
 
             case 'visa':
