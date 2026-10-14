@@ -527,6 +527,12 @@ class EmployeeResignationController extends Controller
 
         $employee = $employeeResignation->employee;
         if ($employee && $employee->resortAdmin) {
+            // HOD/XCOM approval is only the first of two acceptances — the
+            // employee hears "approved, proceed with exit clearance" once HR
+            // has accepted too (HR was already notified above).
+            if ($status === 'Approved' && $employeeResignation->hr_status !== 'Approved') {
+                return response()->json(['success' => true, 'message' => 'Resignation approved. It now needs HR approval.']);
+            }
             if ($status === 'Approved') {
 
                 $employeeName = $employee->resortAdmin->full_name;

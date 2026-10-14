@@ -1642,6 +1642,7 @@ class LeaveController extends Controller
                     $benefit_grid                       =   DB::table('resort_benifit_grid as rbg')
                                                                     ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                                                                     ->where('rbg.emp_grade', $emp_grade)
+                                                                    ->where('rbg.resort_id', $resortId)
                                                                     ->get();
 
                     // Calculate total leaves taken by the employee for the current year
@@ -2134,6 +2135,7 @@ class LeaveController extends Controller
                         $benefit_grid       = DB::table('resort_benifit_grid as rbg')
                             ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                             ->where('rbg.emp_grade', $emp_grade)
+                            ->where('rbg.resort_id', $resortId)
                             ->get();
 
                         // Calculate total leaves taken by the employee for the current year
@@ -2378,6 +2380,7 @@ class LeaveController extends Controller
                 $benefit_grid                           =   DB::table('resort_benifit_grid as rbg')
                                                                 ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                                                                 ->where('rbg.emp_grade', $emp_grade)
+                                                                ->where('rbg.resort_id', $resortId)
                                                                 ->where('rbgc.rank', $rank)
                                                                 ->where('rbgc.leave_cat_id', $categoryId)
                                                                 ->select('rbgc.allocated_days')

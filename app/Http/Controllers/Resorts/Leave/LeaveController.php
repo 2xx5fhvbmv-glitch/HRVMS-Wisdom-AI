@@ -634,6 +634,7 @@ class LeaveController extends Controller
                     $benefit_grid = DB::table('resort_benifit_grid as rbg')
                         ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                         ->where('rbg.emp_grade', $emp_grade)
+                        ->where('rbg.resort_id', $resort_id)
                         ->where('rbgc.leave_cat_id', $leaveRequest->leave_category_id)
                         ->first();
 
@@ -886,6 +887,7 @@ class LeaveController extends Controller
                 $benefit_grid = DB::table('resort_benifit_grid as rbg')
                     ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                     ->where('rbg.emp_grade', $emp_grade)
+                    ->where('rbg.resort_id', $resort_id)
                     ->where('rbgc.leave_cat_id', $leaveRequest->leave_category_id)
                     ->first();
 
@@ -1836,6 +1838,7 @@ class LeaveController extends Controller
                 $benefit_grid = DB::table('resort_benifit_grid as rbg')
                     ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                     ->where('rbg.emp_grade', $emp_grade)
+                    ->where('rbg.resort_id', $resort_id)
                     ->where('rbgc.rank', $rank)
                     ->where('rbgc.leave_cat_id', $categoryId)
                     ->select('rbgc.allocated_days')
