@@ -441,40 +441,31 @@ class ResortAllNotificationController extends Controller
                         'signed_at' => $signatureFields['timestamp'] ?? null,
                     ]);
 
-                    // Was commented out — the old call only ever hit
-                    // nofitication()'s broadcast-only branches (types 5/6/9,
-                    // no ResortNotification row, no push), so even
-                    // uncommented as-is it would never reach mobile or
-                    // survive a page reload. Notify whoever the budget was
-                    // just routed to, via the current recommended helper.
-                    $recipientIds = match ($budgetProcessStatus ?? null) {
-                        'Finance' => Common::getResortFinanceEmployeeIds($resort_id),
-                        'GM' => Common::getResortGmEmployeeIds($resort_id),
-                        default => [],
-                    };
-                    if (!empty($recipientIds)) {
-                        try {
-                            // F4 — same category/year fix as ReviseBudget()'s
-                            // notification: a Finance/GM reviewer with more
-                            // than one department's budget forwarded to them
-                            // had no way to tell WHICH one this was about
-                            // until they opened it.
-                            $categoryLabel = $budget->employment_type ?? 'Permanent';
-                            $yearLabel = $budget->year ?? '';
-                            Common::notifyEmployees(
-                                $resort_id,
-                                $recipientIds,
-                                'Budget Review Update',
-                                "{$categoryLabel} budget {$yearLabel} has been forwarded to {$budgetProcessStatus} for review.",
-                                'WorkForce Planning',
-                                $budget->id
-                            );
-                        } catch (\Exception $notifErr) {
-                            \Log::warning('SendToFinance notification failed for budget ' . $budget->id . ': ' . $notifErr->getMessage());
-                        }
-                    }
                 }
                 DB::commit();
+
+                // One notice per action (was one per department, to every Finance staff member):
+                // HR → Finance and Finance → GM each reach their own group, never the clicker.
+                if (in_array($budgetProcessStatus, ['Finance', 'GM'], true) && $budgets->isNotEmpty()) {
+                    try {
+                        $label = implode(' / ', $categoriesToSend) . ' budget ' . $request->year;
+                        Common::notifyEmployees(
+                            $resort_id,
+                            Common::budgetStageRecipients($resort_id, $budgetProcessStatus === 'Finance' ? 'finance' : 'gm',
+                                $budgets->pluck('dept_id')->unique()->all(), $resort->getEmployee->id ?? null),
+                            'Budget Review Update',
+                            $budgetProcessStatus === 'Finance'
+                                ? "{$label} has been reviewed by HR and forwarded to Finance."
+                                : "{$label} has been reviewed by Finance and forwarded to the GM for approval.",
+                            'WorkForce Planning',
+                            $budgets->first()->id,
+                            'budget'
+                        );
+                    } catch (\Exception $notifErr) {
+                        \Log::warning('SendToFinance notification failed (resort ' . $resort_id . '): ' . $notifErr->getMessage());
+                    }
+                }
+
                 $response['success'] = true;
                 $response['html']= '' ;
                 $response['msg'] = __('Message sent successfully');

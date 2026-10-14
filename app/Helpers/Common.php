@@ -5605,6 +5605,30 @@ class Common
      * getResortFinanceEmployeeIds for fanning out approval-chain notifications
      * (e.g. Salary Advance/Loan) to the GM as well as HR/Finance.
      */
+    /**
+     * Who hears about a budget at each stage (one notice per action, each person once,
+     * never the person who clicked). HOD+XCOM = rank 2 / rank 1 of a department.
+     *  - 'finance'  (HR → Finance):  Finance HOD+XCOM, and each forwarded department's HOD+XCOM
+     *  - 'gm'       (Finance → GM):  the other Finance HOD/XCOM, the GM, HR HOD+XCOM, each department's HOD+XCOM
+     *  - 'approved' (GM approved):   HR HOD+XCOM, Finance HOD+XCOM, each approved department's HOD+XCOM
+     */
+    public static function budgetStageRecipients(int $resortId, string $stage, array $deptIds, ?int $actorId = null): array
+    {
+        $departments = \App\Models\ResortDepartment::where('resort_id', $resortId)->pluck('id');
+        $hrDepts = $departments->filter(fn ($id) => self::isHRDepartment($id))->all();
+        $financeDepts = $departments->filter(fn ($id) => self::isFinanceDepartment($id))->all();
+        $leaders = fn (array $ids) => $ids ? Employee::where('resort_id', $resortId)->whereIn('Dept_id', $ids)->whereIn('rank', [1, 2])
+            ->where(fn ($q) => $q->whereNull('status')->orWhereIn('status', ['Active', 'Probationary']))->pluck('id')->all() : [];
+
+        $ids = array_merge($leaders($deptIds), $leaders($financeDepts));
+        if ($stage === 'gm') {
+            $ids = array_merge($ids, self::getResortGmEmployeeIds($resortId), $leaders($hrDepts));
+        } elseif ($stage === 'approved') {
+            $ids = array_merge($ids, $leaders($hrDepts));
+        }
+        return array_values(array_diff(array_unique(array_map('intval', $ids)), [(int) $actorId]));
+    }
+
     public static function getResortGmEmployeeIds($resortId)
     {
         return \App\Models\Employee::where('resort_id', $resortId)
@@ -9301,6 +9325,11 @@ class Common
                 return url('resort/people/announcement');
 
             case 'workforce planning':
+                // Budget stage notices (page_id 'budget', request_id = manning_responses.id) open that year's budget.
+                if (($notification->page_id ?? null) === 'budget' && $requestId
+                    && ($year = \App\Models\ManningResponse::where('id', $requestId)->value('year'))) {
+                    return route('resort.budget.viewbudget', ['year' => $year]);
+                }
                 return url('resort/workforce-planning/hr-dashboard');
 
             case 'payroll approval':
