@@ -369,6 +369,8 @@ class DashboardController extends Controller
             ->whereBetween('date', [$periodStart->format('Y-m-d'), $periodEnd->format('Y-m-d')])
             ->get()
             ->groupBy('Emp_id');
+        // Day-offs and no-shows live in the roster, not in attendance rows.
+        $rosterContext = Common::payrollRosterContext($resortId, $employeesWithAttendance, $periodStart, $periodEnd, $attendanceByEmp->flatten()->pluck('id'));
 
         // Third-party / staff-shop outstanding (approved, not yet fully paid).
         $outstandingByEmp = DB::table('payments as pay')
@@ -396,9 +398,10 @@ class DashboardController extends Controller
 
             $records = $attendanceByEmp->get($empId, collect());
 
-            $dayOffCount = $records->where('Status', 'DayOff')->count();
+            $dayMarks = Common::payrollDayMarks($records->all(), $rosterContext, $empId);
+            $dayOffCount = $dayMarks['day_off_dates']->count();
             $presentCount = $records->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave', 'FullDayLeave'])->count();
-            $absentRecords = $records->where('Status', 'Absent');
+            $absentRecords = $records->where('Status', 'Absent')->concat($dayMarks['no_shows']);
             $unpaidCount = $absentRecords->filter(fn($r) => stripos($r->note ?? '', 'Unpaid Leave') !== false)->count();
             $absentCount = $absentRecords->count() - $unpaidCount;
 
@@ -409,7 +412,7 @@ class DashboardController extends Controller
 
             $perDay = $basicUSD / $totalDaysInPeriod;
             $earnedSalary = round($perDay * ($presentCount + $dayOffCount), 2);
-            $absentDeduction = round($perDay * ($absentCount + $unpaidCount), 2);
+            $absentDeduction = 0; // absent days are already left out of earned salary — deducting them again doubled the loss
 
             // Approved OT only — same 1.25x/1.5x rates as the real payroll run.
             $perHour = $basicUSD / $totalDaysInPeriod / 8;

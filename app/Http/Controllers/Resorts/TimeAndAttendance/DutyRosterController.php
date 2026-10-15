@@ -342,7 +342,6 @@ class DutyRosterController extends Controller
         }
 
         $Shift = $request->Shift;   //ShiftId
-        $TotalHours = $request->TotalHours; // Shift total hours
         // $request->resort_id was fully client-controlled and never
         // cross-checked — any resort-admin could tag a new duty roster row
         // to ANY resort_id for ANY employee id. Always use the caller's own
@@ -430,6 +429,20 @@ class DutyRosterController extends Controller
                 if ($m === 60) { $h++; $m = 0; }
                 return sprintf('%02d:%02d', $h, $m);
             };
+            // One day's shift length, from the shift itself. The form posts
+            // its summary figure as TotalHours (shift hours × days ×
+            // employees, minus day offs), which was checked against the
+            // grid and stored on every day as if it were one day's hours.
+            $shiftMinutesPerDay = (int) round($toDecimalHours($shitTime->TotalHours) * 60);
+            if (!$shiftMinutesPerDay && $shitTime->StartTime && $shitTime->EndTime) {
+                $shiftStart = Carbon::parse($shitTime->StartTime);
+                $shiftEnd = Carbon::parse($shitTime->EndTime);
+                if ($shiftEnd->lte($shiftStart)) {
+                    $shiftEnd->addDay();
+                }
+                $shiftMinutesPerDay = (int) $shiftStart->diffInMinutes($shiftEnd);
+            }
+            $TotalHours = $toHHMM($shiftMinutesPerDay / 60);
             $shiftHours = $toDecimalHours($TotalHours);
 
             $mismatchedHoursEmployees = [];
@@ -605,7 +618,7 @@ class DutyRosterController extends Controller
                             $DutyRosterEntry->Emp_id    = $DutyRoster->Emp_id;
                             $DutyRosterEntry->OverTime  = $overtimeForThisDay;
                             $DutyRosterEntry->CheckingTime      = $shitTime->StartTime;
-                            $DutyRosterEntry->CheckingOutTime   = $TotalHours;
+                            $DutyRosterEntry->CheckingOutTime   = $shitTime->EndTime;
                             $DutyRosterEntry->date              = $currentDate;
                             $DutyRosterEntry->Status            = $status ? "DayOff" : "Present"; // Default to "Present" if no status is set
                             $DutyRosterEntry->DayWiseTotalHours = $TotalHours;
@@ -664,7 +677,7 @@ class DutyRosterController extends Controller
                                 "DayWiseTotalHours" => $TotalHours,
                                 'date' => $singleDate,
                                 'CheckingTime'=>$shitTime->StartTime,
-                                "CheckingOutTime" => $TotalHours,
+                                "CheckingOutTime" => $shitTime->EndTime,
                                 "Status" => $isSingleDateDayOff ? "DayOff" : "Present",
                             ]);
 
@@ -1730,6 +1743,10 @@ class DutyRosterController extends Controller
                 $entry->delete();
             }
         });
+        // Reviewed punch OT has to reach the attendance row payroll pays from.
+        foreach ($existingEntries->pluck('parent_attendance_id')->filter()->unique() as $parentAttendanceId) {
+            Common::syncAttendanceOvertime($parentAttendanceId, $this->resort->id);
+        }
 
         // View Duty Roster's per-day "OT: X hr" label reads
         // duty_roster_entries.OverTime, not the employee_overtimes table —

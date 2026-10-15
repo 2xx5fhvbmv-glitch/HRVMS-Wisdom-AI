@@ -573,6 +573,8 @@ class ResortsController extends Controller
         $resort->contract_start_date = $request->contract_start_date;
         $resort->contract_end_date = $request->contract_end_date;
         $resort->no_of_users = $request->no_of_users;
+        $resort->wisdom_daily_limit = $request->filled('wisdom_daily_limit') ? max(1, (int) $request->wisdom_daily_limit) : null;
+        $resort->wisdom_monthly_budget = $request->filled('wisdom_monthly_budget') ? max(0, (float) $request->wisdom_monthly_budget) : null;
         $resort->support_preference = $support_preference;
         $resort->Support_SLA = $request->Support_SLA;
         $resort->Position_access = $request->Position_access;

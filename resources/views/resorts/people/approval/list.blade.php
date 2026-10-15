@@ -115,16 +115,27 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Reason for Rejection</h5>
+                    <h5 class="modal-title" id="reasonModalTitle">Reason for Rejection</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <textarea id="rejectionReason" class="form-control" rows="3" placeholder="Enter a reason (optional)"></textarea>
+                    <textarea id="rejectionReason" class="form-control" rows="3" placeholder="Enter a reason"></textarea>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" id="confirmRejectBtn" class="btn eb-btn-critical">Reject</button>
                 </div>
+            </div>
+        </div>
+    </div>
+    <div id="approvalViewModal" class="modal fade" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Request Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div id="approvalViewBody"></div>
             </div>
         </div>
     </div>
@@ -148,6 +159,23 @@
         // pick first when querying `.action-btn`.
         var pendingReject = null;
 
+        // Eye icon for types whose detail view is a modal partial
+        // (show() returns {status, html}). Read-only here — act with the
+        // row's own buttons, so the partial's footer buttons are dropped.
+        $(document).on('click', '.view-modal-btn', function (e) {
+            e.preventDefault();
+            $.get($(this).attr('href'), function (response) {
+                if (response && response.status === 'success') {
+                    $('#approvalViewBody').html(response.html).find('.modal-footer').remove();
+                    $('#approvalViewModal').modal('show');
+                } else {
+                    toastr.error('Request not found.', 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            }).fail(function () {
+                toastr.error('Something went wrong.', 'Error', { positionClass: 'toast-bottom-right' });
+            });
+        });
+
         $(document).on('click', '.action-btn', function (e) {
             e.preventDefault();
             var $btn       = $(this);
@@ -157,6 +185,10 @@
             var action     = $btn.data('action');
             var status     = $btn.data('status');
             var key        = $btn.data('key');
+            // The endpoint's own parameters (e.g. payroll action=reject, budget year/department,
+            // salary-advance stage) — merged last so they override the generic status/action.
+            var payload    = $btn.data('payload') || {};
+            var needsReason = !!$btn.data('needs_reason');
 
             if (!approveUrl || approveUrl === 'javascript:void(0)') {
                 toastr.error('Action URL missing.', 'Error', { positionClass: 'toast-bottom-right' });
@@ -166,8 +198,11 @@
             // Reject — always open the reason modal regardless of method, then
             // submit as POST with reject_reason. (GET-style endpoints like
             // promotion.review.action still accept the same payload.)
-            if (action === 'Rejected') {
-                pendingReject = { reqId: reqId, approveUrl: approveUrl, method: method, action: action, status: 'Rejected', key: key };
+            if (action === 'Rejected' || needsReason) {
+                var isHold = action !== 'Rejected';
+                pendingReject = { reqId: reqId, approveUrl: approveUrl, method: method, action: action, status: isHold ? status : 'Rejected', key: key, payload: payload };
+                $('#reasonModalTitle').text(isHold ? 'Reason for Hold' : 'Reason for Rejection');
+                $('#confirmRejectBtn').text(isHold ? 'Put on Hold' : 'Reject');
                 $('#rejectionReason').val('');
                 $('#rejectionModal').modal('show');
                 return;
@@ -182,7 +217,7 @@
                 data: (function () {
                     var d = { status: status, action: action, _token: $('meta[name="csrf-token"]').attr('content') };
                     if (key) d[key] = reqId;
-                    return d;
+                    return $.extend(d, payload);
                 })(),
                 success: function (response) {
                     // Promotion / transfer / resignation endpoints return
@@ -192,7 +227,7 @@
                     var isError   = response && (response.success === false || response.status === 'error');
 
                     if (isSuccess) {
-                        toastr.success(response.message || 'Done.', 'Success', { positionClass: 'toast-bottom-right' });
+                        toastr.success(response.message || response.msg || 'Done.', 'Success', { positionClass: 'toast-bottom-right' });
                         // Refresh the page so the actioned row drops out
                         // of the inbox and counters / cached state are
                         // re-read. Follows redirect_url when provided
@@ -206,7 +241,7 @@
                             }
                         }, 400);
                     } else if (isError) {
-                        toastr.error(response.message || 'Action failed.', 'Error', { positionClass: 'toast-bottom-right' });
+                        toastr.error(response.message || response.msg || 'Action failed.', 'Error', { positionClass: 'toast-bottom-right' });
                     } else if (response && response.message) {
                         // Ambiguous shape — server didn't 4xx/5xx and
                         // sent a message but no success / status flag.
@@ -220,7 +255,7 @@
                     }
                 },
                 error: function (xhr) {
-                    var msg = (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)) || 'Action failed.';
+                    var msg = (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.msg || xhr.responseJSON.error)) || 'Action failed.';
                     toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
                 }
             });
@@ -232,7 +267,7 @@
             if (!pendingReject) return;
             var rejectReason = ($('#rejectionReason').val() || '').trim();
             if (!rejectReason) {
-                toastr.error('Reject reason is required.', 'Error', { positionClass: 'toast-bottom-right' });
+                toastr.error('A reason is required.', 'Error', { positionClass: 'toast-bottom-right' });
                 return;
             }
             var p = pendingReject;
@@ -243,17 +278,22 @@
                     var d = {
                         status: p.status,
                         action: p.action,
+                        // Each module reads its own key for the reason.
                         reject_reason: rejectReason,
-                        rejection_reason: rejectReason, // some endpoints expect this key
+                        rejection_reason: rejectReason,
+                        hold_reason: rejectReason,       // resignation hold
+                        reason: rejectReason,            // learning, visa payment
+                        remarks: rejectReason,           // payroll
+                        ReviseBudgetComment: rejectReason, // budget
                         _token: $('meta[name="csrf-token"]').attr('content'),
                     };
                     if (p.key) d[p.key] = p.reqId;
-                    return d;
+                    return $.extend(d, p.payload || {});
                 })(),
                 success: function (response) {
                     var isErr = response && (response.success === false || response.status === 'error');
                     if (!isErr) {
-                        toastr.success((response && response.message) || 'Rejected.', 'Success', { positionClass: 'toast-bottom-right' });
+                        toastr.success((response && (response.message || response.msg)) || 'Done.', 'Success', { positionClass: 'toast-bottom-right' });
                         $('#rejectionModal').modal('hide');
                         $('#rejectionReason').val('');
                         pendingReject = null;
@@ -268,11 +308,11 @@
                             }
                         }, 400);
                     } else {
-                        toastr.error(response.message || 'Reject failed.', 'Error', { positionClass: 'toast-bottom-right' });
+                        toastr.error(response.message || response.msg || 'Action failed.', 'Error', { positionClass: 'toast-bottom-right' });
                     }
                 },
                 error: function (xhr) {
-                    var msg = (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)) || 'Reject failed.';
+                    var msg = (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.msg || xhr.responseJSON.error)) || 'Action failed.';
                     toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
                 }
             });

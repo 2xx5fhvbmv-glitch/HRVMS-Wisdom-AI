@@ -33,12 +33,12 @@
         <div class="mt">{{ $leaveInsights['occupancy']['title'] ?? 'Occupancy & Leave Window' }}</div>
         @if(!empty($occDetails['employees']))
             <div class="m-tablewrap">
-                <div class="m-tcap">Employees with unused annual leave @if(!empty($occDetails['entitlement']))(entitlement {{ $fmt($occDetails['entitlement']) }} days)@endif</div>
+                <div class="m-tcap">Employees with unused annual leave</div>
                 <div class="m-tscroll"><table class="m-table">
-                    <thead><tr><th>Employee</th><th>Department</th><th>Used</th><th>Remaining</th></tr></thead>
+                    <thead><tr><th>Employee</th><th>Department</th><th>Entitlement</th><th>Used</th><th>Remaining</th></tr></thead>
                     <tbody>
                         @foreach($occDetails['employees'] as $emp)
-                            <tr><td>{{ $emp['name'] }}</td><td>{{ $emp['dept'] }}</td><td>{{ $fmt($emp['used']) }}</td><td>{{ $fmt($emp['remaining']) }}</td></tr>
+                            <tr><td>{{ $emp['name'] }}</td><td>{{ $emp['dept'] }}</td><td>{{ $fmt($emp['entitlement']) }}</td><td>{{ $fmt($emp['used']) }}</td><td>{{ $fmt($emp['remaining']) }}</td></tr>
                         @endforeach
                     </tbody>
                 </table></div>

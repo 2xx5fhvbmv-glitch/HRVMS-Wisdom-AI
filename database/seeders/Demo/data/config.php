@@ -241,16 +241,16 @@ return array (
     3 => 
     array (
       'ShiftName' => 'Office Shift',
-      'StartTime' => '08:00',
+      'StartTime' => '09:00',
       'EndTime' => '17:00',
-      'TotalHours' => '9:0',
+      'TotalHours' => '8:0',
     ),
   ),
   'payroll_config' => 
   array (
     0 => 
     array (
-      'cutoff_day' => 25,
+      'cutoff_day' => 31, // calendar-month runs: every payslip and report lines up with one month
     ),
   ),
   'attendance_parameters' => 
@@ -363,7 +363,7 @@ return array (
       'uniform' => 'yes',
       'health_care_insurance' => 'yes',
       'day_off_per_week' => 1,
-      'working_hrs_per_week' => 6,
+      'working_hrs_per_week' => 48,
       'emergency_leave' => NULL,
       'birthday_leave' => NULL,
       'public_holiday_per_year' => NULL,
@@ -421,7 +421,7 @@ return array (
       'uniform' => 'yes',
       'health_care_insurance' => 'yes',
       'day_off_per_week' => 1,
-      'working_hrs_per_week' => 6,
+      'working_hrs_per_week' => 48,
       'emergency_leave' => NULL,
       'birthday_leave' => NULL,
       'public_holiday_per_year' => 11,
@@ -479,7 +479,7 @@ return array (
       'uniform' => 'yes',
       'health_care_insurance' => 'yes',
       'day_off_per_week' => 1,
-      'working_hrs_per_week' => 6,
+      'working_hrs_per_week' => 48,
       'emergency_leave' => NULL,
       'birthday_leave' => NULL,
       'public_holiday_per_year' => 11,
@@ -537,7 +537,7 @@ return array (
       'uniform' => 'yes',
       'health_care_insurance' => 'yes',
       'day_off_per_week' => 1,
-      'working_hrs_per_week' => 6,
+      'working_hrs_per_week' => 48,
       'emergency_leave' => NULL,
       'birthday_leave' => NULL,
       'public_holiday_per_year' => 11,
@@ -595,7 +595,7 @@ return array (
       'uniform' => 'yes',
       'health_care_insurance' => 'yes',
       'day_off_per_week' => 1,
-      'working_hrs_per_week' => 6,
+      'working_hrs_per_week' => 48,
       'emergency_leave' => NULL,
       'birthday_leave' => NULL,
       'public_holiday_per_year' => 11,

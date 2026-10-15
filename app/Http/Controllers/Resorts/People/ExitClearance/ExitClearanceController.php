@@ -1154,12 +1154,15 @@ class ExitClearanceController extends Controller
             ->where('resort_id', $resort_id)
             ->firstOrFail();
 
-        $exitClearanceFormAssignments = ExitClearanceFormAssignment::where('emp_resignation_id', $id)
+        // Was `!$collection` on a ->get() result — a Collection is always
+        // truthy, so this never completed. Complete only once every assigned
+        // form is Completed (Pending / Overdue still block).
+        $hasOpenForms = ExitClearanceFormAssignment::where('emp_resignation_id', $id)
             ->where('resort_id', $resort_id)
-            ->where('status','!=','Pending')
-            ->get();
+            ->where('status', '!=', 'Completed')
+            ->exists();
 
-        if (!$exitClearanceFormAssignments) {
+        if (!$hasOpenForms) {
             // Signature snapshot — HR marking exit clearance complete IS the
             // consent/approval moment for this record. Frozen HERE
             // (Common::snapshotSignature()) so the Experience Certificate

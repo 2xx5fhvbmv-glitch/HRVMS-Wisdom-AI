@@ -174,10 +174,12 @@ class DemoEnvFoundationTest extends TestCase
         $this->artisan('demo:reset', ['--force' => true])->assertSuccessful();
         Demo::refresh();
         $this->actingAs(ResortAdmin::where('resort_id', Demo::resortId())->first(), 'resort-admin');
-        for ($i = 0; $i < 10; $i++) {
+        // Burst limit per user (WAI usage limits, layer 1): config('services.wisdom_ai.per_minute'), default 15.
+        $perMinute = (int) config('services.wisdom_ai.per_minute', 15);
+        for ($i = 0; $i < $perMinute; $i++) {
             $this->assertNotSame(429, $this->postJson(route('resort.wisdom.chat'), ['message' => 'hi'])->status());
         }
         $this->postJson(route('resort.wisdom.chat'), ['message' => 'hi'])->assertStatus(429)
-            ->assertJson(['success' => false, 'message' => 'You are sending messages too quickly — please wait a minute and try again.']);
+            ->assertJson(['success' => false, 'code' => 'rate_limited']);
     }
 }

@@ -424,6 +424,46 @@ class LeaveController extends Controller
     }
 
     /**
+     * Apply-leave summary data for the selected employee (HR/HOD/XCOM/manager
+     * applying on someone's behalf): the same category numbers index()
+     * prints, plus the Day Off balance and cap. Reuses index() so the two
+     * can never disagree; display only — store() stays the authority.
+     */
+    public function applyLeaveData(Request $request)
+    {
+        $resortId = $this->resort->resort_id;
+        $empId = (int) $request->employee_id;
+        $selfId = (int) optional($this->resort->GetEmployee)->id;
+        if (!$empId || ($empId !== $selfId && !$this->getApplicableEmployeesForLeave($resortId)->contains('id', $empId))) {
+            return response()->json(['success' => false, 'message' => 'You cannot apply leave for this employee.'], 403);
+        }
+
+        $request->merge(['apply_for_employee_id' => $empId]);
+        $view = $this->index();
+        if (!$view instanceof \Illuminate\View\View) {
+            return response()->json(['success' => false, 'message' => 'Leave application is not available for this account.'], 422);
+        }
+        $data = $view->getData();
+
+        return response()->json([
+            'success' => true,
+            'employee_id' => $data['selectedEmployeeId'],
+            'leave_categories' => collect($data['leave_categories'])->map(fn ($c) => [
+                'leave_cat_id' => $c->leave_cat_id,
+                'leave_type' => $c->leave_type,
+                'allocated_days' => (float) ($c->allocated_days ?? 0),
+                'available_days' => (float) ($c->available_days ?? 0),
+                'total_leave_days' => (float) ($c->total_leave_days ?? 0),
+                'color' => $c->color ?? '',
+            ])->values(),
+            'day_off' => [
+                'balance' => $data['dayOffBalance'],
+                'max' => LeaveCategory::where('resort_id', $resortId)->where('leave_type', 'Day Off')->value('carry_max'),
+            ],
+        ]);
+    }
+
+    /**
      * Leave approval: any employee's leave is approved by their Reporting To (from Employee Details page).
      * Approval chain on submit: applicant's reporting manager is always added first; for GM, HR/EXCOM/HOD are also added.
      * Who can approve: (1) the applicant's reporting manager, or (2) for GM leave, HR/EXCOM/HOD if they have a Pending row.
@@ -594,6 +634,7 @@ class LeaveController extends Controller
                     $benefit_grid = DB::table('resort_benifit_grid as rbg')
                         ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                         ->where('rbg.emp_grade', $emp_grade)
+                        ->where('rbg.resort_id', $resort_id)
                         ->where('rbgc.leave_cat_id', $leaveRequest->leave_category_id)
                         ->first();
 
@@ -846,6 +887,7 @@ class LeaveController extends Controller
                 $benefit_grid = DB::table('resort_benifit_grid as rbg')
                     ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                     ->where('rbg.emp_grade', $emp_grade)
+                    ->where('rbg.resort_id', $resort_id)
                     ->where('rbgc.leave_cat_id', $leaveRequest->leave_category_id)
                     ->first();
 
@@ -1635,13 +1677,15 @@ class LeaveController extends Controller
             // balance server-side rather than trusting the client's
             // requested quantity; cap it at whatever's actually available.
             $dayOffSplitQty = 0;
+            // Before this application is saved — returned on success so the
+            // web summary can show before / taken / after.
+            $dayOffBalanceBefore = Common::getDayOffBalance($emp_id, $resort_id);
             if (count($request->leave_category_id) == 1 && (int) ($request->day_off_quantity ?? 0) > 0) {
                 $requestedDayOffQty = (int) $request->day_off_quantity;
                 $primaryFromDate = \Carbon\Carbon::createFromFormat('d/m/Y', $request->from_date[0]);
                 $primaryToDate = \Carbon\Carbon::createFromFormat('d/m/Y', $request->to_date[0]);
                 $primaryWorkingDays = Common::calculateLeaveWorkingDays($primaryFromDate, $primaryToDate);
-                $dayOffBalance = Common::getDayOffBalance($emp_id, $resort_id);
-                $dayOffSplitQty = max(0, min($requestedDayOffQty, (int) $dayOffBalance, $primaryWorkingDays));
+                $dayOffSplitQty = max(0, min($requestedDayOffQty, (int) $dayOffBalanceBefore, $primaryWorkingDays));
             }
 
             foreach ($request->leave_category_id as $key => $categoryId) {
@@ -1794,6 +1838,7 @@ class LeaveController extends Controller
                 $benefit_grid = DB::table('resort_benifit_grid as rbg')
                     ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                     ->where('rbg.emp_grade', $emp_grade)
+                    ->where('rbg.resort_id', $resort_id)
                     ->where('rbgc.rank', $rank)
                     ->where('rbgc.leave_cat_id', $categoryId)
                     ->select('rbgc.allocated_days')
@@ -2283,7 +2328,10 @@ class LeaveController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Leave application submitted successfully!',
-                'redirect_url' => route('leave.request')
+                'redirect_url' => route('leave.request'),
+                'day_off_days_taken' => $dayOffSplitQty,
+                'day_off_balance_before' => $dayOffBalanceBefore,
+                'day_off_balance_after' => max(0, $dayOffBalanceBefore - $dayOffSplitQty),
             ]);
         } catch (\Exception $e) {
             DB::rollBack();

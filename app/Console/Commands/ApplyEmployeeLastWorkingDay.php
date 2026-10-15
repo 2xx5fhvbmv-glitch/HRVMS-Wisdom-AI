@@ -14,20 +14,21 @@ use Carbon\Carbon;
  *
  * When an employee's last working day arrives (their Approved
  * resignation's `last_working_day`, or `employees.last_working_day`):
- *   1. Flip their `employees.status` from Active to Inactive so they no
- *      longer appear in lists / approval pools / org chart.
+ *   1. Flip their `employees.status` from Active, Offboarding (accepted
+ *      resignation) or Terminated (exit clearance done) to Inactive — the
+ *      single end status (founder, 2026-10-05) — so they no longer appear
+ *      in lists / approval pools / org chart.
  *   2. Adjust the Workforce Manning numbers for their dept + position
  *      (-1 filled, +1 vacant) so the Manning sub-module reflects the
  *      open seat. Reuses TransferController::adjustManningCount() — the
  *      same helper transfers use to keep filled/vacant in sync.
- *   3. Release their bed / room / villa once last_working_day has passed
- *      AND their Full & Final Settlement is finalized
- *      (Common::releaseAccommodationForEmployee, HR notified). If FFS is
- *      still open on the day they're deactivated, the unit is held and HR
- *      is told why; the next run after FFS is finalized releases it.
+ *   3. If they still hold a bed / room / villa and FFS is not finalized,
+ *      tell HR it is held. Releasing is HR's Yes/Keep decision, prompted
+ *      by accommodation:release-follow-up once FFS is finalized
+ *      (founder, 2026-10-05) — never automatic.
  *
- * Idempotent — step 1-2 only act on employees still marked Active, step 3
- * only on units still held. Running the command twice in a row is safe.
+ * Idempotent — only acts on employees not yet Inactive. Running the
+ * command twice in a row is safe.
  */
 class ApplyEmployeeLastWorkingDay extends Command
 {
@@ -38,7 +39,7 @@ class ApplyEmployeeLastWorkingDay extends Command
     {
         $today = Carbon::today()->toDateString();
 
-        $due = Employee::where('status', 'Active')
+        $due = Employee::whereIn('status', ['Active', 'Offboarding', 'Terminated'])
             ->where(fn ($q) => $this->lastWorkingDayReached($q, $today))
             ->get(['id', 'resort_id', 'Dept_id', 'Position_id', 'Emp_id', 'Admin_Parent_id']);
 
@@ -65,7 +66,7 @@ class ApplyEmployeeLastWorkingDay extends Command
                 $this->line(" Deactivated {$emp->Emp_id}; manning freed.");
                 $processed++;
 
-                // Fires once: they're no longer Active on the next run.
+                // Fires once: they're Inactive on the next run.
                 $this->notifyHrIfHeldPendingSettlement($emp);
             } catch (\Throwable $e) {
                 \Log::error("ApplyEmployeeLastWorkingDay failed for emp #{$emp->id}: " . $e->getMessage());
@@ -75,37 +76,7 @@ class ApplyEmployeeLastWorkingDay extends Command
 
         $this->info("Processed {$processed} of {$due->count()} due employees ({$today}).");
 
-        $this->releaseAccommodation($today);
         return 0;
-    }
-
-    /**
-     * Holders whose LWD has passed, who are no longer Active/Probationary
-     * (e.g. Inactive, Offboarding after failed probation), and whose
-     * FFS is finalized.
-     */
-    private function releaseAccommodation(string $today): void
-    {
-        $leavers = Employee::whereIn('id', AssingAccommodation::where('emp_id', '!=', 0)->select('emp_id'))
-            ->whereNotIn('status', ['Active', 'Probationary'])
-            ->where(fn ($q) => $this->lastWorkingDayReached($q, $today))
-            ->whereHas('finalSettlements', fn ($q) => $q->where('status', 'finalized'))
-            ->get();
-
-        foreach ($leavers as $emp) {
-            try {
-                $units = Common::releaseAccommodationForEmployee($emp);
-                $this->line(" Released accommodation of {$emp->Emp_id}: " . implode(', ', $units));
-            } catch (\Throwable $e) {
-                // Status change above is already saved; the unit stays held
-                // (transaction rolled back) and is retried on the next run.
-                // ponytail: HR is re-notified each daily run until it succeeds.
-                \Log::error("Accommodation release failed for emp #{$emp->id}: " . $e->getMessage());
-                $this->error(" Accommodation release failed for {$emp->Emp_id}: " . $e->getMessage());
-                $this->notifyHr($emp, 'Accommodation Not Released',
-                    'could not be released automatically. Please unassign it manually.');
-            }
-        }
     }
 
     /**
@@ -125,7 +96,7 @@ class ApplyEmployeeLastWorkingDay extends Command
         $ffsDone = $emp->finalSettlements()->where('status', 'finalized')->exists();
         if ($holdsUnit && !$ffsDone) {
             $this->notifyHr($emp, 'Accommodation Held - FFS Pending',
-                'is held until their Full & Final Settlement is finalized; it will be released automatically after that.');
+                'is held until their Full & Final Settlement is finalized; HR will then be asked whether to vacate it.');
         }
     }
 

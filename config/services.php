@@ -112,5 +112,18 @@ return [
     // without a matching key.
     'wisdom_ai' => [
         'internal_key' => env('WISDOM_AI_INTERNAL_KEY'),
+        // Product support address the chatbot is allowed to give out.
+        'support_email' => env('WISDOM_SUPPORT_EMAIL', 'support@thewisdom.ai'),
+
+        // Chat usage limits (WisdomChatController). Daily limits are per user
+        // per Maldives calendar day, by WisdomAccess tier; resorts.wisdom_daily_limit
+        // overrides them for every tier of that resort.
+        'daily_limits'  => ['full' => 100, 'gm' => 100, 'policy' => 50],
+        'per_minute'    => 15,
+        'max_in_flight' => 2,
+        // Monthly AI spend cap per resort in USD (resorts.wisdom_monthly_budget
+        // overrides). Null = no cap. Alert mail goes out at 80%.
+        'resort_monthly_budget' => env('WISDOM_RESORT_MONTHLY_BUDGET'),
+        'budget_alert_email'    => env('WISDOM_BUDGET_ALERT_EMAIL'),
     ],
 ];

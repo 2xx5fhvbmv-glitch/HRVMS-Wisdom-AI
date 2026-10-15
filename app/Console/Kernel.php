@@ -52,6 +52,9 @@ class Kernel extends ConsoleKernel
         // the employee to Inactive AND free their manning seat (-1 filled
         // / +1 vacant) so the Workforce Manning numbers stay honest.
         $schedule->command('employees:apply-last-working-day')->dailyAt('06:15');
+        // Ask HR (Yes / Keep) to vacate units held by Inactive employees
+        // with FFS finalized; Keep is re-asked every 3 days.
+        $schedule->command('accommodation:release-follow-up')->dailyAt('09:00');
         // Day-of promotion notifications + apply the employee position/rank/
         // salary update when an Approved promotion's effective_date arrives.
         $schedule->command('promotions:notify-effective')->dailyAt('06:20');

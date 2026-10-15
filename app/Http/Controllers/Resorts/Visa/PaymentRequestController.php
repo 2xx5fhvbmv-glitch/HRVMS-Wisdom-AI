@@ -874,7 +874,9 @@ class PaymentRequestController extends Controller
             return response()->json(['success' => false,'msg' => 'Payment Request not found'], 404); 
         }   
         else{
-            $PaymentRequest->Status = 'Reject';
+            // The enum's value is 'Rejact' (VisaReportController reads it). 'Reject' isn't in
+            // the enum, so non-strict MariaDB stored it as '' and the request vanished from every list.
+            $PaymentRequest->Status = 'Rejact';
             $PaymentRequest->Reason = $reason;
             $PaymentRequest->save();
 

@@ -3229,22 +3229,19 @@ class BudgetController extends Controller
             }
 
             try {
-                $notifyIds = Common::getResortHrEmployeeIds($manningResponse->resort_id);
-                $hod = Common::FindResortHODDepartment($manningResponse->resort_id, $departmentId);
-                if ($hod) {
-                    $notifyIds[] = $hod->id;
-                }
-                // F4 — named the year but not the category; an HR/HOD with
-                // more than one category's budget in flight for the same
-                // year had no way to tell which one this was about.
+                // HR, Finance and the department's HOD+XCOM (Common::budgetStageRecipients 'approved').
+                // F4 — names the category too: an HR/HOD with more than one category's budget in
+                // flight for the same year had no way to tell which one this was about.
                 $categoryLabel = $manningResponse->employment_type ?? 'Permanent';
+                $departmentName = ResortDepartment::where('id', $departmentId)->value('name');
                 Common::notifyEmployees(
                     $manningResponse->resort_id,
-                    $notifyIds,
+                    Common::budgetStageRecipients($manningResponse->resort_id, 'approved', [$departmentId], $this->resort->getEmployee->id ?? null),
                     'Budget Approved',
-                    "{$categoryLabel} budget for year {$year} has been approved by GM.",
+                    "{$categoryLabel} budget {$year} for {$departmentName} has been approved by the GM and locked.",
                     'WorkForce Planning',
-                    $budgetId
+                    $budgetId,
+                    'budget'
                 );
             } catch (\Exception $e) {
                 \Log::warning('Budget approval notification failed: ' . $e->getMessage());
@@ -3334,14 +3331,14 @@ class BudgetController extends Controller
         }
 
         try {
-            $notifyIds = Common::getResortHrEmployeeIds($resortId);
             Common::notifyEmployees(
                 $resortId,
-                $notifyIds,
+                Common::budgetStageRecipients($resortId, 'approved', $budgets->pluck('dept_id')->unique()->all(), $this->resort->getEmployee->id ?? null),
                 'Budget Approved',
-                "All departments' budgets for year {$year} have been approved by GM.",
+                "All departments' budgets for {$year} have been approved by the GM and locked.",
                 'WorkForce Planning',
-                null
+                $budgets->first()->id,
+                'budget'
             );
         } catch (\Exception $e) {
             \Log::warning('Bulk budget approval notification failed: ' . $e->getMessage());

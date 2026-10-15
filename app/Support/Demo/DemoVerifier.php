@@ -66,6 +66,43 @@ class DemoVerifier
             return $blank === 0 ?: "{$blank} employees with a blank status/title";
         });
 
+        // Slice 3: rosters and attendance.
+        $this->check('Everyone is rostered this week and next', function () use ($resortId, $employees) {
+            $nextWeek = now()->addWeek()->endOfWeek()->format('Y-m-d');
+            $rostered = DB::table('duty_roster_entries')->where('resort_id', $resortId)->where('date', $nextWeek)->distinct()->count('Emp_id');
+            $n = $employees()->where('status', 'Active')->count();
+            return $rostered === $n ?: "{$rostered} of {$n} rostered through {$nextWeek}";
+        });
+        $this->check('12 months of attendance, payroll-ready before the last 10 days', function () use ($resortId) {
+            $att = fn () => DB::table('parent_attendaces')->where('resort_id', $resortId);
+            $oldest = $att()->min('date');
+            if (!$oldest || $oldest > now()->subMonths(11)->format('Y-m-d')) {
+                return 'oldest attendance is ' . ($oldest ?? 'missing');
+            }
+            // What PayrollController blocks a run on: no status, a Present day without both punches, undecided OT.
+            $bad = $att()->where('date', '<', now()->subDays(10)->format('Y-m-d'))->where(fn ($q) => $q->whereNull('Status')->orWhere('Status', '')
+                ->orWhereNull('CheckingOutTime')->orWhere(fn ($q) => $q->whereNotNull('OverTime')->whereNull('OTStatus')))->count();
+            return $bad === 0 ?: "{$bad} older attendance days would block payroll";
+        });
+        $this->check('Overtime: decided in the past, some pending now', function () use ($resortId) {
+            $pending = DB::table('employee_overtimes')->where('resort_id', $resortId)->where('status', 'pending')->count();
+            $approved = DB::table('employee_overtimes')->where('resort_id', $resortId)->where('status', 'approved')->count();
+            return ($pending > 0 && $approved > 0) ?: "{$approved} approved, {$pending} pending";
+        });
+
+        // Slice 4: payroll.
+        $this->check('12 locked payroll runs, last month waiting on Finance → HR → GM', function () use ($resortId) {
+            $locked = DB::table('payroll')->where('resort_id', $resortId)->where('status', 'locked')->count();
+            $pending = DB::table('payroll')->where('resort_id', $resortId)->where('status', 'pending_approval')->pluck('id');
+            $steps = DB::table('payroll_approvals')->whereIn('payroll_id', $pending)->where('status', 'pending')->orderBy('step_order')->pluck('role_title')->all();
+            return ($locked === 12 && $pending->count() === 1 && $steps === ['Finance EXCOM', 'HR EXCOM', 'GM']) ?: "{$locked} locked, {$pending->count()} pending";
+        });
+        $this->check('Every locked run totals its payslips', function () use ($resortId) {
+            $off = DB::table('payroll as p')->where('p.resort_id', $resortId)->where('p.status', 'locked')
+                ->whereRaw('ABS(p.total_payroll - (SELECT COALESCE(SUM(r.net_salary), 0) FROM payroll_reviews r WHERE r.payroll_id = p.id)) > 0.01')->count();
+            return $off === 0 ?: "{$off} runs don't add up";
+        });
+
         return ['passed' => !collect($this->checks)->contains('ok', false), 'checks' => $this->checks];
     }
 

@@ -231,6 +231,50 @@ class Common
     }
 
     /**
+     * Issue (or re-issue) an employee's first-time login credentials: fresh
+     * password, revoke live API tokens, email it. Shared by the profile's
+     * Send Credentials tab (People\Employee\EmployeeController::sendCredentials)
+     * and the bulk SendPendingCredentialsJob so both behave identically.
+     * Caller owns the resort scoping of $employee.
+     */
+    public static function issueLoginCredentials(Employee $employee, $resort): array
+    {
+        $resortAdmin = $employee->resortAdmin;
+        if (!$resortAdmin || !$resortAdmin->email) {
+            return ['ok' => false, 'message' => 'Employee does not have a valid email address.'];
+        }
+
+        // Casual/Intern staff get no mobile app access at all — their
+        // reporting manager marks attendance/leave on their behalf.
+        // Derived from employment_type rather than a stored flag so a
+        // later conversion (e.g. Casual -> Full-Time) grants access
+        // automatically. The ResortAdmin record itself still exists
+        // (name/photo/email resolution throughout the app depends on
+        // it) — only the credential dispatch is skipped.
+        if (self::manningCategory($employee->employment_type) !== 'Permanent') {
+            return ['ok' => false, 'message' => 'Mobile app credentials are not issued for Casual/Intern employees.'];
+        }
+
+        $plainPassword = self::generateUniquePassword(8);
+        $resortAdmin->password = \Hash::make($plainPassword);
+        $resortAdmin->save();
+        // Revoke every live mobile token — a reset password means the
+        // old one must stop working everywhere, same as self-service
+        // password change (S4-03).
+        try {
+            self::revokeAllApiTokens($resortAdmin);
+        } catch (\Exception $e) {
+            \Log::warning('revokeAllApiTokens failed on HR password reset: ' . $e->getMessage());
+        }
+        // Hydrate GetEmployee so the notification template can read
+        // Emp_id for the mobile-app login section of the email.
+        $resortAdmin->setRelation('GetEmployee', $employee);
+        $resortAdmin->sendResortemployee($resort, $resortAdmin, $plainPassword);
+
+        return ['ok' => true, 'message' => 'Credentials sent successfully.'];
+    }
+
+    /**
      * Single write path for "create or update an employee's core profile,"
      * shared by the manual Add Employee wizard (People\Employee\
      * EmployeeController::store()) and the Master Import bulk importer
@@ -5561,6 +5605,30 @@ class Common
      * getResortFinanceEmployeeIds for fanning out approval-chain notifications
      * (e.g. Salary Advance/Loan) to the GM as well as HR/Finance.
      */
+    /**
+     * Who hears about a budget at each stage (one notice per action, each person once,
+     * never the person who clicked). HOD+XCOM = rank 2 / rank 1 of a department.
+     *  - 'finance'  (HR → Finance):  Finance HOD+XCOM, and each forwarded department's HOD+XCOM
+     *  - 'gm'       (Finance → GM):  the other Finance HOD/XCOM, the GM, HR HOD+XCOM, each department's HOD+XCOM
+     *  - 'approved' (GM approved):   HR HOD+XCOM, Finance HOD+XCOM, each approved department's HOD+XCOM
+     */
+    public static function budgetStageRecipients(int $resortId, string $stage, array $deptIds, ?int $actorId = null): array
+    {
+        $departments = \App\Models\ResortDepartment::where('resort_id', $resortId)->pluck('id');
+        $hrDepts = $departments->filter(fn ($id) => self::isHRDepartment($id))->all();
+        $financeDepts = $departments->filter(fn ($id) => self::isFinanceDepartment($id))->all();
+        $leaders = fn (array $ids) => $ids ? Employee::where('resort_id', $resortId)->whereIn('Dept_id', $ids)->whereIn('rank', [1, 2])
+            ->where(fn ($q) => $q->whereNull('status')->orWhereIn('status', ['Active', 'Probationary']))->pluck('id')->all() : [];
+
+        $ids = array_merge($leaders($deptIds), $leaders($financeDepts));
+        if ($stage === 'gm') {
+            $ids = array_merge($ids, self::getResortGmEmployeeIds($resortId), $leaders($hrDepts));
+        } elseif ($stage === 'approved') {
+            $ids = array_merge($ids, $leaders($hrDepts));
+        }
+        return array_values(array_diff(array_unique(array_map('intval', $ids)), [(int) $actorId]));
+    }
+
     public static function getResortGmEmployeeIds($resortId)
     {
         return \App\Models\Employee::where('resort_id', $resortId)
@@ -5641,6 +5709,14 @@ class Common
         return in_array($name, $aliases, true)
             || in_array($short, $aliases, true)
             || in_array($code, $aliases, true);
+    }
+
+    /** L&D Manager: an L&D leadership title, or anyone in the L&D department (the rule learning requests are approved under). */
+    public static function isLdManager($employee): bool
+    {
+        if (!$employee) return false;
+        return in_array(optional($employee->position)->position_title, self::ldLeadershipTitles(), true)
+            || self::isLDDepartment($employee->Dept_id ?? null);
     }
 
     /**
@@ -7134,6 +7210,92 @@ class Common
             'current_pending_rank'  => $currentPendingRank,
             'overall_status'        => $overallStatus,
         ];
+    }
+
+    /**
+     * Employee's real leave balance per category, Benefit Grid as the single
+     * source of truth (leave_categories.number_of_days is only a default).
+     * Same steps as the web apply-leave check (Leave\LeaveController):
+     * grade -> grid allocated days for grade+rank -> eligibility -> prorate
+     * by joining date -> minus Approved days this year (Pending not
+     * subtracted) -> plus capped carry-forward. Only categories the
+     * employee is eligible for AND has a grid row for are returned (no row
+     * = no entitlement), keyed by leave_cat_id.
+     */
+    public static function getEmployeeLeaveBalance($empId, $resortId, $categoryId = null): array
+    {
+        // Memoised per request so a dashboard looping a whole department
+        // doesn't re-read the same grid/category rows per employee.
+        static $gridCache = [], $catCache = [];
+
+        $emp = DB::table('employees')->where('id', $empId)->where('resort_id', $resortId)
+            ->first(['id', 'rank', 'benefit_grid_level', 'joining_date']);
+        if (!$emp) {
+            return [];
+        }
+        $grade = self::resolveEmpGrade($resortId, $emp->rank, $emp->benefit_grid_level);
+        if ($grade === null || $grade === '') {
+            return [];
+        }
+
+        $gridKey = $resortId . '|' . $grade . '|' . $emp->rank;
+        $gridCache[$gridKey] ??= DB::table('resort_benifit_grid as rbg')
+            ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
+            ->where('rbg.resort_id', $resortId)
+            ->where('rbg.emp_grade', $grade)
+            ->where('rbgc.rank', $emp->rank)
+            ->orderBy('rbgc.id')
+            ->get(['rbgc.leave_cat_id', 'rbgc.allocated_days'])
+            ->unique('leave_cat_id')   // same first() row the apply check picks
+            ->pluck('allocated_days', 'leave_cat_id');
+        $catCache[$resortId] ??= DB::table('leave_categories')->where('resort_id', $resortId)
+            ->get(['id', 'leave_type', 'eligibility', 'carry_forward', 'carry_max'])->keyBy('id');
+
+        $catIds = $gridCache[$gridKey]->keys()
+            ->when($categoryId, fn($c) => $c->intersect([(int) $categoryId]))
+            ->filter(function ($id) use ($catCache, $resortId, $emp) {
+                $cat = $catCache[$resortId][$id] ?? null;
+                return $cat && (!$cat->eligibility || in_array((string) $emp->rank, explode(',', $cat->eligibility)));
+            })->values();
+        if ($catIds->isEmpty()) {
+            return [];
+        }
+
+        $usedIn = fn($start, $end) => DB::table('employees_leaves')
+            ->where('emp_id', $empId)->where('status', 'Approved')
+            ->whereIn('leave_category_id', $catIds)
+            ->where(fn($q) => $q->whereBetween('from_date', [$start, $end])->orWhereBetween('to_date', [$start, $end]))
+            ->groupBy('leave_category_id')
+            ->selectRaw('leave_category_id, SUM(total_days) as d')
+            ->pluck('d', 'leave_category_id');
+        $now = Carbon::now();
+        $used = $usedIn($now->copy()->startOfYear()->toDateString(), $now->copy()->endOfYear()->toDateString());
+        $usedLastYear = $usedIn($now->copy()->subYear()->startOfYear()->toDateString(), $now->copy()->subYear()->endOfYear()->toDateString());
+
+        $out = [];
+        foreach ($catIds as $id) {
+            $cat = $catCache[$resortId][$id];
+            $allocated = (float) $gridCache[$gridKey][$id];
+            $prorated = (float) self::prorateLeaveByJoiningDate($allocated, $emp->joining_date);
+            $taken = (float) ($used[$id] ?? 0);
+            $carry = 0.0;
+            if (!empty($cat->carry_forward) && $cat->carry_forward != '0') {
+                $unused = max($prorated - (float) ($usedLastYear[$id] ?? 0), 0);
+                $carry = ($cat->carry_max !== null && $cat->carry_max !== '') ? min($unused, (int) $cat->carry_max) : $unused;
+            }
+            $out[$id] = [
+                'leave_cat_id'  => (int) $id,
+                'leave_type'    => $cat->leave_type,
+                'grade'         => $grade,
+                'rank'          => $emp->rank,
+                'allocated'     => $allocated,
+                'prorated'      => $prorated,
+                'used'          => $taken,
+                'carry_forward' => $carry,
+                'balance'       => round($prorated - $taken + $carry, 1),
+            ];
+        }
+        return $out;
     }
 
     /**
@@ -9163,6 +9325,11 @@ class Common
                 return url('resort/people/announcement');
 
             case 'workforce planning':
+                // Budget stage notices (page_id 'budget', request_id = manning_responses.id) open that year's budget.
+                if (($notification->page_id ?? null) === 'budget' && $requestId
+                    && ($year = \App\Models\ManningResponse::where('id', $requestId)->value('year'))) {
+                    return route('resort.budget.viewbudget', ['year' => $year]);
+                }
                 return url('resort/workforce-planning/hr-dashboard');
 
             case 'payroll approval':
@@ -9177,6 +9344,9 @@ class Common
             // here at all — every one of them silently fell through to the
             // generic notification list instead of the module itself.
             case 'accommodation':
+                if (($notification->page_id ?? null) === 'accommodation-release') {
+                    return route('resort.accommodation.release-decisions');
+                }
                 return url('resort/accommodation/maintenance-request/list');
 
             case 'visa':
@@ -12396,6 +12566,73 @@ class Common
      * period's total days is explained; mirrors the register's `not_marked`.
      * $records: attendance rows (models/objects/arrays with date + Status) for ONE employee.
      */
+    /**
+     * Roster lookups a payroll calculation needs, loaded once per run.
+     * A check-in always writes 'Present' and nothing writes DayOff/Absent
+     * attendance rows, so pay code that counted only those rows never paid a
+     * day off nor saw a no-show; the roster (duty_roster_entries) has both.
+     * $attendanceIds: the run's parent_attendaces ids (for their breaks).
+     */
+    public static function payrollRosterContext($resortId, $empIds, $start, $end, $attendanceIds): array
+    {
+        $toMinutes = function ($hm) {
+            [$h, $m] = array_pad(explode(':', (string) $hm), 2, 0);
+            return (int) $h * 60 + (int) $m;
+        };
+        return [
+            'roster' => DB::table('duty_roster_entries')->whereIn('Emp_id', $empIds)
+                ->whereBetween('date', [Carbon::parse($start)->format('Y-m-d'), Carbon::parse($end)->format('Y-m-d')])
+                ->get(['Emp_id', 'date', 'Status'])->groupBy('Emp_id'),
+            'shift_minutes' => DB::table('shift_settings')->where('resort_id', $resortId)->pluck('TotalHours', 'id')->map($toMinutes),
+            'break_minutes' => DB::table('break_attendaces')->whereIn('Parent_attd_id', $attendanceIds)->where('Total_Break_Time', '!=', '')
+                ->get(['Parent_attd_id', 'Total_Break_Time'])->groupBy('Parent_attd_id')
+                ->map(fn ($rows) => $rows->sum(fn ($b) => $toMinutes($b->Total_Break_Time))),
+        ];
+    }
+
+    /**
+     * One employee's paid day-offs and no-shows in a run, from attendance
+     * rows plus the roster. Day off = marked DayOff anywhere, unless they
+     * worked it (then it's a present day). No-show = a rostered workday that
+     * has passed with no attendance row at all (approved leave writes its
+     * own FullDayLeave row), returned shaped like an Absent attendance row.
+     */
+    public static function payrollDayMarks(array $records, array $context, $empId): array
+    {
+        $ymd = fn ($d) => Carbon::parse($d)->format('Y-m-d');
+        $present = ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDay'];
+        $records = collect($records);
+        $marked = $records->map(fn ($r) => $ymd(data_get($r, 'date')))->flip();
+        $worked = $records->whereIn('Status', $present)->map(fn ($r) => $ymd(data_get($r, 'date')))->flip();
+        $roster = collect($context['roster'][$empId] ?? []);
+        $today = Carbon::today()->format('Y-m-d');
+
+        return [
+            'day_off_dates' => $records->where('Status', 'DayOff')->pluck('date')->merge($roster->where('Status', 'DayOff')->pluck('date'))
+                ->map($ymd)->unique()->reject(fn ($d) => isset($worked[$d]))->values(),
+            'no_shows' => $roster->where('Status', '!=', 'DayOff')->pluck('date')->map($ymd)->unique()
+                ->reject(fn ($d) => isset($marked[$d]) || $d >= $today)
+                ->map(fn ($d) => (object) ['date' => $d, 'Status' => 'Absent', 'note' => null])->values(),
+        ];
+    }
+
+    /**
+     * Share of a day's pay one present attendance row earns. DayWiseTotalHours
+     * is net of breaks while a shift's length includes its break, so time on
+     * shift (net + breaks) is compared with the shift itself: a completed
+     * shift is a full day. No recorded hours = a data gap, paid as a full day.
+     */
+    public static function payrollDayFraction($rec, array $context): float
+    {
+        $hours = data_get($rec, 'DayWiseTotalHours');
+        if (empty($hours) || in_array($hours, ['0', '0:0', '0:00', '00:00'], true)) {
+            return 1.0;
+        }
+        [$h, $m] = array_pad(explode(':', (string) $hours), 2, 0);
+        $onShift = (int) $h * 60 + (int) $m + ($context['break_minutes'][data_get($rec, 'id')] ?? 0);
+        return min(1.0, $onShift / max(1, $context['shift_minutes'][data_get($rec, 'Shift_id')] ?? 480));
+    }
+
     public static function unaccountedDays($records, $start, $end): int
     {
         $marked = [];
@@ -13620,6 +13857,43 @@ class Common
     }
 
     /**
+     * Payroll pays overtime from parent_attendaces.OverTime/OTStatus, but the
+     * T&A overtime screens approve employee_overtimes rows — so OT approved
+     * there was never paid. Call after any status decision on the entries a
+     * punch generated: mirrors them onto that attendance day. Approved total
+     * → 'Approved'; all decided, none approved → rejected total, 'Rejected';
+     * nothing decided yet → left blank, as before. Pre-planned entries (no
+     * parent_attendance_id) are a plan, not worked time, and never count.
+     */
+    public static function syncAttendanceOvertime($parentAttendanceId, $approverAdminId): void
+    {
+        if (!$parentAttendanceId) {
+            return;
+        }
+        $entries = \App\Models\EmployeeOvertime::where('parent_attendance_id', $parentAttendanceId)->get(['status', 'total_time']);
+        if ($entries->isEmpty()) {
+            return; // OT on this day, if any, came from the older attendance-row flows — leave it to them
+        }
+        $minutes = fn ($status) => $entries->where('status', $status)->sum(function ($e) {
+            [$h, $m] = array_pad(explode(':', (string) $e->total_time), 2, 0);
+            return (int) $h * 60 + (int) $m;
+        });
+        $approved = $minutes('approved');
+        $ot = null;
+        $status = null;
+        if ($approved > 0) {
+            [$ot, $status] = [$approved, 'Approved'];
+        } elseif (!$entries->contains('status', 'pending')) {
+            [$ot, $status] = [$minutes('rejected'), 'Rejected'];
+        }
+        \App\Models\ParentAttendace::where('id', $parentAttendanceId)->update([
+            'OverTime' => $ot === null ? null : sprintf('%02d:%02d', intdiv($ot, 60), $ot % 60),
+            'OTStatus' => $status,
+            'OTApproved_By' => $status ? $approverAdminId : null,
+        ]);
+    }
+
+    /**
      * Resolve all template placeholders for offer letter / contract
      */
     public static function resolveTemplatePlaceholders($applicantId, $resortId)
@@ -13884,6 +14158,55 @@ class Common
             $map[$key] = $ordinal + 1;
         }
         return $map;
+    }
+
+    /**
+     * NORMAL minutes worked per employee per Mon–Sat working week (Sunday is
+     * not counted): check-in → check-out (overnight-safe) minus completed
+     * breaks minus Approved overtime. Days still on shift are skipped.
+     * Shared by the 48-hour compliance rule and the T&A dashboard insight.
+     * Break_OutTime = break start, Break_InTime = break end ('' while open).
+     *
+     * @return array<int, array<string, int>> [Emp_id => [week-start Y-m-d => minutes]]
+     */
+    public static function weeklyNormalMinutes($resortId, array $empIds, string $from, string $to): array
+    {
+        $clock = function ($time): ?int {
+            if (!is_string($time) || !preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?$/', trim($time), $m)) {
+                return null;
+            }
+            [$h, $min] = [(int) $m[1], (int) $m[2]];
+            return ($h > 24 || $min > 59 || ($h === 24 && $min > 0)) ? null : $h * 60 + $min;
+        };
+        $span = fn (int $a, int $b) => $b >= $a ? $b - $a : $b + 1440 - $a;
+
+        $days = ParentAttendace::where('resort_id', $resortId)->whereIn('Emp_id', $empIds)
+            ->whereNotNull('CheckingTime')->where('Status', 'Present')
+            ->whereBetween('date', [$from, $to])
+            ->get(['id', 'Emp_id', 'date', 'CheckingTime', 'CheckingOutTime', 'OverTime', 'OTStatus']);
+        $breakMinutes = \App\Models\BreakAttendaces::whereIn('Parent_attd_id', $days->pluck('id'))
+            ->get(['Parent_attd_id', 'Break_InTime', 'Break_OutTime'])
+            ->groupBy('Parent_attd_id')
+            ->map(fn ($breaks) => $breaks->sum(function ($b) use ($clock, $span) {
+                $start = $clock($b->Break_OutTime);
+                $end = $clock($b->Break_InTime);
+                return $start === null || $end === null ? 0 : $span($start, $end);
+            }));
+
+        $result = [];
+        foreach ($days as $day) {
+            $date = Carbon::parse($day->date);
+            $in = $clock($day->CheckingTime);
+            $out = $clock($day->CheckingOutTime);
+            if ($date->isSunday() || $in === null || $out === null) {
+                continue;
+            }
+            $worked = $span($in, $out) - ($breakMinutes[$day->id] ?? 0);
+            $overtime = $day->OTStatus === 'Approved' ? ($clock($day->OverTime) ?? 0) : 0;
+            $week = $date->startOfWeek()->format('Y-m-d');
+            $result[$day->Emp_id][$week] = ($result[$day->Emp_id][$week] ?? 0) + max(0, $worked - $overtime);
+        }
+        return $result;
     }
 
 }

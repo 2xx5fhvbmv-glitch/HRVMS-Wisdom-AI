@@ -23,6 +23,7 @@ use App\Models\PayrollConfig;
 use App\Models\DutyRoster;
 use App\Models\DutyRosterEntry;
 use App\Models\ChildAttendace;
+use App\Models\BreakAttendaces;
 class AttandanceRegisterController extends Controller
 {
     protected $resort;
@@ -543,166 +544,99 @@ class AttandanceRegisterController extends Controller
 
     public function CheckoutTimeMissing(Request $request)
     {
+        $action = $request->action === 'approve' ? 'Approved' : 'Rejected';
+        $Approved_id = $this->resort->id;
 
-
-        try{
-            DB::beginTransaction();
-            $AttdanceId = $request->AttdanceId;
-            $CheckoutTime = $request->CheckoutTime;
-            $action = $request->action;
-            $Approved_id = $this->resort->id;
-
-            $action == 'approve' ? $action = 'Approved' : $action = 'Rejected';
-
-            // Safely parse CheckoutTime - validate it's a valid time format
-            $checkoutTimeParsed = null;
-            if (preg_match('/^(\d{1,2}):(\d{2})$/', $CheckoutTime, $matches)) {
-                $hours = (int)$matches[1];
-                $minutes = (int)$matches[2];
-                if ($hours >= 0 && $hours <= 23 && $minutes >= 0 && $minutes <= 59) {
-                    try {
-                        $checkoutTimeParsed = Carbon::parse($CheckoutTime);
-                        $CheckoutTime = $checkoutTimeParsed->format('H:i');
-                    } catch (\Exception $e) {
-                        return response()->json(['success'=>false,'message' => 'Invalid checkout time format.']);
-                    }
-                } else {
-                    return response()->json(['success'=>false,'message' => 'Invalid checkout time format.']);
-                }
-            } else {
-                return response()->json(['success'=>false,'message' => 'Invalid checkout time format.']);
-            }
-
-            // Was an unscoped find-by-id — any resort-admin could read and
-            // overwrite another resort's checkout time/overtime by guessing
-            // an id, and would also fatal on the property access below
-            // instead of hitting the (never-reached) null check that used
-            // to come after it.
-            $ParentAttendace = ParentAttendace::where('id', $AttdanceId)
-                ->where('resort_id', $this->resort->resort_id)
-                ->first();
-
-            if (!$ParentAttendace) {
-                DB::rollback();
-                return response()->json(['success'=>false,'message' => 'Record not found.'], 404);
-            }
-
-            // A-01: this approves/rejects overtime, previously with zero
-            // role check at all — any portal user could approve anyone's
-            // overtime, including their own. HR/GM or the employee's own
-            // HOD/EXCOM only, never the employee themselves.
-            if (!Common::canManageAttendanceFor($ParentAttendace->Emp_id, $this->resort->GetEmployee)) {
-                DB::rollback();
-                return response()->json(['success' => false, 'message' => 'You are not authorized to approve this overtime.'], 403);
-            }
-
-            $DayWiseTotalHours = $ParentAttendace->DayWiseTotalHours;
-            $OldOverTime = $ParentAttendace->OverTime ?? "00:00";
-            if ($ParentAttendace)
-            {
-                // Parse both times as Carbon instances - these are actual times, not durations
-                $CheckingTimeParsed = null;
-                if ($ParentAttendace->CheckingTime && preg_match('/^(\d{1,2}):(\d{2})$/', $ParentAttendace->CheckingTime, $matches)) {
-                    $hours = (int)$matches[1];
-                    $minutes = (int)$matches[2];
-                    if ($hours >= 0 && $hours <= 23 && $minutes >= 0 && $minutes <= 59) {
-                        try {
-                            $CheckingTimeParsed = Carbon::parse($ParentAttendace->CheckingTime);
-                        } catch (\Exception $e) {
-                            return response()->json(['success'=>false,'message' => 'Invalid checking time format.']);
-                        }
-                    }
-                }
-
-                if (!$CheckingTimeParsed || !$checkoutTimeParsed) {
-                    return response()->json(['success'=>false,'message' => 'Invalid time format.']);
-                }
-
-                // Calculate time difference
-                $timeDifferenceInMinutes = $CheckingTimeParsed->diffInMinutes($checkoutTimeParsed, false); // False allows negative values
-                $hours = intdiv(abs($timeDifferenceInMinutes), 60); // Total hours
-                $minutes = abs($timeDifferenceInMinutes) % 60; // Remaining minutes
-                $NewTotalHours = sprintf("%02d:%02d", $hours, $minutes);
-
-                if( $DayWiseTotalHours == $NewTotalHours)
-                {
-                    // Parse both times as Carbon instances
-                    $ParentAttendace ->CheckingOutTime  = $CheckoutTime;
-                }
-                elseif($DayWiseTotalHours < $NewTotalHours)
-                {
-                    // Parse durations (not times) - use explode instead of Carbon::parse
-                    list($dayHours, $dayMinutes) = explode(':', $DayWiseTotalHours ?? '00:00');
-                    list($newHours, $newMinutes) = explode(':', $NewTotalHours);
-
-                    // Convert to minutes for comparison
-                    $dayTotalMinutes = ((int)$dayHours * 60) + (int)$dayMinutes;
-                    $newTotalMinutes = ((int)$newHours * 60) + (int)$newMinutes;
-
-                    // Calculate difference in minutes
-                    $diffMinutes = $newTotalMinutes - $dayTotalMinutes;
-                    $hoursDifferent = intdiv(abs($diffMinutes), 60);
-                    $minutesDifferent = abs($diffMinutes) % 60;
-                    $newOverTime = sprintf("%02d:%02d", $hoursDifferent, $minutesDifferent);
-
-                    // Add to old overtime (also a duration)
-                    list($oldOThours, $oldOTminutes) = explode(':', $OldOverTime);
-                    $totalOldOTMinutes = ((int)$oldOThours * 60) + (int)$oldOTminutes;
-                    $totalNewOTMinutes = ((int)$hoursDifferent * 60) + (int)$minutesDifferent;
-                    $totalUpdatedOTMinutes = $totalOldOTMinutes + $totalNewOTMinutes;
-                    $updatedOThours = intdiv($totalUpdatedOTMinutes, 60);
-                    $updatedOTminutes = $totalUpdatedOTMinutes % 60;
-                    $UpdatedOverTime = sprintf("%02d:%02d", $updatedOThours, $updatedOTminutes);
-
-                    $ParentAttendace->OverTime =  $UpdatedOverTime;
-                    $ParentAttendace->DayWiseTotalHours = sprintf("%02d:%02d", $hours, $minutes);
-                    $ParentAttendace->CheckingOutTime = $CheckoutTime;
-                    $ParentAttendace->OTStatus    = $action;
-                    $ParentAttendace->OTApproved_By = $Approved_id;
-                }
-                elseif($DayWiseTotalHours > $NewTotalHours)
-                {
-
-                    $ParentAttendace->Shift_id;
-                    $ShiftSettings = ShiftSettings::find($ParentAttendace->Shift_id);
-                    $CheckoutTimeFormatted = $CheckoutTime;
-
-                    if($CheckoutTimeFormatted == $ShiftSettings->EndTime && isset($ParentAttendace->OverTime))
-                    {
-                        $ParentAttendace->OTStatus    = "Rejected";
-                        $ParentAttendace->OTApproved_By = $Approved_id;
-                    }
-
-                        $ParentAttendace->DayWiseTotalHours = sprintf("%02d:%02d", $hours, $minutes);
-                        $ParentAttendace->CheckingOutTime = $CheckoutTime;
-                        if(isset($ParentAttendace->OverTime))
-                        {
-                            $ParentAttendace->OTStatus    = "Rejected";
-                            $ParentAttendace->OTApproved_By = $Approved_id;
-                        }
-                }
-                $ParentAttendace->save();
-
-                try {
-                    Common::notifyEmployees(
-                        $this->resort->resort_id,
-                        [(int) $ParentAttendace->Emp_id],
-                        'Overtime Request ' . $ParentAttendace->OTStatus,
-                        'Your overtime request for ' . $ParentAttendace->CheckingTime . ' has been ' . strtolower($ParentAttendace->OTStatus) . '.',
-                        'DutyRoster',
-                        $ParentAttendace->id
-                    );
-                } catch (\Exception $ne) {
-                    \Log::warning('Overtime approve/reject notification failed: ' . $ne->getMessage());
-                }
-            }
-             return response()->json(['success'=>true,'message' => 'OT '.$action.' successfully.']);
+        // <input type="time"> posts HH:MM.
+        if (!preg_match('/^([01]?\d|2[0-3]):[0-5]\d$/', (string) $request->CheckoutTime)) {
+            return response()->json(['success' => false, 'message' => 'Invalid checkout time format.'], 422);
         }
-        catch(Exception $e)
-        {
-            DB::rollback();
-            return response()->json(['success'=>false,'message' => 'Oops somthing wrong to Update Ot Status.']);
+        $CheckoutTime = Carbon::createFromFormat('H:i', $request->CheckoutTime)->format('H:i');
+
+        // Was an unscoped find-by-id — any resort-admin could read and
+        // overwrite another resort's checkout time/overtime by guessing
+        // an id.
+        $ParentAttendace = ParentAttendace::where('id', $request->AttdanceId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if (!$ParentAttendace) {
+            return response()->json(['success' => false, 'message' => 'Record not found.'], 404);
         }
+
+        // A-01: this approves/rejects overtime, previously with zero
+        // role check at all — any portal user could approve anyone's
+        // overtime, including their own. HR/GM or the employee's own
+        // HOD/EXCOM only, never the employee themselves.
+        if (!Common::canManageAttendanceFor($ParentAttendace->Emp_id, $this->resort->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to approve this overtime.'], 403);
+        }
+
+        // Mobile punches store H:i:s, web punches H:i — this used to accept
+        // only H:i, so every mobile check-in failed here.
+        if (!preg_match('/^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/', (string) $ParentAttendace->CheckingTime)) {
+            return response()->json(['success' => false, 'message' => 'This day has no valid check-in time.'], 422);
+        }
+        $date = Carbon::parse($ParentAttendace->date)->format('Y-m-d');
+        $in = Carbon::parse($date . ' ' . $ParentAttendace->CheckingTime);
+        $out = Carbon::parse($date . ' ' . $CheckoutTime);
+        if ($out->lte($in)) {
+            $out->addDay(); // overnight shift
+        }
+
+        // Worked time = out − in − breaks, the way the mobile checkout computes it.
+        $toMinutes = function ($hm) {
+            [$h, $m] = array_pad(explode(':', (string) $hm), 2, 0);
+            return (int) $h * 60 + (int) $m;
+        };
+        $breakMinutes = BreakAttendaces::where('Parent_attd_id', $ParentAttendace->id)->get()
+            ->sum(fn ($b) => $b->Total_Break_Time ? $toMinutes($b->Total_Break_Time) : 0);
+        $worked = max(0, (int) $in->diffInMinutes($out) - $breakMinutes);
+
+        // Overtime = worked beyond the shift. This used to be measured
+        // against DayWiseTotalHours, which a mobile check-in sets to '00:00',
+        // so the whole day became overtime.
+        $shift = ShiftSettings::find($ParentAttendace->Shift_id);
+        $shiftMinutes = $shift ? $toMinutes($shift->TotalHours) : $toMinutes($ParentAttendace->DayWiseTotalHours);
+
+        $ParentAttendace->CheckingOutTime = $CheckoutTime;
+        $ParentAttendace->DayWiseTotalHours = sprintf('%02d:%02d', intdiv($worked, 60), $worked % 60);
+        $otDecided = true;
+        if ($shiftMinutes > 0 && $worked > $shiftMinutes) {
+            $ot = $worked - $shiftMinutes;
+            $ParentAttendace->OverTime = sprintf('%02d:%02d', intdiv($ot, 60), $ot % 60);
+            $ParentAttendace->OTStatus = $action;
+            $ParentAttendace->OTApproved_By = $Approved_id;
+        } elseif (!empty($ParentAttendace->OverTime)) {
+            $ParentAttendace->OTStatus = 'Rejected';
+            $ParentAttendace->OTApproved_By = $Approved_id;
+        } else {
+            $otDecided = false; // no overtime that day — nothing to tell the employee
+        }
+
+        // Previously opened a transaction and never committed it, so
+        // nothing here was ever saved.
+        DB::transaction(function () use ($ParentAttendace, $CheckoutTime) {
+            $ParentAttendace->save();
+            // The register's punch cell reads the child row's out time.
+            ChildAttendace::where('Parent_attd_id', $ParentAttendace->id)->whereIn('OutTime_out', ['', '00:00', '00:00:00'])
+                ->latest('id')->limit(1)->update(['OutTime_out' => $CheckoutTime]);
+        });
+
+        if ($otDecided) {
+            try {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    [(int) $ParentAttendace->Emp_id],
+                    'Overtime Request ' . $ParentAttendace->OTStatus,
+                    'Your overtime on ' . Carbon::parse($date)->format('d M Y') . ' has been ' . strtolower($ParentAttendace->OTStatus) . '.',
+                    'DutyRoster',
+                    $ParentAttendace->id
+                );
+            } catch (\Throwable $ne) {
+                \Log::warning('Overtime approve/reject notification failed: ' . $ne->getMessage());
+            }
+        }
+        return response()->json(['success' => true, 'message' => 'Checkout saved' . ($otDecided ? ', OT ' . $ParentAttendace->OTStatus : '') . '.']);
     }
 
 

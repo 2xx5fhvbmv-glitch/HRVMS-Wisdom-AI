@@ -534,6 +534,18 @@
                     <div id="div-no_of_users"></div>
                   </div>
                 </div>
+                <div class="col-sm-6">
+                  <div class="form-group">
+                    <label>Wisdom AI Daily Messages Per User</label>
+                    <input min="1" type="number" name="wisdom_daily_limit" id="wisdom_daily_limit" class="form-control" placeholder="Default: HR / GM 100, others 50" value="{{ $data->wisdom_daily_limit ?? old('wisdom_daily_limit') }}">
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="form-group">
+                    <label>Wisdom AI Monthly Budget (USD)</label>
+                    <input min="0" step="0.01" type="number" name="wisdom_monthly_budget" id="wisdom_monthly_budget" class="form-control" placeholder="Blank = platform default" value="{{ $data->wisdom_monthly_budget ?? old('wisdom_monthly_budget') }}">
+                  </div>
+                </div>
             </div>
 
             <h3>Support Preferences</h3>

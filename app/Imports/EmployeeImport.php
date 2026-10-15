@@ -313,16 +313,13 @@ class EmployeeImport implements ToModel, WithHeadingRow
             $employeeData['reporting_to'] = $reportingToId;
         }
 
-        // Password/welcome-email only apply the first time this email is
-        // seen — decided here (not inside the shared helper) since that's
-        // the caller's upsert POLICY, not the mechanical persist step.
-        $password = null;
-        if (!$existingResortAdmin) {
-            $password = Common::generateUniquePassword(8);
-            $ResortAdmindata['password'] = Hash::make($password);
-        }
-
-        DB::transaction(function () use ($existingResortAdmin, $ResortAdmindata, $employeeData, $password) {
+        // No password and no credential email here (founder, 2026-10-12):
+        // the import often runs while the platform is still being set up.
+        // New accounts are left with an empty password — the same "not
+        // sent yet" state the profile's Send Credentials tab and the
+        // People > Employees "send to everyone pending" action look for
+        // (Common::issueLoginCredentials()).
+        DB::transaction(function () use ($existingResortAdmin, $ResortAdmindata, $employeeData) {
             // Shared with the manual Add Employee wizard
             // (People\Employee\EmployeeController::store()) — see
             // Common::persistEmployeeProfile() for the single write path.
@@ -332,14 +329,6 @@ class EmployeeImport implements ToModel, WithHeadingRow
                 $this->created++;
             } else {
                 $this->updated++;
-            }
-
-            // Same mobile-access gate as EmployeeController::sendCredentials()
-            // — Casual/Intern staff get no mobile app access, so this bulk
-            // path must skip the credential email too, not just the manual
-            // single-employee one.
-            if (!$existingResortAdmin && Common::manningCategory($employeeData['employment_type'] ?? 'Full-Time') === 'Permanent') {
-                $profile['resortAdmin']->sendResortemployee($this->resort->resort, $profile['resortAdmin'], $password);
             }
         });
 

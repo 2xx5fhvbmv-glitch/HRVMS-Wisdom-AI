@@ -4,7 +4,13 @@ namespace App\Http\Controllers\Resorts;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use App\Models\Resort;
+use App\Models\Settings;
 use App\Services\Wisdom\WisdomAccess;
 use App\Services\Wisdom\OpenRouterClient;
 
@@ -23,15 +29,13 @@ class WisdomChatController extends Controller
     /** Keep only the most recent N messages to bound prompt size. */
     const MAX_HISTORY = 20;
 
-    /** Messages per user per rolling 24h — enforced by the 'wisdom-chat' limiter (RouteServiceProvider). */
-    const DAILY_LIMIT = 200;
-
-    /** Per-user key for the 'wisdom-chat' limiter; the daily cap uses this + ':day'. */
-    public static function limiterKey(Request $request): string
-    {
-        return 'wisdom-chat:' . (optional($request->user('resort-admin'))->id ?: $request->ip());
-    }
-
+    /**
+     * Usage limits (config services.wisdom_ai): the per-minute burst cap is the
+     * 'wisdom-chat' limiter (RouteServiceProvider); the daily allowance, the
+     * in-flight cap and the resort's monthly budget are checked here. Every
+     * message that reaches the provider is logged to wisdom_usage — the daily
+     * count is its successful rows, the budget is its summed cost.
+     */
     public function chat(Request $request, OpenRouterClient $client)
     {
         $ctx = WisdomAccess::context();
@@ -47,6 +51,27 @@ class WisdomChatController extends Controller
             return response()->json(['success' => false, 'message' => 'Message cannot be empty.'], 422);
         }
 
+        // ponytail: count-then-call, so two in-flight requests at limit-1 can overshoot by one.
+        $usage = self::usage();
+        if ($usage['remaining'] <= 0) {
+            return self::limited('daily_limit', "You've reached today's limit of {$usage['limit']} messages. It resets at midnight.", $usage, (int) now()->diffInSeconds(now()->addDay()->startOfDay()));
+        }
+
+        $budget = Resort::whereKey($ctx['resort_id'])->value('wisdom_monthly_budget') ?? config('services.wisdom_ai.resort_monthly_budget');
+        if ($budget > 0 && $this->monthSpend($ctx['resort_id']) >= $budget) {
+            return self::limited('resort_budget', "Your resort's monthly WAI allowance has been reached. Please contact your administrator.", $usage, (int) now()->diffInSeconds(now()->addMonthNoOverflow()->startOfMonth()));
+        }
+
+        $userId = Auth::guard('resort-admin')->id();
+        $lock = null;
+        for ($slot = 0; $slot < config('services.wisdom_ai.max_in_flight', 2) && !$lock; $slot++) {
+            $candidate = Cache::lock("wisdom-inflight:{$userId}:{$slot}", 300);
+            $lock = $candidate->get() ? $candidate : null;
+        }
+        if (!$lock) {
+            return self::limited('rate_limited', 'Please wait for your current question to finish before sending another.', $usage, 5);
+        }
+
         $history = session(self::SESSION_KEY, []);
         $history[] = ['role' => 'user', 'content' => $message];
         $history = $this->trim($history);
@@ -55,13 +80,40 @@ class WisdomChatController extends Controller
         // against a coherent conversation.
         session([self::SESSION_KEY => $history]);
 
-        $result = $client->chat($ctx, $history);
+        $started = microtime(true);
+        try {
+            $result = $client->chat($ctx, $history);
+        } finally {
+            $lock->release();
+        }
+
+        if ($client->usage) { // empty = the provider was never called (e.g. missing API key)
+            try {
+                DB::table('wisdom_usage')->insert([
+                    'resort_id'         => $ctx['resort_id'],
+                    'user_id'           => $userId,
+                    'tier'              => $ctx['tier'],
+                    'ok'                => $result['ok'],
+                    'prompt_tokens'     => $client->usage['prompt_tokens'],
+                    'completion_tokens' => $client->usage['completion_tokens'],
+                    'cost'              => $client->usage['cost'],
+                    'tool_calls'        => $client->usage['tool_calls'],
+                    'duration_ms'       => (int) ((microtime(true) - $started) * 1000),
+                    'created_at'        => now(),
+                ]);
+                if ($budget > 0) {
+                    $this->alertBudget($ctx, (float) $budget);
+                }
+            } catch (\Throwable $e) {
+                Log::error('Wisdom AI usage log failed', ['error' => $e->getMessage()]);
+            }
+        }
 
         if (!$result['ok']) {
             return response()->json([
                 'success' => false,
                 'message' => $result['error'] ?? 'Something went wrong.',
-                'usage'   => $this->usage($request),
+                'usage'   => self::usage(),
             ], 502);
         }
 
@@ -73,7 +125,7 @@ class WisdomChatController extends Controller
             'reply'      => $result['reply'],
             'tier'       => $ctx['tier'],
             'tier_label' => $ctx['tier_label'],
-            'usage'      => $this->usage($request),
+            'usage'      => self::usage(),
         ]);
     }
 
@@ -92,7 +144,7 @@ class WisdomChatController extends Controller
             'user_name'  => $ctx['user_name'],
             'can_db'     => $ctx['can_db'],
             'can_payroll'=> $ctx['can_payroll'],
-            'usage'      => $this->usage($request),
+            'usage'      => self::usage(),
         ]);
     }
 
@@ -106,11 +158,58 @@ class WisdomChatController extends Controller
         return response()->json(['success' => true]);
     }
 
-    /** Today's allowance for the chat screens. Reads the counter ThrottleRequests keeps: md5(limiter name . key). */
-    private function usage(Request $request): array
+    /** Today's allowance for the logged-in user, shared by both bots. The app clock is Maldives time, so "today" ends at Maldives midnight. */
+    public static function usage(): array
     {
-        $used = min(self::DAILY_LIMIT, RateLimiter::attempts(md5('wisdom-chat' . self::limiterKey($request) . ':day')));
-        return ['limit' => self::DAILY_LIMIT, 'used' => $used, 'remaining' => self::DAILY_LIMIT - $used];
+        $user  = Auth::guard('resort-admin')->user();
+        $limit = (int) (Resort::whereKey($user->resort_id)->value('wisdom_daily_limit')
+            ?: (config('services.wisdom_ai.daily_limits')[WisdomAccess::tier()] ?? 50));
+        $used  = DB::table('wisdom_usage')->where('resort_id', $user->resort_id)->where('user_id', $user->id)
+            ->where('ok', true)->where('created_at', '>=', today())->count();
+
+        return [
+            'limit'     => $limit,
+            'used'      => min($used, $limit),
+            'remaining' => max(0, $limit - $used),
+            'resets_at' => today()->addDay()->toIso8601String(),
+        ];
+    }
+
+    /** The 429 body the chat screens read: `message` is shown as the assistant's reply. */
+    public static function limited(string $code, string $message, array $usage, int $retryAfter)
+    {
+        $retryAfter = max(1, $retryAfter);
+        return response()->json([
+            'success'     => false,
+            'code'        => $code,
+            'message'     => $message,
+            'retry_after' => $retryAfter,
+            'usage'       => $usage,
+        ], 429, ['Retry-After' => $retryAfter]);
+    }
+
+    private function monthSpend($resortId): float
+    {
+        return (float) DB::table('wisdom_usage')->where('resort_id', $resortId)
+            ->where('created_at', '>=', now()->startOfMonth())->sum('cost');
+    }
+
+    /** Mail the platform owner once per resort per month when spend crosses 80% of the budget. */
+    private function alertBudget(array $ctx, float $budget): void
+    {
+        $spent = $this->monthSpend($ctx['resort_id']);
+        if ($spent < 0.8 * $budget || !Cache::add("wisdom-budget-alert:{$ctx['resort_id']}:" . now()->format('Y-m'), 1, now()->endOfMonth())) {
+            return;
+        }
+        $to = config('services.wisdom_ai.budget_alert_email') ?: optional(Settings::first())->admin_email;
+        if (!$to) {
+            Log::warning('Wisdom AI budget alert has no recipient', ['resort_id' => $ctx['resort_id']]);
+            return;
+        }
+        Mail::raw(sprintf(
+            "Wisdom AI spend for %s (resort id %d) is USD %.2f this month, %d%% of its USD %.2f monthly budget. AI calls stop at 100%%; raise the budget on the resort's edit page in the admin console.",
+            $ctx['resort_name'], $ctx['resort_id'], $spent, (int) floor($spent / $budget * 100), $budget
+        ), fn ($m) => $m->to($to)->subject("Wisdom AI budget 80% reached — {$ctx['resort_name']}"));
     }
 
     private function trim(array $history): array

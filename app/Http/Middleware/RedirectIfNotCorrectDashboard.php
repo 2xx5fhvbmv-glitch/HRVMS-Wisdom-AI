@@ -153,6 +153,9 @@ class RedirectIfNotCorrectDashboard
             // Only HR dept EXCOM, HR rank, Finance rank, and GM get HR-level dashboards
             $isHrOrFinance = in_array($employeeRank, [3, 7]) || $isHrDeptExcom; // HR, Finance, HR-dept EXCOM
             $isNonHrExcom = ($employeeRank == 1 && !$isHrDeptExcom); // EXCOM but not in HR dept
+            // The HR department's HOD gets the HR Master Dashboard (only the master dashboard —
+            // every other module keeps its HOD dashboard). Same HR-department rule as Common::isHR().
+            $isHrDeptHod = ($employeeRank == 2 && \App\Helpers\Common::isHRDepartment($employeeDeptId));
 
                 // GM (rank 8) gets HR-level dashboards (same as HR) for all modules
                 if ($employeeRank == 8) {
@@ -304,9 +307,12 @@ class RedirectIfNotCorrectDashboard
                                 Log::info("Redirecting Manager to Learning Manager Dashboard");
                                 return redirect()->route('learning.manager.dashboard');
                             }
-                            elseif(str_contains($currentRoute, 'master') && !$request->routeIs('resort.master.hod_dashboard')) {
-                                Log::info("Redirecting HOD to Master Dashboard");
-                                return redirect()->route('resort.master.hod_dashboard');
+                            elseif(str_contains($currentRoute, 'master')) {
+                                $masterRoute = $isHrDeptHod ? 'resort.master.hr_dashboard' : 'resort.master.hod_dashboard';
+                                if (!$request->routeIs($masterRoute)) {
+                                    Log::info("Redirecting HOD to Master Dashboard");
+                                    return redirect()->route($masterRoute);
+                                }
                             }
                     }
                 }

@@ -84,6 +84,8 @@ class ComplianceRunTest extends TestCase
             // 6 × 9h with 1h APPROVED overtime each = 48 normal hours → fine.
             $this->day($overtime, $lastMonday->copy()->addDays($d)->format('Y-m-d'), '07:00', '16:00', '01:00', 'Approved');
         }
+        // Sunday is outside the Mon–Sat working week: a 9h Sunday on top of the 48h stays fine.
+        $this->day($overnight, $lastMonday->copy()->addDays(6)->format('Y-m-d'), '07:00', '16:00');
         // 5 × 9h last week + 3 × 9h this week: 45h and 27h → fine (used to add up to 72h).
         for ($d = 0; $d < 5; $d++) {
             $this->day($twoWeeks, $lastMonday->copy()->addDays($d)->format('Y-m-d'), '07:00', '16:00');
@@ -109,7 +111,7 @@ class ComplianceRunTest extends TestCase
         $this->assertNotNull($row = $this->breach($long, 'Weekly Working Hours Limit'));
         $this->assertStringContainsString('54 normal hours', $row->description);
         $this->assertNull($this->breach($twoWeeks, 'Weekly Working Hours Limit'), 'each week judged on its own');
-        $this->assertNull($this->breach($overnight, 'Weekly Working Hours Limit'), 'overnight shifts count forwards');
+        $this->assertNull($this->breach($overnight, 'Weekly Working Hours Limit'), 'overnight shifts count forwards, Sunday not counted');
         $this->assertNull($this->breach($overtime, 'Weekly Working Hours Limit'), 'approved overtime excluded');
     }
 
