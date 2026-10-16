@@ -105,7 +105,7 @@
                                         $feedback = is_array($mgr) ? ($mgr['feedback'] ?? $mgr['summary'] ?? '') : '';
                                         $training = is_array($mgr) ? ($mgr['training'] ?? 'No') : 'No';
                                         $duration = $row->Start_Date && $row->End_Date
-                                            ? \Carbon\Carbon::parse($row->Start_Date)->diffInMonths(\Carbon\Carbon::parse($row->End_Date)).' month'
+                                            ? (int) \Carbon\Carbon::parse($row->Start_Date)->diffInMonths(\Carbon\Carbon::parse($row->End_Date), true).' month'
                                             : '-';
                                         if ($row->manager_review_status === 'completed'
                                             || ($row->manager_review_status === 'not_applicable' && $row->self_review_status === 'completed')) {

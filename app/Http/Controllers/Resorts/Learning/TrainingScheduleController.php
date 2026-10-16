@@ -673,7 +673,7 @@ class TrainingScheduleController extends Controller
                 })
                 ->addColumn('participants', fn($row) => $row->participants->count())
                 ->addColumn('attendance', function ($row) {
-                    $totalDays = \Carbon\Carbon::parse($row->start_date)->diffInDays(\Carbon\Carbon::parse($row->end_date)) + 1;
+                    $totalDays = (int) \Carbon\Carbon::parse($row->start_date)->diffInDays(\Carbon\Carbon::parse($row->end_date), true) + 1;
                     $totalExpected = $totalDays * $row->participants->count();
                     $actualPresent = $row->trainingAttendances->where('status', 'Present')->count();
                     return $totalExpected > 0 ? round(($actualPresent / $totalExpected) * 100, 2) . '%' : '0%';
@@ -707,7 +707,7 @@ class TrainingScheduleController extends Controller
             return response()->json(['success' => false, 'message' => 'Training not found.'], 404);
         }
 
-        $totalDays = Carbon::parse($training->start_date)->diffInDays(Carbon::parse($training->end_date)) + 1;
+        $totalDays = (int) Carbon::parse($training->start_date)->diffInDays(Carbon::parse($training->end_date), true) + 1;
         $participantsCount = $training->participants->count();
         $totalExpected = $totalDays * $participantsCount;
         $actualPresent = $training->trainingAttendances->where('status', 'Present')->count();

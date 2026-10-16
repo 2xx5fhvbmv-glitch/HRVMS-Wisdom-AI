@@ -509,8 +509,8 @@ class AccommodationController extends Controller
             $employeData->effected_date                     =   Carbon::parse($employeData->effected_date)->format('d M Y');
             $now                                            =   Carbon::now();
             $effectedDate                                   =   Carbon::parse($employeData->effected_date);
-            $years                                          =   $effectedDate->diffInYears($now);
-            $months                                         =   $effectedDate->copy()->addYears($years)->diffInMonths($now);
+            $years                                          =   (int) $effectedDate->diffInYears($now, true);
+            $months                                         =   (int) $effectedDate->copy()->addYears($years)->diffInMonths($now, true);
             $employeData->effected_date_diff                =   "{$years} year(s), {$months} month(s)";
             $InventoryModule                                =   InventoryModule::where('resort_id', $this->resort_id)->get();
             $empArr                                         =   [];
@@ -625,7 +625,7 @@ class AccommodationController extends Controller
         $row->Date                                          =   date('d M Y', strtotime($row->date));
 
         // **Calculate Escalation Time**
-        $daysSinceRequest                                   =   now()->diffInDays(Carbon::parse($row->date));
+        $daysSinceRequest                                   =   (int) now()->diffInDays(Carbon::parse($row->date), true);
         $row->EscalationTimeOver                            =   ($daysSinceRequest > ($EscalationDay->EscalationDay ?? 0)) ? 'Alert' : 'Regular';
 
         // **Set Profile Image**

@@ -487,7 +487,7 @@ class LiabilitiesController extends Controller
     {
         $start = Carbon::today();
         $end = Carbon::parse($endDate);
-        $daysDiff = $start->diffInDays($end, false);
+        $daysDiff = (int) $start->diffInDays($end, false);
         if ($daysDiff < 0) 
         {
             return $end->format('d M Y')."  (Expired " . abs($daysDiff) . " days ago)";

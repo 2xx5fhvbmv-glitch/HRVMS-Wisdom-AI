@@ -41,7 +41,7 @@ class SurveyReminderNotification extends Command
                     $reminderDays = array_filter(array_map('trim', explode(',', $survey->Reminder_notification)), fn($d) => $d !== '' && is_numeric($d));
                     if (empty($reminderDays)) continue;
 
-                    $daysUntilEnd = $today->diffInDays(Carbon::parse($survey->End_date), false);
+                    $daysUntilEnd = (int) $today->diffInDays(Carbon::parse($survey->End_date), false);
                     if ($daysUntilEnd < 0 || !in_array((string) $daysUntilEnd, array_map('strval', $reminderDays), true)) {
                         continue;
                     }

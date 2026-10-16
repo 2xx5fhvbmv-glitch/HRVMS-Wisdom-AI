@@ -313,7 +313,7 @@ class TimeandAttendanceDashboardController extends Controller
             foreach ($attRows as $att) {
                 $checkIn = Carbon::parse($att->CheckingTime);
                 $endRef  = !empty($att->CheckingOutTime) ? Carbon::parse($att->CheckingOutTime) : Carbon::now();
-                $worked  = $checkIn->diffInHours($endRef);
+                $worked  = (int) $checkIn->diffInHours($endRef, true);
                 $hasBreak = BreakAttendaces::where('Parent_attd_id', $att->id)->exists();
                 if (!$hasBreak && $worked > 5) {
                     $emp = $empById->get($att->Emp_id);
@@ -346,7 +346,7 @@ class TimeandAttendanceDashboardController extends Controller
                     continue;
                 }
                 // Current employment-year cycle window.
-                $completedYears = (int) floor($joining->floatDiffInYears($now));
+                $completedYears = (int) floor($joining->floatDiffInYears($now, true));
                 $cycleStart = $joining->copy()->addYears($completedYears);
                 if ($cycleStart->greaterThan($now)) {
                     $cycleStart = $joining->copy()->addYears(max(0, $completedYears - 1));
@@ -356,7 +356,7 @@ class TimeandAttendanceDashboardController extends Controller
                 if ($daysOffPerWeek <= 0) {
                     $daysOffPerWeek = 1;
                 }
-                $accrued = (int) floor($cycleStart->floatDiffInDays($now) / 7 * $daysOffPerWeek);
+                $accrued = (int) floor($cycleStart->floatDiffInDays($now, true) / 7 * $daysOffPerWeek);
 
                 $usedLeaves = 0;
                 if ($dayOffCatId) {
@@ -2016,7 +2016,7 @@ class TimeandAttendanceDashboardController extends Controller
         // Calculate time difference if checkout missing
         $differenceInHoursFormatted = '0 hours and 0 minutes';
         if ($actionType === 'missed_check_out') {
-            $differenceInMinutes = $currentTime->diffInMinutes($expectedEndTime);
+            $differenceInMinutes = (int) $currentTime->diffInMinutes($expectedEndTime, true);
             $diffHours = intval($differenceInMinutes / 60);
             $diffMins = $differenceInMinutes % 60;
             $differenceInHoursFormatted = $diffHours . ' hours and ' . $diffMins . ' minutes';
@@ -2274,7 +2274,7 @@ class TimeandAttendanceDashboardController extends Controller
                 // Calculate total hours worked
                 $checkInTime = Carbon::parse($attendance->CheckingTime);
                 $checkOutTime = Carbon::parse($EndTime);
-                $totalMinutes = $checkInTime->diffInMinutes($checkOutTime);
+                $totalMinutes = (int) $checkInTime->diffInMinutes($checkOutTime, true);
                 $hours = floor($totalMinutes / 60);
                 $minutes = $totalMinutes % 60;
                 $attendance->DayWiseTotalHours = sprintf('%02d:%02d', $hours, $minutes);
@@ -2387,7 +2387,7 @@ class TimeandAttendanceDashboardController extends Controller
                     }
                     
                     // 4️⃣ Calculate total OT
-                    $totalMinutes = $startTime->diffInMinutes($endTime);
+                    $totalMinutes = (int) $startTime->diffInMinutes($endTime, true);
                     $hours = floor($totalMinutes / 60);
                     $minutes = $totalMinutes % 60;
                     

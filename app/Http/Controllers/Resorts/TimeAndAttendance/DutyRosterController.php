@@ -440,7 +440,7 @@ class DutyRosterController extends Controller
                 if ($shiftEnd->lte($shiftStart)) {
                     $shiftEnd->addDay();
                 }
-                $shiftMinutesPerDay = (int) $shiftStart->diffInMinutes($shiftEnd);
+                $shiftMinutesPerDay = (int) $shiftStart->diffInMinutes($shiftEnd, true);
             }
             $TotalHours = $toHHMM($shiftMinutesPerDay / 60);
             $shiftHours = $toDecimalHours($TotalHours);
@@ -1438,7 +1438,7 @@ class DutyRosterController extends Controller
         $prevMonth = $baseDate->copy()->subMonthNoOverflow();
         $startOfMonth = $prevMonth->copy()->day(min($cutoffDay, $prevMonth->daysInMonth))->addDay();
         $endOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
-        $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
+        $totalDays = (int) $startOfMonth->diffInDays($endOfMonth, true) + 1;
 
         // Build monthwise headers for the cutoff period
         $monthwiseheaders = [];
@@ -1498,7 +1498,7 @@ class DutyRosterController extends Controller
         $prevMonth = $baseDate->copy()->subMonthNoOverflow();
         $startOfMonth = $prevMonth->copy()->day(min($cutoffDay, $prevMonth->daysInMonth))->addDay();
         $endOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
-        $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
+        $totalDays = (int) $startOfMonth->diffInDays($endOfMonth, true) + 1;
 
         $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
 
@@ -1704,7 +1704,7 @@ class DutyRosterController extends Controller
                 $endCarbon->addDay();
             }
 
-            $totalMinutes = $startCarbon->diffInMinutes($endCarbon);
+            $totalMinutes = (int) $startCarbon->diffInMinutes($endCarbon, true);
             $totalHours = floor($totalMinutes / 60);
             $totalMins = $totalMinutes % 60;
             $totalTime = sprintf('%02d:%02d', $totalHours, $totalMins);

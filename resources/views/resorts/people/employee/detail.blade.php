@@ -1099,10 +1099,10 @@ if (!function_exists('safeParseDate')) {
                                                                             // default (Carbon 2 truncated to int) —
                                                                             // floor explicitly or this prints e.g.
                                                                             // "4.6979403008349 months".
-                                                                            $years = (int) floor($jd->diffInYears($now));
+                                                                            $years = (int) floor((int) $jd->diffInYears($now, true));
                                                                             $tenureLabel = $years >= 1
                                                                                 ? ($years . ' year' . ($years != 1 ? 's' : ''))
-                                                                                : ((int) floor($jd->diffInMonths($now)) . ' months');
+                                                                                : ((int) floor((int) $jd->diffInMonths($now, true)) . ' months');
                                                                         @endphp
                                                                         <span class="view-mode">
                                                                             {{ $jd->format('d M Y') }}

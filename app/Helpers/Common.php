@@ -4231,7 +4231,7 @@ class Common
                 $startTimeParsed = self::safeParseTime($roster->StartTime);
                 $checkInTimeParsed = self::safeParseTime($roster->CheckingTime);
                 if ($checkInTimeParsed && $startTimeParsed) {
-                    $difference = $startTimeParsed->diffInMinutes($checkInTimeParsed, false);
+                    $difference = (int) $startTimeParsed->diffInMinutes($checkInTimeParsed, false);
                     $roster->InternalStatus = $difference <= 10 && $difference >= 0
                         ? 'OnTime'
                         : ($difference > 10 ? 'Late' : 'Early');
@@ -4278,7 +4278,7 @@ class Common
 
 
                         // Calculate the difference
-                        $differenceInMinutes = $updatedEndTime->diffInMinutes($currentTime24);
+                        $differenceInMinutes = (int) $updatedEndTime->diffInMinutes($currentTime24, true);
                         $roster->differenceInHours = $updatedEndTime->diff($currentTime24)->format('%h hours and %i minutes');
 
                     }
@@ -4400,7 +4400,7 @@ class Common
                         $startTimeParsed = self::safeParseTime($roster->StartTime);
                         $checkInTimeParsed = self::safeParseTime($roster->CheckingTime);
                         if ($checkInTimeParsed && $startTimeParsed) {
-                            $difference = $startTimeParsed->diffInMinutes($checkInTimeParsed, false);
+                            $difference = (int) $startTimeParsed->diffInMinutes($checkInTimeParsed, false);
                             $roster->InternalStatus = $difference <= 10 && $difference >= 0
                                 ? 'OnTime'
                                 : ($difference > 10 ? 'Late' : 'Early');
@@ -4451,7 +4451,7 @@ class Common
 
 
                                 // Calculate the difference
-                                $differenceInMinutes = $updatedEndTime->diffInMinutes($currentTime24);
+                                $differenceInMinutes = (int) $updatedEndTime->diffInMinutes($currentTime24, true);
                                 $roster->differenceInHours = $updatedEndTime->diff($currentTime24)->format('%h hours and %i minutes');
 
                             }
@@ -6821,8 +6821,8 @@ class Common
         if ($rows->isEmpty()) return 0;
 
         $totalDays = $rows->sum(function ($row) {
-            return abs(\Carbon\Carbon::parse($row->created_at)->startOfDay()
-                ->diffInDays(\Carbon\Carbon::parse($row->arrival_date)->startOfDay()));
+            return abs((int) \Carbon\Carbon::parse($row->created_at)->startOfDay()
+                ->diffInDays(\Carbon\Carbon::parse($row->arrival_date)->startOfDay(), true));
         });
 
         return round($totalDays / $rows->count(), 1);
@@ -8924,7 +8924,7 @@ class Common
             $startMonth = $currentMonth;
         }
 
-        $totalMonths = $startMonth->diffInMonths($currentMonth) + $futureMonths;
+        $totalMonths = (int) $startMonth->diffInMonths($currentMonth, true) + $futureMonths;
 
         $availableMonths = [];
         for ($i = 0; $i < $totalMonths; $i++) {
@@ -13357,7 +13357,7 @@ class Common
         }
 
         // Calculate expected shift duration in minutes
-        $shiftDurationMinutes = $shiftStartDateTime->diffInMinutes($shiftEndDateTime);
+        $shiftDurationMinutes = (int) $shiftStartDateTime->diffInMinutes($shiftEndDateTime, true);
 
         // Parse expected overtime
         $expectedOvertimeMinutes = 0;
@@ -13382,7 +13382,7 @@ class Common
                         $breakIn->addDay();
                     }
 
-                    $breakMinutes = $breakOut->diffInMinutes($breakIn);
+                    $breakMinutes = (int) $breakOut->diffInMinutes($breakIn, true);
                     $totalBreakMinutes += $breakMinutes;
 
                     $breakPeriods[] = [
@@ -13399,7 +13399,7 @@ class Common
         }
 
         // Calculate actual worked time (check-out - check-in - breaks)
-        $actualWorkMinutes = $checkInDateTime->diffInMinutes($checkOutDateTime) - $totalBreakMinutes;
+        $actualWorkMinutes = (int) $checkInDateTime->diffInMinutes($checkOutDateTime, true) - $totalBreakMinutes;
         if ($actualWorkMinutes < 0) {
             $actualWorkMinutes = 0;
         }
@@ -13485,7 +13485,7 @@ class Common
             elseif ($checkOutDateTime->gte($shiftEndDateTime)) {
                 // Normal case: check-in before shift, check-out at or after shift end
                 // Calculate time before shift start
-                $overtimeBeforeStart = $checkInDateTime->diffInMinutes($shiftStartDateTime);
+                $overtimeBeforeStart = (int) $checkInDateTime->diffInMinutes($shiftStartDateTime, true);
 
                 // Adjust for breaks that occurred before shift start
                 foreach ($breakPeriods as $break) {
@@ -13523,7 +13523,7 @@ class Common
         if ($checkOutDateTime->gt($shiftEndDateTime) && $checkInDateTime->lte($shiftStartDateTime)) {
             // Normal case: check-in at or before shift start, check-out after shift end
             // Calculate time after shift end
-            $overtimeAfterEnd = $shiftEndDateTime->diffInMinutes($checkOutDateTime);
+            $overtimeAfterEnd = (int) $shiftEndDateTime->diffInMinutes($checkOutDateTime, true);
 
             // Adjust for breaks that occurred after shift end
             foreach ($breakPeriods as $break) {
@@ -13605,13 +13605,13 @@ class Common
             // #endregion
 
             // Calculate total time worked (check-out - check-in - breaks)
-            $totalTimeWorked = $checkInDateTime->diffInMinutes($checkOutDateTime) - $totalBreakMinutes;
+            $totalTimeWorked = (int) $checkInDateTime->diffInMinutes($checkOutDateTime, true) - $totalBreakMinutes;
             if ($totalTimeWorked < 0) {
                 $totalTimeWorked = 0;
             }
 
             // Calculate time before shift start
-            $overtimeBeforeStart = $checkInDateTime->diffInMinutes($shiftStartDateTime);
+            $overtimeBeforeStart = (int) $checkInDateTime->diffInMinutes($shiftStartDateTime, true);
 
             // If total time worked is less than normal shift, no overtime before shift
             // The time before shift is just part of normal attendance to make up for early check-out
@@ -13717,8 +13717,8 @@ class Common
             @file_put_contents($logFile, $logEntry, FILE_APPEND);
             // #endregion
 
-            $timeWorkedDuringShift = $checkInDateTime->diffInMinutes($shiftEndDateTime);
-            $overtimeAfterEnd = $shiftEndDateTime->diffInMinutes($checkOutDateTime);
+            $timeWorkedDuringShift = (int) $checkInDateTime->diffInMinutes($shiftEndDateTime, true);
+            $overtimeAfterEnd = (int) $shiftEndDateTime->diffInMinutes($checkOutDateTime, true);
 
             // If they worked less than normal shift during shift time, adjust overtime
             if ($timeWorkedDuringShift < $normalShiftMinutes) {

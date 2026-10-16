@@ -224,7 +224,7 @@ class GrievanceReportController extends Controller
     private function resolutionDays($created, $resolved)
     {
         if (!$created || !$resolved) return null;
-        return Carbon::parse($created)->diffInDays(Carbon::parse($resolved));
+        return (int) Carbon::parse($created)->diffInDays(Carbon::parse($resolved), true);
     }
 
     /* reports */
@@ -274,7 +274,7 @@ class GrievanceReportController extends Controller
             ->map(fn($c) => [
                 'Case ID' => $c['case_id'], 'Employee Name' => $c['employee'], 'Category' => $c['category'],
                 'Created Date' => $this->dmy($c['created']),
-                'Days Open' => $c['created'] ? Carbon::parse($c['created'])->diffInDays(Carbon::today()) : 'N/A',
+                'Days Open' => $c['created'] ? (int) Carbon::parse($c['created'])->diffInDays(Carbon::today(), true) : 'N/A',
                 'Assigned Investigator' => $c['committee'],
             ])->values()->all();
         return ['columns' => ['Case ID', 'Employee Name', 'Category', 'Created Date', 'Days Open', 'Assigned Investigator'], 'rows' => $rows];
@@ -286,7 +286,7 @@ class GrievanceReportController extends Controller
             ->map(fn($c) => [
                 'Case ID' => $c['case_id'], 'Employee Name' => $c['employee'], 'Pending Stage' => $this->statusLabel($c['status']),
                 'Assigned To' => $c['committee'],
-                'Days Pending' => $c['created'] ? Carbon::parse($c['created'])->diffInDays(Carbon::today()) : 'N/A',
+                'Days Pending' => $c['created'] ? (int) Carbon::parse($c['created'])->diffInDays(Carbon::today(), true) : 'N/A',
             ])->values()->all();
         return ['columns' => ['Case ID', 'Employee Name', 'Pending Stage', 'Assigned To', 'Days Pending'], 'rows' => $rows];
     }
@@ -342,7 +342,7 @@ class GrievanceReportController extends Controller
     {
         $rows = $this->allCases($f)->sortByDesc('created')->map(function ($c) {
             $target = $c['created'] ? Carbon::parse($c['created'])->addDays(30) : null; // no SLA target stored; 30-day convention
-            $remaining = $target ? Carbon::today()->diffInDays($target, false) : null;
+            $remaining = $target ? (int) Carbon::today()->diffInDays($target, false) : null;
             return [
                 'Case ID' => $c['case_id'], 'Start Date' => $this->dmy($c['created']),
                 'Target Resolution Date' => $target ? $target->format('d M Y') : 'N/A',
@@ -372,7 +372,7 @@ class GrievanceReportController extends Controller
         $rows = $this->allCases($f)->filter(fn($c) => $this->isOpen($c['status']) && $c['created'] && Carbon::parse($c['created'])->addDays(30)->isPast())
             ->map(fn($c) => [
                 'Case ID' => $c['case_id'], 'Employee Name' => $c['employee'],
-                'Days Overdue' => Carbon::parse($c['created'])->addDays(30)->diffInDays(Carbon::today()),
+                'Days Overdue' => (int) Carbon::parse($c['created'])->addDays(30)->diffInDays(Carbon::today(), true),
                 'Assigned Investigator' => $c['committee'],
             ])->values()->all();
         return ['columns' => ['Case ID', 'Employee Name', 'Days Overdue', 'Assigned Investigator'], 'rows' => $rows];

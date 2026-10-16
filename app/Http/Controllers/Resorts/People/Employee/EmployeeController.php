@@ -976,7 +976,7 @@ class EmployeeController extends Controller
                     }
 
                     $startDate = Carbon::createFromFormat('Y-m-d', $employee->joining_date);
-                    $probationMonths = $startDate->diffInMonths($employee->probation_end_date);
+                    $probationMonths = (int) $startDate->diffInMonths($employee->probation_end_date, true);
                     // Check if probation period is more than 3 months
                     if ($probationMonths > 3 && $employee->employment_type =='Probationary') {
                         Compliance::create([
@@ -1588,7 +1588,7 @@ class EmployeeController extends Controller
             } catch (\Exception $e) {
                 return [null, null];
             }
-            $days = Carbon::today()->diffInDays($end, false);
+            $days = (int) Carbon::today()->diffInDays($end, false);
             $status = $days < 0
                 ? 'Expired ' . abs($days) . ' days ago'
                 : 'Expires in ' . $days . ' days';

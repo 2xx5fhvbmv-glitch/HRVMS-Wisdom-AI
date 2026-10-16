@@ -181,7 +181,7 @@ class CasualPayrollController extends Controller
 
         $periodStart = Carbon::parse($request->startDate);
         $periodEnd = Carbon::parse($request->endDate);
-        $totalDaysInPeriod = $periodStart->diffInDays($periodEnd) + 1;
+        $totalDaysInPeriod = (int) $periodStart->diffInDays($periodEnd, true) + 1;
 
         $attendanceByEmp = ParentAttendace::whereIn('Emp_id', $scopedEmployeeIds)
             ->whereBetween('date', [$request->startDate, $request->endDate])

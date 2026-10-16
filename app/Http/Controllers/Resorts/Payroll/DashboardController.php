@@ -360,7 +360,7 @@ class DashboardController extends Controller
 
         if ($employeesWithAttendance->isEmpty()) return collect();
 
-        $totalDaysInPeriod = max(1, $periodStart->diffInDays($periodEnd) + 1);
+        $totalDaysInPeriod = max(1, (int) $periodStart->diffInDays($periodEnd, true) + 1);
 
         $employees = Employee::with(['allowance', 'resortAdmin'])->whereIn('id', $employeesWithAttendance)->get()->keyBy('id');
 
@@ -549,8 +549,8 @@ class DashboardController extends Controller
             ];
         };
 
-        $totalDaysInPeriod = max(1, $periodStart->diffInDays($periodEnd) + 1);
-        $dayOfPeriod = min($totalDaysInPeriod, max(1, $periodStart->diffInDays($today) + 1));
+        $totalDaysInPeriod = max(1, (int) $periodStart->diffInDays($periodEnd, true) + 1);
+        $dayOfPeriod = min($totalDaysInPeriod, max(1, (int) $periodStart->diffInDays($today, true) + 1));
 
         return [
             'period_start'        => $periodStart->format('Y-m-d'),
@@ -599,7 +599,7 @@ class DashboardController extends Controller
         $today = Carbon::today();
         $settings = ResortSiteSettings::where('resort_id', $resortId)->first();
         $rate = $settings && $settings->DollertoMVR ? (float) $settings->DollertoMVR : 15.42;
-        $totalDaysInPeriod = max(1, $periodStart->diffInDays($periodEnd) + 1);
+        $totalDaysInPeriod = max(1, (int) $periodStart->diffInDays($periodEnd, true) + 1);
 
         $todayRecords = DB::table('parent_attendaces')
             ->whereIn('Emp_id', Employee::where('resort_id', $resortId)->whereIn('status', ['Active', 'Probationary'])->pluck('id'))
@@ -675,7 +675,7 @@ class DashboardController extends Controller
         $stale = !is_array($cached) || empty($cached['generated_at']);
         if (!$stale) {
             $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
-            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+            if ($regenerate && (int) $generatedAt->diffInHours($now, true) >= $cooldownHours) {
                 $stale = true;
             }
         }
@@ -692,7 +692,7 @@ class DashboardController extends Controller
         $insights = $cached['insights'];
         $insights['_meta'] = [
             'generated_at'   => $generatedAt,
-            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'can_regenerate' => (int) $generatedAt->diffInHours($now, true) >= $cooldownHours,
             'next_available' => $generatedAt->copy()->addHours($cooldownHours),
         ];
 

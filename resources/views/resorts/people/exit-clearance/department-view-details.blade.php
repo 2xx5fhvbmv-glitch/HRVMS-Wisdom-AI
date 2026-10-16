@@ -84,7 +84,7 @@
                                                             if ($diff->y > 0) $parts[] = $diff->y . ' year'  . ($diff->y > 1 ? 's' : '');
                                                             if ($diff->m > 0) $parts[] = $diff->m . ' month' . ($diff->m > 1 ? 's' : '');
                                                             if (empty($parts)) {
-                                                                $days = $start->diffInDays($finish);
+                                                                $days = (int) $start->diffInDays($finish, true);
                                                                 $parts[] = $days . ' day' . ($days === 1 ? '' : 's');
                                                             }
                                                             $tenureLabel = implode(' ', $parts);

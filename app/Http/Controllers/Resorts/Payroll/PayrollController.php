@@ -2361,7 +2361,7 @@ class PayrollController extends Controller
             $dayOffCount = $dayMarks['day_off_dates']->count();
             $periodStart = Carbon::parse($request->startDate);
             $periodEnd = Carbon::parse($request->endDate);
-            $totalDaysInPeriod = $periodStart->diffInDays($periodEnd) + 1;
+            $totalDaysInPeriod = (int) $periodStart->diffInDays($periodEnd, true) + 1;
             $workingDays = max(1, $totalDaysInPeriod - $dayOffCount);
 
             $totalHours = $regularOT = $fridayOT = $holidayOT = 0;
@@ -3421,7 +3421,7 @@ class PayrollController extends Controller
                 $absent = optional($ta)->absent_days ?? 0;
                 $periodStart = \Carbon\Carbon::parse($payroll->start_date);
                 $periodEnd = \Carbon\Carbon::parse($payroll->end_date);
-                $totalDays = $periodStart->diffInDays($periodEnd) + 1;
+                $totalDays = (int) $periodStart->diffInDays($periodEnd, true) + 1;
                 return max(0, $totalDays - $present - $absent);
             })
             ->addColumn('leave_types', function ($employee) use ($payroll) {
@@ -3542,7 +3542,7 @@ class PayrollController extends Controller
             $allEmployeeIds = $payroll->employees->pluck('employee_id');
             $periodStart = \Carbon\Carbon::parse($payroll->start_date);
             $periodEnd = \Carbon\Carbon::parse($payroll->end_date);
-            $totalDaysInPeriod = $periodStart->diffInDays($periodEnd) + 1;
+            $totalDaysInPeriod = (int) $periodStart->diffInDays($periodEnd, true) + 1;
 
             $totals = [
                 'present_days' => $payroll->timeAndAttendances->whereIn('employee_id', $allEmployeeIds)->sum('present_days'),
@@ -4239,7 +4239,7 @@ class PayrollController extends Controller
 
         $periodStart = \Carbon\Carbon::parse($payroll->start_date);
         $periodEnd = \Carbon\Carbon::parse($payroll->end_date);
-        $totalDays = $periodStart->diffInDays($periodEnd) + 1;
+        $totalDays = (int) $periodStart->diffInDays($periodEnd, true) + 1;
 
         // Build complete data rows
         $rows = [];

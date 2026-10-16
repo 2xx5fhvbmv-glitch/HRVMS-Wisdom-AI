@@ -93,7 +93,7 @@ class DashboardController extends Controller
         $stale = !is_array($cached) || empty($cached['generated_at']);
         if (!$stale) {
             $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
-            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+            if ($regenerate && (int) $generatedAt->diffInHours($now, true) >= $cooldownHours) {
                 $stale = true;
             }
         }
@@ -110,7 +110,7 @@ class DashboardController extends Controller
         $insights = $cached['insights'];
         $insights['_meta'] = [
             'generated_at'   => $generatedAt,
-            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'can_regenerate' => (int) $generatedAt->diffInHours($now, true) >= $cooldownHours,
             'next_available' => $generatedAt->copy()->addHours($cooldownHours),
         ];
 
@@ -703,7 +703,7 @@ class DashboardController extends Controller
             if (!$emp) {
                 continue;
             }
-            $overdueDays = $w->$dateCol ? Carbon::parse($w->$dateCol)->diffInDays($now, false) : 0;
+            $overdueDays = $w->$dateCol ? (int) Carbon::parse($w->$dateCol)->diffInDays($now, false) : 0;
             $due = $overdueDays > 0 ? " $overdueDays days overdue." : null;
 
             $adminId = $emp->resortAdmin->id ?? null;

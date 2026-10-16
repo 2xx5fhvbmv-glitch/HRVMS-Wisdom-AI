@@ -413,7 +413,7 @@
                                                                     {
                                                                         $startTime = \Carbon\Carbon::parse($shiftData->StartTime);
                                                                         $endTime = \Carbon\Carbon::parse($shiftData->EndTime);
-                                                                        $hours_abc = $startTime->diffInHours($endTime);
+                                                                        $hours_abc = (int) $startTime->diffInHours($endTime, true);
                                                                         $toatalHoursForDay = $hours_abc;
                                                                         $totalHours += $toatalHoursForDay; // Update total hours worked
                                                                     }else{
@@ -599,7 +599,7 @@
                                                                 {
                                                                     $startTime = \Carbon\Carbon::parse($shiftData->StartTime);
                                                                     $endTime = \Carbon\Carbon::parse($shiftData->EndTime);
-                                                                    $hours_abc = $startTime->diffInHours($endTime);
+                                                                    $hours_abc = (int) $startTime->diffInHours($endTime, true);
                                                                     $toatalHoursForDay = $hours_abc;
                                                                     $totalHoursMonth += $toatalHoursForDay;
                                                                 }else{

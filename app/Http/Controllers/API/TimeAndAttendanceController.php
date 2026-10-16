@@ -209,7 +209,7 @@ class TimeAndAttendanceController extends Controller
 
                 $startTime                                  =   Carbon::parse($todayAttendance['StartTime']);
                 $checkInTime                                =   Carbon::parse($todayAttendance['CheckingTime']);
-                $difference                                 =   $startTime->diffInMinutes($checkInTime, false);
+                $difference                                 =   (int) $startTime->diffInMinutes($checkInTime, false);
 
                 if ($difference <= 10 && $difference >= 0) {
                     $color                                  =   Common::GetThemeColor('On Time');
@@ -1801,7 +1801,7 @@ class TimeAndAttendanceController extends Controller
                 }
 
                 // Calculate break duration in minutes
-                $totalBreakMinutes = $breakOutDateTime->diffInMinutes($breakInDateTime);
+                $totalBreakMinutes = (int) $breakOutDateTime->diffInMinutes($breakInDateTime, true);
 
                 // Ensure break time is not negative
                 if ($totalBreakMinutes < 0) {
@@ -1896,7 +1896,7 @@ class TimeAndAttendanceController extends Controller
                 $checkOutTimeCarbon->addDay();
             }
 
-            $totalWorkMinutes                               =   $checkOutTimeCarbon->diffInMinutes($checkInTimeCarbon);
+            $totalWorkMinutes                               =   (int) $checkOutTimeCarbon->diffInMinutes($checkInTimeCarbon, true);
 
             // Get Total Break Time from Break Table
             $totalBreakMinutes                              =   0;
@@ -4081,7 +4081,7 @@ class TimeAndAttendanceController extends Controller
                         if ($checkOut->lt($checkIn)) {
                             $checkOut->addDay(); // overnight shift
                         }
-                        $totalWorkedHours = round($checkIn->diffInMinutes($checkOut) / 60, 2);
+                        $totalWorkedHours = round((int) $checkIn->diffInMinutes($checkOut, true) / 60, 2);
                     } catch (\Exception $e) {
                         $totalWorkedHours = 0;
                     }
@@ -4309,7 +4309,7 @@ class TimeAndAttendanceController extends Controller
             );
 
             // Get all days of the cutoff period
-            $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
+            $totalDays = (int) $startOfMonth->diffInDays($endOfMonth, true) + 1;
 
             $monthDays = [];
             for ($day = 0; $day < $totalDays; $day++) {
@@ -4520,7 +4520,7 @@ class TimeAndAttendanceController extends Controller
         if ($endCopy->lte($start)) {
             $endCopy->addDay();
         }
-        $totalMinutes = $start->diffInMinutes($endCopy);
+        $totalMinutes = (int) $start->diffInMinutes($endCopy, true);
         $hours        = (int) floor($totalMinutes / 60);
         $minutes      = (int) ($totalMinutes % 60);
         if ($hours >= 24) {
@@ -4670,7 +4670,7 @@ class TimeAndAttendanceController extends Controller
 
                 $differenceInHoursFormatted = '0 hours and 0 minutes';
                 if ($actionType === 'check_out') {
-                    $differenceInMinutes        = $currentTime->diffInMinutes($expectedEndTime);
+                    $differenceInMinutes        = (int) $currentTime->diffInMinutes($expectedEndTime, true);
                     $differenceInHoursFormatted = intval($differenceInMinutes / 60) . ' hours and ' . ($differenceInMinutes % 60) . ' minutes';
                 }
 

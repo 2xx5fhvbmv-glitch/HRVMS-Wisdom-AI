@@ -66,7 +66,7 @@ class CheckDailyExtraHours extends Command
                             if ($breaks->isEmpty()) 
                             {   
                            
-                              $hoursWorked = $checkInTime->diffInHours(Carbon::now());
+                              $hoursWorked = (int) $checkInTime->diffInHours(Carbon::now(), true);
                             
                                     if ($hoursWorked >= 5) 
                                     {
@@ -94,7 +94,7 @@ class CheckDailyExtraHours extends Command
                                     foreach ($breaks as $break) 
                                     {
                                         $breakStartTime = Carbon::parse($break->start_time);
-                                        $timeDifference = $lastBreakTime->diffInHours($breakStartTime);
+                                        $timeDifference = (int) $lastBreakTime->diffInHours($breakStartTime, true);
                                         if ($timeDifference >= 5) 
                                         {
                                                 $hadLongPeriod = true;

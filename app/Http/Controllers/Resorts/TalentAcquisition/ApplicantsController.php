@@ -3180,7 +3180,7 @@ class ApplicantsController extends Controller
                 ->map(function ($item) {
                     $item->name = ucfirst($item->first_name . ' ' . $item->last_name);
                     $item->interview_date = Carbon::parse($item->InterViewDate)->format('d M Y');
-                    $item->days_until = Carbon::today()->diffInDays(Carbon::parse($item->InterViewDate));
+                    $item->days_until = (int) Carbon::today()->diffInDays(Carbon::parse($item->InterViewDate), true);
                     if ($item->passport_photo) {
                         $getFile = Common::GetApplicantAWSFile($item->passport_photo);
                         $item->profileImg = $getFile['NewURLshow'];

@@ -53,7 +53,7 @@
                                         if($shiftData->Status!= 'DayOff'){
                                             $startTime = \Carbon\Carbon::parse($shiftData->StartTime);
                                             $endTime = \Carbon\Carbon::parse($shiftData->EndTime);
-                                            $hours_abc = $startTime->diffInHours($endTime);
+                                            $hours_abc = (int) $startTime->diffInHours($endTime, true);
                                             // list($hours, $minutes) = explode(':', $shiftData->DayWiseTotalHours);
                                             // $toatalHoursForDay = (int)$hours + ((int)$minutes / 60); // Convert to decimal hours
                                             $toatalHoursForDay = $hours_abc;

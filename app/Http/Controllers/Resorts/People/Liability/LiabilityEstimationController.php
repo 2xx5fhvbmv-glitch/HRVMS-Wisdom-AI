@@ -485,7 +485,7 @@ class LiabilityEstimationController extends Controller
                     $effectiveStart = $jd->greaterThan($yearStart) ? $jd : $yearStart;
                     if ($effectiveStart->greaterThan($today)) continue; // joined after today
 
-                    $eligibleDays = $effectiveStart->diffInDays($today) + 1;
+                    $eligibleDays = (int) $effectiveStart->diffInDays($today, true) + 1;
                     $contribution = $rateUsd * $eligibleDays;
                     $foodCostYtd += $contribution;
 
@@ -777,7 +777,7 @@ class LiabilityEstimationController extends Controller
                         // Overlap [jd, monthEnd] ∩ [monthStart, monthEnd]
                         $winStart = $jd->greaterThan($monthStart) ? $jd : $monthStart;
                         if ($winStart->greaterThan($monthEnd)) continue;
-                        $days = $winStart->diffInDays($monthEnd) + 1;
+                        $days = (int) $winStart->diffInDays($monthEnd, true) + 1;
                         $monthlyFood[$m] += $rateUsd * $days;
                     }
                 }

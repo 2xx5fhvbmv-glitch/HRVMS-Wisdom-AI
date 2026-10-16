@@ -716,7 +716,7 @@ class AccommodationDashboardController extends Controller
         $stale = !is_array($cached) || empty($cached['generated_at']);
         if (!$stale) {
             $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
-            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+            if ($regenerate && (int) $generatedAt->diffInHours($now, true) >= $cooldownHours) {
                 $stale = true;
             }
         }
@@ -733,7 +733,7 @@ class AccommodationDashboardController extends Controller
         $insights = $cached['insights'];
         $insights['_meta'] = [
             'generated_at'   => $generatedAt,
-            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'can_regenerate' => (int) $generatedAt->diffInHours($now, true) >= $cooldownHours,
             'next_available' => $generatedAt->copy()->addHours($cooldownHours),
         ];
 
@@ -1187,7 +1187,7 @@ class AccommodationDashboardController extends Controller
         $row->Date                                          =   date('d M Y', strtotime($row->date));
 
         // **Calculate Escalation Time**
-        $daysSinceRequest                                   =   now()->diffInDays(Carbon::parse($row->date));
+        $daysSinceRequest                                   =   (int) now()->diffInDays(Carbon::parse($row->date), true);
         $row->EscalationTimeOver                            =   ($daysSinceRequest > ($EscalationDay->EscalationDay ?? 0)) ? '#ffb4b4' :null;
         // **Set Profile Image**
         $row->profileImg                                    =   Common::getResortUserPicture($row->Parentid);

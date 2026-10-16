@@ -83,7 +83,7 @@
                                                             if (empty($parts)) {
                                                                 // Less than a month — show days
                                                                 // instead of an empty bracket.
-                                                                $days = $start->diffInDays($finish);
+                                                                $days = (int) $start->diffInDays($finish, true);
                                                                 $parts[] = $days . ' day' . ($days === 1 ? '' : 's');
                                                             }
                                                             $tenureLabel = implode(' ', $parts);

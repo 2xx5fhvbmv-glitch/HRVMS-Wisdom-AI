@@ -56,7 +56,7 @@ class CalenderPushNotification extends Command
 
                                 $reminderHours = (int)$matches[1];
                                 $reminderMinutes = $reminderHours * 60;
-                                $diffInMinutes = $now->diffInMinutes($eventDateTime, false);
+                                $diffInMinutes = (int) $now->diffInMinutes($eventDateTime, false);
         
                                 // dd($reminderHours);
                                 // Only process if the event is exactly X hours away

@@ -771,7 +771,7 @@ class LeaveController extends Controller
                 }
 
                 // Calculate total days (inclusive)
-                $totalDays = $fromDate->diffInDays($toDate) + 1;
+                $totalDays = (int) $fromDate->diffInDays($toDate, true) + 1;
 
                 // Get the leave category details for the current category ID
                 $leaveCategory = DB::table('leave_categories')->where('id', $categoryId)->first();

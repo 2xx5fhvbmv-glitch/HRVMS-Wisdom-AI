@@ -2307,7 +2307,7 @@ class LeaveController extends Controller
                 // applicant always gets a record of their submission.
                 if ($applicantAdmin && filter_var($applicantAdmin->email ?? '', FILTER_VALIDATE_EMAIL)) {
                     $leaveCategoryName = LeaveCategory::where('id', $leave->leave_category_id ?? 0)->value('leave_type') ?? 'Leave';
-                    $totalDays = $leave->total_days ?? Carbon::parse($fromDate)->diffInDays(Carbon::parse($toDate)) + 1;
+                    $totalDays = $leave->total_days ?? (int) Carbon::parse($fromDate)->diffInDays(Carbon::parse($toDate), true) + 1;
 
                     Mail::send('emails.leave-applied', [
                         'applicantName'   => $applicantName,

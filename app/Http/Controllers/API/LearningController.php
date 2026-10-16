@@ -282,7 +282,7 @@ class LearningController extends Controller
                                                         ->count();
 
                     // Calculate total training days
-                    $total_training_days            =   \Carbon\Carbon::parse($sessions->start_date)->diffInDays(\Carbon\Carbon::parse($sessions->end_date)) + 1; // +1 to include start date
+                    $total_training_days            =   (int) \Carbon\Carbon::parse($sessions->start_date)->diffInDays(\Carbon\Carbon::parse($sessions->end_date), true) + 1; // +1 to include start date
 
                     // Format attendance as Present/Total
                     $attendance_status              =   "{$total_present_days}/{$total_training_days}";
@@ -616,7 +616,7 @@ class LearningController extends Controller
                                                                    ->get()->reduce(function ($carry, $session) {
                                                                     $start = \Carbon\Carbon::parse($session->start_time);
                                                                     $end = \Carbon\Carbon::parse($session->end_time);
-                                                                    $hours = $end->diffInMinutes($start) / 60;
+                                                                    $hours = (int) $end->diffInMinutes($start, true) / 60;
                                                                     return $carry + $hours;
                                                                 }, 0);
 

@@ -54,12 +54,12 @@ class WisdomChatController extends Controller
         // ponytail: count-then-call, so two in-flight requests at limit-1 can overshoot by one.
         $usage = self::usage();
         if ($usage['remaining'] <= 0) {
-            return self::limited('daily_limit', "You've reached today's limit of {$usage['limit']} messages. It resets at midnight.", $usage, (int) now()->diffInSeconds(now()->addDay()->startOfDay()));
+            return self::limited('daily_limit', "You've reached today's limit of {$usage['limit']} messages. It resets at midnight.", $usage, (int) now()->diffInSeconds(now()->addDay()->startOfDay(), true));
         }
 
         $budget = Resort::whereKey($ctx['resort_id'])->value('wisdom_monthly_budget') ?? config('services.wisdom_ai.resort_monthly_budget');
         if ($budget > 0 && $this->monthSpend($ctx['resort_id']) >= $budget) {
-            return self::limited('resort_budget', "Your resort's monthly WAI allowance has been reached. Please contact your administrator.", $usage, (int) now()->diffInSeconds(now()->addMonthNoOverflow()->startOfMonth()));
+            return self::limited('resort_budget', "Your resort's monthly WAI allowance has been reached. Please contact your administrator.", $usage, (int) now()->diffInSeconds(now()->addMonthNoOverflow()->startOfMonth(), true));
         }
 
         $userId = Auth::guard('resort-admin')->id();

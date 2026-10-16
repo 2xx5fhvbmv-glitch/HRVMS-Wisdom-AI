@@ -25,7 +25,7 @@
             if ($consentDate) {
                 if ($a->consent_status === 'pending') { $consentWord = 'Pending'; }
                 elseif ($consentDate->isPast()) { $consentWord = 'Expired'; $consentClass = 'err'; }
-                elseif ($consentDate->diffInDays(now()) <= 30) { $consentWord = 'Expiring'; $consentClass = 'warn'; }
+                elseif ((int) $consentDate->diffInDays(now(), true) <= 30) { $consentWord = 'Expiring'; $consentClass = 'warn'; }
                 else { $consentWord = 'Valid'; $consentClass = 'ok'; }
             }
             $wai = is_numeric($a->AIRanking) ? max(0, min(100, (float) $a->AIRanking)) : null;

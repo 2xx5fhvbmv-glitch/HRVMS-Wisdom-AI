@@ -382,12 +382,12 @@ class ProbationController extends Controller
         $probationCompleted = $probationEnd ? $probationEnd->isPast() : false;
 
         // Progress / days-remaining.
-        $totalDays = ($joiningDate && $probationEnd) ? $joiningDate->diffInDays($probationEnd) : 0;
+        $totalDays = ($joiningDate && $probationEnd) ? (int) $joiningDate->diffInDays($probationEnd, true) : 0;
         $remainingDays = 0;
         $progress = 0;
         if ($joiningDate && $probationEnd) {
             $remainingDays = $today->lte($probationEnd)
-                ? ($today->lt($joiningDate) ? $totalDays : $today->diffInDays($probationEnd))
+                ? ($today->lt($joiningDate) ? $totalDays : (int) $today->diffInDays($probationEnd, true))
                 : 0;
             $daysPassed = $totalDays - $remainingDays;
             $progress = $totalDays > 0 ? min(100, round(($daysPassed / $totalDays) * 100)) : 0;

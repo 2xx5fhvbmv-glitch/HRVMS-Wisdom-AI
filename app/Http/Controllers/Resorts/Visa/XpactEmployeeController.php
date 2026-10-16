@@ -1273,7 +1273,7 @@ class XpactEmployeeController extends Controller
             return 'Unavailable';
         }
         $start = Carbon::today();
-        $daysDiff = $start->diffInDays($end, false);
+        $daysDiff = (int) $start->diffInDays($end, false);
         if ($daysDiff < 0) 
         {
             return $end->format('d M Y')."  (Expired " . abs($daysDiff) . " days ago)";
