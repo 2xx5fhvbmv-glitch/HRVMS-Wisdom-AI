@@ -1845,7 +1845,9 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
        Route::post('/people/employees/extract-details', 'People\Employee\EmployeeController@extractDetails')->name('people.employees.extract-details');
        Route::post('/people/employees/setp-save', 'People\Employee\EmployeeController@saveStep')->name('save.employeeinfo.step');
        Route::post('/people/employees/draft', 'People\Employee\EmployeeController@getDraft')->name('get.employeeinfo.draft');
-       Route::post('/people/employees/delete', 'People\Employee\EmployeeController@delete')->name('employee.delete');
+       // Disabled 2026-10-15: employee records are never deleted (Inactive is the only end state).
+       // See ANKIT-REMAINING-2026-10-15.md section 1.
+       // Route::post('/people/employees/delete', 'People\Employee\EmployeeController@delete')->name('employee.delete');
        Route::post('/people/employees/update-location', 'People\Employee\EmployeeController@updateLocation')->name('people.employees.updateLocation');
        // Update profile / full-length photo on an existing employee. Plugs
        // the gap that forced HR to re-create an employee just to replace a

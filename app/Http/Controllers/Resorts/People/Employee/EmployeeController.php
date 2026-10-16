@@ -286,8 +286,6 @@ class EmployeeController extends Controller
                         </button>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="' . route("people.employees.details", base64_encode($row->id)) . '">View Profile</a></li>
-                            <li><a class="dropdown-item delete-employee" href="#" data-emp-id="'.$row->id.'">
-                            Delete Employee</a></li>
                             <li><a class="dropdown-item add-to-team-btn" href="#" data-emp-id="'.$row->id.'">
                             Add to Team / Assign Role</a></li>
                             <li><a class="dropdown-item change-status" href="#"
@@ -2959,6 +2957,8 @@ class EmployeeController extends Controller
 
     }
 
+    // Disabled 2026-10-15: employee records are never deleted. See ANKIT-REMAINING-2026-10-15.md section 1.
+    /*
     public function delete(Request $request)
     {
         if ($guard = $this->requireHrAccess()) return $guard;
@@ -2983,6 +2983,7 @@ class EmployeeController extends Controller
 
         return response()->json(['message' => 'Employee deleted successfully.']);
     }
+    */
 
     // Disabled 2026-10-14: employee records are never deleted, and bulk delete is removed
     // (founder, batch-2 notes Part 7 §1). Single delete() stays pending the wipe-scope decision.
