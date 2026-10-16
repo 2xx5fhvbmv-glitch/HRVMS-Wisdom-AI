@@ -1365,10 +1365,8 @@ class PayrollController extends Controller
             return response()->json(['success' => false, 'message' => 'Employee not found.'], 403);
         }
 
-        $rankPosition = Common::getEmployeeRankPosition($employee);
-
-        // Find which approval step this user can approve
-        $approvalStep = $this->getApprovalStepForUser($rankPosition, $employee);
+        // The step this user (or whoever they are covering for today) can approve on this payroll.
+        $approvalStep = self::actionableStepFor($employee, $resortId, $payrollId);
         if (!$approvalStep) {
             return response()->json(['success' => false, 'message' => 'You are not authorized to approve this payroll.'], 403);
         }
@@ -1525,8 +1523,7 @@ class PayrollController extends Controller
         // Determine current user's role
         $currentUser = \Auth::guard('resort-admin')->user();
         $employee = $currentUser->GetEmployee ?? null;
-        $rankPosition = $employee ? Common::getEmployeeRankPosition($employee) : ['rank' => null, 'position' => null];
-        $userApprovalStep = $this->getApprovalStepForUser($rankPosition, $employee);
+        $userApprovalStep = self::actionableStepFor($employee, $this->resort->resort_id, $payrollId);
 
         // Check if current user is the supervisor (person who ran the payroll)
         $isSupervisor = $employee && $employee->rank == 5; // SUP rank
@@ -1540,6 +1537,35 @@ class PayrollController extends Controller
             // Legacy: only runs stuck at 'approved' before auto-lock existed.
             'can_lock' => $payroll->status === 'approved' && $isSupervisor,
         ]);
+    }
+
+    /**
+     * Steps this employee may approve: their own, plus those of anyone they are
+     * covering for today (task delegation) — Common::actingEmployees().
+     */
+    public static function approvalStepsFor($employee, $resortId): array
+    {
+        return Common::actingEmployees($employee, $resortId)
+            ->map(fn ($e) => self::getApprovalStepForUser(Common::getEmployeeRankPosition($e), $e))
+            ->filter()->unique()->values()->all();
+    }
+
+    /**
+     * Of those steps, the one this payroll is waiting on (pending, every earlier step
+     * approved); otherwise their first step, so approvePayroll() reports why it can't act.
+     */
+    public static function actionableStepFor($employee, $resortId, $payrollId): ?int
+    {
+        $steps = self::approvalStepsFor($employee, $resortId);
+        foreach ($steps as $step) {
+            $waiting = PayrollApproval::where('payroll_id', $payrollId)->where('resort_id', $resortId)
+                ->where('step_order', $step)->where('status', 'pending')->exists()
+                && !PayrollApproval::where('payroll_id', $payrollId)->where('step_order', '<', $step)->where('status', '!=', 'approved')->exists();
+            if ($waiting) {
+                return $step;
+            }
+        }
+        return $steps[0] ?? null;
     }
 
     /**

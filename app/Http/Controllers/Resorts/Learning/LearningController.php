@@ -221,11 +221,9 @@ class LearningController extends Controller
             return abort(403, 'Unauthorized access');
         }
         $page_title = "Learning Requests";
-        $emp = $this->resort->getEmployee;
-        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
-        $currentPositionTitle = optional(optional($emp)->position)->position_title;
-        $isLdManager = in_array($currentPositionTitle, $ldManagerTitles, true)
-            || ($emp && Common::isLDDepartment($emp->Dept_id ?? null));
+        // The L&D Manager, or whoever is covering for them today (task delegation).
+        $isLdManager = Common::actingEmployees($this->resort->getEmployee, $this->resort->resort_id)
+            ->contains(fn ($e) => Common::isLdManager($e));
         $isAdmin = (($this->resort->type ?? null) === 'super') || ($this->resort->is_master_admin ?? 0);
         // Approve / On Hold / Deny actions are available ONLY to L&D Manager (or
         // super/master admin). HR and GM can SEE the requests but not act on them.
@@ -243,11 +241,9 @@ class LearningController extends Controller
             $current_rank = $this->resort->getEmployee->rank ?? null;
             $available_rank = $rank[$current_rank] ?? '';
             $isHOD = ($available_rank === "HOD");
-            $emp = $this->resort->getEmployee;
-            $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
-            $currentPositionTitle = optional(optional($emp)->position)->position_title;
-            $isLdManager = in_array($currentPositionTitle, $ldManagerTitles, true)
-                || ($emp && Common::isLDDepartment($emp->Dept_id ?? null));
+            // The L&D Manager, or whoever is covering for them today (task delegation).
+            $isLdManager = Common::actingEmployees($this->resort->getEmployee, $this->resort->resort_id)
+                ->contains(fn ($e) => Common::isLdManager($e));
             $isAdmin = (($this->resort->type ?? null) === 'super') || ($this->resort->is_master_admin ?? 0);
             // Only L&D Manager (or super/master admin) can Approve / Hold / Deny.
             // Visibility scope is separate — getPerformanceScopedEmpIds() filters
@@ -384,11 +380,9 @@ class LearningController extends Controller
         try {
             // Server-side authorisation — only L&D Manager (or super/master admin)
             // can change a learning-request status. Mirrors the UI gate in list().
-            $emp = $this->resort->getEmployee;
-            $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
-            $currentPositionTitle = optional(optional($emp)->position)->position_title;
-            $isLdManager = in_array($currentPositionTitle, $ldManagerTitles, true)
-                || ($emp && Common::isLDDepartment($emp->Dept_id ?? null));
+            // The L&D Manager, or whoever is covering for them today (task delegation).
+            $isLdManager = Common::actingEmployees($this->resort->getEmployee, $this->resort->resort_id)
+                ->contains(fn ($e) => Common::isLdManager($e));
             $isAdmin = (($this->resort->type ?? null) === 'super') || ($this->resort->is_master_admin ?? 0);
             if (!($isLdManager || $isAdmin)) {
                 return response()->json(['error' => 'Only the L&D Manager can update a request status.'], 403);

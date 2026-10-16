@@ -12353,6 +12353,33 @@ class Common
     }
 
     /**
+     * The signed-in employee, then everyone they are covering for today (approved
+     * leave with task_delegation = them). Approval endpoints accept the first of
+     * these who passes their own role check, so a delegate can act — and the
+     * Approvals inbox lists exactly what those endpoints will accept.
+     */
+    public static function actingEmployees($employee, $resortId): \Illuminate\Support\Collection
+    {
+        if (!$employee) {
+            return collect();
+        }
+        $ids = self::getDelegatedEmployeeIds($employee->id, $resortId);
+        return collect([$employee])->merge($ids ? Employee::where('resort_id', $resortId)->whereIn('id', $ids)->get() : []);
+    }
+
+    /** getEmployeeRankPosition() of the first acting employee $qualifies accepts (self first), or null. */
+    public static function actingRankPosition($employee, $resortId, callable $qualifies): ?array
+    {
+        foreach (self::actingEmployees($employee, $resortId) as $candidate) {
+            $rankPosition = self::getEmployeeRankPosition($candidate);
+            if ($qualifies($rankPosition, $candidate)) {
+                return $rankPosition;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Get all employee IDs that the given delegate is currently acting on behalf of.
      * Returns array of employee IDs who are on approved leave with task_delegation = $delegateEmpId.
      *
