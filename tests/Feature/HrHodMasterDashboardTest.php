@@ -42,4 +42,26 @@ class HrHodMasterDashboardTest extends TestCase
         $this->as('hod.housekeeping')->get(route('resort.master.hr_dashboard'))->assertRedirect(route('resort.master.hod_dashboard'));
         $this->as('hod.housekeeping')->get(route('resort.master.hod_dashboard'))->assertOk();
     }
+
+    public function test_header_logo_points_hr_hod_at_the_hr_dashboard()
+    {
+        $page = $this->as('hr.manager')->get(route('resort.master.hr_dashboard'))->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('#href="' . preg_quote(route('resort.master.hr_dashboard'), '#') . '" class="brand-logo"#', $page);
+    }
+
+    public function test_without_position_access_the_hr_hod_still_gets_the_hr_dashboard()
+    {
+        \Illuminate\Support\Facades\DB::table('resorts')->where('id', $this->resortId)->update(['Position_access' => null]);
+        $this->assertStringEndsWith('/master/hr-dashboard', $this->landing('hr.manager'));
+        $this->as('hr.manager')->get(route('resort.master.hod_dashboard'))->assertRedirect(route('resort.master.hr_dashboard'));
+        $this->as('hod.housekeeping')->get(route('resort.master.hod_dashboard'))->assertOk();
+    }
+
+    public function test_an_hr_department_named_hr_is_still_recognised()
+    {
+        \Illuminate\Support\Facades\DB::table('resort_departments')->where('resort_id', $this->resortId)->where('name', 'Human Resources')->update(['name' => 'HR']);
+        // HR-dept EXCOM: HR-level module dashboards (was: treated as a non-HR EXCOM → EXCOM dashboard).
+        $this->as('hr')->get(route('leave.dashboard'))->assertOk();
+        $this->as('hr.manager')->get(route('resort.master.hod_dashboard'))->assertRedirect(route('resort.master.hr_dashboard'));
+    }
 }

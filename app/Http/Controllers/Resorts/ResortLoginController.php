@@ -493,9 +493,12 @@ class ResortLoginController extends Controller
             case ($admin->is_master_admin == 0):
             $position_name = $admin->GetEmployee->position->position_title ?? null;
             $resort_access = Resort::where('id', $admin->resort_id)->first('Position_access');
-            
+            // The HR department's HOD gets the HR Master Dashboard, Position_access configured or not.
+            $employee = $admin->GetEmployee;
+            $isHrDeptHod = $employee && (int) $employee->rank === 2 && \App\Helpers\Common::isHRDepartment($employee->Dept_id);
+
             if (!$resort_access) {
-                $redirectRoute = $defaultRoute;
+                $redirectRoute = $isHrDeptHod ? 'resort.master.hr_dashboard' : $defaultRoute;
                 break;
             }
             
@@ -503,10 +506,7 @@ class ResortLoginController extends Controller
                 ->where('id', $resort_access->Position_access)
                 ->first();
                 
-            // The resort's designated HR position, or the HR department's HOD (who also
-            // gets the HR Master Dashboard — RedirectIfNotCorrectDashboard).
-            $employee = $admin->GetEmployee;
-            $isHrDeptHod = $employee && (int) $employee->rank === 2 && \App\Helpers\Common::isHRDepartment($employee->Dept_id);
+            // The resort's designated HR position, or the HR department's HOD.
             if (($Access_position && $Access_position->position_title == $position_name) || $isHrDeptHod) {
                 $redirectRoute = 'resort.master.hr_dashboard';
             } else {
