@@ -136,11 +136,13 @@ class ApprovalController extends Controller
             if (array_intersect($approverIds, Common::getResortHrEmployeeIds($resort->resort_id))) {
                 $advanceStages['hr'] = fn ($q) => $q->where('hr_status', 'Pending');
             }
+            // Own role or the role of anyone they cover for today — the endpoint's Finance/GM checks.
             // Same titles as the endpoint's whereIn (MySQL compares case-insensitively: "Director Of Finance").
-            if (in_array(strtolower(trim((string) optional($employee->position)->position_title)), ['director of finance', 'finance manager'], true)) {
+            $acting = Common::actingEmployees($employee, $resort->resort_id);
+            if ($acting->contains(fn ($e) => in_array(strtolower(trim((string) optional($e->position)->position_title)), ['director of finance', 'finance manager'], true))) {
                 $advanceStages['finance'] = fn ($q) => $q->where('hr_status', 'Approved')->where('finance_status', 'Pending');
             }
-            if ((int) $rank === 8) {
+            if ($acting->contains(fn ($e) => (int) $e->rank === 8)) {
                 $advanceStages['gm'] = fn ($q) => $q->where('finance_status', 'Approved')->where('gm_status', 'Pending');
             }
             $advancePayrolls = collect();

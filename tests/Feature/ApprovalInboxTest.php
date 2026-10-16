@@ -319,4 +319,22 @@ class ApprovalInboxTest extends TestCase
         $this->click('hod.fnb', $this->row('hod.fnb', 'Learning Request', 'Wine Basics'), 'approve');
         $this->assertSame('Approved', DB::table('learning_requests')->where('id', $lid)->value('status'));
     }
+
+    public function test_salary_advance_finance_stage_accepts_a_delegate()
+    {
+        $staff = $this->emp('employee');
+        $id = DB::table('payroll_advance')->insertGetId(['employee_id' => $staff->id, 'resort_id' => $this->resortId, 'request_type' => 'Salary Advance',
+            'request_date' => now()->toDateString(), 'pourpose' => 'Family', 'request_amount' => 300, 'hr_status' => 'Approved', 'finance_status' => 'Pending',
+            'gm_status' => 'Pending', 'status' => 'Pending', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('payroll_advance_guarantor')->insert(['payroll_advance_id' => $id, 'guarantor_id' => $this->emp('supervisor')->id, 'status' => 'Approved',
+            'created_at' => now(), 'updated_at' => now()]);
+        $name = $staff->resortAdmin->full_name;
+
+        $this->assertNull($this->row('hod.fnb', 'Payroll Advance', $name));
+        $this->delegate('finance', 'hod.fnb'); // the F&B HOD covers for the Finance Director
+        $row = $this->row('hod.fnb', 'Payroll Advance', $name);
+        $this->assertNotNull($row, 'the delegate sees the Finance stage');
+        $this->click('hod.fnb', $row, 'approve');
+        $this->assertSame('Approved', DB::table('payroll_advance')->where('id', $id)->value('finance_status'), 'and the endpoint accepts them (was: never matched)');
+    }
 }
