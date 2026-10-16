@@ -82,6 +82,21 @@ class ResignationController extends Controller
                 'message'                               =>  'Resignation dashboard retrieved successfully.',
                 'data'                                  =>  [
                     'resignation'                       =>  $resignations ?? null,
+                    // Withdrawal requested while Offboarding: HOD step, then HR (withdraw_*_status).
+                    // null when none was requested; once HR approves, the resignation becomes
+                    // 'Withdraw' and drops out of this endpoint (employee is Active again).
+                    'withdrawal'                        =>  ($resignations && $resignations->withdraw_hod_status !== null) ? [
+                        'stage'             => match (true) {
+                            $resignations->withdraw_hod_status === 'Pending' => 'pending_hod',
+                            $resignations->withdraw_hr_status === 'Pending' => 'pending_hr',
+                            default => 'rejected',
+                        },
+                        'hod_status'        => $resignations->withdraw_hod_status,
+                        'hr_status'         => $resignations->withdraw_hr_status,
+                        'reason'            => $resignations->withdraw_reason,
+                        'requested_at'      => $resignations->withdraw_requested_at,
+                        'rejected_reason'   => $resignations->withdraw_rejected_reason,
+                    ] : null,
                     'withdrawal_config'                 =>  $employeeResignationWithdrawalConfig ?? null,
                     'exit_clearance_form'               =>  $employeeForm ?? null,
                     'resignation_meeting_schedule'      =>  $ResignationMeetingSchedule ?? null,
