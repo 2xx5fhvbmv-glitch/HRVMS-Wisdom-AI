@@ -7276,7 +7276,7 @@ class Common
         foreach ($catIds as $id) {
             $cat = $catCache[$resortId][$id];
             $allocated = (float) $gridCache[$gridKey][$id];
-            $prorated = (float) self::prorateLeaveByJoiningDate($allocated, $emp->joining_date);
+            $prorated = (float) self::prorateLeaveByJoiningDate($allocated, $emp->joining_date, $id);
             $taken = (float) ($used[$id] ?? 0);
             $carry = 0.0;
             if (!empty($cat->carry_forward) && $cat->carry_forward != '0') {
@@ -7299,14 +7299,28 @@ class Common
     }
 
     /**
-     * Prorate allocated leave days based on employee's joining date.
-     * If employee joined in the current year, prorate by months worked.
-     * If joined before current year, return full allocation.
+     * Allocated leave days the employee has earned so far.
+     *
+     * Annual Leave (founder, 2026-10-15) accrues on the employee's own anniversary
+     * cycle: allocated ÷ 12 per full month worked since the most recent anniversary
+     * of the joining date (2.5 days/month for a 30-day grid), resetting each
+     * anniversary — see annualLeaveCycle(). Every other leave type stays calendar-year:
+     * joined before this 1 Jan → full allocation; joined this year → prorated by the
+     * months from the joining month to December. Pass $leaveCategoryId so Annual Leave
+     * is recognised; without it the calendar-year rule applies (old behaviour).
      */
-    public static function prorateLeaveByJoiningDate($allocatedDays, $joiningDate)
+    public static function prorateLeaveByJoiningDate($allocatedDays, $joiningDate, $leaveCategoryId = null)
     {
         if (empty($joiningDate) || empty($allocatedDays)) {
             return $allocatedDays;
+        }
+        if ($leaveCategoryId && self::isAnnualLeaveCategory($leaveCategoryId)) {
+            $cycle = self::annualLeaveCycle($joiningDate);
+            if (!$cycle) {
+                return 0; // joins in the future
+            }
+            $months = (int) $cycle['start']->diffInMonths(\Carbon\Carbon::today(), true);
+            return round(min($allocatedDays, ($allocatedDays / 12) * $months), 1);
         }
 
         $joining = \Carbon\Carbon::parse($joiningDate);
@@ -7328,6 +7342,25 @@ class Common
         $prorated = round(($allocatedDays / 12) * $monthsWorked, 1);
 
         return $prorated;
+    }
+
+    /** The employee's current Annual Leave cycle: [start = latest anniversary on/before $today, end = day before the next]; null before joining. */
+    public static function annualLeaveCycle($joiningDate, $today = null): ?array
+    {
+        $joining = \Carbon\Carbon::parse($joiningDate)->startOfDay();
+        $today = $today ? \Carbon\Carbon::parse($today)->startOfDay() : \Carbon\Carbon::today();
+        if ($joining->gt($today)) {
+            return null;
+        }
+        $start = $joining->copy()->addYearsNoOverflow((int) $joining->diffInYears($today, true));
+        return ['start' => $start, 'end' => $start->copy()->addYearNoOverflow()->subDay()];
+    }
+
+    /** Whether a leave category is the resort's Annual Leave (the only anniversary-accrued type). */
+    public static function isAnnualLeaveCategory($leaveCategoryId): bool
+    {
+        static $cache = [];
+        return $cache[$leaveCategoryId] ??= strcasecmp(trim((string) \App\Models\LeaveCategory::where('id', $leaveCategoryId)->value('leave_type')), 'Annual Leave') === 0;
     }
 
     /**
