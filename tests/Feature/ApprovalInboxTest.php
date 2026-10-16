@@ -188,6 +188,11 @@ class ApprovalInboxTest extends TestCase
         $this->assertNotNull($row);
         $this->assertStringNotContainsString('btnIcon-skyblue me-2" data-req_id', strstr($row['action'], 'view-btn', true) ?: '', 'no approve button');
 
+        // A direct call without a reason is refused server-side too.
+        $this->as('finance')->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+            ->postJson(route('resort.visa.PaymentRequestRejected'), ['Payment_id' => base64_encode($id), 'reason' => ' '])->assertStatus(422);
+        $this->assertSame('Pending', DB::table('payment_requests')->where('id', $id)->value('Status'));
+
         $this->click('finance', $row, 'reject', 'Wrong fee amounts');
         $this->assertSame(['Rejact', 'Wrong fee amounts'], array_values((array) DB::table('payment_requests')->where('id', $id)->first(['Status', 'Reason'])),
             'stored as the enum value, not blanked');

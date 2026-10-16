@@ -866,6 +866,10 @@ class PaymentRequestController extends Controller
     {
        $reason = $request->reason;
        $id = base64_decode($request->Payment_id);
+       // The form asks for a reason; a direct call must not be able to skip it.
+       if (!trim((string) $reason)) {
+           return response()->json(['success' => false, 'msg' => 'Please give a reason for rejecting this payment request.'], 422);
+       }
 
 
          $PaymentRequest = PaymentRequest::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
