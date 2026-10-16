@@ -1296,10 +1296,7 @@ class LearningController extends Controller
     private function isLdManager($employee)
     {
         if (!$employee) return false;
-        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
-        $positionTitle = optional($employee->position)->position_title;
-        return in_array($positionTitle, $ldManagerTitles, true)
-            || Common::isLDDepartment($employee->Dept_id ?? null);
+        return Common::isLdManager($employee);
     }
 
     /**

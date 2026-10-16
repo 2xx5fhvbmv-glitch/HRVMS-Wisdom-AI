@@ -31,11 +31,7 @@ class EnsureLDManagerAccess
         }
 
         $employee = $resortAdmin->GetEmployee ?? null;
-        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
-        $positionTitle = optional(optional($employee)->position)->position_title;
-
-        $isLdManager = in_array($positionTitle, $ldManagerTitles, true)
-            || Common::isLDDepartment($employee->Dept_id ?? null);
+        $isLdManager = Common::isLdManager($employee);
 
         if ($isLdManager) {
             return $next($request);

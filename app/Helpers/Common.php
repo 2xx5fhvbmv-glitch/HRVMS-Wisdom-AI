@@ -4932,7 +4932,7 @@ class Common
      * L&D-specific (as opposed to HR/GM leadership). Used only by the
      * Performance-module tightening in getPerformanceScopedEmpIds() above.
      */
-    private static function ldLeadershipTitles()
+    public static function ldLeadershipTitles(): array
     {
         return ['Training Director', 'L&D Manager', 'Learning & Development Head'];
     }
@@ -5139,7 +5139,7 @@ class Common
         }
 
         $positionTitle = optional($employee->position)->position_title;
-        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $ldManagerTitles = self::ldLeadershipTitles();
         return in_array($positionTitle, $ldManagerTitles, true);
     }
 
@@ -5527,7 +5527,7 @@ class Common
             ->filter(fn($id) => self::isLDDepartment($id))
             ->all();
 
-        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $ldManagerTitles = self::ldLeadershipTitles();
 
         return \App\Models\Employee::where('resort_id', $resortId)
             ->where(function ($q) use ($ldDeptIds, $ldManagerTitles) {
@@ -6204,7 +6204,7 @@ class Common
             || self::isSOSResponseTeamMember($employee->resort_id ?? null, $resortAdmin->id ?? null);
 
         // Same position-title check as EnsureLDManagerAccess middleware.
-        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $ldManagerTitles = self::ldLeadershipTitles();
         $isLdManager = $isMasterAdmin
             || in_array($positionTitle, $ldManagerTitles, true)
             || self::isLDDepartment($deptId);
@@ -6315,7 +6315,7 @@ class Common
         // L&D Managers (rank 4 / MGR with a learning-leadership position title)
         // need resort-wide visibility for training/attendance/schedule modules.
         $positionTitle = optional($emp->position)->position_title;
-        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $ldManagerTitles = self::ldLeadershipTitles();
         if (in_array($positionTitle, $ldManagerTitles, true)) {
             return true;
         }

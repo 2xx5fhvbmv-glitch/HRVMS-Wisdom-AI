@@ -101,7 +101,7 @@ class LearningController extends Controller
         $employees = $employees_query->get();
         // dd($employees);
 
-        $trainingManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $trainingManagerTitles = Common::ldLeadershipTitles();
 
         // Get position IDs that match the titles in the current resort
         $positionIds = ResortPosition::where('resort_id', $resort_id)
@@ -151,7 +151,7 @@ class LearningController extends Controller
         $rankConfig = config('settings.Position_Rank');
         $currentRank = $this->resort->getEmployee->rank ?? null;
         $availableRank = $rankConfig[$currentRank] ?? '';
-        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $ldManagerTitles = Common::ldLeadershipTitles();
         $currentPositionTitle = optional(optional($this->resort->getEmployee)->position)->position_title;
         $autoApprove = ($availableRank === 'HR'
             || $availableRank === 'GM'

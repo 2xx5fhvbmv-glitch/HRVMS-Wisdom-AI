@@ -223,7 +223,7 @@ class MonthlyCheckingController extends Controller
         $page_title="Create Monthly Check In";
 
 
-        $trainingManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $trainingManagerTitles = Common::ldLeadershipTitles();
 
         // Get position IDs that match the titles in the current resort
         $positionIds = ResortPosition::where('resort_id',  $this->resort->resort_id)
