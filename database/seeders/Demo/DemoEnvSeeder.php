@@ -37,6 +37,8 @@ class DemoEnvSeeder
         $say("Organisation and {$counts['employees']} employees ready.");
         $counts += (new DemoTimeSeeder($resortId, $admin->id))->seed();
         $say("Rosters and {$counts['attendance days']} attendance days ready.");
+        $counts += (new DemoLeaveSeeder($resortId, $admin->id))->seed();
+        $say("{$counts['leave requests']} leave requests and {$counts['island passes']} island passes ready.");
         $counts += (new DemoPayrollSeeder($resortId, $admin->id))->seed();
         $say("{$counts['payroll runs']} payroll runs ready.");
 

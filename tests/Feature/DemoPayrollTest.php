@@ -51,6 +51,7 @@ class DemoPayrollTest extends TestCase
     {
         $this->signIn('finance');
         $reviews = DB::table('payroll_reviews')->where('payroll_id', $this->run->id)->get()->keyBy('employee_id');
+        $times = DB::table('payroll_time_and_attandance')->where('payroll_id', $this->run->id)->pluck('leave_types', 'employee_id');
 
         $result = collect($this->post(route('fetch.time.attendance'), [
             'employees' => $reviews->keys()->all(), 'startDate' => $this->run->start_date, 'endDate' => $this->run->end_date,
@@ -63,9 +64,13 @@ class DemoPayrollTest extends TestCase
         foreach ($reviews as $id => $review) {
             $this->assertEqualsWithDelta((float) $review->earned_salary, $result[$id]['earned_salary'], 0.011, "earned salary of employee {$id}");
             $this->assertEqualsWithDelta((float) $review->earnings_overtime, $result[$id]['totalOTPay'], 0.011, "OT pay of employee {$id}");
+            $this->assertEqualsWithDelta((float) $review->fridayOTPay, $result[$id]['fridayOTPay'], 0.011, "Friday OT pay of employee {$id}");
+            $this->assertEqualsWithDelta((float) $review->earnings_basic, $result[$id]['basic_salary'], 0.011, "basic of employee {$id}");
+            $this->assertSame($times[$id], strip_tags($result[$id]['leave_types']), "leave days of employee {$id}");
         }
+        $this->assertNotSame([], array_diff($times->all(), ['-']), 'some approved leave falls in the pending run');
         // A full month of shifts plus day-offs is (close to) the full basic salary — it was ~78% before.
-        $line = $result->first(fn ($r) => (int) $r['absent'] === 0 && (int) $r['unaccounted_days'] === 0);
+        $line = $result->first(fn ($r) => (int) $r['absent'] === 0 && (int) $r['unpaid_absent'] === 0 && (int) $r['unaccounted_days'] === 0);
         $this->assertGreaterThan(0.97 * $line['basic_salary'], $line['earned_salary']);
 
         // The dashboard's live estimate uses the same day counts.

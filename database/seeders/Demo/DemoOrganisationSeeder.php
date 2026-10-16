@@ -67,7 +67,8 @@ class DemoOrganisationSeeder
         foreach ($config as $table => $rows) {
             foreach ($rows as $row) {
                 $ref = $row['_ref'] ?? null;
-                unset($row['_ref']);
+                $gridLeave = $row['_leave'] ?? [];
+                unset($row['_ref'], $row['_leave']);
                 if ($table === 'resort_benefit_grade_level_ranks') {
                     $row['grade_level_id'] = $gradeIds[$row['grade_level_id']] ?? null;
                     if (!$row['grade_level_id']) {
@@ -82,6 +83,13 @@ class DemoOrganisationSeeder
                     $leaveIds[$ref] = $id;
                 } elseif ($table === 'resort_benefit_grade_levels') {
                     $gradeIds[$ref] = $id;
+                }
+                // One allocation row per rank on the grid, as BenifitGridController saves them.
+                foreach ($gridLeave as $leaveRef => [$days, $who]) {
+                    foreach (explode(',', $row['rank']) as $rank) {
+                        DB::table('resort_benefit_grid_child')->insert(['benefit_grid_id' => $id, 'leave_cat_id' => $leaveIds[$leaveRef],
+                            'rank' => $rank, 'allocated_days' => $days, 'eligible_emp_type' => $who, 'created_at' => now(), 'updated_at' => now()]);
+                    }
                 }
             }
             $counts[$table] = count($rows);
