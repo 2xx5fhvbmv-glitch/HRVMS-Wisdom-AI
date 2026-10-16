@@ -420,7 +420,9 @@ class ManningController extends Controller
                 ->make(true);
         }
 
-        return view('resorts.manning.index');
+        // A data endpoint for the DataTable — opened directly it rendered the host page
+        // without its variables (500, "Undefined variable $page_title"); send it to that page.
+        return redirect()->route('resort.manning.index');
     }
 
    
@@ -712,7 +714,9 @@ class ManningController extends Controller
                 ->make(true);
         }
 
-        return view('resorts.manning.index');
+        // A data endpoint for the DataTable — opened directly it rendered the host page
+        // without its variables (500, "Undefined variable $page_title"); send it to that page.
+        return redirect()->route('resort.manning.index');
     }
 
     public function store_sections(Request $request)
@@ -1018,7 +1022,9 @@ class ManningController extends Controller
                 ->make(true);
         }
 
-        return view('resorts.manning.index');
+        // A data endpoint for the DataTable — opened directly it rendered the host page
+        // without its variables (500, "Undefined variable $page_title"); send it to that page.
+        return redirect()->route('resort.manning.index');
     }
 
     public function store_positions(Request $request)
