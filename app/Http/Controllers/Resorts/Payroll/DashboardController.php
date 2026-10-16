@@ -400,7 +400,9 @@ class DashboardController extends Controller
 
             $dayMarks = Common::payrollDayMarks($records->all(), $rosterContext, $empId);
             $dayOffCount = $dayMarks['day_off_dates']->count();
-            $presentCount = $records->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave', 'FullDayLeave'])->count();
+            // A half day pays 50% (founder, 2026-10-15) — same as the Permanent run.
+            $presentCount = $records->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'FullDayLeave'])->count()
+                + 0.5 * $records->where('Status', 'HalfDayLeave')->count();
             $absentRecords = $records->where('Status', 'Absent')->concat($dayMarks['no_shows']);
             $unpaidCount = $absentRecords->filter(fn($r) => stripos($r->note ?? '', 'Unpaid Leave') !== false)->count();
             $absentCount = $absentRecords->count() - $unpaidCount;
@@ -629,7 +631,9 @@ class DashboardController extends Controller
             $time = $rec->updated_at ? Carbon::parse($rec->updated_at)->format('h:i A') : null;
             $base = ['employee_id' => $rec->Emp_id, 'name' => $name, 'initials' => $initials ?: '?', 'department' => optional($employee->department)->name, 'time' => $time];
 
-            if (in_array($rec->Status, ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave', 'FullDayLeave'], true)) {
+            if ($rec->Status === 'HalfDayLeave') {
+                $rows->push($base + ['status' => 'Half Day', 'note' => "half a day's salary", 'amount' => round($perDay / 2, 2), 'type' => 'earn']);
+            } elseif (in_array($rec->Status, ['Present', 'On-Time', 'Late', 'ShortLeave', 'FullDayLeave'], true)) {
                 $rows->push($base + ['status' => 'Present', 'note' => "1 day's salary", 'amount' => round($perDay, 2), 'type' => 'earn']);
             } elseif ($rec->Status === 'DayOff') {
                 $rows->push($base + ['status' => 'Day Off', 'note' => 'paid, counted as worked', 'amount' => round($perDay, 2), 'type' => 'earn']);

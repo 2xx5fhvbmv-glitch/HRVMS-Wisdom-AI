@@ -7543,6 +7543,30 @@ class Common
      * whereDate()/whereYear() would silently return zero rows — normalise
      * every active row to Y-m-d in PHP first.
      */
+    /**
+     * Active public holidays as a set of 'Y-m-d' => true. public_holidays.holiday_date
+     * is a string in mixed formats (dd-mm-YYYY in practice), so a plain where() on a
+     * formatted date silently matches nothing — payroll compared 'd M Y' and holiday
+     * OT never paid. Normalise here; callers check isset($set[$date]).
+     */
+    public static function publicHolidayDates(): array
+    {
+        return PublicHoliday::where('status', 'active')->pluck('holiday_date')
+            ->map(function ($d) {
+                $d = trim((string) $d);
+                if ($d === '') return null;
+                foreach (['d-m-Y', 'd/m/Y', 'Y-m-d', 'Y/m/d', 'd-m-y', 'd/m/y'] as $fmt) {
+                    try {
+                        $c = \Carbon\Carbon::createFromFormat('!' . $fmt, $d);
+                        if ($c && $c->format($fmt) === $d) return $c->format('Y-m-d');
+                    } catch (\Exception $e) { /* try next */ }
+                }
+                try { return \Carbon\Carbon::parse($d)->format('Y-m-d'); }
+                catch (\Exception $e) { return null; }
+            })
+            ->filter()->flip()->map(fn () => true)->all();
+    }
+
     public static function calculateLeaveWorkingDays($fromDate, $toDate): int
     {
         $fromDate = $fromDate instanceof \Carbon\Carbon ? $fromDate : \Carbon\Carbon::parse($fromDate);
@@ -7550,23 +7574,7 @@ class Common
 
         $rangeStart = $fromDate->format('Y-m-d');
         $rangeEnd = $toDate->format('Y-m-d');
-        $holidayLookup = PublicHoliday::where('status', 'active')
-            ->pluck('holiday_date')
-            ->map(function ($d) {
-                $d = trim((string) $d);
-                if ($d === '') return null;
-                foreach (['d-m-Y', 'd/m/Y', 'Y-m-d', 'Y/m/d', 'd-m-y', 'd/m/y'] as $fmt) {
-                    try {
-                        $c = \Carbon\Carbon::createFromFormat($fmt, $d);
-                        if ($c) return $c->format('Y-m-d');
-                    } catch (\Exception $e) { /* try next */ }
-                }
-                try { return \Carbon\Carbon::parse($d)->format('Y-m-d'); }
-                catch (\Exception $e) { return null; }
-            })
-            ->filter()
-            ->filter(fn($d) => $d >= $rangeStart && $d <= $rangeEnd)
-            ->flip();
+        $holidayLookup = array_filter(self::publicHolidayDates(), fn ($d) => $d >= $rangeStart && $d <= $rangeEnd, ARRAY_FILTER_USE_KEY);
 
         $totalDays = 0;
         $cursor = $fromDate->copy();

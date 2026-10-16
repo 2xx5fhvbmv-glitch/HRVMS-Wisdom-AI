@@ -121,7 +121,7 @@ class FinalSettlementService
             if (!empty($record->OverTime) && str_contains($record->OverTime, ':')) {
                 [$h, $m] = explode(':', $record->OverTime);
                 $hours = (int)$h + ((int)$m / 60);
-                $isHoliday = PublicHoliday::where('holiday_date', date('d M Y', strtotime($record->date)))->exists();
+                $isHoliday = isset(Common::publicHolidayDates()[date('Y-m-d', strtotime($record->date))]); // stored dd-mm-YYYY
                 $isHoliday ? $holidayOT += $hours : $regularOT += $hours;
             }
         }
@@ -306,7 +306,7 @@ class FinalSettlementService
         $loanCount          = 0;
         $advanceCount       = 0;
         foreach ($recoveryRows as $r) {
-            $amt = (float) ($r->amount ?? 0) + (float) ($r->interest_amount ?? 0);
+            $amt = (float) ($r->amount ?? 0); // installment already includes interest_amount — adding it again double-charged
             $amtMvr = ($currency === 'USD') ? $amt * $conversionRate : $amt;
             // request_type values seeded by the UI are 'loan' /
             // 'salary_advance' / 'advance' — anything containing 'loan'

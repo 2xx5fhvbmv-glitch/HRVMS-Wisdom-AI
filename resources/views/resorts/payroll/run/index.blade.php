@@ -1558,7 +1558,8 @@
                         overtimeFriday: stripVal($row.find("td.col-overtime:eq(1)")),
                         overtimeHoliday: stripVal($row.find("td.col-overtime:eq(2)")),
                         overtimeTotal: stripVal($row.find("td.col-overtime:eq(3)")),
-                        earningsBasic: stripVal($earningsCols.eq(1)), // Earned is second earnings col
+                        // Full contracted basic (unprorated) — was the Earned cell, so it equalled earned_salary.
+                        earningsBasic: (function () { var b = parseFloat($row.attr('data-basic-salary')); return isNaN(b) ? stripVal($earningsCols.eq(1)) : b; })(),
                         earnedSalary: stripVal($earningsCols.eq(1)),
                         earningsAllowance: 0,
                         earningsNormal: stripVal($earningsCols.last()), // Total Earnings is last earnings col
@@ -3469,7 +3470,7 @@
                         let netSalary = (employee.normal_pay || 0) - (employee.total_deduction || 0);
 
                         let row = `
-                            <tr>
+                            <tr data-basic-salary="${employee.basic_salary ?? ''}">
                                 <td>${employee.employee_id}</td>
                                 <td>
                                     <div class="tableUser-block">
