@@ -1022,6 +1022,7 @@ class ApplicantsController extends Controller
                        
                         $StatusApplicantStatus->rank_name = $config[$StatusApplicantStatus->As_ApprovedBy] ?? 'Unknown Rank';
                         $StatusApplicantStatus->ApplicantStatus_raw = $StatusApplicantStatus->ApplicantStatus;
+                        $StatusApplicantStatus->applied_date_raw = $StatusApplicantStatus->Application_date; // sortable; AppliedDate below is d M Y text
                         $StatusApplicantStatus->AppliedDate = Carbon::parse($StatusApplicantStatus->Application_date)->format('d M Y');
 
                         $StatusApplicantStatus->MalidivanTime = (isset($StatusApplicantStatus->ResortInterviewtime)) ?$StatusApplicantStatus->ResortInterviewtime: '-';
@@ -2217,6 +2218,7 @@ class ApplicantsController extends Controller
             ->get()
 
         ->map(function ($item) use($config) {
+            $item->applied_date_raw = $item->Application_date; // sortable; AppliedDate below is d M Y text
             $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
 
             $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d M Y') : '-';
