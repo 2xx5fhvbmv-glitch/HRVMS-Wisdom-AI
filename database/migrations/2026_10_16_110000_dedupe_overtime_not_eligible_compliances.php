@@ -16,8 +16,10 @@ return new class extends Migration
 
     public function up(): void
     {
+        // Only rows HR can see: soft-deleted copies (an earlier dedupe) stay as they are, so the
+        // kept row is never a hidden one while the visible breach is deleted.
         $rows = DB::table('compliances')->where('compliance_breached_name', self::BREACH)->where('module_name', 'Time and Attendance')
-            ->orderBy('id')->get(['id', 'resort_id', 'employee_id', 'description']);
+            ->whereNull('deleted_at')->orderBy('id')->get(['id', 'resort_id', 'employee_id', 'description']);
 
         $byEmployee = [];
         $unmatched = [];

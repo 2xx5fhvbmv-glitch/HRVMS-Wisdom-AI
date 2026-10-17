@@ -58,7 +58,11 @@ class CheckDailyExtraHours extends Command
 
                         $ak->EmployeeAttandance->where('date',$today)->each(function($attendance) use (&$ExcludingOtExtraHours,&$ak,$employeesWithoutBreak) 
                         {
-            
+                            // Approved leave pre-creates the day's row at the shift start; nobody works a leave or day-off day.
+                            if (in_array($attendance->Status, ['FullDayLeave', 'DayOff'], true)) {
+                                return;
+                            }
+
                             $breaks = BreakAttendaces::where('Parent_attd_id', $attendance->id)->get();
                                              
                      
