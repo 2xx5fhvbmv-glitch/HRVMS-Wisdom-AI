@@ -39,6 +39,13 @@ class Demo
         return $resortId !== null && self::resortId() !== null && (int) $resortId === self::resortId();
     }
 
+    /** A named demo login (gm@, hr@…) — not the import's placeholder address for everyone else (demo-0007@). */
+    public static function isLogin(?string $email): bool
+    {
+        return str_ends_with((string) $email, '@' . config('demo.login_domain'))
+            && !str_starts_with((string) $email, strtolower(config('demo.prefix')) . '-');
+    }
+
     /** Forget the cached id (after the resort row is created). */
     public static function refresh(): void
     {

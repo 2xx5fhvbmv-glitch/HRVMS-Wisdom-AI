@@ -58,7 +58,11 @@ class CheckDailyExtraHours extends Command
 
                         $ak->EmployeeAttandance->where('date',$today)->each(function($attendance) use (&$ExcludingOtExtraHours,&$ak,$employeesWithoutBreak) 
                         {
-            
+                            // Approved leave pre-creates the day's row at the shift start; nobody works a leave or day-off day.
+                            if (in_array($attendance->Status, ['FullDayLeave', 'DayOff'], true)) {
+                                return;
+                            }
+
                             $breaks = BreakAttendaces::where('Parent_attd_id', $attendance->id)->get();
                                              
                      
@@ -66,7 +70,7 @@ class CheckDailyExtraHours extends Command
                             if ($breaks->isEmpty()) 
                             {   
                            
-                              $hoursWorked = $checkInTime->diffInHours(Carbon::now());
+                              $hoursWorked = (int) $checkInTime->diffInHours(Carbon::now(), true);
                             
                                     if ($hoursWorked >= 5) 
                                     {
@@ -94,7 +98,7 @@ class CheckDailyExtraHours extends Command
                                     foreach ($breaks as $break) 
                                     {
                                         $breakStartTime = Carbon::parse($break->start_time);
-                                        $timeDifference = $lastBreakTime->diffInHours($breakStartTime);
+                                        $timeDifference = (int) $lastBreakTime->diffInHours($breakStartTime, true);
                                         if ($timeDifference >= 5) 
                                         {
                                                 $hadLongPeriod = true;

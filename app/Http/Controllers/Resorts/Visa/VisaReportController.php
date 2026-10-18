@@ -234,7 +234,7 @@ class VisaReportController extends Controller
     private function daysLeftLabel($date): string
     {
         if (!$date) return 'N/A';
-        $d = Carbon::today()->diffInDays(Carbon::parse($date), false);
+        $d = (int) Carbon::today()->diffInDays(Carbon::parse($date), false);
         if ($d < 0)  return 'Expired ' . abs($d) . ' day(s) ago';
         if ($d === 0) return 'Expires today';
         return $d . ' day(s)';
@@ -493,7 +493,7 @@ class VisaReportController extends Controller
                 'Employee Name'  => trim($r->employee_name) ?: 'N/A',
                 'Nationality'    => $r->nationality ?? 'N/A',
                 'Deposit Amount' => $this->money($r->Deposit_Amt),
-                'Days Pending'   => $r->last_working_day ? Carbon::parse($r->last_working_day)->diffInDays(Carbon::today()) : 'N/A',
+                'Days Pending'   => $r->last_working_day ? (int) Carbon::parse($r->last_working_day)->diffInDays(Carbon::today(), true) : 'N/A',
             ])->all();
         return ['columns' => ['Employee Name', 'Nationality', 'Deposit Amount', 'Days Pending'], 'rows' => $rows];
     }
@@ -1127,7 +1127,7 @@ class VisaReportController extends Controller
                 'Nationality'     => $r->nationality ?? 'N/A',
                 'Deposit Amount'  => $this->money($r->Deposit_Amt),
                 'Deposit Date'    => $r->Date ? Carbon::parse($r->Date)->format('d M Y') : 'N/A',
-                'Days Outstanding' => $r->Date ? Carbon::parse($r->Date)->diffInDays(Carbon::today()) : 'N/A',
+                'Days Outstanding' => $r->Date ? (int) Carbon::parse($r->Date)->diffInDays(Carbon::today(), true) : 'N/A',
                 'Refund Status'   => $r->Deposit_withdraw === 'Yes' ? 'Refunded' : 'Held',
             ])->all();
         return ['columns' => ['Employee Name', 'Nationality', 'Deposit Amount', 'Deposit Date', 'Days Outstanding', 'Refund Status'], 'rows' => $rows];

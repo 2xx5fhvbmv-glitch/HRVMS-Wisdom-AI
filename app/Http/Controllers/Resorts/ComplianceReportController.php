@@ -261,7 +261,7 @@ class ComplianceReportController extends Controller
             ->when(true, fn($q) => $this->applyDuration($q, $f, 'c.reported_on'))
             ->orderByDesc('c.reported_on')->get()->map(function ($r) use ($columns) {
                 $cells = $this->cells($r);
-                $cells['Days Outstanding'] = $r->reported_on ? Carbon::parse($r->reported_on)->startOfDay()->diffInDays(Carbon::today()) . ' day(s)' : 'N/A';
+                $cells['Days Outstanding'] = $r->reported_on ? (int) Carbon::parse($r->reported_on)->startOfDay()->diffInDays(Carbon::today(), true) . ' day(s)' : 'N/A';
                 return $this->pick($cells, $columns);
             })->all();
         return ['columns' => $columns, 'rows' => $rows];

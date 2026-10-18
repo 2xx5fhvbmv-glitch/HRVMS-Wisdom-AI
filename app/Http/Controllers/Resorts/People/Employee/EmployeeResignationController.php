@@ -531,6 +531,20 @@ class EmployeeResignationController extends Controller
             // employee hears "approved, proceed with exit clearance" once HR
             // has accepted too (HR was already notified above).
             if ($status === 'Approved' && $employeeResignation->hr_status !== 'Approved') {
+                // Progress notice at the HOD step (founder, 2026-10-15) — the final
+                // "approved, proceed with exit clearance" still comes after HR.
+                try {
+                    Common::notifyEmployees(
+                        $this->resort->resort_id,
+                        [$employee->id],
+                        'Resignation Accepted by HOD',
+                        'Your resignation has been accepted by your HOD and is now with HR for final approval.',
+                        'Resignation',
+                        $employeeResignation->id
+                    );
+                } catch (\Throwable $e) {
+                    \Log::warning('HOD-acceptance notice failed for resignation ' . $employeeResignation->id . ': ' . $e->getMessage());
+                }
                 return response()->json(['success' => true, 'message' => 'Resignation approved. It now needs HR approval.']);
             }
             if ($status === 'Approved') {

@@ -970,7 +970,7 @@ class ComplianceController extends Controller
                          $probationStartDate = Carbon::parse($probation->joining_date);
 
                          // Calculate the difference in months (shown in the message)
-                         $probationMonths = round($probationStartDate->diffInMonths($probationEndDate), 1);
+                         $probationMonths = round((int) $probationStartDate->diffInMonths($probationEndDate, true), 1);
 
                          // Check if probation period is more than 3 calendar months
                          if ($probationEndDate->gt($probationStartDate->copy()->addMonths(3)) && $probation->probation_status == 'Active') {
@@ -1706,7 +1706,7 @@ class ComplianceController extends Controller
                          $employee->Department_name = $employee->department->name;
                          $employee->Position_name = $employee->position->position_title;
                          $joiningDate = Carbon::parse($employee->joining_date)->format('d M Y');
-                         $daysSinceJoining = Carbon::parse($employee->joining_date)->diffInDays(Carbon::now());
+                         $daysSinceJoining = (int) Carbon::parse($employee->joining_date)->diffInDays(Carbon::now(), true);
                          
                          // Create compliance record with grace period context
                          $probationStatus = $employee->probation_status == 'Active' ? 'Active Probation' : 'Inactive Probation';
@@ -2222,7 +2222,7 @@ class ComplianceController extends Controller
      {
           $start = Carbon::today();
           $end = Carbon::parse($endDate);
-          $daysDiff = $start->diffInDays($end, false);
+          $daysDiff = (int) $start->diffInDays($end, false);
           if ($daysDiff < 0) 
           {
                return $end->format('d M Y')."  (Expired " . abs($daysDiff) . " days ago)";
@@ -2380,7 +2380,7 @@ class ComplianceController extends Controller
                     }
 
                     // Check if employee has completed at least one year in the company
-                    if($employee->joining_date && Carbon::parse($employee->joining_date)->diffInYears(Carbon::now()) >= 1) {
+                    if($employee->joining_date && (int) Carbon::parse($employee->joining_date)->diffInYears(Carbon::now(), true) >= 1) {
                          $annualLeaveCategory = $leaveCategory->where('leave_type', 'Annual Leave')->first();
                          $annualLeaveEmployees = EmployeeLeave::where('resort_id', $resort->resort_id)
                               ->where('leave_category_id', $annualLeaveCategory->id)

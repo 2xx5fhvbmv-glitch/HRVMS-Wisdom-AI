@@ -544,8 +544,8 @@ class AccommodationMasterController extends Controller
                 $data->effected_date =  Carbon::parse($data->effected_date)->format('d M Y');
                 $now = Carbon::now();
                 $effectedDate = Carbon::parse($data->effected_date);
-                $years = $effectedDate->diffInYears($now);
-                $months = $effectedDate->copy()->addYears($years)->diffInMonths($now);
+                $years = (int) $effectedDate->diffInYears($now, true);
+                $months = (int) $effectedDate->copy()->addYears($years)->diffInMonths($now, true);
                 $data->effected_date_diff = "{$years} year(s), {$months} month(s)";
 
                 $itemData = [];

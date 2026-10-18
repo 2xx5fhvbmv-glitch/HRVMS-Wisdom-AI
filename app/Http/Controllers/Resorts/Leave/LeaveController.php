@@ -653,7 +653,7 @@ class LeaveController extends Controller
                         ->sum('total_days');
                     $leaveAllocation = $benefit_grid->allocated_days ?? 0;
                     // Prorate allocation based on joining date
-                    $leaveAllocation = Common::prorateLeaveByJoiningDate($leaveAllocation, $leaveRequest->joining_date ?? null);
+                    $leaveAllocation = Common::prorateLeaveByJoiningDate($leaveAllocation, $leaveRequest->joining_date ?? null, $leaveRequest->leave_category_id);
                     $leaveRequest->available_balance = $leaveAllocation - $leavesTaken;
 
                     // Can approve: only if current user has a Pending row in the approval chain
@@ -906,7 +906,7 @@ class LeaveController extends Controller
                     ->sum('total_days');
                 $leaveAllocation = $benefit_grid->allocated_days ?? 0;
                 // Prorate allocation based on joining date
-                $leaveAllocation = Common::prorateLeaveByJoiningDate($leaveAllocation, $leaveRequest->joining_date ?? null);
+                $leaveAllocation = Common::prorateLeaveByJoiningDate($leaveAllocation, $leaveRequest->joining_date ?? null, $leaveRequest->leave_category_id);
                 $leaveRequest->available_balance = $leaveAllocation - $leavesTaken;
 
                 return $leaveRequest;
@@ -1210,7 +1210,7 @@ class LeaveController extends Controller
             $usedDays = $usageRow ? (int) $usageRow->used_days : 0;
             $grid->used_days = $usedDays;
             // Prorate allocation based on joining date
-            $proratedDays = Common::prorateLeaveByJoiningDate((int) $grid->allocated_days, $empJoiningDate);
+            $proratedDays = Common::prorateLeaveByJoiningDate((int) $grid->allocated_days, $empJoiningDate, $grid->leave_category_id);
             $grid->allocated_days = $proratedDays;
             $available = $proratedDays - $usedDays;
 
@@ -1856,7 +1856,7 @@ class LeaveController extends Controller
                 // Prorate allocation based on employee's joining date
                 $employeeRecord = DB::table('employees')->where('id', $emp_id)->first();
                 $joiningDate = $employeeRecord->joining_date ?? null;
-                $allocatedDays = Common::prorateLeaveByJoiningDate($allocatedDays, $joiningDate);
+                $allocatedDays = Common::prorateLeaveByJoiningDate($allocatedDays, $joiningDate, $categoryId);
 
                 // Get the total used days for the current leave category within the current year
                 $currentYearStart = Carbon::now()->startOfYear()->format('Y-m-d');
@@ -2307,7 +2307,7 @@ class LeaveController extends Controller
                 // applicant always gets a record of their submission.
                 if ($applicantAdmin && filter_var($applicantAdmin->email ?? '', FILTER_VALIDATE_EMAIL)) {
                     $leaveCategoryName = LeaveCategory::where('id', $leave->leave_category_id ?? 0)->value('leave_type') ?? 'Leave';
-                    $totalDays = $leave->total_days ?? Carbon::parse($fromDate)->diffInDays(Carbon::parse($toDate)) + 1;
+                    $totalDays = $leave->total_days ?? (int) Carbon::parse($fromDate)->diffInDays(Carbon::parse($toDate), true) + 1;
 
                     Mail::send('emails.leave-applied', [
                         'applicantName'   => $applicantName,
@@ -2653,7 +2653,7 @@ class LeaveController extends Controller
             $usedDays = (int) ($usedPerCategory->get($grid->leave_category_id) ?? 0);
             $grid->used_days = $usedDays;
             // Prorate allocation based on joining date
-            $proratedDays = Common::prorateLeaveByJoiningDate((int) $grid->allocated_days, $pdfEmpJoiningDate);
+            $proratedDays = Common::prorateLeaveByJoiningDate((int) $grid->allocated_days, $pdfEmpJoiningDate, $grid->leave_category_id);
             $grid->allocated_days = $proratedDays;
             $available = $proratedDays - $usedDays;
             $carryForwardEnabled = !empty($grid->carry_forward) && $grid->carry_forward != '0';

@@ -325,7 +325,7 @@ class EmployeeController extends Controller
         $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
         $monthStartingDate = $cutoffPeriod['start']->format('Y-m-d');
         $monthEndingDate = $cutoffPeriod['end']->format('Y-m-d');
-        $currentMonthDays = $cutoffPeriod['start']->diffInDays($cutoffPeriod['end']) + 1;
+        $currentMonthDays = (int) $cutoffPeriod['start']->diffInDays($cutoffPeriod['end'], true) + 1;
         $currentDate = Carbon::now();
             $attendanceCols = $this->getAttendanceSelectColumns($this->resort->resort_id, $monthStartingDate, $monthEndingDate);
             $employeesQuery = Employee::select(array_merge([
@@ -386,7 +386,7 @@ class EmployeeController extends Controller
                 $employee->Leave = isset($employee->LeaveCount) ? $employee->LeaveCount : 0 ;
                 $employee->Present = $employee->PresentCount;
                 $employee->Dayoff = $employee->DayOffCount;
-                $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
+                $elapsedDays = (int) Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate)), true) + 1;
                 // Was elapsedDays - Present - DayOff - Leave (a residual/
                 // subtraction), which silently folded every un-recorded
                 // day-off and any pre-joining gap into "Absent" since
@@ -434,7 +434,7 @@ class EmployeeController extends Controller
         $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
         $monthStartingDate = $cutoffPeriod['start']->format('Y-m-d');
         $monthEndingDate = $cutoffPeriod['end']->format('Y-m-d');
-        $currentMonthDays = $cutoffPeriod['start']->diffInDays($cutoffPeriod['end']) + 1;
+        $currentMonthDays = (int) $cutoffPeriod['start']->diffInDays($cutoffPeriod['end'], true) + 1;
         $attendanceCols = $this->getAttendanceSelectColumns($this->resort->resort_id, $monthStartingDate, $monthEndingDate);
         $employees = Employee::select(array_merge([
             'employees.id as employee_id',
@@ -563,7 +563,7 @@ class EmployeeController extends Controller
             $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
             $monthStartingDate = $cutoffPeriod['start']->format('Y-m-d');
             $monthEndingDate = $cutoffPeriod['end']->format('Y-m-d');
-            $currentMonthDays = $cutoffPeriod['start']->diffInDays($cutoffPeriod['end']) + 1;
+            $currentMonthDays = (int) $cutoffPeriod['start']->diffInDays($cutoffPeriod['end'], true) + 1;
 
             $attendanceCols = $this->getAttendanceSelectColumns($this->resort->resort_id, $monthStartingDate, $monthEndingDate);
             $employees = Employee::select(array_merge([
@@ -634,7 +634,7 @@ class EmployeeController extends Controller
                 $employee->Leave = isset($employee->LeaveCount) ? $employee->LeaveCount : 0 ;
                 $employee->Present = $employee->PresentCount;
                 $employee->Dayoff = $employee->DayOffCount;
-                $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
+                $elapsedDays = (int) Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate)), true) + 1;
                 // Was elapsedDays - Present - DayOff - Leave (a residual/
                 // subtraction), which silently folded every un-recorded
                 // day-off and any pre-joining gap into "Absent" since
@@ -715,7 +715,7 @@ class EmployeeController extends Controller
         $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
         $monthStartingDate = $cutoffPeriod['start']->format('Y-m-d');
         $monthEndingDate = $cutoffPeriod['end']->format('Y-m-d');
-        $currentMonthDays = $cutoffPeriod['start']->diffInDays($cutoffPeriod['end']) + 1;
+        $currentMonthDays = (int) $cutoffPeriod['start']->diffInDays($cutoffPeriod['end'], true) + 1;
         $currentDate = Carbon::now();
         $detailCols = $this->getDetailSelectColumns($resortId, $monthStartingDate, $monthEndingDate);
         $employee = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
@@ -758,7 +758,7 @@ class EmployeeController extends Controller
                 $employee->Present = $employee->PresentCount;
                 $employee->Dayoff = $employee->DayOffCount;
                 $today = Carbon::today()->format('Y-m-d');
-                $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
+                $elapsedDays = (int) Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate)), true) + 1;
                 // Was elapsedDays - Present - DayOff - Leave (a residual/
                 // subtraction), which silently folded every un-recorded
                 // day-off and any pre-joining gap into "Absent" since
@@ -1006,7 +1006,7 @@ class EmployeeController extends Controller
                             if ($canParseStartTime && $canParseCheckInTime) {
                                 $startTime = Carbon::parse($h->StartTime);
                                 $checkInTime = Carbon::parse($h->CheckingTime);
-                                $difference = $startTime->diffInMinutes($checkInTime, false);
+                                $difference = (int) $startTime->diffInMinutes($checkInTime, false);
 
                                 if ($difference <= 10 && $difference >= 0) {
                                     $color = Common::GetThemeColor('On Time');
@@ -1282,7 +1282,7 @@ class EmployeeController extends Controller
         $page_title = "Employee Details";
         $Rank =  $this->resort->GetEmployee->rank;
         $resortId = $this->resort->resort_id;
-        $currentMonthDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse($monthEndingDate)) + 1;
+        $currentMonthDays = (int) Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse($monthEndingDate), true) + 1;
         $currentDate = Carbon::now();
             $detailCols = $this->getDetailSelectColumns($resortId, $monthStartingDate, $monthEndingDate);
             $employee = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
@@ -1325,7 +1325,7 @@ class EmployeeController extends Controller
                     $employee->Present = $employee->PresentCount;
                     $employee->Dayoff = $employee->DayOffCount;
                     $today = Carbon::today()->format('Y-m-d');
-                    $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
+                    $elapsedDays = (int) Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate)), true) + 1;
                     // Was elapsedDays - Present - DayOff - Leave (a residual/
                 // subtraction), which silently folded every un-recorded
                 // day-off and any pre-joining gap into "Absent" since
@@ -1494,7 +1494,7 @@ class EmployeeController extends Controller
                                                     if ($canParseStartTime && $canParseCheckInTime) {
                                                         $startTime = Carbon::parse($h->StartTime);
                                                         $checkInTime = Carbon::parse($h->CheckingTime);
-                                                        $difference = $startTime->diffInMinutes($checkInTime, false);
+                                                        $difference = (int) $startTime->diffInMinutes($checkInTime, false);
 
                                                         if ($difference <= 10 && $difference >= 0) {
                                                             $h->Status = '<span class="badge badge-themeSuccess">On Time</span>';
@@ -1554,7 +1554,7 @@ class EmployeeController extends Controller
                     // keep defaults on parse error
                 }
             }
-            $currentMonthDays = Carbon::parse($previousMonthStart)->diffInDays(Carbon::parse($previousMonthEnd)) + 1;
+            $currentMonthDays = (int) Carbon::parse($previousMonthStart)->diffInDays(Carbon::parse($previousMonthEnd), true) + 1;
             $AttendanceHistroy =  ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
                 ->join('employees as t1', 't1.id', '=', 'parent_attendaces.Emp_id')
                 ->leftjoin('child_attendaces as t2', 't2.Parent_attd_id', '=', 'parent_attendaces.id')
@@ -1658,7 +1658,7 @@ class EmployeeController extends Controller
                             if ($canParseStartTime && $canParseCheckInTime) {
                                 $startTime = Carbon::parse($h->StartTime);
                                 $checkInTime = Carbon::parse($h->CheckingTime);
-                                $difference = $startTime->diffInMinutes($checkInTime, false); // False for negative values if CheckingTime is before StartTime
+                                $difference = (int) $startTime->diffInMinutes($checkInTime, false); // False for negative values if CheckingTime is before StartTime
 
                                 if ($difference <= 10 && $difference >= 0)
                                 {
@@ -1866,7 +1866,7 @@ class EmployeeController extends Controller
         $page_title = "Employee Details";
         $Rank =  $this->resort->GetEmployee->rank;
         $resortId = $this->resort->resort_id;
-        $currentMonthDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse($monthEndingDate)) + 1;
+        $currentMonthDays = (int) Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse($monthEndingDate), true) + 1;
 
         $currentDate = Carbon::now();
         $detailCols = $this->getDetailSelectColumns($resortId, $monthStartingDate, $monthEndingDate);
@@ -1907,7 +1907,7 @@ class EmployeeController extends Controller
                 $employee->Present = $employee->PresentCount;
                 $employee->Dayoff = $employee->DayOffCount;
                 $today = Carbon::today()->format('Y-m-d');
-                $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
+                $elapsedDays = (int) Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate)), true) + 1;
                 // Was elapsedDays - Present - DayOff - Leave (a residual/
                 // subtraction), which silently folded every un-recorded
                 // day-off and any pre-joining gap into "Absent" since
@@ -2179,7 +2179,7 @@ class EmployeeController extends Controller
                             if ($canParseStartTime && $canParseCheckInTime) {
                                 $startTime = Carbon::parse($h->StartTime);
                                 $checkInTime = Carbon::parse($h->CheckingTime);
-                                $difference = $startTime->diffInMinutes($checkInTime, false);
+                                $difference = (int) $startTime->diffInMinutes($checkInTime, false);
 
                                 if ($difference <= 10 && $difference >= 0) {
                                     $color = Common::GetThemeColor('On Time');

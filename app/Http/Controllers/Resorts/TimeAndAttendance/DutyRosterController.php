@@ -440,7 +440,7 @@ class DutyRosterController extends Controller
                 if ($shiftEnd->lte($shiftStart)) {
                     $shiftEnd->addDay();
                 }
-                $shiftMinutesPerDay = (int) $shiftStart->diffInMinutes($shiftEnd);
+                $shiftMinutesPerDay = (int) $shiftStart->diffInMinutes($shiftEnd, true);
             }
             $TotalHours = $toHHMM($shiftMinutesPerDay / 60);
             $shiftHours = $toDecimalHours($TotalHours);
@@ -711,15 +711,21 @@ class DutyRosterController extends Controller
                         if( $CheckEmployees->entitled_overtime  =="no" && $hasAnyOvertime)
                         {
 
+                                // One row per employee, keyed like ComplianceController's overtime rule.
+                                // Was: description + reported_on (now()) in the match keys, so every roster
+                                // save added a row — and Emp_name/Position_name aren't set here, so it was blank.
+                                $empName = optional($CheckEmployees->resortAdmin)->full_name ?? '';
+                                $positionName = optional($CheckEmployees->position)->position_title ?? '-';
                                 Compliance::firstOrCreate([
-                                'resort_id' => $this->resort->resort_id,
-                                'employee_id' => $CheckEmployees->id,
-                                'module_name' => 'Time and Attendance',
-                                'compliance_breached_name' => 'Over Time Not Eligibile',
-                                'description' => "{$CheckEmployees->Emp_name} ({$CheckEmployees->Emp_id} - {$CheckEmployees->Position_name}) is not eligible for overtime.",
-                                'reported_on' => Carbon::now(),
-                                'status' => 'Breached'
-                            ]);
+                                    'resort_id' => $this->resort->resort_id,
+                                    'employee_id' => $CheckEmployees->id,
+                                    'module_name' => 'Time and Attendance',
+                                    'compliance_breached_name' => 'Over Time Not Eligibile',
+                                ], [
+                                    'description' => "{$empName} ({$CheckEmployees->Emp_id} - {$positionName}) is not eligible for overtime.",
+                                    'reported_on' => Carbon::now(),
+                                    'status' => 'Breached',
+                                ]);
                         }
                     }
 
@@ -1438,7 +1444,7 @@ class DutyRosterController extends Controller
         $prevMonth = $baseDate->copy()->subMonthNoOverflow();
         $startOfMonth = $prevMonth->copy()->day(min($cutoffDay, $prevMonth->daysInMonth))->addDay();
         $endOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
-        $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
+        $totalDays = (int) $startOfMonth->diffInDays($endOfMonth, true) + 1;
 
         // Build monthwise headers for the cutoff period
         $monthwiseheaders = [];
@@ -1498,7 +1504,7 @@ class DutyRosterController extends Controller
         $prevMonth = $baseDate->copy()->subMonthNoOverflow();
         $startOfMonth = $prevMonth->copy()->day(min($cutoffDay, $prevMonth->daysInMonth))->addDay();
         $endOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
-        $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
+        $totalDays = (int) $startOfMonth->diffInDays($endOfMonth, true) + 1;
 
         $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
 
@@ -1704,7 +1710,7 @@ class DutyRosterController extends Controller
                 $endCarbon->addDay();
             }
 
-            $totalMinutes = $startCarbon->diffInMinutes($endCarbon);
+            $totalMinutes = (int) $startCarbon->diffInMinutes($endCarbon, true);
             $totalHours = floor($totalMinutes / 60);
             $totalMins = $totalMinutes % 60;
             $totalTime = sprintf('%02d:%02d', $totalHours, $totalMins);

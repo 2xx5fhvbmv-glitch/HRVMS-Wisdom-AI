@@ -360,7 +360,7 @@ class DashboardController extends Controller
 
         if ($employeesWithAttendance->isEmpty()) return collect();
 
-        $totalDaysInPeriod = max(1, $periodStart->diffInDays($periodEnd) + 1);
+        $totalDaysInPeriod = max(1, (int) $periodStart->diffInDays($periodEnd, true) + 1);
 
         $employees = Employee::with(['allowance', 'resortAdmin'])->whereIn('id', $employeesWithAttendance)->get()->keyBy('id');
 
@@ -400,7 +400,9 @@ class DashboardController extends Controller
 
             $dayMarks = Common::payrollDayMarks($records->all(), $rosterContext, $empId);
             $dayOffCount = $dayMarks['day_off_dates']->count();
-            $presentCount = $records->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave', 'FullDayLeave'])->count();
+            // A half day pays 50% (founder, 2026-10-15) — same as the Permanent run.
+            $presentCount = $records->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'FullDayLeave'])->count()
+                + 0.5 * $records->where('Status', 'HalfDayLeave')->count();
             $absentRecords = $records->where('Status', 'Absent')->concat($dayMarks['no_shows']);
             $unpaidCount = $absentRecords->filter(fn($r) => stripos($r->note ?? '', 'Unpaid Leave') !== false)->count();
             $absentCount = $absentRecords->count() - $unpaidCount;
@@ -549,8 +551,8 @@ class DashboardController extends Controller
             ];
         };
 
-        $totalDaysInPeriod = max(1, $periodStart->diffInDays($periodEnd) + 1);
-        $dayOfPeriod = min($totalDaysInPeriod, max(1, $periodStart->diffInDays($today) + 1));
+        $totalDaysInPeriod = max(1, (int) $periodStart->diffInDays($periodEnd, true) + 1);
+        $dayOfPeriod = min($totalDaysInPeriod, max(1, (int) $periodStart->diffInDays($today, true) + 1));
 
         return [
             'period_start'        => $periodStart->format('Y-m-d'),
@@ -599,7 +601,7 @@ class DashboardController extends Controller
         $today = Carbon::today();
         $settings = ResortSiteSettings::where('resort_id', $resortId)->first();
         $rate = $settings && $settings->DollertoMVR ? (float) $settings->DollertoMVR : 15.42;
-        $totalDaysInPeriod = max(1, $periodStart->diffInDays($periodEnd) + 1);
+        $totalDaysInPeriod = max(1, (int) $periodStart->diffInDays($periodEnd, true) + 1);
 
         $todayRecords = DB::table('parent_attendaces')
             ->whereIn('Emp_id', Employee::where('resort_id', $resortId)->whereIn('status', ['Active', 'Probationary'])->pluck('id'))
@@ -629,7 +631,9 @@ class DashboardController extends Controller
             $time = $rec->updated_at ? Carbon::parse($rec->updated_at)->format('h:i A') : null;
             $base = ['employee_id' => $rec->Emp_id, 'name' => $name, 'initials' => $initials ?: '?', 'department' => optional($employee->department)->name, 'time' => $time];
 
-            if (in_array($rec->Status, ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave', 'FullDayLeave'], true)) {
+            if ($rec->Status === 'HalfDayLeave') {
+                $rows->push($base + ['status' => 'Half Day', 'note' => "half a day's salary", 'amount' => round($perDay / 2, 2), 'type' => 'earn']);
+            } elseif (in_array($rec->Status, ['Present', 'On-Time', 'Late', 'ShortLeave', 'FullDayLeave'], true)) {
                 $rows->push($base + ['status' => 'Present', 'note' => "1 day's salary", 'amount' => round($perDay, 2), 'type' => 'earn']);
             } elseif ($rec->Status === 'DayOff') {
                 $rows->push($base + ['status' => 'Day Off', 'note' => 'paid, counted as worked', 'amount' => round($perDay, 2), 'type' => 'earn']);
@@ -675,7 +679,7 @@ class DashboardController extends Controller
         $stale = !is_array($cached) || empty($cached['generated_at']);
         if (!$stale) {
             $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
-            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+            if ($regenerate && (int) $generatedAt->diffInHours($now, true) >= $cooldownHours) {
                 $stale = true;
             }
         }
@@ -692,7 +696,7 @@ class DashboardController extends Controller
         $insights = $cached['insights'];
         $insights['_meta'] = [
             'generated_at'   => $generatedAt,
-            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'can_regenerate' => (int) $generatedAt->diffInHours($now, true) >= $cooldownHours,
             'next_available' => $generatedAt->copy()->addHours($cooldownHours),
         ];
 

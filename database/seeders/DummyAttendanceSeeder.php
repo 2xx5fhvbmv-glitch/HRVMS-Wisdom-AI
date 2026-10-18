@@ -69,7 +69,7 @@ class DummyAttendanceSeeder extends Seeder
 
                     $checkIn = $isPresent ? $date->copy()->setTime(rand(7, 9), rand(0, 59), 0) : null;
                     $checkOut = $isPresent ? $date->copy()->setTime(rand(16, 18), rand(0, 59), 0) : null;
-                    $hoursWorked = ($checkIn && $checkOut) ? round($checkOut->diffInMinutes($checkIn) / 60, 2) : 0;
+                    $hoursWorked = ($checkIn && $checkOut) ? round((int) $checkOut->diffInMinutes($checkIn, true) / 60, 2) : 0;
 
                     $hasOT = $isPresent && rand(1, 10) === 1;
                     $overtime = $hasOT ? rand(1, 3) : null;

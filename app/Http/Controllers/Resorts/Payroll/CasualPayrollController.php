@@ -181,7 +181,7 @@ class CasualPayrollController extends Controller
 
         $periodStart = Carbon::parse($request->startDate);
         $periodEnd = Carbon::parse($request->endDate);
-        $totalDaysInPeriod = $periodStart->diffInDays($periodEnd) + 1;
+        $totalDaysInPeriod = (int) $periodStart->diffInDays($periodEnd, true) + 1;
 
         $attendanceByEmp = ParentAttendace::whereIn('Emp_id', $scopedEmployeeIds)
             ->whereBetween('date', [$request->startDate, $request->endDate])
@@ -287,7 +287,7 @@ class CasualPayrollController extends Controller
                 $hours = (int) ($otParts[0] ?? 0) + ((int) ($otParts[1] ?? 0) / 60);
 
                 $isFriday = Carbon::parse($rec->date)->isFriday();
-                $isPublicHoliday = PublicHoliday::where('holiday_date', Carbon::parse($rec->date)->format('d M Y'))->exists();
+                $isPublicHoliday = isset(Common::publicHolidayDates()[Carbon::parse($rec->date)->format('Y-m-d')]); // stored dd-mm-YYYY
                 $isResortHoliday = DB::table('resortholidays')->where('resort_id', $resort_id)->where('PublicHolidaydate', $rec->date)->exists();
                 $isDayOff = $rec->Status === 'DayOff';
 

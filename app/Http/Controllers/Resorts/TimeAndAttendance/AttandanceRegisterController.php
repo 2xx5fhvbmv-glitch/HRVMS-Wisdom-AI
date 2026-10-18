@@ -590,7 +590,7 @@ class AttandanceRegisterController extends Controller
         };
         $breakMinutes = BreakAttendaces::where('Parent_attd_id', $ParentAttendace->id)->get()
             ->sum(fn ($b) => $b->Total_Break_Time ? $toMinutes($b->Total_Break_Time) : 0);
-        $worked = max(0, (int) $in->diffInMinutes($out) - $breakMinutes);
+        $worked = max(0, (int) $in->diffInMinutes($out, true) - $breakMinutes);
 
         // Overtime = worked beyond the shift. This used to be measured
         // against DayWiseTotalHours, which a mobile check-in sets to '00:00',
@@ -746,7 +746,7 @@ class AttandanceRegisterController extends Controller
                         $endOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth)); // cutoff day of selected month
 
                         // Total days in the cutoff period
-                        $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
+                        $totalDays = (int) $startOfMonth->diffInDays($endOfMonth, true) + 1;
 
                         // Week info (first week of the cutoff period)
                         $WeekstartDate = $startOfMonth->copy()->startOfWeek();

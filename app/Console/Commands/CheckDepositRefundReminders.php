@@ -61,7 +61,7 @@ class CheckDepositRefundReminders extends Command
                     continue;
                 }
                 $departureDate = Carbon::parse($departureRaw)->startOfDay();
-                $daysSince     = $departureDate->diffInDays($today, false);
+                $daysSince     = (int) $departureDate->diffInDays($today, false);
                 if ($daysSince < 0) {
                     continue; // future-dated departure, skip
                 }

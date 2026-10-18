@@ -145,10 +145,9 @@ class RedirectIfNotCorrectDashboard
             // Non-HR EXCOM (rank 1) → HOD-level dashboards (department-scoped)
             // GM (rank 8) → GM/HR-level dashboards
             // HOD (rank 2), MGR (rank 4), SUP (rank 5), Line Workers (rank 6) → HOD/lower dashboards
-            $hrDeptId = \App\Models\ResortDepartment::where('resort_id', $Resort->resort_id)
-                ->where('name', 'Human Resources')->value('id');
             $employeeDeptId = $employee->Dept_id ?? null;
-            $isHrDeptExcom = ($employeeRank == 1 && $employeeDeptId == $hrDeptId);
+            // Same HR-department rule as Common::isHR() (was: only a department named exactly "Human Resources").
+            $isHrDeptExcom = ($employeeRank == 1 && \App\Helpers\Common::isHRDepartment($employeeDeptId));
 
             // Only HR dept EXCOM, HR rank, Finance rank, and GM get HR-level dashboards
             $isHrOrFinance = in_array($employeeRank, [3, 7]) || $isHrDeptExcom; // HR, Finance, HR-dept EXCOM
@@ -347,6 +346,10 @@ class RedirectIfNotCorrectDashboard
                         Log::info("Redirecting HR/Finance to Master Dashboard");
                         return redirect()->route('resort.master.hr_dashboard');
                     }
+                }
+                // No Position_access configured yet: the HR department's HOD still gets the HR Master Dashboard.
+                elseif ($isHrDeptHod && str_contains($currentRoute, 'master') && !$request->routeIs('resort.master.hr_dashboard')) {
+                    return redirect()->route('resort.master.hr_dashboard');
                 }
 
             // if ( ($availableRank == 'HOD' || $availableRank == 'MGR' || $availableRank == 'EXCOM' ) && $Resort->is_master_admin == 0)

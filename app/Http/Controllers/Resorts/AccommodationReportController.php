@@ -509,7 +509,7 @@ class AccommodationReportController extends Controller
             ->map(fn($r) => [
                 'Request No.' => $r->Request_id ?? 'N/A', 'Building' => $r->BuildingName ?? 'N/A', 'Room' => $r->RoomNo ?? 'N/A',
                 'Priority' => $r->priority ?? 'N/A', 'Assigned To' => trim($r->assigned_to) ?: 'N/A',
-                'Days Open' => $r->date ? Carbon::parse($r->date)->diffInDays(Carbon::today()) : 'N/A',
+                'Days Open' => $r->date ? (int) Carbon::parse($r->date)->diffInDays(Carbon::today(), true) : 'N/A',
             ])->all();
         return ['columns' => ['Request No.', 'Building', 'Room', 'Priority', 'Assigned To', 'Days Open'], 'rows' => $rows];
     }
@@ -531,7 +531,7 @@ class AccommodationReportController extends Controller
             ->get(['m.Request_id', DB::raw($this->raiser), 'm.date'])
             ->map(fn($r) => [
                 'Request No.' => $r->Request_id ?? 'N/A', 'Requested By' => trim($r->raised_by) ?: 'N/A',
-                'Request Date' => $this->dmy($r->date), 'Pending Days' => $r->date ? Carbon::parse($r->date)->diffInDays(Carbon::today()) : 'N/A',
+                'Request Date' => $this->dmy($r->date), 'Pending Days' => $r->date ? (int) Carbon::parse($r->date)->diffInDays(Carbon::today(), true) : 'N/A',
             ])->all();
         return ['columns' => ['Request No.', 'Requested By', 'Request Date', 'Pending Days'], 'rows' => $rows];
     }
@@ -542,7 +542,7 @@ class AccommodationReportController extends Controller
             ->get(['m.Request_id', 'm.priority', 'm.date', 'm.Status', 'm.updated_at'])
             ->map(function ($r) {
                 $closed = stripos((string) $r->Status, 'clos') !== false;
-                $resTime = $closed && $r->date ? Carbon::parse($r->date)->diffInDays(Carbon::parse($r->updated_at)) . ' day(s)' : 'N/A';
+                $resTime = $closed && $r->date ? (int) Carbon::parse($r->date)->diffInDays(Carbon::parse($r->updated_at), true) . ' day(s)' : 'N/A';
                 return ['Request No.' => $r->Request_id ?? 'N/A', 'Priority' => $r->priority ?? 'N/A', 'Response Time' => 'N/A', 'Resolution Time' => $resTime, 'SLA Status' => $closed ? 'Resolved' : 'Open'];
             })->all();
         return ['columns' => ['Request No.', 'Priority', 'Response Time', 'Resolution Time', 'SLA Status'], 'rows' => $rows];
@@ -554,7 +554,7 @@ class AccommodationReportController extends Controller
             ->get(['m.Request_id', 'b.BuildingName', 'm.RoomNo', 'm.date', 'm.priority', 'm.Status'])
             ->map(fn($r) => [
                 'Request No.' => $r->Request_id ?? 'N/A', 'Building' => $r->BuildingName ?? 'N/A', 'Room' => $r->RoomNo ?? 'N/A',
-                'Open Days' => $r->date ? Carbon::parse($r->date)->diffInDays(Carbon::today()) : 'N/A', 'Priority' => $r->priority ?? 'N/A', 'Status' => $r->Status ?? 'N/A',
+                'Open Days' => $r->date ? (int) Carbon::parse($r->date)->diffInDays(Carbon::today(), true) : 'N/A', 'Priority' => $r->priority ?? 'N/A', 'Status' => $r->Status ?? 'N/A',
             ])->all();
         return ['columns' => ['Request No.', 'Building', 'Room', 'Open Days', 'Priority', 'Status'], 'rows' => $rows];
     }
@@ -577,7 +577,7 @@ class AccommodationReportController extends Controller
             ->map(fn($r) => [
                 'Request No.' => $r->Request_id ?? 'N/A', 'Completion Date' => $this->dmy($r->updated_at),
                 'Assigned Technician' => trim($r->assigned_to) ?: 'N/A',
-                'Resolution Time' => $r->date ? Carbon::parse($r->date)->diffInDays(Carbon::parse($r->updated_at)) . ' day(s)' : 'N/A',
+                'Resolution Time' => $r->date ? (int) Carbon::parse($r->date)->diffInDays(Carbon::parse($r->updated_at), true) . ' day(s)' : 'N/A',
             ])->all();
         return ['columns' => ['Request No.', 'Completion Date', 'Assigned Technician', 'Resolution Time'], 'rows' => $rows];
     }

@@ -778,7 +778,7 @@ class StaffAccommodationController extends Controller
         $row->Date                                          =   date('d M Y', strtotime($row->date));
 
         // **Calculate Escalation Time**
-        $daysSinceRequest                                   =   now()->diffInDays(Carbon::parse($row->date));
+        $daysSinceRequest                                   =   (int) now()->diffInDays(Carbon::parse($row->date), true);
         $row->EscalationTimeOver                            =   ($daysSinceRequest > ($EscalationDay->EscalationDay ?? 0)) ? 'Alert' : 'Regular';
 
         // **Set Profile Image**

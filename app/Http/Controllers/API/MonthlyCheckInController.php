@@ -181,7 +181,7 @@ class MonthlyCheckInController extends Controller
         }
 
         try {
-            $trainingManagerTitles                      =   ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+            $trainingManagerTitles                      =   Common::ldLeadershipTitles();
 
             // Get position IDs that match the titles in the current resort
             $positionIds                                =   ResortPosition::where('resort_id',  $this->resort_id)

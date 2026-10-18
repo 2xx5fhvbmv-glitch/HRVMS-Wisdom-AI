@@ -4231,7 +4231,7 @@ class Common
                 $startTimeParsed = self::safeParseTime($roster->StartTime);
                 $checkInTimeParsed = self::safeParseTime($roster->CheckingTime);
                 if ($checkInTimeParsed && $startTimeParsed) {
-                    $difference = $startTimeParsed->diffInMinutes($checkInTimeParsed, false);
+                    $difference = (int) $startTimeParsed->diffInMinutes($checkInTimeParsed, false);
                     $roster->InternalStatus = $difference <= 10 && $difference >= 0
                         ? 'OnTime'
                         : ($difference > 10 ? 'Late' : 'Early');
@@ -4278,7 +4278,7 @@ class Common
 
 
                         // Calculate the difference
-                        $differenceInMinutes = $updatedEndTime->diffInMinutes($currentTime24);
+                        $differenceInMinutes = (int) $updatedEndTime->diffInMinutes($currentTime24, true);
                         $roster->differenceInHours = $updatedEndTime->diff($currentTime24)->format('%h hours and %i minutes');
 
                     }
@@ -4400,7 +4400,7 @@ class Common
                         $startTimeParsed = self::safeParseTime($roster->StartTime);
                         $checkInTimeParsed = self::safeParseTime($roster->CheckingTime);
                         if ($checkInTimeParsed && $startTimeParsed) {
-                            $difference = $startTimeParsed->diffInMinutes($checkInTimeParsed, false);
+                            $difference = (int) $startTimeParsed->diffInMinutes($checkInTimeParsed, false);
                             $roster->InternalStatus = $difference <= 10 && $difference >= 0
                                 ? 'OnTime'
                                 : ($difference > 10 ? 'Late' : 'Early');
@@ -4451,7 +4451,7 @@ class Common
 
 
                                 // Calculate the difference
-                                $differenceInMinutes = $updatedEndTime->diffInMinutes($currentTime24);
+                                $differenceInMinutes = (int) $updatedEndTime->diffInMinutes($currentTime24, true);
                                 $roster->differenceInHours = $updatedEndTime->diff($currentTime24)->format('%h hours and %i minutes');
 
                             }
@@ -4932,7 +4932,7 @@ class Common
      * L&D-specific (as opposed to HR/GM leadership). Used only by the
      * Performance-module tightening in getPerformanceScopedEmpIds() above.
      */
-    private static function ldLeadershipTitles()
+    public static function ldLeadershipTitles(): array
     {
         return ['Training Director', 'L&D Manager', 'Learning & Development Head'];
     }
@@ -5139,7 +5139,7 @@ class Common
         }
 
         $positionTitle = optional($employee->position)->position_title;
-        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $ldManagerTitles = self::ldLeadershipTitles();
         return in_array($positionTitle, $ldManagerTitles, true);
     }
 
@@ -5527,7 +5527,7 @@ class Common
             ->filter(fn($id) => self::isLDDepartment($id))
             ->all();
 
-        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $ldManagerTitles = self::ldLeadershipTitles();
 
         return \App\Models\Employee::where('resort_id', $resortId)
             ->where(function ($q) use ($ldDeptIds, $ldManagerTitles) {
@@ -6204,7 +6204,7 @@ class Common
             || self::isSOSResponseTeamMember($employee->resort_id ?? null, $resortAdmin->id ?? null);
 
         // Same position-title check as EnsureLDManagerAccess middleware.
-        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $ldManagerTitles = self::ldLeadershipTitles();
         $isLdManager = $isMasterAdmin
             || in_array($positionTitle, $ldManagerTitles, true)
             || self::isLDDepartment($deptId);
@@ -6315,7 +6315,7 @@ class Common
         // L&D Managers (rank 4 / MGR with a learning-leadership position title)
         // need resort-wide visibility for training/attendance/schedule modules.
         $positionTitle = optional($emp->position)->position_title;
-        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $ldManagerTitles = self::ldLeadershipTitles();
         if (in_array($positionTitle, $ldManagerTitles, true)) {
             return true;
         }
@@ -6821,8 +6821,8 @@ class Common
         if ($rows->isEmpty()) return 0;
 
         $totalDays = $rows->sum(function ($row) {
-            return abs(\Carbon\Carbon::parse($row->created_at)->startOfDay()
-                ->diffInDays(\Carbon\Carbon::parse($row->arrival_date)->startOfDay()));
+            return abs((int) \Carbon\Carbon::parse($row->created_at)->startOfDay()
+                ->diffInDays(\Carbon\Carbon::parse($row->arrival_date)->startOfDay(), true));
         });
 
         return round($totalDays / $rows->count(), 1);
@@ -7276,7 +7276,7 @@ class Common
         foreach ($catIds as $id) {
             $cat = $catCache[$resortId][$id];
             $allocated = (float) $gridCache[$gridKey][$id];
-            $prorated = (float) self::prorateLeaveByJoiningDate($allocated, $emp->joining_date);
+            $prorated = (float) self::prorateLeaveByJoiningDate($allocated, $emp->joining_date, $id);
             $taken = (float) ($used[$id] ?? 0);
             $carry = 0.0;
             if (!empty($cat->carry_forward) && $cat->carry_forward != '0') {
@@ -7299,14 +7299,28 @@ class Common
     }
 
     /**
-     * Prorate allocated leave days based on employee's joining date.
-     * If employee joined in the current year, prorate by months worked.
-     * If joined before current year, return full allocation.
+     * Allocated leave days the employee has earned so far.
+     *
+     * Annual Leave (founder, 2026-10-15) accrues on the employee's own anniversary
+     * cycle: allocated ÷ 12 per full month worked since the most recent anniversary
+     * of the joining date (2.5 days/month for a 30-day grid), resetting each
+     * anniversary — see annualLeaveCycle(). Every other leave type stays calendar-year:
+     * joined before this 1 Jan → full allocation; joined this year → prorated by the
+     * months from the joining month to December. Pass $leaveCategoryId so Annual Leave
+     * is recognised; without it the calendar-year rule applies (old behaviour).
      */
-    public static function prorateLeaveByJoiningDate($allocatedDays, $joiningDate)
+    public static function prorateLeaveByJoiningDate($allocatedDays, $joiningDate, $leaveCategoryId = null)
     {
         if (empty($joiningDate) || empty($allocatedDays)) {
             return $allocatedDays;
+        }
+        if ($leaveCategoryId && self::isAnnualLeaveCategory($leaveCategoryId)) {
+            $cycle = self::annualLeaveCycle($joiningDate);
+            if (!$cycle) {
+                return 0; // joins in the future
+            }
+            $months = (int) $cycle['start']->diffInMonths(\Carbon\Carbon::today(), true);
+            return round(min($allocatedDays, ($allocatedDays / 12) * $months), 1);
         }
 
         $joining = \Carbon\Carbon::parse($joiningDate);
@@ -7328,6 +7342,25 @@ class Common
         $prorated = round(($allocatedDays / 12) * $monthsWorked, 1);
 
         return $prorated;
+    }
+
+    /** The employee's current Annual Leave cycle: [start = latest anniversary on/before $today, end = day before the next]; null before joining. */
+    public static function annualLeaveCycle($joiningDate, $today = null): ?array
+    {
+        $joining = \Carbon\Carbon::parse($joiningDate)->startOfDay();
+        $today = $today ? \Carbon\Carbon::parse($today)->startOfDay() : \Carbon\Carbon::today();
+        if ($joining->gt($today)) {
+            return null;
+        }
+        $start = $joining->copy()->addYearsNoOverflow((int) $joining->diffInYears($today, true));
+        return ['start' => $start, 'end' => $start->copy()->addYearNoOverflow()->subDay()];
+    }
+
+    /** Whether a leave category is the resort's Annual Leave (the only anniversary-accrued type). */
+    public static function isAnnualLeaveCategory($leaveCategoryId): bool
+    {
+        static $cache = [];
+        return $cache[$leaveCategoryId] ??= strcasecmp(trim((string) \App\Models\LeaveCategory::where('id', $leaveCategoryId)->value('leave_type')), 'Annual Leave') === 0;
     }
 
     /**
@@ -7510,6 +7543,30 @@ class Common
      * whereDate()/whereYear() would silently return zero rows — normalise
      * every active row to Y-m-d in PHP first.
      */
+    /**
+     * Active public holidays as a set of 'Y-m-d' => true. public_holidays.holiday_date
+     * is a string in mixed formats (dd-mm-YYYY in practice), so a plain where() on a
+     * formatted date silently matches nothing — payroll compared 'd M Y' and holiday
+     * OT never paid. Normalise here; callers check isset($set[$date]).
+     */
+    public static function publicHolidayDates(): array
+    {
+        return PublicHoliday::where('status', 'active')->pluck('holiday_date')
+            ->map(function ($d) {
+                $d = trim((string) $d);
+                if ($d === '') return null;
+                foreach (['d-m-Y', 'd/m/Y', 'Y-m-d', 'Y/m/d', 'd-m-y', 'd/m/y'] as $fmt) {
+                    try {
+                        $c = \Carbon\Carbon::createFromFormat('!' . $fmt, $d);
+                        if ($c && $c->format($fmt) === $d) return $c->format('Y-m-d');
+                    } catch (\Exception $e) { /* try next */ }
+                }
+                try { return \Carbon\Carbon::parse($d)->format('Y-m-d'); }
+                catch (\Exception $e) { return null; }
+            })
+            ->filter()->flip()->map(fn () => true)->all();
+    }
+
     public static function calculateLeaveWorkingDays($fromDate, $toDate): int
     {
         $fromDate = $fromDate instanceof \Carbon\Carbon ? $fromDate : \Carbon\Carbon::parse($fromDate);
@@ -7517,23 +7574,7 @@ class Common
 
         $rangeStart = $fromDate->format('Y-m-d');
         $rangeEnd = $toDate->format('Y-m-d');
-        $holidayLookup = PublicHoliday::where('status', 'active')
-            ->pluck('holiday_date')
-            ->map(function ($d) {
-                $d = trim((string) $d);
-                if ($d === '') return null;
-                foreach (['d-m-Y', 'd/m/Y', 'Y-m-d', 'Y/m/d', 'd-m-y', 'd/m/y'] as $fmt) {
-                    try {
-                        $c = \Carbon\Carbon::createFromFormat($fmt, $d);
-                        if ($c) return $c->format('Y-m-d');
-                    } catch (\Exception $e) { /* try next */ }
-                }
-                try { return \Carbon\Carbon::parse($d)->format('Y-m-d'); }
-                catch (\Exception $e) { return null; }
-            })
-            ->filter()
-            ->filter(fn($d) => $d >= $rangeStart && $d <= $rangeEnd)
-            ->flip();
+        $holidayLookup = array_filter(self::publicHolidayDates(), fn ($d) => $d >= $rangeStart && $d <= $rangeEnd, ARRAY_FILTER_USE_KEY);
 
         $totalDays = 0;
         $cursor = $fromDate->copy();
@@ -8924,7 +8965,7 @@ class Common
             $startMonth = $currentMonth;
         }
 
-        $totalMonths = $startMonth->diffInMonths($currentMonth) + $futureMonths;
+        $totalMonths = (int) $startMonth->diffInMonths($currentMonth, true) + $futureMonths;
 
         $availableMonths = [];
         for ($i = 0; $i < $totalMonths; $i++) {
@@ -12353,6 +12394,33 @@ class Common
     }
 
     /**
+     * The signed-in employee, then everyone they are covering for today (approved
+     * leave with task_delegation = them). Approval endpoints accept the first of
+     * these who passes their own role check, so a delegate can act — and the
+     * Approvals inbox lists exactly what those endpoints will accept.
+     */
+    public static function actingEmployees($employee, $resortId): \Illuminate\Support\Collection
+    {
+        if (!$employee) {
+            return collect();
+        }
+        $ids = self::getDelegatedEmployeeIds($employee->id, $resortId);
+        return collect([$employee])->merge($ids ? Employee::where('resort_id', $resortId)->whereIn('id', $ids)->get() : []);
+    }
+
+    /** getEmployeeRankPosition() of the first acting employee $qualifies accepts (self first), or null. */
+    public static function actingRankPosition($employee, $resortId, callable $qualifies): ?array
+    {
+        foreach (self::actingEmployees($employee, $resortId) as $candidate) {
+            $rankPosition = self::getEmployeeRankPosition($candidate);
+            if ($qualifies($rankPosition, $candidate)) {
+                return $rankPosition;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Get all employee IDs that the given delegate is currently acting on behalf of.
      * Returns array of employee IDs who are on approved leave with task_delegation = $delegateEmpId.
      *
@@ -13357,7 +13425,7 @@ class Common
         }
 
         // Calculate expected shift duration in minutes
-        $shiftDurationMinutes = $shiftStartDateTime->diffInMinutes($shiftEndDateTime);
+        $shiftDurationMinutes = (int) $shiftStartDateTime->diffInMinutes($shiftEndDateTime, true);
 
         // Parse expected overtime
         $expectedOvertimeMinutes = 0;
@@ -13382,7 +13450,7 @@ class Common
                         $breakIn->addDay();
                     }
 
-                    $breakMinutes = $breakOut->diffInMinutes($breakIn);
+                    $breakMinutes = (int) $breakOut->diffInMinutes($breakIn, true);
                     $totalBreakMinutes += $breakMinutes;
 
                     $breakPeriods[] = [
@@ -13399,7 +13467,7 @@ class Common
         }
 
         // Calculate actual worked time (check-out - check-in - breaks)
-        $actualWorkMinutes = $checkInDateTime->diffInMinutes($checkOutDateTime) - $totalBreakMinutes;
+        $actualWorkMinutes = (int) $checkInDateTime->diffInMinutes($checkOutDateTime, true) - $totalBreakMinutes;
         if ($actualWorkMinutes < 0) {
             $actualWorkMinutes = 0;
         }
@@ -13485,7 +13553,7 @@ class Common
             elseif ($checkOutDateTime->gte($shiftEndDateTime)) {
                 // Normal case: check-in before shift, check-out at or after shift end
                 // Calculate time before shift start
-                $overtimeBeforeStart = $checkInDateTime->diffInMinutes($shiftStartDateTime);
+                $overtimeBeforeStart = (int) $checkInDateTime->diffInMinutes($shiftStartDateTime, true);
 
                 // Adjust for breaks that occurred before shift start
                 foreach ($breakPeriods as $break) {
@@ -13523,7 +13591,7 @@ class Common
         if ($checkOutDateTime->gt($shiftEndDateTime) && $checkInDateTime->lte($shiftStartDateTime)) {
             // Normal case: check-in at or before shift start, check-out after shift end
             // Calculate time after shift end
-            $overtimeAfterEnd = $shiftEndDateTime->diffInMinutes($checkOutDateTime);
+            $overtimeAfterEnd = (int) $shiftEndDateTime->diffInMinutes($checkOutDateTime, true);
 
             // Adjust for breaks that occurred after shift end
             foreach ($breakPeriods as $break) {
@@ -13605,13 +13673,13 @@ class Common
             // #endregion
 
             // Calculate total time worked (check-out - check-in - breaks)
-            $totalTimeWorked = $checkInDateTime->diffInMinutes($checkOutDateTime) - $totalBreakMinutes;
+            $totalTimeWorked = (int) $checkInDateTime->diffInMinutes($checkOutDateTime, true) - $totalBreakMinutes;
             if ($totalTimeWorked < 0) {
                 $totalTimeWorked = 0;
             }
 
             // Calculate time before shift start
-            $overtimeBeforeStart = $checkInDateTime->diffInMinutes($shiftStartDateTime);
+            $overtimeBeforeStart = (int) $checkInDateTime->diffInMinutes($shiftStartDateTime, true);
 
             // If total time worked is less than normal shift, no overtime before shift
             // The time before shift is just part of normal attendance to make up for early check-out
@@ -13717,8 +13785,8 @@ class Common
             @file_put_contents($logFile, $logEntry, FILE_APPEND);
             // #endregion
 
-            $timeWorkedDuringShift = $checkInDateTime->diffInMinutes($shiftEndDateTime);
-            $overtimeAfterEnd = $shiftEndDateTime->diffInMinutes($checkOutDateTime);
+            $timeWorkedDuringShift = (int) $checkInDateTime->diffInMinutes($shiftEndDateTime, true);
+            $overtimeAfterEnd = (int) $shiftEndDateTime->diffInMinutes($checkOutDateTime, true);
 
             // If they worked less than normal shift during shift time, adjust overtime
             if ($timeWorkedDuringShift < $normalShiftMinutes) {

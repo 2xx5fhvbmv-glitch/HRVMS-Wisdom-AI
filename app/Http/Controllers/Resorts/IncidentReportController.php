@@ -191,7 +191,7 @@ class IncidentReportController extends Controller
         $closed = (clone $b)->where(fn($q) => $q->where('status', 'like', '%clos%')->orWhere('status', 'like', '%resolv%'))->count();
         $invest = (clone $b)->where('status', 'like', '%investigat%')->count();
         $open = $total - $closed;
-        $times = (clone $b)->whereNotNull('resolved_at')->get(['incident_date', 'resolved_at'])->map(fn($r) => Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at)))->filter();
+        $times = (clone $b)->whereNotNull('resolved_at')->get(['incident_date', 'resolved_at'])->map(fn($r) => (int) Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at), true))->filter();
         return ['columns' => ['Total Incidents', 'Open Incidents', 'Under Investigation', 'Closed Incidents', 'Average Resolution Time'],
             'rows' => [['Total Incidents' => $total, 'Open Incidents' => $open, 'Under Investigation' => $invest, 'Closed Incidents' => $closed, 'Average Resolution Time' => $times->count() ? round($times->avg(), 1) . ' day(s)' : 'N/A']]];
     }
@@ -220,7 +220,7 @@ class IncidentReportController extends Controller
                 return [
                     'Incident ID' => $r->incident_id ?? 'N/A', 'Incident Title' => $r->incident_name ?? 'N/A',
                     'Location' => $r->location ?? 'N/A', 'Report Date' => $this->dmy($r->incident_date),
-                    'Days Open' => $r->incident_date ? Carbon::parse($r->incident_date)->diffInDays(Carbon::today()) : 'N/A',
+                    'Days Open' => $r->incident_date ? (int) Carbon::parse($r->incident_date)->diffInDays(Carbon::today(), true) : 'N/A',
                     'Assigned Investigator' => $comm ?? 'Unassigned',
                 ];
             })->all();
@@ -236,7 +236,7 @@ class IncidentReportController extends Controller
             ->get(['i.incident_id', 'i.resolved_at', 'i.incident_date', 'i.outcome_type'])
             ->map(fn($r) => [
                 'Incident ID' => $r->incident_id ?? 'N/A', 'Resolution Date' => $this->dmy($r->resolved_at),
-                'Resolution Time' => $r->resolved_at && $r->incident_date ? Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at)) . ' day(s)' : 'N/A',
+                'Resolution Time' => $r->resolved_at && $r->incident_date ? (int) Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at), true) . ' day(s)' : 'N/A',
                 'Final Outcome' => $r->outcome_type ? 'Outcome #' . $r->outcome_type : 'N/A',
             ])->all();
         return ['columns' => ['Incident ID', 'Resolution Date', 'Resolution Time', 'Final Outcome'], 'rows' => $rows];
@@ -378,7 +378,7 @@ class IncidentReportController extends Controller
             ->map(fn($r) => [
                 'Incident ID' => $r->incident_id ?? 'N/A', 'Report Date' => $this->dmy($r->incident_date),
                 'Resolution Date' => $this->dmy($r->resolved_at),
-                'Resolution Time' => Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at)) . ' day(s)',
+                'Resolution Time' => (int) Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at), true) . ' day(s)',
             ])->all();
         return ['columns' => ['Incident ID', 'Report Date', 'Resolution Date', 'Resolution Time'], 'rows' => $rows];
     }
@@ -391,7 +391,7 @@ class IncidentReportController extends Controller
             ->orderByDesc('i.resolved_at')->get(['i.incident_id', 'i.incident_date', 'i.resolved_at', 'i.priority'])
             ->map(function ($r) {
                 $sla = $this->slaDays($r->priority);
-                $taken = Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at));
+                $taken = (int) Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at), true);
                 return ['Incident ID' => $r->incident_id ?? 'N/A', 'SLA Target' => $sla . ' day(s)', 'Resolution Time' => $taken . ' day(s)', 'SLA Status' => $taken <= $sla ? 'Met' : 'Breached'];
             })->all();
         return ['columns' => ['Incident ID', 'SLA Target', 'Resolution Time', 'SLA Status'], 'rows' => $rows];
@@ -405,7 +405,7 @@ class IncidentReportController extends Controller
                 $deadline = Carbon::parse($r->incident_date)->addDays($this->slaDays($r->priority));
                 $inv = DB::table('incidents_investigation')->where('incident_id', $r->id)->value('committee_id');
                 $comm = $inv ? DB::table('incident_committee')->where('id', $inv)->value('commitee_name') : null;
-                return ['Incident ID' => $r->incident_id ?? 'N/A', 'Assigned Investigator' => $comm ?? 'Unassigned', 'Deadline Date' => $deadline->format('d M Y'), 'Days Remaining' => Carbon::today()->diffInDays($deadline, false) . ' day(s)', '_d' => Carbon::today()->diffInDays($deadline, false)];
+                return ['Incident ID' => $r->incident_id ?? 'N/A', 'Assigned Investigator' => $comm ?? 'Unassigned', 'Deadline Date' => $deadline->format('d M Y'), 'Days Remaining' => (int) Carbon::today()->diffInDays($deadline, false) . ' day(s)', '_d' => (int) Carbon::today()->diffInDays($deadline, false)];
             })->filter(fn($r) => $r['_d'] >= 0 && $r['_d'] <= 14)->map(fn($r) => collect($r)->except('_d')->all())->values()->all();
         return ['columns' => ['Incident ID', 'Assigned Investigator', 'Deadline Date', 'Days Remaining'], 'rows' => $rows];
     }
@@ -420,7 +420,7 @@ class IncidentReportController extends Controller
                 $sla = $this->slaDays($r->priority);
                 $deadline = Carbon::parse($r->incident_date)->addDays($sla);
                 $end = $r->resolved_at ? Carbon::parse($r->resolved_at) : Carbon::today();
-                $over = $deadline->diffInDays($end, false);
+                $over = (int) $deadline->diffInDays($end, false);
                 if ($over <= 0) return null;
                 $inv = DB::table('incidents_investigation')->where('incident_id', $r->id)->value('committee_id');
                 $comm = $inv ? DB::table('incident_committee')->where('id', $inv)->value('commitee_name') : null;
@@ -451,7 +451,7 @@ class IncidentReportController extends Controller
     public function committeePerformance(array $f): array
     {
         $rows = $this->committeeAgg($f)->map(function ($items, $name) {
-            $times = $items->filter(fn($r) => $r->resolved_at)->map(fn($r) => Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at)));
+            $times = $items->filter(fn($r) => $r->resolved_at)->map(fn($r) => (int) Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at), true));
             return ['Committee Name' => $name ?: 'N/A', 'Total Cases' => $items->count(), 'Completed Cases' => $items->filter(fn($r) => $this->isClosed($r->status))->count(), 'Average Resolution Time' => $times->count() ? round($times->avg(), 1) . ' day(s)' : 'N/A'];
         })->values()->all();
         return ['columns' => ['Committee Name', 'Total Cases', 'Completed Cases', 'Average Resolution Time'], 'rows' => $rows];
@@ -576,9 +576,9 @@ class IncidentReportController extends Controller
         $closed = (clone $b)->where(fn($q) => $q->where('status', 'like', '%clos%')->orWhere('status', 'like', '%resolv%'))->count();
         $open = $total - $closed;
         $invest = (clone $b)->where('status', 'like', '%investigat%')->count();
-        $times = (clone $b)->whereNotNull('resolved_at')->get(['incident_date', 'resolved_at'])->map(fn($r) => Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at)));
+        $times = (clone $b)->whereNotNull('resolved_at')->get(['incident_date', 'resolved_at'])->map(fn($r) => (int) Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at), true));
         $high = (clone $b)->where(fn($q) => $q->where('severity', 'like', '%critical%')->orWhere('severity', 'like', '%severe%')->orWhere('priority', 'High'))->count();
-        $slaMet = (clone $b)->whereNotNull('resolved_at')->get(['incident_date', 'resolved_at', 'priority'])->filter(fn($r) => Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at)) <= $this->slaDays($r->priority))->count();
+        $slaMet = (clone $b)->whereNotNull('resolved_at')->get(['incident_date', 'resolved_at', 'priority'])->filter(fn($r) => (int) Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at), true) <= $this->slaDays($r->priority))->count();
         $resolvedCount = (clone $b)->whereNotNull('resolved_at')->count();
         return ['columns' => ['Total Incidents', 'Open Cases', 'Investigation Progress', 'Average Resolution Time', 'SLA Compliance %', 'High-Risk Incidents'],
             'rows' => [['Total Incidents' => $total, 'Open Cases' => $open, 'Investigation Progress' => $invest, 'Average Resolution Time' => $times->count() ? round($times->avg(), 1) . ' day(s)' : 'N/A', 'SLA Compliance %' => $this->pct($slaMet, $resolvedCount), 'High-Risk Incidents' => $high]]];

@@ -193,7 +193,7 @@ class SosReportController extends Controller
     private function minutesBetween($start, $end): ?float
     {
         if (!$start || !$end) return null;
-        return Carbon::parse($start)->diffInMinutes(Carbon::parse($end), false);
+        return (int) Carbon::parse($start)->diffInMinutes(Carbon::parse($end), false);
     }
 
     private function fmtDur($minutes): string

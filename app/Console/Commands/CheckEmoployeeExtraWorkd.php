@@ -66,7 +66,7 @@ class CheckEmoployeeExtraWorkd extends Command
                             if ($shiftTotalHours)
                             {
                                 $shiftTotalHours = $shiftTotalHours->format('H:i');
-                                $shiftTotalHours = Carbon::parse($shiftTotalHours)->diffInMinutes(Carbon::parse('00:00')) / 60;
+                                $shiftTotalHours = (int) Carbon::parse($shiftTotalHours)->diffInMinutes(Carbon::parse('00:00'), true) / 60;
                             } 
                             else 
                             {
@@ -80,13 +80,13 @@ class CheckEmoployeeExtraWorkd extends Command
                             {
                                 $checkout->addDay(); 
                             }
-                            $SumOfTotalDailyWorkingHours = $checkout->diffInMinutes($checkin) / 60;
+                            $SumOfTotalDailyWorkingHours = (int) $checkout->diffInMinutes($checkin, true) / 60;
                             $SumOfTotalDailyWorkingHours = round($SumOfTotalDailyWorkingHours, 2);
                     
 
                         $overtimeHours = 0;
 
-                        $DayWiseTotalHours = Carbon::parse( $attendance->DayWiseTotalHours)->diffInMinutes(Carbon::parse('00:00')) / 60;
+                        $DayWiseTotalHours = (int) Carbon::parse( $attendance->DayWiseTotalHours)->diffInMinutes(Carbon::parse('00:00'), true) / 60;
 
                         if ($SumOfTotalDailyWorkingHours > $shiftTotalHours && $shiftTotalHours > 0) 
                         {

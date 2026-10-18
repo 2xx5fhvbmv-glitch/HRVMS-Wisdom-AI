@@ -148,7 +148,7 @@ class DemoTimeSeeder
                     $break = [$bStart, $bEnd->gt($this->now) ? null : $bEnd];
                 }
             }
-            $breakMinutes = $break && $break[1] ? (int) $break[0]->diffInMinutes($break[1]) : 0;
+            $breakMinutes = $break && $break[1] ? (int) $break[0]->diffInMinutes($break[1], true) : 0;
 
             [$inLat, $inLng] = $this->chance(0.03) ? $this->offSite() : $this->onSite();
             [$outLat, $outLng] = $this->onSite();
@@ -162,7 +162,7 @@ class DemoTimeSeeder
                 'roster_id' => $rosterId, 'resort_id' => $this->resortId, 'Shift_id' => $shift->id, 'Emp_id' => $e->id,
                 'date' => $date, 'Status' => 'Present', 'CheckInCheckOut_Type' => 'Geofencing',
                 'CheckingTime' => $in->format('H:i:s'), 'CheckingOutTime' => $closed ? $out->format('H:i:s') : null,
-                'DayWiseTotalHours' => $closed ? $this->hm((int) $in->diffInMinutes($out) - $breakMinutes) : '00:00',
+                'DayWiseTotalHours' => $closed ? $this->hm((int) $in->diffInMinutes($out, true) - $breakMinutes) : '00:00',
                 'OverTime' => $otStatus && $otStatus !== 'pending' ? $this->hm($ot) : null, // as Common::syncAttendanceOvertime leaves it
                 'OTStatus' => $otStatus && $otStatus !== 'pending' ? ucfirst($otStatus) : null,
                 'OTApproved_By' => $otStatus && $otStatus !== 'pending' ? $approverAdmin : null,

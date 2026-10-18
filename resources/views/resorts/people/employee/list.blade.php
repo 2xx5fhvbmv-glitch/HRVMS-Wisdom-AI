@@ -581,48 +581,6 @@
             });
         });
 
-         $(document).on('click', '.delete-employee', function(e) {
-            e.preventDefault();
-            const empId = $(this).data('emp-id');
-
-            wisdomConfirm({
-                role: 'destructive',
-                title: 'Are you sure?',
-                text: "Are you sure you want to delete this employee!",
-                confirmText: 'Yes, delete it!'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    $.ajax({
-                        url: "{{ route('employee.delete') }}", // Adjust route name
-                        type: 'POST',
-                        data: {
-                            _token: '{{ csrf_token() }}',
-                            id: empId
-                        },
-                        success: function(response) {
-                            wisdomAlert({
-                                type: 'success',
-                                title: 'Deleted!',
-                                text: response.message
-                            }).then(() => {
-                                if ($('.btn-grid').hasClass('active')) {
-                                    loadGridView(); // Reload Grid View
-                                } else {
-                                    getEmpTable();  // Reload List View
-                                }
-                            });
-                        },
-                        error: function(xhr) {
-                            wisdomAlert({
-                                type: 'error',
-                                title: 'Error!',
-                                text: xhr.responseJSON?.message || 'Something went wrong.'
-                            });
-                        }
-                    });
-                }
-            });
-        });
 
 
         // Clear selection link

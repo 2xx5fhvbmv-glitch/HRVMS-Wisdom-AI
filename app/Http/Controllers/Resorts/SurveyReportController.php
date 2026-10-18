@@ -319,7 +319,7 @@ class SurveyReportController extends Controller
             ->map(fn($r) => [
                 'Survey Name'        => $r->Surevey_title ?? 'N/A',
                 'Closing Date'       => $this->dmy($r->End_date),
-                'Days Remaining'     => $r->End_date ? Carbon::today()->diffInDays(Carbon::parse($r->End_date), false) . ' day(s)' : 'N/A',
+                'Days Remaining'     => $r->End_date ? (int) Carbon::today()->diffInDays(Carbon::parse($r->End_date), false) . ' day(s)' : 'N/A',
                 'Participation Rate' => $this->pct($r->completed, $r->invited),
             ])->all();
         return ['columns' => ['Survey Name', 'Closing Date', 'Days Remaining', 'Participation Rate'], 'rows' => $rows];
@@ -511,7 +511,7 @@ class SurveyReportController extends Controller
                 return [
                     'Employee Name'  => trim($r->employee_name) ?: 'N/A',
                     'Department'     => $r->dept ?? 'N/A',
-                    'Days Remaining' => $end ? Carbon::today()->diffInDays(Carbon::parse($end), false) . ' day(s)' : 'N/A',
+                    'Days Remaining' => $end ? (int) Carbon::today()->diffInDays(Carbon::parse($end), false) . ' day(s)' : 'N/A',
                     'Reminder Status' => 'Pending',
                 ];
             })->all();

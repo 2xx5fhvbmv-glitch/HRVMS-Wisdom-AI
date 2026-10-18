@@ -323,7 +323,9 @@ class ResortAllNotificationController extends Controller
     public function SendToFinance(Request $request)
     {
         $resort = Auth::guard('resort-admin')->user();
-        $employeeRankPosition = Common::getEmployeeRankPosition($resort->getEmployee);
+        // Own role, or the role of whoever they are covering for today (task delegation).
+        $employeeRankPosition = Common::actingRankPosition($resort->getEmployee, $resort->resort_id,
+            fn ($rp) => in_array($rp['position'], ['HR', 'Finance', 'GM'], true)) ?? Common::getEmployeeRankPosition($resort->getEmployee);
         $resort_id = $resort->resort_id;
 
         // C2 — no role check existed at all; any authenticated resort-admin
@@ -490,7 +492,10 @@ class ResortAllNotificationController extends Controller
     public function ReviseBudget(Request $request)
     {
         $resort = Auth::guard('resort-admin')->user();
-        $employeeRankPosition = Common::getEmployeeRankPosition($resort->getEmployee);
+        // Own role, or the role of whoever they are covering for today (task delegation).
+        $employeeRankPosition = Common::actingRankPosition($resort->getEmployee, $resort->resort_id,
+            fn ($rp) => in_array($rp['position'], ['HR', 'Finance', 'GM'], true) || ($rp['rank'] ?? null) === 'GM')
+            ?? Common::getEmployeeRankPosition($resort->getEmployee);
         // 'position' comes from the department name, and a GM's department is usually
         // "Executive Office" — so the GM was refused here (403) while approveBudget(),
         // which checks the rank, let them approve. Same rank check as approveBudget().

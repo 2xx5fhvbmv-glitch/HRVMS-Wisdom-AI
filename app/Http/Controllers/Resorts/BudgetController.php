@@ -3175,7 +3175,8 @@ class BudgetController extends Controller
             // aren't (e.g. "Executive Office"), so position always came
             // back null for them. Same field PayrollController's own
             // approval-step resolution already trusts for "is this the GM".
-            $pos = Common::getEmployeeRankPosition($this->resort->getEmployee);
+            // The GM, or whoever is covering for the GM today (task delegation).
+            $pos = Common::actingRankPosition($this->resort->getEmployee, $this->resort->resort_id, fn ($rp) => ($rp['rank'] ?? null) === 'GM');
             if (($pos['rank'] ?? null) !== 'GM') {
                 return response()->json(['success' => false, 'message' => 'Only the GM can approve budgets.'], 403);
             }
@@ -3279,7 +3280,7 @@ class BudgetController extends Controller
 
         // W-02 — only the GM approves (see the 'rank' vs 'position' note
         // in approveBudget() above).
-        $pos = Common::getEmployeeRankPosition($this->resort->getEmployee);
+        $pos = Common::actingRankPosition($this->resort->getEmployee, $this->resort->resort_id, fn ($rp) => ($rp['rank'] ?? null) === 'GM');
         if (($pos['rank'] ?? null) !== 'GM') {
             return response()->json(['success' => false, 'message' => 'Only the GM can approve budgets.'], 403);
         }

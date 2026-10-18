@@ -1234,11 +1234,33 @@ class PayrollController extends Controller
             }
 
             if ($deduction->staff_shop > 0) {
-                Payment::where('emp_id', $employeeId)
-                    ->where('status', 'pending')
-                    ->whereBetween('purchased_date', [$payroll->start_date, $payroll->end_date])
-                    ->limit(1) // in case of partial deduction logic
-                    ->update(['status' => 'Paid']);
+                // Settle exactly what this run deducted, against the purchases it was summed
+                // from (fetch: Consented / Partial Paid outstanding balances), oldest first.
+                // Was: one row with status 'pending' (no such value — the real one is
+                // 'Pending Consent') inside the period marked Paid, whatever was deducted, and
+                // payroll_deducted never recorded. Purchases without consent are never touched.
+                // Prices are USD; the run shows the resort's display currency (index()).
+                $settings = ResortSiteSettings::where('resort_id', $payroll->resort_id)->first();
+                $remaining = (float) $deduction->staff_shop;
+                if (($settings->currency ?? 'Dollar') === 'MVR') {
+                    $remaining /= (float) ($settings->DollertoMVR ?: 15.42);
+                }
+                $purchases = Payment::where('emp_id', $employeeId)->whereIn('status', ['Consented', 'Partial Paid'])
+                    ->orderBy('purchased_date')->orderBy('id')->get();
+                foreach ($purchases as $purchase) {
+                    if ($remaining < 0.005) {
+                        break;
+                    }
+                    $outstanding = max(0, (float) $purchase->price - (float) $purchase->cash_paid - (float) $purchase->payroll_deducted);
+                    if ($outstanding < 0.005) {
+                        continue;
+                    }
+                    $take = min($outstanding, $remaining);
+                    $purchase->payroll_deducted = round((float) $purchase->payroll_deducted + $take, 2);
+                    $purchase->status = ($outstanding - $take) < 0.005 ? 'Paid' : 'Partial Paid';
+                    $purchase->save();
+                    $remaining -= $take;
+                }
             }
         }
     }
@@ -1365,10 +1387,8 @@ class PayrollController extends Controller
             return response()->json(['success' => false, 'message' => 'Employee not found.'], 403);
         }
 
-        $rankPosition = Common::getEmployeeRankPosition($employee);
-
-        // Find which approval step this user can approve
-        $approvalStep = $this->getApprovalStepForUser($rankPosition, $employee);
+        // The step this user (or whoever they are covering for today) can approve on this payroll.
+        $approvalStep = self::actionableStepFor($employee, $resortId, $payrollId);
         if (!$approvalStep) {
             return response()->json(['success' => false, 'message' => 'You are not authorized to approve this payroll.'], 403);
         }
@@ -1525,8 +1545,7 @@ class PayrollController extends Controller
         // Determine current user's role
         $currentUser = \Auth::guard('resort-admin')->user();
         $employee = $currentUser->GetEmployee ?? null;
-        $rankPosition = $employee ? Common::getEmployeeRankPosition($employee) : ['rank' => null, 'position' => null];
-        $userApprovalStep = $this->getApprovalStepForUser($rankPosition, $employee);
+        $userApprovalStep = self::actionableStepFor($employee, $this->resort->resort_id, $payrollId);
 
         // Check if current user is the supervisor (person who ran the payroll)
         $isSupervisor = $employee && $employee->rank == 5; // SUP rank
@@ -1540,6 +1559,35 @@ class PayrollController extends Controller
             // Legacy: only runs stuck at 'approved' before auto-lock existed.
             'can_lock' => $payroll->status === 'approved' && $isSupervisor,
         ]);
+    }
+
+    /**
+     * Steps this employee may approve: their own, plus those of anyone they are
+     * covering for today (task delegation) — Common::actingEmployees().
+     */
+    public static function approvalStepsFor($employee, $resortId): array
+    {
+        return Common::actingEmployees($employee, $resortId)
+            ->map(fn ($e) => self::getApprovalStepForUser(Common::getEmployeeRankPosition($e), $e))
+            ->filter()->unique()->values()->all();
+    }
+
+    /**
+     * Of those steps, the one this payroll is waiting on (pending, every earlier step
+     * approved); otherwise their first step, so approvePayroll() reports why it can't act.
+     */
+    public static function actionableStepFor($employee, $resortId, $payrollId): ?int
+    {
+        $steps = self::approvalStepsFor($employee, $resortId);
+        foreach ($steps as $step) {
+            $waiting = PayrollApproval::where('payroll_id', $payrollId)->where('resort_id', $resortId)
+                ->where('step_order', $step)->where('status', 'pending')->exists()
+                && !PayrollApproval::where('payroll_id', $payrollId)->where('step_order', '<', $step)->where('status', '!=', 'approved')->exists();
+            if ($waiting) {
+                return $step;
+            }
+        }
+        return $steps[0] ?? null;
     }
 
     /**
@@ -2329,11 +2377,15 @@ class PayrollController extends Controller
 
         // Check if next month is Ramadan (based on start date)
         $nextMonthDate = Carbon::parse($request->startDate)->addMonthNoOverflow()->startOfMonth();
-        $response = Http::get("https://api.aladhan.com/v1/gToH", [
-            'date' => $nextMonthDate->format('d M Y')
-        ]);
-        $isNextMonthRamadan = $response->successful()
-            && ($response['data']['hijri']['month']['number'] == 9);
+        // External lookup: a slow / unreachable / odd answer must not break the payroll
+        // calculation — treat it as "not Ramadan" (only affects the Ramadan-bonus hint).
+        try {
+            $response = Http::timeout(5)->get("https://api.aladhan.com/v1/gToH", ['date' => $nextMonthDate->format('d M Y')]);
+            $isNextMonthRamadan = $response->successful() && (int) data_get($response->json(), 'data.hijri.month.number') === 9;
+        } catch (\Throwable $e) {
+            \Log::warning('Ramadan lookup failed: ' . $e->getMessage());
+            $isNextMonthRamadan = false;
+        }
 
         // Load employee data
         $employees = Employee::with(['resortAdmin', 'department', 'position', 'allowance'])
@@ -2361,7 +2413,7 @@ class PayrollController extends Controller
             $dayOffCount = $dayMarks['day_off_dates']->count();
             $periodStart = Carbon::parse($request->startDate);
             $periodEnd = Carbon::parse($request->endDate);
-            $totalDaysInPeriod = $periodStart->diffInDays($periodEnd) + 1;
+            $totalDaysInPeriod = (int) $periodStart->diffInDays($periodEnd, true) + 1;
             $workingDays = max(1, $totalDaysInPeriod - $dayOffCount);
 
             $totalHours = $regularOT = $fridayOT = $holidayOT = 0;
@@ -2390,6 +2442,11 @@ class PayrollController extends Controller
                 }
                 $presentDayEquivalent += Common::payrollDayFraction($presentRec, $rosterContext);
             }
+
+            // A half day pays 50% of a full day (founder, 2026-10-15). It is stored as
+            // 'HalfDayLeave' — the 'HalfDay' in the lists above isn't a real status — so it
+            // matched nothing and paid 0.
+            $presentDayEquivalent += 0.5 * collect($recordsArray)->where('Status', 'HalfDayLeave')->count();
 
             $absentRecords = collect($recordsArray)->where('Status', 'Absent')->concat($dayMarks['no_shows']);
             // Split absent into regular absent and unpaid leave (based on note field)
@@ -2514,9 +2571,9 @@ class PayrollController extends Controller
                     $totalHours += $hours;
 
                     // Classify OT: Friday OT, Holiday OT (public/resort holiday or DayOff), Regular OT
-                    $dateFormatted = date('d M Y', strtotime($rec->date));
                     $isFriday = Carbon::parse($rec->date)->isFriday();
-                    $isPublicHoliday = PublicHoliday::where('holiday_date', $dateFormatted)->exists();
+                    // Was ->where('holiday_date', 'd M Y') against dd-mm-YYYY strings: never matched.
+                    $isPublicHoliday = isset(Common::publicHolidayDates()[Carbon::parse($rec->date)->format('Y-m-d')]);
                     $isResortHoliday = \DB::table('resortholidays')
                         ->where('resort_id', $this->resort->resort_id)
                         ->where('PublicHolidaydate', $rec->date)
@@ -3116,7 +3173,8 @@ class PayrollController extends Controller
 
             $ewtMVR = Common::calculateEWT($taxableIncomeMVR);
 
-            if($employee->ewt_status =="Yes" && $taxableIncomeMVR > 60000)
+            // ewt_status is stored lowercase 'yes'/'no' (EmployeeController) — "Yes" never matched, so the alert never fired.
+            if(strtolower((string) $employee->ewt_status) === 'yes' && $taxableIncomeMVR > 60000)
             {
                 // Raw rank=3 (with a resort-wide, department-blind rank=2
                 // fallback) excluded this resort's real HR employee.
@@ -3421,7 +3479,7 @@ class PayrollController extends Controller
                 $absent = optional($ta)->absent_days ?? 0;
                 $periodStart = \Carbon\Carbon::parse($payroll->start_date);
                 $periodEnd = \Carbon\Carbon::parse($payroll->end_date);
-                $totalDays = $periodStart->diffInDays($periodEnd) + 1;
+                $totalDays = (int) $periodStart->diffInDays($periodEnd, true) + 1;
                 return max(0, $totalDays - $present - $absent);
             })
             ->addColumn('leave_types', function ($employee) use ($payroll) {
@@ -3542,7 +3600,7 @@ class PayrollController extends Controller
             $allEmployeeIds = $payroll->employees->pluck('employee_id');
             $periodStart = \Carbon\Carbon::parse($payroll->start_date);
             $periodEnd = \Carbon\Carbon::parse($payroll->end_date);
-            $totalDaysInPeriod = $periodStart->diffInDays($periodEnd) + 1;
+            $totalDaysInPeriod = (int) $periodStart->diffInDays($periodEnd, true) + 1;
 
             $totals = [
                 'present_days' => $payroll->timeAndAttendances->whereIn('employee_id', $allEmployeeIds)->sum('present_days'),
@@ -4014,9 +4072,10 @@ class PayrollController extends Controller
             ->get()
             ->groupBy('employee_id')
             ->map(function ($group) {
-                return $group->sum(function ($item) {
-                    return ($item->amount ?? 0) + ($item->interest_amount ?? 0);
-                });
+                // amount IS the installment, interest already inside it (paymentRescheduleStore:
+                // interest_amount = installment − principal). Adding interest_amount again
+                // recovered the interest twice.
+                return $group->sum(fn ($item) => (float) ($item->amount ?? 0));
             });
 
         return response()->json(['success' => true,'data' => $recoveryData]);
@@ -4028,16 +4087,13 @@ class PayrollController extends Controller
         $month = $carbonDate->format('m');
         $year = $carbonDate->format('Y');
 
-        $response = Http::get("https://api.aladhan.com/v1/gToH", [
-            'date' => "$day-$month-$year"
-        ]);
-
-        if ($response->successful()) {
-            $hijriMonth = $response['data']['hijri']['month']['number'];
-            return $hijriMonth == 9; // 9 = Ramadan
+        try {
+            $response = Http::timeout(5)->get("https://api.aladhan.com/v1/gToH", ['date' => "$day-$month-$year"]);
+            return $response->successful() && (int) data_get($response->json(), 'data.hijri.month.number') === 9; // 9 = Ramadan
+        } catch (\Throwable $e) {
+            \Log::warning('Ramadan lookup failed: ' . $e->getMessage());
+            return false;
         }
-
-        return false;
     }
 
     public function downloadBankAndCashSheets(Request $request, $payroll_id)
@@ -4239,7 +4295,7 @@ class PayrollController extends Controller
 
         $periodStart = \Carbon\Carbon::parse($payroll->start_date);
         $periodEnd = \Carbon\Carbon::parse($payroll->end_date);
-        $totalDays = $periodStart->diffInDays($periodEnd) + 1;
+        $totalDays = (int) $periodStart->diffInDays($periodEnd, true) + 1;
 
         // Build complete data rows
         $rows = [];

@@ -302,7 +302,8 @@ class LeaveController extends Controller
                     ]);
                 }
 
-                $allocatedDays                          =   $benefit_grid->allocated_days;
+                // Earned so far, same rule as the web apply check (Annual Leave: anniversary accrual).
+                $allocatedDays                          =   Common::prorateLeaveByJoiningDate($benefit_grid->allocated_days, $employee->joining_date ?? null, $categoryId);
 
                 // Get the total used days for the current leave category within the current year
                 $currentYearStart                       =   Carbon::now()->startOfYear()->format('Y-m-d');
@@ -1263,10 +1264,13 @@ class LeaveController extends Controller
                     if($leaveUsage) {
 
                         // Combine leave balances and usage (carry forward when leave is eligible and not used by employee)
-                        $leaveBalances                  =   $benefit_grids->map(function ($grid) use ($leaveUsage, $emp_id, $apiLastYearStart, $apiLastYearEnd) {
+                        $leaveBalances                  =   $benefit_grids->map(function ($grid) use ($leaveUsage, $emp_id, $apiLastYearStart, $apiLastYearEnd, $employee) {
                             $usageRow                   =   $leaveUsage->get($grid->leave_category_id);
                             $usedDays                   =   $usageRow ? (int) $usageRow->used_days : 0;
                             $grid->used_days            =   $usedDays;
+                            $fullAllocation             =   $grid->allocated_days; // last year's carry-forward is measured against the full grid figure
+                            // Earned so far, as on the web (Annual Leave: anniversary accrual).
+                            $grid->allocated_days       =   Common::prorateLeaveByJoiningDate($grid->allocated_days, $employee->joining_date ?? null, $grid->leave_category_id);
                             $available                 =   $grid->allocated_days - $usedDays;
                             $apiCarryEnabled            =   !empty($grid->carry_forward) && $grid->carry_forward != '0';
                             if ($apiCarryEnabled) {
@@ -1280,7 +1284,7 @@ class LeaveController extends Controller
                                                                             ->orWhereBetween('to_date', [$apiLastYearStart, $apiLastYearEnd]);
                                                                     })
                                                                     ->value('used_days') ?? 0;
-                                $unused                 =   max($grid->allocated_days - $lastYearUsed, 0);
+                                $unused                 =   max($fullAllocation - $lastYearUsed, 0);
                                 $carryMax               =   isset($grid->carry_max) && $grid->carry_max !== null && $grid->carry_max !== '' ? (int) $grid->carry_max : null;
                                 $carryForward           =   $carryMax !== null ? min($unused, $carryMax) : $unused;
                                 $available              +=  $carryForward;
@@ -2393,7 +2397,8 @@ class LeaveController extends Controller
                     ]);
                 }
 
-                $allocatedDays                          =   $benefit_grid->allocated_days;
+                // Earned so far, same rule as the web apply check (Annual Leave: anniversary accrual).
+                $allocatedDays                          =   Common::prorateLeaveByJoiningDate($benefit_grid->allocated_days, $employee->joining_date ?? null, $categoryId);
 
                 // Get the total used days for the current leave category within the current year
                 $currentYearStart                       =   Carbon::now()->startOfYear()->format('Y-m-d');

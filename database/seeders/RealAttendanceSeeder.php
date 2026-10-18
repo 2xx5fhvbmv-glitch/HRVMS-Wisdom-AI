@@ -427,7 +427,7 @@ class RealAttendanceSeeder extends Seeder
                 $prev = Carbon::parse($rangePrev);
                 $curr = Carbon::parse($alDates[$i]);
 
-                if ($curr->diffInDays($prev) == 1) {
+                if ((int) $curr->diffInDays($prev, true) == 1) {
                     $rangePrev = $alDates[$i];
                 } else {
                     $ranges[] = ['from' => $rangeStart, 'to' => $rangePrev];
@@ -440,7 +440,7 @@ class RealAttendanceSeeder extends Seeder
             foreach ($ranges as $range) {
                 $fromDate = Carbon::parse($range['from']);
                 $toDate = Carbon::parse($range['to']);
-                $totalDays = $fromDate->diffInDays($toDate) + 1;
+                $totalDays = (int) $fromDate->diffInDays($toDate, true) + 1;
 
                 // Check no existing leave record for this range
                 $exists = DB::table('employees_leaves')

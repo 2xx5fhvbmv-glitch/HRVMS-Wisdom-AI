@@ -379,13 +379,14 @@
                         $auth_id = isset($resort_admin->GetEmployee) ? $resort_admin->GetEmployee->id : 26;
                         $current_route = Route::currentRouteName();
                         $_empRank = $resort_admin->GetEmployee->rank ?? null;
-                        $_hrDeptId = \App\Models\ResortDepartment::where('resort_id', $resort_id)->where('name', 'Human Resources')->value('id');
-                        $_empDeptId = $resort_admin->GetEmployee->Dept_id ?? null;
+                        // Same HR-department rule as the dashboard middleware / login redirect.
+                        $_inHrDept = \App\Helpers\Common::isHRDepartment($resort_admin->GetEmployee->Dept_id ?? null);
                         if ($resort_admin->is_master_admin == 1) {
                             $_logoRoute = route('resort.Page.Permission');
                         } elseif ($_empRank == 8) {
                             $_logoRoute = route('resort.master.gm_dashboard');
-                        } elseif (in_array($_empRank, [3, 7]) || ($_empRank == 1 && $_empDeptId == $_hrDeptId)) {
+                        } elseif (in_array($_empRank, [3, 7]) || (in_array((int) $_empRank, [1, 2], true) && $_inHrDept)) {
+                            // HR, Finance, HR-dept EXCOM — and the HR department's HOD.
                             $_logoRoute = route('resort.master.hr_dashboard');
                         } elseif ($_empRank == 1) {
                             $_logoRoute = route('resort.master.excom_dashboard');

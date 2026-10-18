@@ -41,6 +41,11 @@ class ApplyEmployeeLastWorkingDay extends Command
 
         $due = Employee::whereIn('status', ['Active', 'Offboarding', 'Terminated'])
             ->where(fn ($q) => $this->lastWorkingDayReached($q, $today))
+            // A withdrawal still waiting on HOD/HR holds the Inactive change until it is decided
+            // (approved → Active again; rejected → this run picks them up). Founder, 2026-10-15.
+            ->whereDoesntHave('resignation', fn ($r) => $r->where(fn ($w) => $w
+                ->where('withdraw_hod_status', 'Pending')
+                ->orWhere(fn ($h) => $h->where('withdraw_hod_status', 'Approved')->where('withdraw_hr_status', 'Pending'))))
             ->get(['id', 'resort_id', 'Dept_id', 'Position_id', 'Emp_id', 'Admin_Parent_id']);
 
         $processed = 0;

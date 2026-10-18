@@ -58,7 +58,9 @@ class IncrementTypeController extends Controller
                 ->rawColumns(['status','action']) 
                 ->make(true);
         }
-        return view('resorts.people.config.increment-type.list');
+        // A data endpoint for the DataTable — opened directly it rendered the host page
+        // without its variables (500, "Undefined variable $page_title"); send it to that page.
+        return redirect()->route('people.increment-types.index');
     }
   
     

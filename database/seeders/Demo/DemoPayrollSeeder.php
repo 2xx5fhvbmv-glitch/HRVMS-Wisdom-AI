@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Hash;
  * employee's pay worked out the way fetchTimeAttendance works it out —
  * through the same Common::payroll* helpers — so re-opening the pending run
  * shows the same figures. Amounts are USD (the resort currency is 'Dollar').
+ * Approved leave days are paid as the wizard pays them (paid leave = a present day).
  * Also: salary advances and loans with recovery schedules (paid by the
  * locked runs), and a staff shop whose consented purchases payroll deducts.
  */
@@ -29,6 +30,7 @@ class DemoPayrollSeeder
     private float $rate;
     private object $employees;
     private array $approvers;   // step => [employee id, name]
+    private object $leaves;     // approved leave by employee
     private array $counts = ['payroll runs' => 0, 'payslips' => 0, 'advances' => 0, 'shop purchases' => 0];
 
     public function __construct(private int $resortId, private int $adminId)
@@ -44,6 +46,9 @@ class DemoPayrollSeeder
                 'e.nationality', 'e.joining_date', 'e.Admin_Parent_id', 'a.first_name', 'a.last_name', 'a.email'])
             ->keyBy('id');
         $by = fn ($login) => $this->employees->firstWhere('email', $login . '@' . config('demo.login_domain'));
+        $this->leaves = DB::table('employees_leaves as l')->join('leave_categories as c', 'c.id', '=', 'l.leave_category_id')
+            ->where('l.resort_id', $this->resortId)->where('l.status', 'Approved')
+            ->get(['l.emp_id', 'l.from_date', 'l.to_date', 'c.leave_type', 'c.color', 'c.is_paid'])->groupBy('emp_id');
         foreach ([1 => ['Finance EXCOM', 'finance'], 2 => ['HR EXCOM', 'hr'], 3 => ['GM', 'gm']] as $step => [$role, $login]) {
             $e = $by($login);
             $this->approvers[$step] = [$role, $e->id, trim($e->first_name . ' ' . $e->last_name)];
@@ -76,8 +81,9 @@ class DemoPayrollSeeder
         $attendance = DB::table('parent_attendaces')->where('resort_id', $this->resortId)->whereBetween('date', [$from, $to])->get()->groupBy('Emp_id');
         $people = $this->employees->only($attendance->keys()->all());
         $context = Common::payrollRosterContext($this->resortId, $people->keys(), $from, $to, $attendance->flatten()->pluck('id'));
+        // Holiday OT days, as the wizard tests them: the resort's holidays and the national public holidays.
         $holidays = DB::table('resortholidays')->where('resort_id', $this->resortId)->whereBetween('PublicHolidaydate', [$from, $to])
-            ->pluck('PublicHolidaydate')->flip();
+            ->pluck('PublicHolidaydate')->flip()->all() + Common::publicHolidayDates();
         $days = $start->daysInMonth;
 
         $lines = [];
@@ -87,6 +93,13 @@ class DemoPayrollSeeder
             $presentRows = collect($records)->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDay']);
             $presentEquivalent = $presentRows->sum(fn ($r) => Common::payrollDayFraction($r, $context));
             $dayOff = $marks['day_off_dates']->count();
+            // Approved leave days (FullDayLeave): paid leave is a full present day, unpaid leave isn't paid.
+            $leave = collect($records)->where('Status', 'FullDayLeave')->map(function ($r) use ($id) {
+                $l = ($this->leaves[$id] ?? collect())->first(fn ($l) => $l->from_date <= $r->date && $l->to_date >= $r->date);
+                return $l ? ['type' => $l->leave_type, 'color' => $l->color, 'date' => $r->date, 'from' => $l->from_date, 'to' => $l->to_date,
+                    'is_paid' => $l->is_paid === 'paid'] : null;
+            })->filter()->values();
+            $paidLeave = $leave->where('is_paid', true)->count();
 
             $regular = $friday = $holiday = 0.0;
             foreach ($records as $r) {
@@ -109,13 +122,13 @@ class DemoPayrollSeeder
             $basic = (float) $e->basic_salary / ($e->basic_salary_currency === 'MVR' ? $this->rate : 1);
             $perDay = $basic / $days;
             $perHour = $perDay / 8;
-            $earned = round($perDay * ($presentEquivalent + $dayOff), 2);
+            $earned = round($perDay * ($presentEquivalent + $paidLeave + $dayOff), 2);
             $regularPay = round($perHour * 1.25 * $regular, 2);
             $fridayPay = round($perHour * 1.5 * $friday, 2);
             $holidayPay = round($perHour * 1.5 * $holiday, 2);
             $lines[$id] = [
-                'e' => $e, 'present' => $presentRows->count(), 'absent' => $marks['no_shows']->count() + collect($records)->where('Status', 'Absent')->count(),
-                'workdays' => $presentRows->count() + $dayOff, 'regular' => $regular, 'holiday' => $holiday,
+                'e' => $e, 'basic' => round($basic, 2), 'fridayPay' => $fridayPay, 'present' => $presentRows->count() + $paidLeave, 'absent' => $marks['no_shows']->count() + collect($records)->where('Status', 'Absent')->count(),
+                'workdays' => $presentRows->count() + $paidLeave + $dayOff, 'regular' => $regular, 'holiday' => $holiday, 'leave' => $leave,
                 'earned' => $earned, 'regularPay' => $regularPay, 'holidayPay' => $holidayPay, 'otPay' => round($regularPay + $fridayPay + $holidayPay, 2),
             ];
         }
@@ -149,14 +162,14 @@ class DemoPayrollSeeder
 
             $rows['payroll_employees'][] = $stamp + ['employee_id' => $id, 'Emp_id' => $e->Emp_id, 'position' => $e->Position_id,
                 'department' => $e->Dept_id, 'section' => null, 'paymentMethod' => $e->payment_mode ?: 'Cash'];
-            $rows['payroll_time_and_attandance'][] = $key + ['present_days' => $l['present'], 'absent_days' => $l['absent'], 'leave_types' => '-',
+            $rows['payroll_time_and_attandance'][] = $key + ['present_days' => $l['present'], 'absent_days' => $l['absent'], 'leave_types' => $this->leaveTypes($l['leave']),
                 'regular_ot_hours' => round($l['regular'], 2), 'holiday_ot_hours' => round($l['holiday'], 2),
                 'total_ot' => round($l['regular'] + $l['holiday'], 2), 'notes' => null];
             $rows['payroll_service_charges'][] = $key + ['total_working_days' => $l['workdays'], 'service_charge_amount' => $l['sc']];
             $rows['payroll_deductions'][] = $key + ['attendance_deduction' => 0, 'city_ledger' => 0, 'staff_shop' => $shopDue,
                 'advance_loan' => $advance, 'pension' => $pension, 'ewt' => $ewt, 'other' => 0, 'total_deductions' => $deductions];
             $rows['payroll_reviews'][] = $key + ['service_charge' => $l['sc'], 'service_provider_commission' => null,
-                'regularOTPay' => $l['regularPay'], 'holidayOTPay' => $l['holidayPay'], 'earnings_basic' => $l['earned'], 'earned_salary' => $l['earned'],
+                'regularOTPay' => $l['regularPay'], 'holidayOTPay' => $l['holidayPay'], 'fridayOTPay' => $l['fridayPay'], 'earnings_basic' => $l['basic'], 'earned_salary' => $l['earned'],
                 'earnings_overtime' => $l['otPay'], 'earnings_allowance' => 0, 'kpi_bonus' => 0, 'total_earnings' => $earnings,
                 'total_deductions' => $deductions, 'net_salary' => round($earnings - $deductions, 2)];
         }
@@ -187,6 +200,18 @@ class DemoPayrollSeeder
         }
         $this->counts['payroll runs']++;
         $this->counts['payslips'] += count($lines);
+    }
+
+    /**
+     * The run's "Other Leaves", e.g. "Sick Leave (2) Annual Leave (5)": the text of PayrollController's own badges
+     * (the method has no state, so no constructor is needed). The wizard saves the badge HTML itself, which
+     * leave_types (varchar 191) cuts off — the readable text fits.
+     */
+    private function leaveTypes($leave): string
+    {
+        static $format;
+        $format ??= new \ReflectionMethod(\App\Http\Controllers\Resorts\Payroll\PayrollController::class, 'formatLeaveTypes');
+        return strip_tags($format->invoke((new \ReflectionClass($format->class))->newInstanceWithoutConstructor(), $leave));
     }
 
     /**
@@ -286,7 +311,7 @@ class DemoPayrollSeeder
                 $e = $staff[mt_rand(0, count($staff) - 1)];
                 [$productId, $price] = $products[mt_rand(0, count($products) - 1)];
                 $qty = mt_rand(1, 3);
-                $bought = $month->copy()->addDays(mt_rand(0, (int) $month->diffInDays($last)));
+                $bought = $month->copy()->addDays(mt_rand(0, (int) $month->diffInDays($last, true)));
                 if ($bought->lt(Carbon::parse($e->joining_date))) {
                     continue;
                 }

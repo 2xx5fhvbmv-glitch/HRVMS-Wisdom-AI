@@ -230,12 +230,12 @@ class DashboardController extends Controller
         $resolvedDurations = collect();
         foreach ($cases->where('status', 'resolved') as $c) {
             if ($c->created_at && $c->updated_at) {
-                $resolvedDurations->push($c->created_at->diffInHours($c->updated_at));
+                $resolvedDurations->push((int) $c->created_at->diffInHours($c->updated_at, true));
             }
         }
         foreach ($disciplinary as $d) {
             if (strtolower((string)$d->status) === 'resolved' && $d->created_at && $d->updated_at) {
-                $resolvedDurations->push($d->created_at->diffInHours($d->updated_at));
+                $resolvedDurations->push((int) $d->created_at->diffInHours($d->updated_at, true));
             }
         }
         $avgResolutionHours = $resolvedDurations->count() > 0
@@ -440,12 +440,12 @@ class DashboardController extends Controller
         $resolvedDurations = collect();
         foreach ($cases->where('status', 'resolved') as $c) {
             if ($c->created_at && $c->updated_at) {
-                $resolvedDurations->push($c->created_at->diffInHours($c->updated_at));
+                $resolvedDurations->push((int) $c->created_at->diffInHours($c->updated_at, true));
             }
         }
         foreach ($disciplinary as $d) {
             if (strtolower((string)$d->status) === 'resolved' && $d->created_at && $d->updated_at) {
-                $resolvedDurations->push($d->created_at->diffInHours($d->updated_at));
+                $resolvedDurations->push((int) $d->created_at->diffInHours($d->updated_at, true));
             }
         }
         $avgResolutionHours = $resolvedDurations->count() > 0
@@ -502,7 +502,7 @@ class DashboardController extends Controller
         $stale = !is_array($cached) || empty($cached['generated_at']);
         if (!$stale) {
             $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
-            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+            if ($regenerate && (int) $generatedAt->diffInHours($now, true) >= $cooldownHours) {
                 $stale = true;
             }
         }
@@ -519,7 +519,7 @@ class DashboardController extends Controller
         $insights = $cached['insights'];
         $insights['_meta'] = [
             'generated_at'   => $generatedAt,
-            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'can_regenerate' => (int) $generatedAt->diffInHours($now, true) >= $cooldownHours,
             'next_available' => $generatedAt->copy()->addHours($cooldownHours),
         ];
 
@@ -603,10 +603,10 @@ class DashboardController extends Controller
             }
             $durations = [];
             foreach (GrivanceSubmissionModel::where('resort_id', $resortId)->where('status', 'resolved')->get(['created_at', 'updated_at']) as $c) {
-                if ($c->created_at && $c->updated_at) $durations[] = \Carbon\Carbon::parse($c->created_at)->diffInDays(\Carbon\Carbon::parse($c->updated_at));
+                if ($c->created_at && $c->updated_at) $durations[] = (int) \Carbon\Carbon::parse($c->created_at)->diffInDays(\Carbon\Carbon::parse($c->updated_at), true);
             }
             foreach (\App\Models\disciplinarySubmit::where('resort_id', $resortId)->whereRaw('LOWER(status) = ?', ['resolved'])->get(['created_at', 'updated_at']) as $d) {
-                if ($d->created_at && $d->updated_at) $durations[] = \Carbon\Carbon::parse($d->created_at)->diffInDays(\Carbon\Carbon::parse($d->updated_at));
+                if ($d->created_at && $d->updated_at) $durations[] = (int) \Carbon\Carbon::parse($d->created_at)->diffInDays(\Carbon\Carbon::parse($d->updated_at), true);
             }
             $avgDays = !empty($durations) ? round(array_sum($durations) / count($durations), 1) : null;
             if ($openCount > 0 || $avgDays !== null) {
@@ -719,8 +719,8 @@ class DashboardController extends Controller
 
     private function progressPct(Carbon $filed, Carbon $deadline): int
     {
-        $totalDays = max(1, $filed->diffInDays($deadline));
-        $usedDays  = max(0, min($totalDays, $filed->diffInDays(Carbon::now())));
+        $totalDays = max(1, (int) $filed->diffInDays($deadline, true));
+        $usedDays  = max(0, min($totalDays, (int) $filed->diffInDays(Carbon::now(), true)));
         $pct       = (int) round(($usedDays / $totalDays) * 100);
         return max(5, min(100, $pct));
     }

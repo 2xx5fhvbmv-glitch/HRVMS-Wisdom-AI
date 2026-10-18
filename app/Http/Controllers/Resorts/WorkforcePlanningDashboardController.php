@@ -789,7 +789,9 @@ class WorkforcePlanningDashboardController extends Controller
                 ->make(true);
         }
 
-        return view('resorts.workforce_planning.filledpositions');
+        // A data endpoint for the DataTable — opened directly it rendered the host page
+        // without its variables (500, "Undefined variable $page_title"); send it to that page.
+        return redirect()->route('resort.workforceplan.filledpositions');
     }
 
     public function getEmployeeNames(Request $request)

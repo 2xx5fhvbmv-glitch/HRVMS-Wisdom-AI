@@ -188,6 +188,11 @@ class ApprovalInboxTest extends TestCase
         $this->assertNotNull($row);
         $this->assertStringNotContainsString('btnIcon-skyblue me-2" data-req_id', strstr($row['action'], 'view-btn', true) ?: '', 'no approve button');
 
+        // A direct call without a reason is refused server-side too.
+        $this->as('finance')->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+            ->postJson(route('resort.visa.PaymentRequestRejected'), ['Payment_id' => base64_encode($id), 'reason' => ' '])->assertStatus(422);
+        $this->assertSame('Pending', DB::table('payment_requests')->where('id', $id)->value('Status'));
+
         $this->click('finance', $row, 'reject', 'Wrong fee amounts');
         $this->assertSame(['Rejact', 'Wrong fee amounts'], array_values((array) DB::table('payment_requests')->where('id', $id)->first(['Status', 'Reason'])),
             'stored as the enum value, not blanked');
@@ -245,5 +250,96 @@ class ApprovalInboxTest extends TestCase
         $rows = $this->inbox('hr', ['search' => $otherPrefix . '-']);
         $this->assertSame([], array_values(array_filter($rows, fn ($r) => !str_starts_with((string) $r['emp_id'], 'DMX') && $r['emp_id'] !== '—')),
             'the ungrouped orWhereHas(Emp_id) no longer escapes the resort filter');
+    }
+
+    /** $absent is on approved leave today and handed their approvals to $delegate (how the app records delegation). */
+    private function delegate(string $absent, string $delegate): void
+    {
+        DB::table('employees_leaves')->insert(['resort_id' => $this->resortId, 'emp_id' => $this->emp($absent)->id,
+            'leave_category_id' => DB::table('leave_categories')->where('resort_id', $this->resortId)->where('leave_type', 'Annual Leave')->value('id'),
+            'from_date' => now()->subDay()->toDateString(), 'to_date' => now()->addDays(3)->toDateString(), 'total_days' => 5, 'duration' => 'Full Day',
+            'reason' => 'Holiday', 'status' => 'Approved', 'task_delegation' => $this->emp($delegate)->id, 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    public function test_resignation_withdrawal_goes_hod_then_hr_and_reject_needs_a_reason()
+    {
+        $staff = $this->emp('employee');
+        DB::table('employees')->where('id', $staff->id)->update(['status' => 'Offboarding']);
+        $id = DB::table('employee_resignation')->insertGetId(['resort_id' => $this->resortId, 'employee_id' => $staff->id, 'reason' => 'Relocation',
+            'resignation_date' => now()->toDateString(), 'hod_id' => $this->emp('hod.housekeeping')->id, 'hr_id' => $this->emp('hr')->id,
+            'status' => 'Approved', 'hod_status' => 'Approved', 'hr_status' => 'Approved', 'withdraw_hod_status' => 'Pending', 'withdraw_hr_status' => 'Pending',
+            'created_at' => now(), 'updated_at' => now()]);
+        $name = $staff->resortAdmin->full_name;
+
+        $this->assertNull($this->row('hr', 'Resignation Withdrawal', $name), 'HR waits for the HOD');
+        $row = $this->row('hod.housekeeping', 'Resignation Withdrawal', $name);
+        $this->assertNotNull($row);
+        $this->assertStringNotContainsString('On-Hold', $row['action'], 'no hold for withdrawals');
+        $this->click('hod.housekeeping', $row, 'approve');
+        $this->assertSame('Approved', DB::table('employee_resignation')->where('id', $id)->value('withdraw_hod_status'));
+        $this->assertNull($this->row('hod.housekeeping', 'Resignation Withdrawal', $name));
+
+        $this->click('hr', $this->row('hr', 'Resignation Withdrawal', $name), 'reject', 'Replacement already hired');
+        $r = DB::table('employee_resignation')->where('id', $id)->first();
+        $this->assertSame(['Rejected', 'Replacement already hired'], [$r->withdraw_hr_status, $r->withdraw_rejected_reason]);
+        $this->assertSame('Offboarding', DB::table('employees')->where('id', $staff->id)->value('status'), 'a rejected withdrawal leaves the employee Offboarding');
+        $this->assertNull($this->row('hr', 'Resignation Withdrawal', $name));
+    }
+
+    public function test_delegates_can_act_on_payroll_budget_and_learning()
+    {
+        // Payroll: the Finance Director is away, the Finance Manager covers step 1.
+        $pid = DB::table('payroll')->insertGetId(['resort_id' => $this->resortId, 'start_date' => '2026-09-01', 'end_date' => '2026-09-30',
+            'total_payroll' => 1000, 'total_employees' => 100, 'draft_date' => now(), 'payment_date' => now(), 'status' => 'pending_approval',
+            'created_at' => now(), 'updated_at' => now()]);
+        foreach ([1 => 'Finance EXCOM', 2 => 'HR EXCOM', 3 => 'GM'] as $order => $title) {
+            DB::table('payroll_approvals')->insert(['payroll_id' => $pid, 'resort_id' => $this->resortId, 'step_order' => $order, 'role_title' => $title,
+                'status' => 'pending', 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $this->assertNull($this->row('finance.manager', 'Payroll Approval'), 'not without a delegation');
+        $this->delegate('finance', 'finance.manager');
+        $this->click('finance.manager', $this->row('finance.manager', 'Payroll Approval'), 'approve');
+        $this->assertSame('approved', DB::table('payroll_approvals')->where('payroll_id', $pid)->where('step_order', 1)->value('status'));
+        $this->as('finance.manager')->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)->postJson(route('payroll.approval.status'), ['payroll_id' => $pid])->assertJsonPath('user_approval_step', 1);
+
+        // Budget: the GM is away, the Resident Manager (EXCOM) covers the GM step.
+        $kitchen = DB::table('resort_departments')->where('resort_id', $this->resortId)->where('name', 'Kitchen')->value('id');
+        $bid = DB::table('manning_responses')->insertGetId(['resort_id' => $this->resortId, 'dept_id' => $kitchen, 'year' => 2027, 'status' => 'submitted',
+            'employment_type' => 'Permanent', 'budget_process_status' => 'GM', 'created_at' => now(), 'updated_at' => now()]);
+        $this->assertNull($this->row('excom', 'Budget Approval', 'Kitchen'));
+        $this->delegate('gm', 'excom');
+        $this->click('excom', $this->row('excom', 'Budget Approval', 'Kitchen'), 'approve');
+        $this->assertSame('Approved', DB::table('manning_responses')->where('id', $bid)->value('budget_process_status'));
+
+        // Learning: the L&D Manager is away, the F&B HOD covers.
+        $ld = $this->emp('hr.manager');
+        DB::table('resort_positions')->where('id', $ld->Position_id)->update(['position_title' => 'L&D Manager']);
+        $cat = DB::table('learning_categories')->insertGetId(['resort_id' => $this->resortId, 'category' => 'Service', 'color' => '#000', 'created_at' => now(), 'updated_at' => now()]);
+        $prog = DB::table('learning_programs')->insertGetId(['resort_id' => $this->resortId, 'name' => 'Wine Basics', 'description' => '-', 'learning_category_id' => $cat,
+            'target_audience' => 'All', 'frequency' => 'Once', 'delivery_mode' => 'Classroom', 'created_at' => now(), 'updated_at' => now()]);
+        $lid = DB::table('learning_requests')->insertGetId(['resort_id' => $this->resortId, 'learning_id' => $prog, 'learning_manager_id' => $ld->id,
+            'status' => 'Pending', 'created_by' => $this->emp('hod.kitchen')->Admin_Parent_id, 'created_at' => now(), 'updated_at' => now()]);
+        $this->assertNull($this->row('hod.fnb', 'Learning Request', 'Wine Basics'));
+        $this->delegate('hr.manager', 'hod.fnb');
+        $this->click('hod.fnb', $this->row('hod.fnb', 'Learning Request', 'Wine Basics'), 'approve');
+        $this->assertSame('Approved', DB::table('learning_requests')->where('id', $lid)->value('status'));
+    }
+
+    public function test_salary_advance_finance_stage_accepts_a_delegate()
+    {
+        $staff = $this->emp('employee');
+        $id = DB::table('payroll_advance')->insertGetId(['employee_id' => $staff->id, 'resort_id' => $this->resortId, 'request_type' => 'Salary Advance',
+            'request_date' => now()->toDateString(), 'pourpose' => 'Family', 'request_amount' => 300, 'hr_status' => 'Approved', 'finance_status' => 'Pending',
+            'gm_status' => 'Pending', 'status' => 'Pending', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('payroll_advance_guarantor')->insert(['payroll_advance_id' => $id, 'guarantor_id' => $this->emp('supervisor')->id, 'status' => 'Approved',
+            'created_at' => now(), 'updated_at' => now()]);
+        $name = $staff->resortAdmin->full_name;
+
+        $this->assertNull($this->row('hod.fnb', 'Payroll Advance', $name));
+        $this->delegate('finance', 'hod.fnb'); // the F&B HOD covers for the Finance Director
+        $row = $this->row('hod.fnb', 'Payroll Advance', $name);
+        $this->assertNotNull($row, 'the delegate sees the Finance stage');
+        $this->click('hod.fnb', $row, 'approve');
+        $this->assertSame('Approved', DB::table('payroll_advance')->where('id', $id)->value('finance_status'), 'and the endpoint accepts them (was: never matched)');
     }
 }

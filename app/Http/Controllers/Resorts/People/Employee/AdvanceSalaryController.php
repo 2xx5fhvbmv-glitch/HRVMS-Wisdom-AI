@@ -700,19 +700,13 @@ class AdvanceSalaryController extends Controller
                     ->whereIn('position_title', $financeManagerTitles)
                     ->pluck('id');
 
-                $financeApprover = Employee::with(['resortAdmin', 'position'])
-                    ->whereIn('position_id', $positionIds)
+                // A Finance approver by title, or someone covering for one today. Was: the
+                // lookup was filtered to the signed-in user, so a delegate never matched.
+                $me = $this->resort->GetEmployee->id ?? null;
+                $financeApprover = Employee::whereIn('position_id', $positionIds)
                     ->where('resort_id', $this->resort->resort_id)
-                    ->where('Admin_Parent_id',$this->resort->id)
-                    ->select('id')
-                    ->first();
-
-                // If current user is not the finance approver, check delegation
-                if ($financeApprover && $financeApprover->id != ($this->resort->GetEmployee->id ?? null)) {
-                    if (!\App\Helpers\Common::hasDelegationAuthority($this->resort->GetEmployee->id, $financeApprover->id, $this->resort->resort_id)) {
-                        $financeApprover = null;
-                    }
-                }
+                    ->get(['id'])
+                    ->first(fn ($f) => $f->id == $me || \App\Helpers\Common::hasDelegationAuthority($me, $f->id, $this->resort->resort_id));
                 if (!$financeApprover) {
                     return response()->json(['success' => false, 'status' => 'error', 'message' => 'You are not authorized to approve as Finance.'], 403);
                 }
@@ -771,19 +765,12 @@ class AdvanceSalaryController extends Controller
                 }
             }elseif($request->action_by == 'gm' && $payrollAdvance->gm_status == 'Pending'){
             
-                $gmApprover = Employee::with('position')
-                    ->where('rank', 8)
+                // The GM, or someone covering for the GM today (same delegate bug as Finance above).
+                $me = $this->resort->GetEmployee->id ?? null;
+                $gmApprover = Employee::where('rank', 8)
                     ->where('resort_id', $this->resort->resort_id)
-                    ->where('Admin_Parent_id',$this->resort->id)
-                    ->select('id')
-                    ->first();
-
-                // If current user is not the GM, check delegation
-                if ($gmApprover && $gmApprover->id != ($this->resort->GetEmployee->id ?? null)) {
-                    if (!\App\Helpers\Common::hasDelegationAuthority($this->resort->GetEmployee->id, $gmApprover->id, $this->resort->resort_id)) {
-                        $gmApprover = null;
-                    }
-                }
+                    ->get(['id'])
+                    ->first(fn ($g) => $g->id == $me || \App\Helpers\Common::hasDelegationAuthority($me, $g->id, $this->resort->resort_id));
                 if (!$gmApprover) {
                     return response()->json(['success' => false, 'status' => 'error', 'message' => 'You are not authorized to approve as GM.'], 403);
                 }

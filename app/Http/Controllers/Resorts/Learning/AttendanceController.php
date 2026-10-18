@@ -115,8 +115,8 @@ class AttendanceController extends Controller
                         ->count();
 
                     // Calculate total training days
-                    $total_training_days = \Carbon\Carbon::parse($session->start_date)
-                        ->diffInDays(\Carbon\Carbon::parse($session->end_date)) + 1; // +1 to include start date
+                    $total_training_days = (int) \Carbon\Carbon::parse($session->start_date)
+                        ->diffInDays(\Carbon\Carbon::parse($session->end_date), true) + 1; // +1 to include start date
 
                     // Format attendance as Present/Total
                     $attendance_status = "{$total_present_days}/{$total_training_days}";

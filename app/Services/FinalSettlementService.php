@@ -67,7 +67,7 @@ class FinalSettlementService
         // Guard against inverted ranges (employee joined after payroll
         // window). 0 expected days → proratedBasic 0; warning will fire.
         $expectedWorkingDays = $effectiveStart->lessThanOrEqualTo($effectiveEnd)
-            ? ($effectiveEnd->diffInDays($effectiveStart) + 1)
+            ? ((int) $effectiveEnd->diffInDays($effectiveStart, true) + 1)
             : 0;
 
         $attendance = ParentAttendace::where('Emp_id', $employee->Emp_id)
@@ -102,7 +102,7 @@ class FinalSettlementService
         // so an employee who actually worked 6 of the 30 cycle days gets
         // 6/30 of the monthly. expectedWorkingDays is reported alongside
         // so HR can spot "worked 0 of 6 expected" gaps.
-        $totalDays = $payrollEnd->diffInDays($payrollStart) + 1;
+        $totalDays = (int) $payrollEnd->diffInDays($payrollStart, true) + 1;
 
         $settings = ResortSiteSettings::where('resort_id', $resortId)->first();
         $conversionRate = $settings ? ($settings->DollertoMVR ?? 15.42) : 15.42;
@@ -121,7 +121,7 @@ class FinalSettlementService
             if (!empty($record->OverTime) && str_contains($record->OverTime, ':')) {
                 [$h, $m] = explode(':', $record->OverTime);
                 $hours = (int)$h + ((int)$m / 60);
-                $isHoliday = PublicHoliday::where('holiday_date', date('d M Y', strtotime($record->date)))->exists();
+                $isHoliday = isset(Common::publicHolidayDates()[date('Y-m-d', strtotime($record->date))]); // stored dd-mm-YYYY
                 $isHoliday ? $holidayOT += $hours : $regularOT += $hours;
             }
         }
@@ -271,7 +271,7 @@ class FinalSettlementService
                 // produces 0 instead of crashing.
                 $noticeRequiredDays  = (int) preg_replace('/\D+/', '', (string) $noticeRule->period);
                 $noticeServedDays    = $lastWorkingDay->greaterThanOrEqualTo($resignationDate)
-                    ? ($lastWorkingDay->diffInDays($resignationDate) + 1)
+                    ? ((int) $lastWorkingDay->diffInDays($resignationDate, true) + 1)
                     : 0;
                 $noticeShortfallDays = max(0, $noticeRequiredDays - $noticeServedDays);
                 $noticePeriodChargeMvr = round($noticeShortfallDays * $dailySalary, 2);
@@ -306,7 +306,7 @@ class FinalSettlementService
         $loanCount          = 0;
         $advanceCount       = 0;
         foreach ($recoveryRows as $r) {
-            $amt = (float) ($r->amount ?? 0) + (float) ($r->interest_amount ?? 0);
+            $amt = (float) ($r->amount ?? 0); // installment already includes interest_amount — adding it again double-charged
             $amtMvr = ($currency === 'USD') ? $amt * $conversionRate : $amt;
             // request_type values seeded by the UI are 'loan' /
             // 'salary_advance' / 'advance' — anything containing 'loan'
@@ -499,7 +499,7 @@ class FinalSettlementService
             : $today;
         $joiningDate = $employee->joining_date ? Carbon::parse($employee->joining_date) : null;
         $accrualStart = $joiningDate
-            ? $joiningDate->copy()->addYears((int) floor($joiningDate->floatDiffInYears($now)))
+            ? $joiningDate->copy()->addYears((int) floor($joiningDate->floatDiffInYears($now, true)))
             : $now->copy()->startOfYear();
         // Clock-skew safety: a freshly anniversary'd employee whose hour
         // hasn't ticked over yet shouldn't see a future cycleStart.
@@ -528,7 +528,7 @@ class FinalSettlementService
         // months gets credited proportionally instead of rounding to a
         // full month. Clamp to [0, 12] so we never grant more than one
         // year of accrual within a single cycle, regardless of clock drift.
-        $tenureMonths = max(0.0, min(12.0, (float) $accrualStart->floatDiffInMonths($now)));
+        $tenureMonths = max(0.0, min(12.0, (float) $accrualStart->floatDiffInMonths($now, true)));
         $tenureRatio  = $tenureMonths / 12.0;
 
         foreach ($benefit_grids as $grid) {

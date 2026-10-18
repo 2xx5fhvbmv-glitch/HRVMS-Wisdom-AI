@@ -2636,7 +2636,7 @@ class WisdomTools
             foreach ($resolved as $r) {
                 $c = $r->getRawOriginal('created_at');
                 $rs = $r->getRawOriginal('resolved_at');
-                if ($c && $rs) { $sum += Carbon::parse($c)->diffInDays(Carbon::parse($rs)); $n++; }
+                if ($c && $rs) { $sum += (int) Carbon::parse($c)->diffInDays(Carbon::parse($rs), true); $n++; }
             }
             $avgDays = $n > 0 ? round($sum / $n, 1) : null;
         }

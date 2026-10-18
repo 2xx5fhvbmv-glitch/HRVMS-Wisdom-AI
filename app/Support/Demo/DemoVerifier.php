@@ -90,6 +90,64 @@ class DemoVerifier
             return ($pending > 0 && $approved > 0) ?: "{$approved} approved, {$pending} pending";
         });
 
+        // Slice 3b: leave and island passes.
+        $leaves = fn () => DB::table('employees_leaves')->where('resort_id', $resortId);
+        $this->check('Leave in every state: taken, on leave today, waiting, rejected', function () use ($leaves) {
+            $today = now()->format('Y-m-d');
+            $n = ['taken' => $leaves()->where('status', 'Approved')->where('to_date', '<', $today)->count(),
+                'on leave today' => $leaves()->where('status', 'Approved')->where('from_date', '<=', $today)->where('to_date', '>=', $today)->count(),
+                'waiting' => $leaves()->where('status', 'Pending')->count(), 'rejected' => $leaves()->where('status', 'Rejected')->count()];
+            return min($n) > 0 ?: json_encode($n);
+        });
+        $this->check('Every leave\'s approval chain matches its status', function () use ($leaves) {
+            $steps = DB::table('employees_leaves_status')->whereIn('leave_request_id', $leaves()->pluck('id'))->get()->groupBy('leave_request_id');
+            $bad = $leaves()->get(['id', 'status'])->filter(function ($l) use ($steps) {
+                $s = ($steps[$l->id] ?? collect())->pluck('status');
+                return $s->isEmpty() || match ($l->status) {
+                    'Approved' => $s->contains(fn ($x) => $x !== 'Approved'),
+                    'Pending' => !$s->contains('Pending') || $s->contains('Rejected'),
+                    default => !$s->contains('Rejected'),
+                };
+            })->count();
+            return $bad === 0 ?: "{$bad} leaves out of step with their approvals";
+        });
+        $this->check('Every login with a team has a leave request waiting on them', function () use ($resortId) {
+            $missing = [];
+            foreach (DB::table('employees as e')->join('resort_admins as a', 'a.id', '=', 'e.Admin_Parent_id')->where('e.resort_id', $resortId)
+                ->where('e.status', 'Active')->whereExists(fn ($q) => $q->from('employees as r')->whereColumn('r.reporting_to', 'e.id'))
+                ->get(['e.id', 'a.email'])->filter(fn ($a) => Demo::isLogin($a->email)) as $a) {
+                $waiting = DB::table('employees_leaves_status as s')->join('employees_leaves as l', 'l.id', '=', 's.leave_request_id')
+                    ->where('l.resort_id', $resortId)->where('l.status', 'Pending')->where('s.status', 'Pending')->where('s.approver_id', $a->id)
+                    ->whereRaw('s.id = (SELECT MIN(p.id) FROM employees_leaves_status p WHERE p.leave_request_id = l.id AND p.status = ?)', ['Pending'])->exists();
+                if (!$waiting) {
+                    $missing[] = strstr($a->email, '@', true);
+                }
+            }
+            return !$missing ?: 'nothing waiting for ' . implode(', ', $missing);
+        });
+        $this->check('Leave balances: everyone has one, nobody is overdrawn', function () use ($resortId, $employees) {
+            foreach ($employees()->where('status', 'Active')->pluck('id') as $id) {
+                $balance = \App\Helpers\Common::getEmployeeLeaveBalance($id, $resortId);
+                if (!$balance || collect($balance)->min('balance') < 0) {
+                    return "employee {$id}: " . ($balance ? 'overdrawn' : 'no balance');
+                }
+            }
+            return true;
+        });
+        $this->check('Approved leave days are leave in the attendance', function () use ($resortId) {
+            $worked = DB::table('parent_attendaces as p')->join('employees_leaves as l', fn ($j) => $j->on('l.emp_id', '=', 'p.Emp_id')
+                ->where('l.status', 'Approved')->whereColumn('p.date', '>=', 'l.from_date')->whereColumn('p.date', '<=', 'l.to_date'))
+                ->where('p.resort_id', $resortId)->where('p.Status', '!=', 'FullDayLeave')->count();
+            return $worked === 0 ?: "{$worked} attendance days inside approved leave";
+        });
+        $this->check('Island passes: travelled, waiting, rejected, cancelled', function () use ($resortId) {
+            $passes = fn () => DB::table('employee_travel_passes')->where('resort_id', $resortId);
+            $n = ['travelled' => $passes()->where('status', 'Approved')->where('employee_arrival_status', 'arrived')->count(),
+                'waiting' => $passes()->where('status', 'Pending')->count(), 'rejected' => $passes()->where('status', 'Rejected')->count(),
+                'cancelled' => $passes()->where('status', 'Cancel')->count()];
+            return min($n) > 0 ?: json_encode($n);
+        });
+
         // Slice 4: payroll.
         $this->check('12 locked payroll runs, last month waiting on Finance → HR → GM', function () use ($resortId) {
             $locked = DB::table('payroll')->where('resort_id', $resortId)->where('status', 'locked')->count();

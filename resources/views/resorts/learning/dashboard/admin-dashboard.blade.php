@@ -256,7 +256,7 @@
                             @else
                                 @foreach ($trainings as $training)
                                     @php
-                                        $totalTrainingDays = \Carbon\Carbon::parse($training->start_date)->diffInDays(\Carbon\Carbon::parse($training->end_date)) + 1;
+                                        $totalTrainingDays = (int) \Carbon\Carbon::parse($training->start_date)->diffInDays(\Carbon\Carbon::parse($training->end_date), true) + 1;
                                         $totalParticipants = $training->participants->count();
                                         $totalExpectedAttendance = $totalTrainingDays * $totalParticipants;
                                         $actualAttendance = $training->trainingAttendances->where('status', 'Present')->count();

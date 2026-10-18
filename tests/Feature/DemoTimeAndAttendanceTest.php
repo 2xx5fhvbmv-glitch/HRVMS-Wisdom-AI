@@ -57,10 +57,10 @@ class DemoTimeAndAttendanceTest extends TestCase
         // Register inner-joins the shift and the dashboard joins the roster: neither may be missing.
         $this->assertSame(0, $pa()->whereNotIn('Shift_id', DB::table('shift_settings')->where('resort_id', $this->resortId)->select('id'))->count());
         $this->assertSame(0, $pa()->whereNotIn('roster_id', DB::table('duty_rosters')->where('resort_id', $this->resortId)->select('id'))->count());
-        // Nobody works a day longer than 24h; every punch has a parseable location.
+        // Nobody works a day longer than 24h; every punch has a parseable location (leave days are marked, not punched).
         $this->assertLessThan(24 * 60, $pa()->pluck('DayWiseTotalHours')->map(fn ($h) => $this->minutes($h))->max());
         $this->assertSame(0, DB::table('child_attendaces as c')->join('parent_attendaces as p', 'p.id', '=', 'c.Parent_attd_id')
-            ->where('p.resort_id', $this->resortId)->where('c.InTime_Location', 'not like', '%center=%')->count());
+            ->where('p.resort_id', $this->resortId)->where('p.Status', '!=', 'FullDayLeave')->where('c.InTime_Location', 'not like', '%center=%')->count());
         // Open breaks look like the API's: blank end, blank total.
         $this->assertSame(0, DB::table('break_attendaces as b')->join('parent_attendaces as p', 'p.id', '=', 'b.Parent_attd_id')
             ->where('p.resort_id', $this->resortId)->where('b.Break_InTime', '')->where('b.Total_Break_Time', '!=', '')->count());
@@ -70,7 +70,7 @@ class DemoTimeAndAttendanceTest extends TestCase
     {
         $hr = $this->signInHr();
         $day = DB::table('parent_attendaces as pa')->join('shift_settings as s', 's.id', '=', 'pa.Shift_id')
-            ->where('pa.resort_id', $this->resortId)->where('s.ShiftName', 'Morning Shift')
+            ->where('pa.resort_id', $this->resortId)->where('s.ShiftName', 'Morning Shift')->where('pa.Status', 'Present')
             ->where('pa.date', '<', now()->subDays(20)->toDateString())->whereNotNull('pa.CheckingOutTime')->first(['pa.*']);
         $this->assertMatchesRegularExpression('/^\d{2}:\d{2}:\d{2}$/', $day->CheckingTime, 'mobile punches are H:i:s');
         DB::table('employee_overtimes')->where('parent_attendance_id', $day->id)->delete();

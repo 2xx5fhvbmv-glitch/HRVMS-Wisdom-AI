@@ -89,6 +89,9 @@ class JobDescriptionEmployeeRecord extends Model
     public static function syncCompliance($resortId, $employeeId): array
     {
         $active = [];
+        // Only Active employees are flagged (founder, 2026-10-15); an Inactive one's
+        // open breach resolves exactly as if the JD had been signed.
+        $isActive = \App\Models\Employee::where('resort_id', $resortId)->where('id', $employeeId)->value('status') === 'Active';
         foreach (self::COMPLIANCE_RULES as $status => [$breach, $verb]) {
             $open = Compliance::where('resort_id', $resortId)->where('employee_id', $employeeId)
                 ->where('module_name', 'Job Description')->where('compliance_breached_name', $breach)
@@ -97,7 +100,7 @@ class JobDescriptionEmployeeRecord extends Model
                 ->where('resort_id', $resortId)->where('employee_id', $employeeId)
                 ->where('status', $status)->latest('id')->first();
 
-            if (!$record) {
+            if (!$record || !$isActive) {
                 // Same resolved marking as ComplianceController::resolveStaleBreaches().
                 foreach ($open->where('Dismissal_status', 'Pending')->get() as $row) {
                     $row->status = 'Resolved';

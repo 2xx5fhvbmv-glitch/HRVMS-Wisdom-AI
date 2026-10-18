@@ -97,10 +97,10 @@ class RenewalController extends Controller
             if($VisaRenewal) 
             {
                 $Visaend = Carbon::parse($VisaRenewal->end_date);
-                $months_diff = $start->diffInMonths($Visaend);
+                $months_diff = (int) $start->diffInMonths($Visaend, true);
                 if ($months_diff < 1) 
                 {
-                    $days_diff = $start->diffInDays($Visaend);
+                    $days_diff = (int) $start->diffInDays($Visaend, true);
                     $VisaRenewal->VisaRenewalTime = "Expires in $days_diff days";
                 } 
                 else
@@ -141,18 +141,18 @@ class RenewalController extends Controller
                 // "7 month(s) remaining" instead of expired. Branch on past/future.
                 if ($insurance_end_date->isPast())
                 {
-                    $monthsAgo = $insurance_end_date->diffInMonths($start);
-                    $daysAgo   = $insurance_end_date->diffInDays($start);
+                    $monthsAgo = (int) $insurance_end_date->diffInMonths($start, true);
+                    $daysAgo   = (int) $insurance_end_date->diffInDays($start, true);
                     $EmployeeInsurance->InsuranceRenewalTime = $monthsAgo >= 1
                         ? "Expired $monthsAgo month(s) ago"
                         : "Expired $daysAgo day(s) ago";
                 }
                 else
                 {
-                    $insurance_months_diff = $start->diffInMonths($insurance_end_date);
+                    $insurance_months_diff = (int) $start->diffInMonths($insurance_end_date, true);
                     if ($insurance_months_diff < 1)
                     {
-                        $days_diff = $start->diffInDays($insurance_end_date);
+                        $days_diff = (int) $start->diffInDays($insurance_end_date, true);
                         $EmployeeInsurance->InsuranceRenewalTime = "Expires in $days_diff days";
                     }
                     else
@@ -176,10 +176,10 @@ class RenewalController extends Controller
                 // Unified — latest UNPAID medical record (falls back to latest).
                 $medDue = \App\Helpers\Common::visaNextDue(WorkPermitMedicalRenewal::class, $this->resort->resort_id, $emp_id, 'end_date', 'desc') ?: $WorkPermitMedicalRenewal->end_date;
                 $medical_end_date = Carbon::parse($medDue);
-                $medical_months_diff = $start->diffInMonths($medical_end_date);
+                $medical_months_diff = (int) $start->diffInMonths($medical_end_date, true);
                 if ($medical_months_diff < 1) 
                 {
-                    $days_diff = $start->diffInDays($medical_end_date);
+                    $days_diff = (int) $start->diffInDays($medical_end_date, true);
                     $WorkPermitMedicalRenewal->MedicalRenewalTime = "Expires in $days_diff days";
                 } 
                 else
@@ -206,10 +206,10 @@ class RenewalController extends Controller
                     ->whereNotNull('Due_Date')->max('Due_Date') ?: $QuotaSlotRenewal->Due_Date;
                 $QuotaSlotRenewal_end_date = Carbon::parse($slotDue);
 
-                $QuotaSlotRenewal_months_diff = $start->diffInMonths($QuotaSlotRenewal_end_date);
+                $QuotaSlotRenewal_months_diff = (int) $start->diffInMonths($QuotaSlotRenewal_end_date, true);
                 if ($QuotaSlotRenewal_months_diff < 1) 
                 {
-                    $days_diff = $start->diffInDays($QuotaSlotRenewal_end_date);
+                    $days_diff = (int) $start->diffInDays($QuotaSlotRenewal_end_date, true);
                     $QuotaSlotRenewal->QuotaSlotRenewalDate = "Expires in $days_diff days";
                 } 
                 else
@@ -237,11 +237,11 @@ class RenewalController extends Controller
                     ->whereNotNull('Due_Date')->max('Due_Date') ?: $WorkPermitRenewal->Due_Date;
                 $WorkPermitRenewal_end_date = Carbon::parse($wpDue);
 
-                $WorkPermitRenewal_months_diff = $start->diffInMonths($WorkPermitRenewal_end_date);
+                $WorkPermitRenewal_months_diff = (int) $start->diffInMonths($WorkPermitRenewal_end_date, true);
                 if ($WorkPermitRenewal_months_diff < 1) 
 
                 {
-                    $days_diff = $start->diffInDays($WorkPermitRenewal_end_date);
+                    $days_diff = (int) $start->diffInDays($WorkPermitRenewal_end_date, true);
                     $WorkPermitRenewal->WorkPermitRenewalDate = "Expires in $days_diff days";
                 } 
                 else
@@ -1187,7 +1187,7 @@ class RenewalController extends Controller
     {
         $start = Carbon::today();
         $end = Carbon::parse($endDate);
-        $daysDiff = $start->diffInDays($end, false);
+        $daysDiff = (int) $start->diffInDays($end, false);
         if ($daysDiff < 0) 
         {
             return $end->format('d M Y')."  (Expired " . abs($daysDiff) . " days ago)";

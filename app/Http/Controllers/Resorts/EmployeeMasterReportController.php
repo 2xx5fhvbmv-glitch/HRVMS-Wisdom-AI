@@ -196,7 +196,7 @@ class EmployeeMasterReportController extends Controller
     {
         if (!$join) return null;
         $end = $end ? Carbon::parse($end) : Carbon::now();
-        return round(Carbon::parse($join)->floatDiffInYears($end), 1);
+        return round(Carbon::parse($join)->floatDiffInYears($end, true), 1);
     }
 
     private function separationType($r): string

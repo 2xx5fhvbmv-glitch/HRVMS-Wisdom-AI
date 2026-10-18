@@ -51,7 +51,7 @@ class AccommodationEscalationReminder extends Command
                     $threshold = $thresholdByResort[$request->resort_id];
                     if ($threshold <= 0) continue;
 
-                    $daysSinceRequest = now()->diffInDays(Carbon::parse($request->date));
+                    $daysSinceRequest = (int) now()->diffInDays(Carbon::parse($request->date), true);
                     if ($daysSinceRequest <= $threshold) continue;
 
                     $recipients = array_values(array_unique(array_filter(array_merge(

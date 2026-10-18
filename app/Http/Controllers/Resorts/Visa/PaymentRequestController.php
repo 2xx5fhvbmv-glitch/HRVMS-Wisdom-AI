@@ -582,7 +582,7 @@ class PaymentRequestController extends Controller
     {
         $start = Carbon::today();
         $end = Carbon::parse($endDate);
-        $daysDiff = $start->diffInDays($end, false);
+        $daysDiff = (int) $start->diffInDays($end, false);
         if ($daysDiff < 0) 
         {
             return $end->format('d M Y')."  (Expired " . abs($daysDiff) . " days ago)";
@@ -866,6 +866,10 @@ class PaymentRequestController extends Controller
     {
        $reason = $request->reason;
        $id = base64_decode($request->Payment_id);
+       // The form asks for a reason; a direct call must not be able to skip it.
+       if (!trim((string) $reason)) {
+           return response()->json(['success' => false, 'msg' => 'Please give a reason for rejecting this payment request.'], 422);
+       }
 
 
          $PaymentRequest = PaymentRequest::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
@@ -1048,10 +1052,10 @@ class PaymentRequestController extends Controller
                 $work_permit_amt =  $ResortBudgetCost['WORK VISA MEDICAL TEST FEE'];
 
                 $medical_end_date = Carbon::parse($WorkPermitMedicalRenewal->end_date);
-                $medical_months_diff = $start->diffInMonths($medical_end_date);
+                $medical_months_diff = (int) $start->diffInMonths($medical_end_date, true);
                 if ($medical_months_diff < 1) 
                 {
-                    $days_diff = $start->diffInDays($medical_end_date);
+                    $days_diff = (int) $start->diffInDays($medical_end_date, true);
                     $WorkPermitMedicalRenewal->MedicalRenewalTime = "Expires in $days_diff days";
                 } 
                 else
@@ -1079,11 +1083,11 @@ class PaymentRequestController extends Controller
                 {
                 
                     $insurance_end_date = Carbon::parse($EmployeeInsurance->insurance_end_date);
-                    $insurance_months_diff = $start->diffInMonths($insurance_end_date);
+                    $insurance_months_diff = (int) $start->diffInMonths($insurance_end_date, true);
 
                     if ($insurance_months_diff < 1) 
                     {
-                        $days_diff = $start->diffInDays($insurance_end_date);
+                        $days_diff = (int) $start->diffInDays($insurance_end_date, true);
                         $EmployeeInsurance->InsuranceRenewalTime = "Expires in $days_diff days";
                     } 
                     else 
@@ -1158,10 +1162,10 @@ class PaymentRequestController extends Controller
             if($VisaRenewal) 
             {
                 $Visaend = Carbon::parse($VisaRenewal->end_date);
-                $months_diff = $start->diffInMonths($Visaend);
+                $months_diff = (int) $start->diffInMonths($Visaend, true);
                 if ($months_diff < 1) 
                 {
-                    $days_diff = $start->diffInDays($Visaend);
+                    $days_diff = (int) $start->diffInDays($Visaend, true);
                     $VisaRenewal->VisaRenewalTime = "Expires in $days_diff days";
                 } 
                 else

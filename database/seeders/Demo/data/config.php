@@ -354,6 +354,8 @@ return array (
     array (
       'emp_grade' => '1',
       'rank' => '6',
+      // Days per leave category (_ref) and who is eligible, as resort 26's grids allocate them.
+      '_leave' => [57 => [30, 'all'], 58 => [10, 'all'], 59 => [60, 'female'], 60 => [3, 'male'], 61 => [1, 'all'], 62 => [30, 'all'], 64 => [5, 'muslim'], 76 => [30, 'all']],
       'contract_status' => 'single',
       'effective_date' => '08/31/2026',
       'salary_period' => 'monthly',
@@ -412,6 +414,7 @@ return array (
     array (
       'emp_grade' => '2',
       'rank' => '5',
+      '_leave' => [57 => [30, 'all'], 58 => [10, 'all'], 59 => [60, 'female'], 60 => [3, 'male'], 61 => [1, 'all'], 62 => [30, 'all'], 64 => [5, 'muslim'], 76 => [30, 'all']],
       'contract_status' => 'single',
       'effective_date' => '11/13/2025',
       'salary_period' => 'monthly',
@@ -470,6 +473,7 @@ return array (
     array (
       'emp_grade' => '3',
       'rank' => '4',
+      '_leave' => [57 => [30, 'all'], 58 => [10, 'all'], 59 => [60, 'female'], 60 => [3, 'male'], 61 => [1, 'all'], 62 => [30, 'all'], 64 => [5, 'muslim'], 76 => [30, 'all']],
       'contract_status' => 'single',
       'effective_date' => '11/13/2025',
       'salary_period' => 'monthly',
@@ -528,6 +532,7 @@ return array (
     array (
       'emp_grade' => '4',
       'rank' => '2',
+      '_leave' => [57 => [30, 'all'], 58 => [10, 'all'], 59 => [60, 'female'], 60 => [3, 'male'], 61 => [1, 'all'], 62 => [30, 'all'], 64 => [5, 'muslim'], 76 => [30, 'all'], 63 => [12, 'all']],
       'contract_status' => 'married',
       'effective_date' => '11/13/2025',
       'salary_period' => 'monthly',
@@ -586,6 +591,7 @@ return array (
     array (
       'emp_grade' => '5',
       'rank' => '1,3,7,8',
+      '_leave' => [57 => [30, 'all'], 58 => [10, 'all'], 59 => [60, 'female'], 60 => [3, 'male'], 61 => [1, 'all'], 62 => [30, 'all'], 64 => [5, 'muslim'], 76 => [30, 'all'], 63 => [12, 'all']],
       'contract_status' => 'married',
       'effective_date' => '11/13/2025',
       'salary_period' => 'monthly',
@@ -1742,5 +1748,13 @@ return array (
       'name' => 'Day Off',
       'color' => '#000000',
     ),
+  ),
+  // Island transport offered on leave / island pass requests (resort 26's list).
+  'resort_transportations' =>
+  array (
+    0 => array ('transportation_option' => 'Seaplane'),
+    1 => array ('transportation_option' => 'Speedboat'),
+    2 => array ('transportation_option' => 'Domestic Flight'),
+    3 => array ('transportation_option' => 'International Flight'),
   ),
 );

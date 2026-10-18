@@ -2415,6 +2415,7 @@ class VacancyController extends Controller
 
             ->get();
                     $SorlistedApplicants->map(function ($item) use($config) {
+                        $item->applied_date_raw = $item->Application_date; // sortable; AppliedDate below is d M Y text
                         $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
                         $item->Rank =$item->As_ApprovedBy;
                         $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
@@ -2588,6 +2589,7 @@ class VacancyController extends Controller
         ')
         ->get()
         ->map(function ($item) {
+            $item->applied_date_raw = $item->Application_date; // sortable; AppliedDate below is d M Y text
             $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
 
             // Raw date so the table can sort chronologically (formatted d M Y sorts as text).
@@ -2899,6 +2901,7 @@ class VacancyController extends Controller
                             ')
                             ->get()
                             ->map(function ($item) {
+                                $item->applied_date_raw = $item->Application_date; // sortable; AppliedDate below is d M Y text
                                 $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
 
                                 $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d M Y') : '-';

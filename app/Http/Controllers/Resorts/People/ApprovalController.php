@@ -136,11 +136,13 @@ class ApprovalController extends Controller
             if (array_intersect($approverIds, Common::getResortHrEmployeeIds($resort->resort_id))) {
                 $advanceStages['hr'] = fn ($q) => $q->where('hr_status', 'Pending');
             }
+            // Own role or the role of anyone they cover for today — the endpoint's Finance/GM checks.
             // Same titles as the endpoint's whereIn (MySQL compares case-insensitively: "Director Of Finance").
-            if (in_array(strtolower(trim((string) optional($employee->position)->position_title)), ['director of finance', 'finance manager'], true)) {
+            $acting = Common::actingEmployees($employee, $resort->resort_id);
+            if ($acting->contains(fn ($e) => in_array(strtolower(trim((string) optional($e->position)->position_title)), ['director of finance', 'finance manager'], true))) {
                 $advanceStages['finance'] = fn ($q) => $q->where('hr_status', 'Approved')->where('finance_status', 'Pending');
             }
-            if ((int) $rank === 8) {
+            if ($acting->contains(fn ($e) => (int) $e->rank === 8)) {
                 $advanceStages['gm'] = fn ($q) => $q->where('finance_status', 'Approved')->where('gm_status', 'Pending');
             }
             $advancePayrolls = collect();
@@ -353,6 +355,7 @@ class ApprovalController extends Controller
                 $this->budgetApprovalRows($employee, $resort->resort_id, $search, $departmentId, $positionId),
                 $this->learningRequestRows($employee, $resort->resort_id, $search, $departmentId, $positionId),
                 $this->visaPaymentRows($employee, $resort->resort_id, $approverIds, $search, $departmentId, $positionId),
+                $this->resignationWithdrawalRows($resort->resort_id, $approverIds, $search, $departmentId, $positionId),
                 $infoUpdateRequests ?? collect(),
                 $employeePromotionList ?? collect(),
                 $advancePayrolls ?? collect(),
@@ -477,11 +480,11 @@ class ApprovalController extends Controller
      */
     private function payrollApprovalRows($employee, int $resortId, $search, $departmentId, $positionId)
     {
-        $step = PayrollController::getApprovalStepForUser(Common::getEmployeeRankPosition($employee), $employee);
-        if (!$step || !empty($departmentId) || !empty($positionId)) {
+        $steps = PayrollController::approvalStepsFor($employee, $resortId); // own step + steps of people they cover for
+        if (!$steps || !empty($departmentId) || !empty($positionId)) {
             return collect();
         }
-        return PayrollApproval::where('resort_id', $resortId)->where('step_order', $step)->where('status', 'pending')
+        return PayrollApproval::where('resort_id', $resortId)->whereIn('step_order', $steps)->where('status', 'pending')
             ->whereNotExists(fn ($q) => $q->from('payroll_approvals as earlier')
                 ->whereColumn('earlier.payroll_id', 'payroll_approvals.payroll_id')
                 ->whereColumn('earlier.step_order', '<', 'payroll_approvals.step_order')
@@ -500,14 +503,17 @@ class ApprovalController extends Controller
      */
     private function budgetApprovalRows($employee, int $resortId, $search, $departmentId, $positionId)
     {
-        $pos = Common::getEmployeeRankPosition($employee);
+        // Own role or the role of anyone they are covering for today — what the budget endpoints accept.
+        $acting = Common::actingEmployees($employee, $resortId);
+        $isFinanceLead = $acting->contains(fn ($e) => Common::getEmployeeRankPosition($e)['position'] === 'Finance' && in_array((int) $e->rank, [1, 2], true));
+        $isGm = $acting->contains(fn ($e) => Common::getEmployeeRankPosition($e)['rank'] === 'GM');
         $rows = collect();
         if (!empty($positionId)) {
             return $rows;
         }
         $budgets = fn ($stage) => ManningResponse::where('resort_id', $resortId)->where('status', 'submitted')->where('budget_process_status', $stage);
 
-        if (($pos['position'] ?? null) === 'Finance' && in_array((int) $employee->rank, [1, 2], true) && empty($departmentId)) {
+        if ($isFinanceLead && empty($departmentId)) {
             foreach ($budgets('Finance')->get(['id', 'year', 'employment_type', 'updated_at'])->groupBy(fn ($b) => $b->year . '|' . ($b->employment_type ?: 'Permanent')) as $key => $group) {
                 [$year, $type] = explode('|', $key);
                 $label = "{$type} budget {$year} — {$group->count()} department(s)";
@@ -515,7 +521,7 @@ class ApprovalController extends Controller
                     $group->max(fn ($b) => $b->getRawOriginal('updated_at')), ['year' => $year, 'employment_type' => $type]));
             }
         }
-        if (($pos['rank'] ?? null) === 'GM') {
+        if ($isGm) {
             $gmBudgets = $budgets('GM')->with('department')->when(!empty($departmentId), fn ($q) => $q->where('dept_id', $departmentId))->get();
             foreach ($gmBudgets as $b) {
                 $type = $b->employment_type ?: 'Permanent';
@@ -530,7 +536,7 @@ class ApprovalController extends Controller
     /** Learning requests for the L&D Manager — the same gate LearningController::updateStatus() applies. */
     private function learningRequestRows($employee, int $resortId, $search, $departmentId, $positionId)
     {
-        if (!Common::isLdManager($employee) || !empty($departmentId) || !empty($positionId)) {
+        if (!Common::actingEmployees($employee, $resortId)->contains(fn ($e) => Common::isLdManager($e)) || !empty($departmentId) || !empty($positionId)) {
             return collect();
         }
         return LearningRequest::where('resort_id', $resortId)->whereIn('status', ['Pending', 'On Hold'])->with(['learning', 'employees'])->get()
@@ -552,6 +558,22 @@ class ApprovalController extends Controller
             ->map(fn ($p) => $this->recordRow($p->id, "Visa payment request {$p->Requestd_id}", 'Visa', 'Visa Payment Request', 'visa-payment', 'Pending',
                 $p->getRawOriginal('created_at')))
             ->filter(fn ($r) => self::matchesSearch($r['name'], $search))->values();
+    }
+
+    /**
+     * Withdrawals requested while Offboarding: HOD step, then HR once the HOD approved —
+     * read from the same withdraw_*_status columns EmployeeResignationController::withdrawDecision()
+     * writes, for the assigned HOD/HR or their delegate (the actors withdrawalStage() accepts).
+     */
+    private function resignationWithdrawalRows(int $resortId, array $approverIds, $search, $departmentId, $positionId)
+    {
+        $query = EmployeeResignation::with(['employee.resortAdmin', 'employee.department', 'employee.position'])
+            ->where('resort_id', $resortId)
+            ->where(fn ($q) => $q
+                ->where(fn ($h) => $h->where('withdraw_hod_status', 'Pending')->whereIn('hod_id', $approverIds))
+                ->orWhere(fn ($h) => $h->where('withdraw_hod_status', 'Approved')->where('withdraw_hr_status', 'Pending')->whereIn('hr_id', $approverIds)));
+        $this->filterByEmployee($query, $search, $departmentId, $positionId);
+        return $query->get()->map(fn ($r) => $this->employeeRow($r, 'Resignation Withdrawal', 'resignation-withdrawal', 'Pending'));
     }
 
     private function generateActionButtons($request)
@@ -696,6 +718,15 @@ class ApprovalController extends Controller
 
             ];
             $view_route = route('leave.details', ['leave_id' => base64_encode($request['id'])]);
+        } elseif ($request['action'] == 'resignation-withdrawal') {
+
+            // withdrawDecision(): resignation_id (base64) + decision Approved | Rejected (+ reason, required on reject). No hold.
+            $approve_url = ['route' => route('people.employee-resignation.withdraw-decision'), 'method' => 'POST', 'action' => 'Approved', 'status' => 'Approved',
+                'id' => base64_encode($request['id']), 'key' => 'resignation_id', 'payload' => ['decision' => 'Approved']];
+            $reject_url = ['route' => route('people.employee-resignation.withdraw-decision'), 'method' => 'POST', 'action' => 'Rejected', 'status' => 'Rejected',
+                'id' => base64_encode($request['id']), 'key' => 'resignation_id', 'payload' => ['decision' => 'Rejected']];
+            $view_route = route('people.employee-resignation.show', ['id' => base64_encode($request['id'])]);
+
         } elseif ($request['action'] == 'payroll') {
 
             // approvePayroll(): payroll_id + action approve|reject (+ remarks). 'Rejected' would approve.

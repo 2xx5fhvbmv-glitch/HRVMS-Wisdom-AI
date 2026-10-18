@@ -422,7 +422,7 @@ class MaintananceContorller extends Controller
                             $row->NewStatus = $row->Status;
 
                             $row->Date =date('d M Y',strtotime($row->date));
-                            $daysSinceRequest = now()->diffInDays(Carbon::parse($row->date));
+                            $daysSinceRequest = (int) now()->diffInDays(Carbon::parse($row->date), true);
 
                             $row->EscalationTimeOver = ($daysSinceRequest > $EscalationDay) ? 'Alert' : 'Regular';
                             $row->profileImg = Common::getResortUserPicture($row->Parentid);
@@ -557,7 +557,7 @@ class MaintananceContorller extends Controller
                         $row->Location = $row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - ' . $row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - ' . $row->FloorNo : '');
                         $row->Priority = $row->priority;
                         $row->Date =date('d M Y',strtotime($row->date));
-                        $daysSinceRequest = now()->diffInDays(Carbon::parse($row->date));
+                        $daysSinceRequest = (int) now()->diffInDays(Carbon::parse($row->date), true);
                         $row->NewStatus = $row->Status;
 
                         $row->EscalationTimeOver = ($daysSinceRequest > $EscalationDay) ? 'Alert' : 'Regular';
@@ -1496,7 +1496,7 @@ class MaintananceContorller extends Controller
                                                                     $row->NewStatus = $row->Status;
 
                                                                     $row->Date =date('d M Y',strtotime($row->date));
-                                                                    $daysSinceRequest = now()->diffInDays(Carbon::parse($row->date));
+                                                                    $daysSinceRequest = (int) now()->diffInDays(Carbon::parse($row->date), true);
 
                                                                     $row->EscalationTimeOver = ($daysSinceRequest > $EscalationDay->EscalationDay) ? 'Alert' : 'Regular';
                                                                     $row->profileImg = Common::getResortUserPicture($row->Parentid);
@@ -1673,7 +1673,7 @@ class MaintananceContorller extends Controller
                                                                     $row->NewStatus = $row->Status;
 
                                                                     $row->Date =date('d M Y',strtotime($row->date));
-                                                                    $row->AssignedDays = now()->diffInDays(Carbon::parse($row->date));
+                                                                    $row->AssignedDays = (int) now()->diffInDays(Carbon::parse($row->date), true);
 
                                                                     // $row->EscalationTimeOver = ($daysSinceRequest > $EscalationDay->EscalationDay) ? 'Alert' : 'Regular';
                                                                     $row->profileImg = Common::getResortUserPicture($row->Parentid);
