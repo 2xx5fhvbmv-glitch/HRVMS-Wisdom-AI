@@ -24,7 +24,12 @@
                             <h1>{{ $page_title }}</h1>
                         </div>
                     </div>
-                    <div class="col-auto  ms-auto">
+                    <div class="col-auto  ms-auto d-flex gap-2">
+                        @if($canBulkSendCredentials && $pendingCredentialCount > 0)
+                            <button type="button" id="bulkSendCredentialsBtn" class="wai-btn" data-pending="{{ $pendingCredentialCount }}">
+                                Send Login Credentials ({{ $pendingCredentialCount }})
+                            </button>
+                        @endif
                         <a class="wai-btn wai-btn-primary" href="{{route('people.employees.create')}}">Add New Employee</a>
                     </div>
                 </div>
@@ -582,6 +587,80 @@
         });
 
 
+        // Bulk "send login credentials to everyone pending" — one-time button,
+        // hidden again by the controller once nobody is left with no password.
+        $('#bulkSendCredentialsBtn').on('click', function () {
+            var $btn = $(this);
+            var pending = $btn.data('pending');
+
+            wisdomConfirm({
+                role: 'warning',
+                title: 'Send login credentials?',
+                text: 'This will email first-time login details to ' + pending + ' employee(s) who have never received them. This cannot be undone.',
+                confirmText: 'Yes, send them'
+            }).then(function (result) {
+                if (!result.isConfirmed) return;
+
+                $btn.prop('disabled', true).text('Sending…');
+
+                $.ajax({
+                    url: "{{ route('people.employee.send-all-credentials') }}",
+                    type: 'POST',
+                    data: { _token: '{{ csrf_token() }}' },
+                    success: function (response) {
+                        if (response && response.processing && response.status_url) {
+                            pollCredentialsStatus(response.status_url, $btn);
+                        } else {
+                            $btn.prop('disabled', false).text('Send Login Credentials (' + pending + ')');
+                        }
+                    },
+                    error: function (xhr) {
+                        $btn.prop('disabled', false).text('Send Login Credentials (' + pending + ')');
+                        wisdomAlert({
+                            type: 'error',
+                            title: 'Error!',
+                            text: xhr.responseJSON?.message || 'Something went wrong.'
+                        });
+                    }
+                });
+            });
+        });
+
+        function pollCredentialsStatus(statusUrl, $btn) {
+            var tries = 0, maxTries = 100; // ~5 min ceiling at 3s, same cap as the Excel import poll
+            var iv = setInterval(function () {
+                tries++;
+                $.ajax({ url: statusUrl, type: 'GET' })
+                    .done(function (res) {
+                        if (res && (res.status === 'queued' || res.status === 'processing')) {
+                            if (tries >= maxTries) {
+                                clearInterval(iv);
+                                $btn.prop('disabled', false).text('Send Login Credentials');
+                                toastr.error('Still sending — please check back shortly.', 'Timeout', { positionClass: 'toast-bottom-right' });
+                            }
+                            return; // keep waiting
+                        }
+
+                        clearInterval(iv);
+                        var sent = (res && res.created_count) || 0;
+                        var failures = (res && res.error_report) ? res.error_report : [];
+
+                        wisdomAlert({
+                            type: failures.length ? 'error' : 'success',
+                            title: failures.length ? 'Sent with some failures' : 'Sent!',
+                            text: sent + ' credential email(s) sent.' + (failures.length ? ' ' + failures.length + ' could not be sent — check the employee\'s email address.' : '')
+                        }).then(function () {
+                            // Nobody left pending — the button's own condition is now false, drop it.
+                            $btn.remove();
+                        });
+                    })
+                    .fail(function () {
+                        clearInterval(iv);
+                        $btn.prop('disabled', false).text('Send Login Credentials');
+                        toastr.error('Could not check progress. Please refresh the page.', 'Error', { positionClass: 'toast-bottom-right' });
+                    });
+            }, 3000);
+        }
 
         // Clear selection link
         $('#clearAllSelection').on('click', function (e) {
