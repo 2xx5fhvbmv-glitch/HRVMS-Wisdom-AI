@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 /**
- * Demo ENV slice 2: resort configuration + organisation + 100 employees.
+ * Demo ENV slice 2: resort configuration + organisation + 112 employees (8 casual, 4 interns).
  *
  * Divisions → positions → staff → salary/bank/passport/visa/reporting line →
  * holidays all go through ResortDataImporter::importRecords(), i.e. the exact
@@ -124,7 +124,9 @@ class DemoOrganisationSeeder
         $maldivianShare = mt_rand(40, 60) / 100;
         $n = 0;
         $recent = 0;
-        foreach ($this->data['positions'] as [$dept, $title, $level, $section, $headcount, $login, $fixedNat]) {
+        foreach ($this->data['positions'] as $row) {
+            [$dept, $title, $level, $section, $headcount, $login, $fixedNat] = $row;
+            $category = $row[7] ?? null;
             for ($i = 0; $i < $headcount; $i++) {
                 $n++;
                 $nat = $fixedNat ?? ($this->chance($maldivianShare) ? 'Maldivian' : $this->weighted($this->data['expat_weights']));
@@ -135,11 +137,11 @@ class DemoOrganisationSeeder
                 $hired = !$senior && $recent < 6 && $this->chance(0.12)
                     ? Carbon::today()->subDays(mt_rand(10, 75)) : Carbon::today()->subDays(mt_rand(150, 6 * 365));
                 $recent += $hired->gt(Carbon::today()->subDays(80)) ? 1 : 0;
-                $payLevel = $title === 'General Manager' ? 'GM' : $level;
+                $payLevel = $category ?? ($title === 'General Manager' ? 'GM' : $level);
                 $usd = round(mt_rand(...$this->data['salary'][$payLevel]) / 10) * 10;
 
                 $this->people[sprintf('%04d', $n)] = [
-                    'dept' => $dept, 'title' => $title, 'level' => $level, 'section' => $section, 'login' => $i === 0 ? $login : null,
+                    'dept' => $dept, 'title' => $title, 'level' => $level, 'section' => $section, 'login' => $i === 0 ? $login : null, 'category' => $category,
                     'nationality' => $nat, 'gender' => $gender, 'muslim' => $this->chance($muslimShare),
                     'name' => $this->pick($gender === 'male' ? $male : $female) . ' ' . $this->pick($last),
                     'hired' => $hired, 'dob' => Carbon::today()->subYears(mt_rand($senior ? 35 : 21, $senior ? 56 : 45))->subDays(mt_rand(0, 364)),
@@ -171,8 +173,11 @@ class DemoOrganisationSeeder
                 $sections[] = ['name' => $name, 'department' => $dept];
             }
         }
-        foreach ($this->data['positions'] as [$dept, $title, $level, $section]) {
-            $positions[] = ['department' => $dept, 'title' => $title, 'level' => $level, 'section' => $section];
+        foreach ($this->data['positions'] as $row) {
+            [$dept, $title, $level, $section] = $row;
+            if (empty($row[7])) { // Casual/Intern positions come from the staff list, as the importer creates them
+                $positions[] = ['department' => $dept, 'title' => $title, 'level' => $level, 'section' => $section];
+            }
         }
 
         $managers = $this->reportingLines();
@@ -181,7 +186,8 @@ class DemoOrganisationSeeder
             $staff[] = [
                 'emp_id' => $id, 'name' => $p['name'], 'department' => $p['dept'], 'section' => $p['section'], 'position' => $p['title'],
                 'level' => $p['level'], 'gender' => $p['gender'], 'nationality' => $p['nationality'], 'religion' => $p['muslim'] ? 'Muslim' : '',
-                'hire_date' => $p['hired']->format('d/m/Y'), 'employment_type' => 'Full-Time',
+                'hire_date' => $p['hired']->format('d/m/Y'),
+                'employment_type' => match ($p['category']) { 'Casual' => 'Casual', 'Intern' => 'Internship', default => 'Full-Time' },
                 'email' => $p['login'] ? $p['login'] . '@' . config('demo.login_domain') : '',
             ];
             $expat = $p['nationality'] !== 'Maldivian';
@@ -285,6 +291,13 @@ class DemoOrganisationSeeder
                 'emg_cont_first_name' => $this->pick($this->data['names'][$p['nationality']][2]) . ' ' . explode(' ', $p['name'], 2)[1],
                 'emg_cont_relationship' => $this->pick($relations), 'emg_cont_no' => '+960 7' . mt_rand(100000, 999999),
             ]);
+        }
+
+        // Casual/Intern are paid their position's rate (Common::casualInternBasicSalary), not basic_salary.
+        foreach (DB::table('resort_positions')->where('resort_id', $this->resortId)->whereNotNull('employee_category')->get(['id', 'employee_category']) as $pos) {
+            DB::table('casual_position_pay_configs')->insert(['resort_id' => $this->resortId, 'position_id' => $pos->id,
+                'basic_salary' => $this->data['salary'][$pos->employee_category][0], 'basic_salary_currency' => 'USD',
+                'commission_amount' => 0, 'commission_currency' => 'USD', 'created_at' => now(), 'updated_at' => now()]);
         }
 
         // Every demo login uses DEMO_PASSWORD and goes straight in (no forced change).

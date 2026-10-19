@@ -41,8 +41,9 @@ class DemoPayrollSeeder
     {
         $this->rate = (float) DB::table('resort_site_settings')->where('resort_id', $this->resortId)->value('DollertoMVR') ?: 15.42;
         $this->employees = DB::table('employees as e')->join('resort_admins as a', 'a.id', '=', 'e.Admin_Parent_id')
-            ->where('e.resort_id', $this->resortId)->where('e.status', 'Active')->whereNull('e.deleted_at')->orderBy('e.id')
-            ->get(['e.id', 'e.Emp_id', 'e.Position_id', 'e.Dept_id', 'e.payment_mode', 'e.basic_salary', 'e.basic_salary_currency',
+            // Casual staff have their own Casual payroll run; interns fold into this Permanent one.
+            ->where('e.resort_id', $this->resortId)->where('e.status', 'Active')->whereNull('e.deleted_at')->where('e.employment_type', '!=', 'Casual')->orderBy('e.id')
+            ->get(['e.id', 'e.Emp_id', 'e.Position_id', 'e.Dept_id', 'e.payment_mode', 'e.basic_salary', 'e.basic_salary_currency', 'e.employment_type',
                 'e.nationality', 'e.joining_date', 'e.Admin_Parent_id', 'a.first_name', 'a.last_name', 'a.email'])
             ->keyBy('id');
         $by = fn ($login) => $this->employees->firstWhere('email', $login . '@' . config('demo.login_domain'));
@@ -119,7 +120,10 @@ class DemoPayrollSeeder
                 }
             }
 
-            $basic = (float) $e->basic_salary / ($e->basic_salary_currency === 'MVR' ? $this->rate : 1);
+            // As the wizard pays them: interns at their position's rate, everyone else their basic salary.
+            [$amount, $currency] = $e->employment_type === 'Internship'
+                ? array_values(array_slice(Common::casualInternBasicSalary($e), 0, 2)) : [$e->basic_salary, $e->basic_salary_currency];
+            $basic = (float) $amount / ($currency === 'MVR' ? $this->rate : 1);
             $perDay = $basic / $days;
             $perHour = $perDay / 8;
             $earned = round($perDay * ($presentEquivalent + $paidLeave + $dayOff), 2);

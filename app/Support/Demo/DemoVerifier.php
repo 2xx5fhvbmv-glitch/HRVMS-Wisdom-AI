@@ -125,8 +125,9 @@ class DemoVerifier
             }
             return !$missing ?: 'nothing waiting for ' . implode(', ', $missing);
         });
-        $this->check('Leave balances: everyone has one, nobody is overdrawn', function () use ($resortId, $employees) {
-            foreach ($employees()->where('status', 'Active')->pluck('id') as $id) {
+        $this->check('Leave balances: every permanent employee has one, nobody is overdrawn', function () use ($resortId, $employees) {
+            // Casual/Intern staff sit outside the benefit grid.
+            foreach ($employees()->where('status', 'Active')->whereNotIn('employment_type', ['Casual', 'Internship'])->pluck('id') as $id) {
                 $balance = \App\Helpers\Common::getEmployeeLeaveBalance($id, $resortId);
                 if (!$balance || collect($balance)->min('balance') < 0) {
                     return "employee {$id}: " . ($balance ? 'overdrawn' : 'no balance');
@@ -146,6 +147,39 @@ class DemoVerifier
                 'waiting' => $passes()->where('status', 'Pending')->count(), 'rejected' => $passes()->where('status', 'Rejected')->count(),
                 'cancelled' => $passes()->where('status', 'Cancel')->count()];
             return min($n) > 0 ?: json_encode($n);
+        });
+
+        // Slice 5a: workforce planning.
+        $this->check('Workforce planning: this year approved with open seats, next year out to the HODs', function () use ($resortId) {
+            $y = (int) date('Y');
+            $responses = fn ($year) => DB::table('manning_responses')->where('resort_id', $resortId)->where('year', $year);
+            $open = DB::table('position_monthly_data as p')->join('manning_responses as m', 'm.id', '=', 'p.manning_response_id')
+                ->where('m.resort_id', $resortId)->where('m.year', $y)->where('p.month', 1)->sum('p.vacantcount');
+            $depts = DB::table('resort_departments')->where('resort_id', $resortId)->where('status', 'active')->count();
+            $approved = $responses($y)->where('employment_type', 'Permanent')->where('budget_process_status', 'Approved')->count();
+            $pending = DB::table('resorts_child_notifications')->where('response', 'No')
+                ->whereIn('Parent_msg_id', DB::table('resorts_parent_notifications')->where('resort_id', $resortId)->select('message_id'))->count();
+            $priced = DB::table('resort_vacant_budget_costs')->where('resort_id', $resortId)->where('year', $y)->where('basic_salary', '>', 0)->count();
+            return ($approved === $depts && $open > 0 && $priced > 0 && $responses($y + 1)->exists() && $pending > 0)
+                ?: "{$approved}/{$depts} departments approved, {$open} open seats, {$priced} priced, {$pending} pending";
+        });
+        $this->check('Casual and intern staff on their own positions, each position with a pay rate', function () use ($resortId, $employees) {
+            $casual = $employees()->where('employment_type', 'Casual')->count();
+            $interns = $employees()->where('employment_type', 'Internship')->count();
+            $unpaid = DB::table('resort_positions')->where('resort_id', $resortId)->whereNotNull('employee_category')
+                ->whereNotIn('id', DB::table('casual_position_pay_configs')->where('resort_id', $resortId)->select('position_id'))->count();
+            return ($casual > 0 && $interns > 0 && $unpaid === 0) ?: "{$casual} casual, {$interns} interns, {$unpaid} positions without a pay rate";
+        });
+        $this->check('Cost configuration: permanent and casual/intern lines', function () use ($resortId) {
+            $perm = DB::table('resort_budget_costs')->where('resort_id', $resortId)->where('status', 'active')->count();
+            $non = DB::table('resort_nonpermanent_budget_costs')->where('resort_id', $resortId)->where('status', 'active')->count();
+            return ($perm > 0 && $non > 0) ?: "{$perm} permanent, {$non} casual/intern lines";
+        });
+        $this->check('Occupancy: 12 months of history and today ± 5 days', function () use ($resortId) {
+            $occ = fn () => DB::table('occuplanies')->where('resort_id', $resortId);
+            $months = $occ()->where('occupancydate', '<', now()->startOfMonth()->format('Y-m-d'))->selectRaw("DISTINCT DATE_FORMAT(occupancydate, '%Y-%m') m")->get()->count();
+            $around = $occ()->whereBetween('occupancydate', [now()->subDays(5)->format('Y-m-d'), now()->addDays(5)->format('Y-m-d')])->count();
+            return ($months >= 12 && $around === 11) ?: "{$months} past months, {$around} of 11 days around today";
         });
 
         // Slice 4: payroll.
