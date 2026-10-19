@@ -4262,7 +4262,7 @@ class Common
                             $hours = intval($overTime);
                             $minutes = 0;
                         }
-                        $updatedEndTime = $endTime->copy()->addHours($hours)->addMinutes($minutes);
+                        $updatedEndTime = $endTime->copy()->addHours((int) $hours)->addMinutes((int) $minutes); // Carbon 3 rejects numeric strings
                     } else {
                         $updatedEndTime = null;
                     }

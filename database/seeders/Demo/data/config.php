@@ -11,7 +11,7 @@ return array (
     0 => 
     array (
       'currency' => 'Dollar',
-      'casual_payment_model' => 'lump_sum',
+      'casual_payment_model' => 'direct_pay', // casual staff paid by the resort (+ agency fee), so the Casual payroll run is available
       'MVRtoDoller' => 0.06485084306096,
       'DollertoMVR' => 15.42,
       'MVR_img' => 'maldives-currency-icon-new.svg',
@@ -1756,5 +1756,40 @@ return array (
     1 => array ('transportation_option' => 'Speedboat'),
     2 => array ('transportation_option' => 'Domestic Flight'),
     3 => array ('transportation_option' => 'International Flight'),
+  ),
+  // Workforce Planning cost configuration (resort 26's lines; typos in its names corrected). Ramadan Bonus is MVR.
+  'resort_budget_costs' =>
+  array (
+    0 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Language Allowance', 'amount' => '50.00', 'amount_unit' => 'USD', 'cost_type' => 'Fixed', 'frequency' => 'Month', 'details' => 'Both', 'status' => 'active', 'is_payroll_allowance' => 1),
+    1 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Male-Based/Airport Based Allowance', 'amount' => '300.00', 'amount_unit' => 'USD', 'cost_type' => 'Fixed', 'frequency' => 'Month', 'details' => 'Both', 'status' => 'active', 'is_payroll_allowance' => 1),
+    2 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Ramadan Bonus', 'amount' => '3000.00', 'amount_unit' => 'MVR', 'cost_type' => 'Fixed', 'frequency' => 'Year', 'details' => 'Locals Only', 'status' => 'active', 'is_payroll_allowance' => 0),
+    3 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Fire Brigade Allowance', 'amount' => '50.00', 'amount_unit' => 'USD', 'cost_type' => 'Fixed', 'frequency' => 'Month', 'details' => 'Both', 'status' => 'active', 'is_payroll_allowance' => 1),
+    4 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Food Cost', 'amount' => '6.00', 'amount_unit' => 'USD', 'cost_type' => 'Fixed', 'frequency' => 'Daily', 'details' => 'Both', 'status' => 'active', 'is_payroll_allowance' => 0),
+    5 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Pension - Employer Contribution', 'amount' => '7.00', 'amount_unit' => '%', 'cost_type' => 'Fixed', 'frequency' => 'Month', 'details' => 'Locals Only', 'status' => 'active', 'is_payroll_allowance' => 1),
+    6 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Overtime - Holiday', 'amount' => '1.50', 'amount_unit' => '%', 'cost_type' => 'Fixed', 'frequency' => 'Month', 'details' => 'Both', 'status' => 'active', 'is_payroll_allowance' => 1),
+    7 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Overtime - Normal', 'amount' => '1.25', 'amount_unit' => '%', 'cost_type' => 'Fixed', 'frequency' => 'Month', 'details' => 'Both', 'status' => 'active', 'is_payroll_allowance' => 1),
+    8 => array ('cost_title' => 'Operational Cost', 'particulars' => 'R And R Allowance', 'amount' => '42.00', 'amount_unit' => 'USD', 'cost_type' => 'Fixed', 'frequency' => 'Month', 'details' => 'Both', 'status' => 'active', 'is_payroll_allowance' => 1),
+    9 => array ('cost_title' => 'Operational Cost', 'particulars' => 'R And R Allowance - Excom', 'amount' => '125.00', 'amount_unit' => 'USD', 'cost_type' => 'Fixed', 'frequency' => 'Month', 'details' => 'Both', 'status' => 'active', 'is_payroll_allowance' => 1),
+    10 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Ticket - Annual Leave', 'amount' => '10794.00', 'amount_unit' => 'MVR', 'cost_type' => 'Variable', 'frequency' => 'Year', 'details' => 'Xpat Only', 'status' => 'active', 'is_payroll_allowance' => 0),
+    11 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Ticket - Annual Leave - Local', 'amount' => '400.00', 'amount_unit' => 'USD', 'cost_type' => 'Variable', 'frequency' => 'Year', 'details' => 'Locals Only', 'status' => 'active', 'is_payroll_allowance' => 0),
+    12 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Medical Insurance - International', 'amount' => '3000.00', 'amount_unit' => 'USD', 'cost_type' => 'Variable', 'frequency' => 'Year', 'details' => 'Both', 'status' => 'active', 'is_payroll_allowance' => 0),
+    13 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Work Permit Fee', 'amount' => '350.00', 'amount_unit' => 'MVR', 'cost_type' => 'Fixed', 'frequency' => 'Month', 'details' => 'Xpat Only', 'status' => 'active', 'is_payroll_allowance' => 0),
+    14 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Medical Insurance', 'amount' => '150.00', 'amount_unit' => 'USD', 'cost_type' => 'Variable', 'frequency' => 'Year', 'details' => 'Both', 'status' => 'active', 'is_payroll_allowance' => 0),
+    15 => array ('cost_title' => 'Recruitment Cost', 'particulars' => 'Relocation / Luggage Allowance', 'amount' => '1542.00', 'amount_unit' => 'MVR', 'cost_type' => 'Variable', 'frequency' => 'One time cost', 'details' => 'Xpat Only', 'status' => 'active', 'is_payroll_allowance' => 0),
+    16 => array ('cost_title' => 'Recruitment Cost', 'particulars' => 'Accomodation In Male City', 'amount' => '100.00', 'amount_unit' => 'USD', 'cost_type' => 'Variable', 'frequency' => 'One time cost', 'details' => 'Both', 'status' => 'active', 'is_payroll_allowance' => 0),
+    17 => array ('cost_title' => 'Recruitment Cost', 'particulars' => 'Work Visa Medical Test', 'amount' => '771.00', 'amount_unit' => 'MVR', 'cost_type' => 'Fixed', 'frequency' => 'Year', 'details' => 'Xpat Only', 'status' => 'active', 'is_payroll_allowance' => 0),
+    18 => array ('cost_title' => 'Recruitment Cost', 'particulars' => 'Seaplane And Boat - Arrival', 'amount' => '40.00', 'amount_unit' => 'USD', 'cost_type' => 'Fixed', 'frequency' => 'One time cost', 'details' => 'Both', 'status' => 'active', 'is_payroll_allowance' => 0),
+    19 => array ('cost_title' => 'Recruitment Cost', 'particulars' => 'Expat Insurance', 'amount' => '771.00', 'amount_unit' => 'MVR', 'cost_type' => 'Fixed', 'frequency' => 'Year', 'details' => 'Xpat Only', 'status' => 'active', 'is_payroll_allowance' => 0),
+    20 => array ('cost_title' => 'Recruitment Cost', 'particulars' => 'Recruitment Fee', 'amount' => '771.00', 'amount_unit' => 'MVR', 'cost_type' => 'Variable', 'frequency' => 'One time cost', 'details' => 'Xpat Only', 'status' => 'active', 'is_payroll_allowance' => 0),
+    21 => array ('cost_title' => 'Recruitment Cost', 'particulars' => 'Arrival Ticket - Relocation/Arrival', 'amount' => '700.00', 'amount_unit' => 'USD', 'cost_type' => 'Variable', 'frequency' => 'One time cost', 'details' => 'Both', 'status' => 'active', 'is_payroll_allowance' => 0),
+    22 => array ('cost_title' => 'Recruitment Cost', 'particulars' => 'Quota Slot Payment', 'amount' => '2000.00', 'amount_unit' => 'MVR', 'cost_type' => 'Fixed', 'frequency' => 'Year', 'details' => 'Xpat Only', 'status' => 'active', 'is_payroll_allowance' => 0),
+  ),
+  'resort_nonpermanent_budget_costs' =>
+  array (
+    0 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Skilled', 'amount' => '550.00', 'amount_unit' => 'USD', 'cost_type' => 'Fixed', 'frequency' => 'Month', 'applies_to' => 'Both', 'status' => 'active'),
+    1 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Unskilled', 'amount' => '450.00', 'amount_unit' => 'USD', 'cost_type' => 'Fixed', 'frequency' => 'Month', 'applies_to' => 'Both', 'status' => 'active'),
+    2 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Food', 'amount' => '6.00', 'amount_unit' => 'USD', 'cost_type' => 'Fixed', 'frequency' => 'Daily', 'applies_to' => 'Both', 'status' => 'active'),
+    3 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Casual Allowance', 'amount' => '500.00', 'amount_unit' => 'MVR', 'cost_type' => 'Variable', 'frequency' => 'Month', 'applies_to' => 'Casual', 'status' => 'active'),
+    4 => array ('cost_title' => 'Operational Cost', 'particulars' => 'Interns Allowance', 'amount' => '500.00', 'amount_unit' => 'MVR', 'cost_type' => 'Variable', 'frequency' => 'Month', 'applies_to' => 'Intern', 'status' => 'active'),
   ),
 );

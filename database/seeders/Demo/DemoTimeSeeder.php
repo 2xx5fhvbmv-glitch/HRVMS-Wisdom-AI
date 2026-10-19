@@ -60,7 +60,8 @@ class DemoTimeSeeder
         $from = $this->today->copy()->startOfMonth()->subMonths(DemoPayrollSeeder::RUNS)->startOfWeek();
         $until = $this->today->copy()->addWeek()->endOfWeek(); // this week and next are planned ahead
         foreach ($staff as $e) {
-            $isOffice = in_array($depts[$e->Dept_id] ?? '', self::OFFICE_DEPTS, true) || !in_array((int) $e->rank, self::OT_RANKS, true);
+            // Casual/Intern staff (rank 0) work the operational rotation like line staff.
+            $isOffice = in_array($depts[$e->Dept_id] ?? '', self::OFFICE_DEPTS, true) || !in_array((int) $e->rank, [0, ...self::OT_RANKS], true);
             $approver = $approvers[$e->Dept_id] ?? $gm;
             if ($approver->id === $e->id) {
                 $approver = $gm;

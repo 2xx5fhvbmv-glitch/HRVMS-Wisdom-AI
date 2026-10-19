@@ -1,7 +1,8 @@
 <?php
 
-// Demo ENV organisation and staff template (spec §4–§5). 100 people.
-// positions: [department, title, level, section, headcount, demo login (local part) or null, fixed nationality or null]
+// Demo ENV organisation and staff template (spec §4–§5). 112 people (100 permanent, 8 casual, 4 interns).
+// positions: [department, title, level, section, headcount, demo login (local part) or null, fixed nationality or null, category]
+// category 'Casual' / 'Intern' = a Casual/Intern position and staff (rank 0, own pay rate); headcount 0 = budgeted, not yet filled.
 // Levels map to ranks in DemoOrganisationSeeder::LEVELS (the GM's EXCOM title becomes rank 8 in the importer).
 
 return [
@@ -38,12 +39,15 @@ return [
         ['Engineering', 'Engineering Supervisor', 'SUP', '', 1, null, null],
         ['Engineering', 'Technician', 'LINE', '', 5, null, null],
         ['Engineering', 'Electrician', 'LINE', '', 3, null, null],
+        ['Engineering', 'Plumber', 'LINE', '', 0, null, null],
 
         ['Front Office', 'Front Office Manager', 'HOD', '', 1, 'hod.frontoffice', null],
         ['Front Office', 'Assistant Front Office Manager', 'MGR', '', 1, null, null],
         ['Front Office', 'Guest Service Supervisor', 'SUP', '', 2, null, null],
         ['Front Office', 'Guest Service Agent', 'LINE', '', 6, null, null],
         ['Front Office', 'Butler', 'LINE', '', 4, null, null],
+        ['Front Office', 'Guest Relations Officer', 'LINE', '', 0, null, null],
+        ['Front Office', 'Front Office Intern', 'LINE', '', 2, null, null, 'Intern'],
 
         ['Housekeeping', 'Executive Housekeeper', 'HOD', '', 1, 'hod.housekeeping', null],
         ['Housekeeping', 'Assistant Housekeeper', 'MGR', '', 1, null, null],
@@ -51,12 +55,15 @@ return [
         ['Housekeeping', 'Room Attendant', 'LINE', 'Rooms', 12, 'employee', null],
         ['Housekeeping', 'Laundry Attendant', 'LINE', 'Laundry', 4, null, null],
         ['Housekeeping', 'Gardener', 'LINE', 'Public Area', 4, null, null],
+        ['Housekeeping', 'Casual Room Attendant', 'LINE', 'Rooms', 4, null, null, 'Casual'],
 
         ['F&B Service', 'Food And Beverage Manager', 'HOD', '', 1, 'hod.fnb', null],
         ['F&B Service', 'Restaurant Manager', 'MGR', 'Main Restaurant', 1, 'manager', null],
         ['F&B Service', 'Captain', 'SUP', 'Main Restaurant', 2, null, null],
         ['F&B Service', 'Waiter', 'LINE', 'Main Restaurant', 12, null, null],
         ['F&B Service', 'Bartender', 'LINE', 'Bar', 4, null, null],
+        ['F&B Service', 'Sommelier', 'SUP', 'Bar', 0, null, null],
+        ['F&B Service', 'Casual Waiter', 'LINE', 'Main Restaurant', 4, null, null, 'Casual'],
 
         ['Kitchen', 'Executive Chef', 'HOD', '', 1, 'hod.kitchen', 'Italian'],
         ['Kitchen', 'Sous Chef', 'MGR', 'Hot Kitchen', 1, null, null],
@@ -64,6 +71,8 @@ return [
         ['Kitchen', 'Commis Chef', 'LINE', 'Hot Kitchen', 8, null, null],
         ['Kitchen', 'Pastry Commis', 'LINE', 'Pastry', 2, null, null],
         ['Kitchen', 'Kitchen Steward', 'LINE', '', 3, null, null],
+        ['Kitchen', 'Pastry Chef', 'SUP', 'Pastry', 0, null, null],
+        ['Kitchen', 'Culinary Intern', 'LINE', 'Hot Kitchen', 2, null, null, 'Intern'],
     ],
 
     // Expat mix (weights); the Maldivian share is drawn per reset (40–60 %).
@@ -101,7 +110,8 @@ return [
     ],
 
     // Monthly basic salary in USD by level [min, max]; Maldivians are paid the MVR equivalent.
-    'salary' => ['GM' => [11000, 13000], 'EXCOM' => [6000, 8500], 'HOD' => [3000, 4500], 'MGR' => [1800, 2600], 'SUP' => [900, 1400], 'LINE' => [550, 850]],
+    // Casual/Intern are paid their position's rate (casual_position_pay_configs); this only fills basic_salary.
+    'salary' => ['Casual' => [450, 450], 'Intern' => [300, 300], 'GM' => [11000, 13000], 'EXCOM' => [6000, 8500], 'HOD' => [3000, 4500], 'MGR' => [1800, 2600], 'SUP' => [900, 1400], 'LINE' => [550, 850]],
 
     // Maldives public holidays. Fixed dates repeat yearly; Islamic ones (approximate) per year.
     'holidays_fixed' => ['01-01' => "New Year's Day", '05-01' => 'Labour Day', '07-26' => 'Independence Day', '11-03' => 'Victory Day', '11-11' => 'Republic Day'],

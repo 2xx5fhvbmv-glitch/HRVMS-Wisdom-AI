@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\Hash;
  * employee's pay worked out the way fetchTimeAttendance works it out —
  * through the same Common::payroll* helpers — so re-opening the pending run
  * shows the same figures. Amounts are USD (the resort currency is 'Dollar').
- * Approved leave days are paid as the wizard pays them (paid leave = a present day).
+ * Approved leave days are paid as the wizard pays them (paid leave = a present day). Casual staff get the
+ * matching Casual runs (CasualPayrollController's formula).
  * Also: salary advances and loans with recovery schedules (paid by the
  * locked runs), and a staff shop whose consented purchases payroll deducts.
  */
@@ -31,6 +32,7 @@ class DemoPayrollSeeder
     private object $employees;
     private array $approvers;   // step => [employee id, name]
     private object $leaves;     // approved leave by employee
+    private object $casual;     // casual staff — paid in their own Casual run
     private array $counts = ['payroll runs' => 0, 'payslips' => 0, 'advances' => 0, 'shop purchases' => 0];
 
     public function __construct(private int $resortId, private int $adminId)
@@ -40,11 +42,15 @@ class DemoPayrollSeeder
     public function seed(): array
     {
         $this->rate = (float) DB::table('resort_site_settings')->where('resort_id', $this->resortId)->value('DollertoMVR') ?: 15.42;
-        $this->employees = DB::table('employees as e')->join('resort_admins as a', 'a.id', '=', 'e.Admin_Parent_id')
-            ->where('e.resort_id', $this->resortId)->where('e.status', 'Active')->whereNull('e.deleted_at')->orderBy('e.id')
-            ->get(['e.id', 'e.Emp_id', 'e.Position_id', 'e.Dept_id', 'e.payment_mode', 'e.basic_salary', 'e.basic_salary_currency',
+        // Casual staff have their own Casual payroll run; interns fold into the Permanent one.
+        $staff = fn (bool $casual) => DB::table('employees as e')->join('resort_admins as a', 'a.id', '=', 'e.Admin_Parent_id')
+            ->where('e.resort_id', $this->resortId)->where('e.status', 'Active')->whereNull('e.deleted_at')
+            ->where('e.employment_type', $casual ? '=' : '!=', 'Casual')->orderBy('e.id')
+            ->get(['e.id', 'e.Emp_id', 'e.Position_id', 'e.Dept_id', 'e.payment_mode', 'e.basic_salary', 'e.basic_salary_currency', 'e.employment_type',
                 'e.nationality', 'e.joining_date', 'e.Admin_Parent_id', 'a.first_name', 'a.last_name', 'a.email'])
             ->keyBy('id');
+        $this->employees = $staff(false);
+        $this->casual = $staff(true);
         $by = fn ($login) => $this->employees->firstWhere('email', $login . '@' . config('demo.login_domain'));
         $this->leaves = DB::table('employees_leaves as l')->join('leave_categories as c', 'c.id', '=', 'l.leave_category_id')
             ->where('l.resort_id', $this->resortId)->where('l.status', 'Approved')
@@ -60,6 +66,7 @@ class DemoPayrollSeeder
         for ($i = 0; $i < self::RUNS; $i++) {
             $start = $first->copy()->addMonths($i);
             $this->run($start, $start->copy()->endOfMonth(), $i === self::RUNS - 1, $advanceDue, $shop);
+            $this->casualRun($start, $start->copy()->endOfMonth(), $i === self::RUNS - 1);
         }
         return $this->counts;
     }
@@ -119,7 +126,10 @@ class DemoPayrollSeeder
                 }
             }
 
-            $basic = (float) $e->basic_salary / ($e->basic_salary_currency === 'MVR' ? $this->rate : 1);
+            // As the wizard pays them: interns at their position's rate, everyone else their basic salary.
+            [$amount, $currency] = $e->employment_type === 'Internship'
+                ? array_values(array_slice(Common::casualInternBasicSalary($e), 0, 2)) : [$e->basic_salary, $e->basic_salary_currency];
+            $basic = (float) $amount / ($currency === 'MVR' ? $this->rate : 1);
             $perDay = $basic / $days;
             $perHour = $perDay / 8;
             $earned = round($perDay * ($presentEquivalent + $paidLeave + $dayOff), 2);
@@ -179,17 +189,7 @@ class DemoPayrollSeeder
             }
         }
 
-        // Finance EXCOM → HR EXCOM → GM; the GM's approval locked the run (PayrollController::finalizeAndLockPayroll).
-        $signed = [1 => $end->copy()->addDays(3)->setTime(10, 5), 2 => $end->copy()->addDays(3)->setTime(15, 40), 3 => $locked];
-        foreach ($this->approvers as $step => [$role, $empId, $name]) {
-            DB::table('payroll_approvals')->insert([
-                'payroll_id' => $payrollId, 'resort_id' => $this->resortId, 'step_order' => $step, 'role_title' => $role,
-                'approver_id' => $pending ? null : $empId, 'approver_name' => $pending ? null : $name, 'status' => $pending ? 'pending' : 'approved',
-                'remarks' => $pending ? null : ($step === 3 ? 'Approved for payment.' : null), 'approved_at' => $pending ? null : $signed[$step],
-                'signature_img' => null, 'signature_name' => $pending ? null : $name, 'signed_at' => $pending ? null : $signed[$step],
-                'created_at' => $created, 'updated_at' => $pending ? $created : $signed[$step],
-            ]);
-        }
+        $this->approvals($payrollId, $end, $created, $locked, $pending);
         if (!$pending) {
             DB::table('payroll')->where('id', $payrollId)->update(['total_payroll' => round($total, 2), 'total_employees' => count($lines)]);
             // What the lock does: this period's installments are recovered, and shop purchases deducted are paid.
@@ -200,6 +200,107 @@ class DemoPayrollSeeder
         }
         $this->counts['payroll runs']++;
         $this->counts['payslips'] += count($lines);
+    }
+
+    /** Finance EXCOM → HR EXCOM → GM; the GM's approval locked the run (PayrollController::finalizeAndLockPayroll). */
+    private function approvals(int $payrollId, Carbon $end, Carbon $created, Carbon $locked, bool $pending): void
+    {
+        $signed = [1 => $end->copy()->addDays(3)->setTime(10, 5), 2 => $end->copy()->addDays(3)->setTime(15, 40), 3 => $locked];
+        foreach ($this->approvers as $step => [$role, $empId, $name]) {
+            DB::table('payroll_approvals')->insert([
+                'payroll_id' => $payrollId, 'resort_id' => $this->resortId, 'step_order' => $step, 'role_title' => $role,
+                'approver_id' => $pending ? null : $empId, 'approver_name' => $pending ? null : $name, 'status' => $pending ? 'pending' : 'approved',
+                'remarks' => $pending ? null : ($step === 3 ? 'Approved for payment.' : null), 'approved_at' => $pending ? null : $signed[$step],
+                'signature_img' => null, 'signature_name' => $pending ? null : $name, 'signed_at' => $pending ? null : $signed[$step],
+                'created_at' => $created, 'updated_at' => $pending ? $created : $signed[$step],
+            ]);
+        }
+    }
+
+    /**
+     * The month's Casual run, worked out as CasualPayrollController::fetchTimeAttendance works it out: the
+     * position rate over the period's days, present days (hour-prorated) plus rostered day-offs, approved OT
+     * only (Friday / holiday ×1.5, else ×1.25), no service charge, and the agency commission recorded but
+     * never paid to the employee. Saved as the Casual run screen saves it: deductions start at 0 there,
+     * Friday OT hours go into holiday OT hours.
+     */
+    private function casualRun(Carbon $start, Carbon $end, bool $pending): void
+    {
+        if ($this->casual->isEmpty()) {
+            return;
+        }
+        $from = $start->format('Y-m-d');
+        $to = $end->format('Y-m-d');
+        $created = $end->copy()->addDays(2)->setTime(10, 30);
+        $locked = $end->copy()->addDays(4)->setTime(12, 0);
+        $payrollId = DB::table('payroll')->insertGetId([
+            'resort_id' => $this->resortId, 'payroll_category' => 'Casual', 'start_date' => $from, 'end_date' => $to,
+            'total_payroll' => 0, 'total_employees' => 0, 'draft_date' => $created->format('Y-m-d'),
+            'payment_date' => $end->copy()->addDays(5)->format('Y-m-d'), 'status' => $pending ? 'pending_approval' : 'locked',
+            'created_at' => $created, 'updated_at' => $pending ? $created->copy()->addDay() : $locked,
+        ]);
+        $attendance = DB::table('parent_attendaces')->whereIn('Emp_id', $this->casual->keys())->whereBetween('date', [$from, $to])->get()->groupBy('Emp_id');
+        $people = $this->casual->only($attendance->keys()->all());
+        $context = Common::payrollRosterContext($this->resortId, $people->keys(), $from, $to, $attendance->flatten()->pluck('id'));
+        $holidays = DB::table('resortholidays')->where('resort_id', $this->resortId)->whereBetween('PublicHolidaydate', [$from, $to])
+            ->pluck('PublicHolidaydate')->flip()->all() + Common::publicHolidayDates();
+        $commission = DB::table('casual_position_pay_configs')->where('resort_id', $this->resortId)->get()->keyBy('position_id');
+        $days = (int) $start->diffInDays($end, true) + 1;
+        $usd = fn ($amount, $currency) => (float) $amount / ($currency === 'MVR' ? $this->rate : 1);
+
+        $rows = ['payroll_employees' => [], 'payroll_time_and_attandance' => [], 'payroll_deductions' => [], 'payroll_reviews' => []];
+        $stamp = ['payroll_id' => $payrollId, 'created_at' => $created, 'updated_at' => $created];
+        $total = 0.0;
+        foreach ($people as $id => $e) {
+            $records = collect($attendance[$id]);
+            $salary = Common::casualInternBasicSalary($e);
+            $basic = $usd($salary['amount'], $salary['currency']);
+            $fee = $usd($commission[$e->Position_id]->commission_amount ?? 0, $commission[$e->Position_id]->commission_currency ?? 'USD');
+            $dayOff = Common::payrollDayMarks($records->all(), $context, $id)['day_off_dates']->count();
+            $present = $records->where('Status', 'Present');
+            $presentEquivalent = $present->sum(fn ($r) => $this->hours($r->DayWiseTotalHours) > 0 ? Common::payrollDayFraction($r, $context) : 1.0);
+            $unpaid = $records->whereIn('Status', ['Absent', 'Sick', 'ShortLeave', 'HalfDayLeave'])->count();
+            $regular = $friday = $holiday = 0.0;
+            foreach ($records as $r) {
+                if ($r->OverTime && strtolower((string) $r->OTStatus) === 'approved') {
+                    $h = $this->hours($r->OverTime);
+                    match (true) {
+                        Carbon::parse($r->date)->isFriday() => $friday += $h,
+                        isset($holidays[$r->date]) || $r->Status === 'DayOff' => $holiday += $h,
+                        default => $regular += $h,
+                    };
+                }
+            }
+            $perHour = $basic / $days / 8;
+            $earned = round($basic / $days * ($presentEquivalent + $dayOff), 2);
+            $pays = [round($perHour * 1.25 * $regular, 2), round($perHour * 1.5 * $friday, 2), round($perHour * 1.5 * $holiday, 2)];
+            $otPay = round(array_sum($pays), 2);
+            $earnings = round($earned + $otPay, 2);
+            $total += $earnings;
+
+            $key = $stamp + ['employee_id' => $id, 'Emp_id' => $e->Emp_id];
+            $rows['payroll_employees'][] = $stamp + ['employee_id' => $id, 'Emp_id' => $e->Emp_id, 'position' => $e->Position_id,
+                'department' => $e->Dept_id, 'section' => null, 'paymentMethod' => $e->payment_mode ?: 'Cash'];
+            $rows['payroll_time_and_attandance'][] = $key + ['present_days' => $present->count(), 'absent_days' => $unpaid, 'leave_types' => '',
+                'regular_ot_hours' => round($regular, 2), 'holiday_ot_hours' => round($friday + $holiday, 2),
+                'total_ot' => round($regular + $friday + $holiday, 2), 'notes' => null];
+            $rows['payroll_deductions'][] = $key + ['attendance_deduction' => 0, 'city_ledger' => 0, 'staff_shop' => 0,
+                'advance_loan' => 0, 'pension' => 0, 'ewt' => 0, 'other' => 0, 'total_deductions' => 0];
+            $rows['payroll_reviews'][] = $key + ['service_charge' => 0, 'service_provider_commission' => round($fee, 2),
+                'regularOTPay' => $pays[0], 'fridayOTPay' => $pays[1], 'holidayOTPay' => $pays[2], 'earnings_basic' => round($basic, 2),
+                'earned_salary' => $earned, 'earnings_overtime' => $otPay, 'earnings_allowance' => 0, 'kpi_bonus' => 0,
+                'total_earnings' => $earnings, 'total_deductions' => 0, 'net_salary' => $earnings];
+        }
+        foreach ($rows as $table => $data) {
+            foreach (array_chunk($data, 500) as $chunk) {
+                DB::table($table)->insert($chunk);
+            }
+        }
+        $this->approvals($payrollId, $end, $created, $locked, $pending);
+        if (!$pending) {
+            DB::table('payroll')->where('id', $payrollId)->update(['total_payroll' => round($total, 2), 'total_employees' => $people->count()]);
+        }
+        $this->counts['casual payroll runs'] = ($this->counts['casual payroll runs'] ?? 0) + 1;
     }
 
     /**

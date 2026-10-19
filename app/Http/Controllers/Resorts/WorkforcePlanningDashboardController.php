@@ -1770,7 +1770,8 @@ class WorkforcePlanningDashboardController extends Controller
             // parallel via curl_multi; the batched endpoint cuts HTTP
             // overhead by ~12× and gives the AI service a single point
             // to short-circuit / cache / fail.
-            $aiBase   = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/');
+            // From config, not env(): env() returns null once config is cached, and every call fell back to localhost.
+            $aiBase   = rtrim((string) config('services.ai_service.url'), '/');
             $batchUrl = $aiBase . '/predict_staff_batch';
             $url      = $aiBase . '/predict_staff'; // legacy fallback if batch is 404 (older AI deploy)
 
@@ -1813,7 +1814,8 @@ class WorkforcePlanningDashboardController extends Controller
                     $occupancy = 0.0; // No history at all — accept the zero.
                 }
 
-                $cacheKey = sprintf('ai_insights:%d:%s:%.2f', $resort_id, $monthYear, $occupancy);
+                // v2: earlier entries hold predictions made from a 0-100 occupancy the model doesn't understand.
+                $cacheKey = sprintf('ai_insights:v2:%d:%s:%.2f', $resort_id, $monthYear, $occupancy);
                 $cached = \Cache::get($cacheKey);
                 if ($cached !== null) {
                     // Backwards-compat: pre-reason caches stored a bare
@@ -1852,7 +1854,7 @@ class WorkforcePlanningDashboardController extends Controller
             if (!empty($missing)) {
                 $batchItems = array_map(fn($m) => [
                     'month'             => $m['month_name'],
-                    'occupancy_percent' => $m['occupancy'],
+                    'occupancy_percent' => $m['occupancy'] / 100, // the staffing model is trained on a 0-1 fraction
                 ], $missing);
 
                 $ch = curl_init();
@@ -1912,7 +1914,7 @@ class WorkforcePlanningDashboardController extends Controller
                             CURLOPT_POST           => true,
                             CURLOPT_POSTFIELDS     => json_encode([
                                 'month'             => $m['month_name'],
-                                'occupancy_percent' => $m['occupancy'],
+                                'occupancy_percent' => $m['occupancy'] / 100, // 0-1, as above
                             ]),
                             CURLOPT_HTTPHEADER     => ['Accept: application/json', 'Content-Type: application/json'],
                             CURLOPT_CONNECTTIMEOUT => 3,
