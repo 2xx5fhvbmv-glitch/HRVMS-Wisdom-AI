@@ -1407,7 +1407,12 @@ class MasterDashboardController extends Controller
                 }
             }
 
-            return view('resorts.master-dashboard.hoddashboard', compact(
+            // Non-HR HOD / ExCom get the leader master dashboard; HR-department staff keep the existing view.
+            $masterView = \App\Helpers\Common::isHRDepartment($Dept_id)
+                ? 'resorts.master-dashboard.hoddashboard'
+                : 'resorts.master-dashboard.leaderdashboard';
+
+            return view($masterView, compact(
                 'page_header','resort_id','resort_divisions','resort_departments','resort_positions',
                 'hiring_request','vacancies','TotalApplicants','TotalApplicantCounts','Interviews','Hired','UpcomingApplicants',
                 'total_employees','present_employee_counts','absent_employee_counts','leave_employee_counts','resort_positions',
@@ -1837,7 +1842,7 @@ class MasterDashboardController extends Controller
                         ->doesntExist();
                 });
 
-            return view('resorts.master-dashboard.gmdashboard', compact(
+            return view('resorts.master-dashboard.leaderdashboard', compact(
                 'resort_id','resort_divisions','resort_departments','resort_positions',
                 'hiring_request','vacancies','TotalApplicants','TotalApplicantCounts','Interviews','Hired','UpcomingApplicants',
                 'total_employees','present_employee_counts','absent_employee_counts','leave_employee_counts','resort_positions',

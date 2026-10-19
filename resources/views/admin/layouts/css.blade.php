@@ -13,8 +13,7 @@
 <link rel="stylesheet" href="{{ URL::asset('admin_assets/plugins/daterangepicker/daterangepicker.css') }}">
 <link rel="stylesheet" href="{{ URL::asset('admin_assets/plugins/summernote/summernote-bs4.min.css') }}">
 <link rel="stylesheet" href="{{ URL::asset('assets/css/custom.css') }}">
-<link rel="stylesheet" href="{{ URL::asset('admin_assets/plugins/toastr/toastr.min.css') }}">
-<link rel="stylesheet" href="{{ URL::asset('resorts_assets/css/toastr-theme.css') }}">
+<link rel="stylesheet" href="{{ URL::asset('resorts_assets/css/wai-toast.css') }}?v={{ @filemtime(public_path('resorts_assets/css/wai-toast.css')) }}">
 <link rel="stylesheet" href="{{ URL::asset('admin_assets/plugins/holdon/holdon.min.css') }}">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/6.6.9/sweetalert2.min.css">
 <link rel="stylesheet" href="{{ URL::asset('assets/css/datepicker.css') }}">

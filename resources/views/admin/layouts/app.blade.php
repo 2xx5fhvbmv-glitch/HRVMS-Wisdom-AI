@@ -31,6 +31,7 @@
   <script>
       document.addEventListener('DOMContentLoaded', function () {
           wisdomToast('error', 'Please fix the following', 'A few things need attention before you can continue:', {
+              sticky: true,
               list: @json($errors->all())
           });
       });

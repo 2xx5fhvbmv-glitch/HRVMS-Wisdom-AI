@@ -9,8 +9,7 @@
   <link rel="stylesheet" href="{{ URL::asset('admin_assets/plugins/icheck-bootstrap/icheck-bootstrap.min.css') }}">
   <link rel="stylesheet" href="{{ URL::asset('admin_assets/dist/css/adminlte.min.css') }}">
   <link rel="stylesheet" href="{{ URL::asset('assets/css/custom.css') }}">
-  <link rel="stylesheet" href="{{ URL::asset('admin_assets/plugins/toastr/toastr.min.css') }}">
-  <link rel="stylesheet" href="{{ URL::asset('resorts_assets/css/toastr-theme.css') }}">
+  <link rel="stylesheet" href="{{ URL::asset('resorts_assets/css/wai-toast.css') }}?v={{ @filemtime(public_path('resorts_assets/css/wai-toast.css')) }}">
   <link rel="stylesheet" href="{{ URL::asset('admin_assets/plugins/holdon/holdon.min.css') }}">
 </head>
 <body class="hold-transition login-page">
@@ -75,58 +74,7 @@
   <script src="{{ URL::asset('admin_assets/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
   <script src="{{ URL::asset('admin_assets/dist/js/adminlte.min.js') }}"></script>
   <script src="{{ URL::asset('assets/js/jquery.validate.min.js') }}"></script>
-  <script src="{{ URL::asset('admin_assets/plugins/toastr/toastr.min.js') }}"></script>
-    <script>
-        // Toastr re-theme glue (see toastr-theme.css) — standalone page, kept
-        // in sync with admin/layouts/js.blade.php.
-        var WT_DURATION = 5000; // visible-toast duration for the .wt-prog bar
-        var wtPendingSticky = false;
-        if (window.toastr) {
-            toastr.options.closeButton = true;
-            toastr.options.progressBar = false;
-            toastr.options.closeOnHover = false;
-            toastr.options.showMethod = 'show';
-            toastr.options.hideMethod = 'hide';
-            toastr.options.timeOut = 0; // toastr's own internal auto-hide timer would race our .wt-prog bar's animationend (see WT_DURATION above)
-            toastr.options.extendedTimeOut = 0;
-            toastr.options.onShown = function () {
-                var $t = $(this);
-                if (wtPendingSticky) { wtPendingSticky = false; return; }
-                $t.append(
-                    $('<span class="wt-prog"></span>')
-                        .css('animation-duration', WT_DURATION + 'ms')
-                        .on('animationend', function () {
-                            if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) {
-                                toastr.clear($t);
-                                return;
-                            }
-                            $t.addClass('wt-out').one('animationend', function () { toastr.clear($t); });
-                        })
-                );
-            };
-        }
-        function wisdomToast(type, title, message, opts) {
-            if (!window.toastr) return;
-            opts = opts || {};
-            var sticky = !!opts.sticky || !!(opts.list && opts.list.length);
-            var esc = function (s) {
-                return String(s).replace(/[&<>"']/g, function (c) {
-                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-                });
-            };
-            var html = esc(message || '');
-            if (opts.list && opts.list.length) {
-                html += '<ul class="wt-errlist">' + opts.list.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>';
-            }
-            wtPendingSticky = sticky;
-            var $toast = toastr[type](html, title, {
-                timeOut: 0,
-                extendedTimeOut: 0,
-                escapeHtml: false
-            });
-            return $toast;
-        }
-    </script>
+  <script src="{{ URL::asset('resorts_assets/js/wai-toast.js') }}?v={{ @filemtime(public_path('resorts_assets/js/wai-toast.js')) }}"></script>
   <script src="{{ URL::asset('admin_assets/plugins/holdon/holdon.min.js') }}"></script>
   <script type="text/javascript">
     $(document).ready( function() {

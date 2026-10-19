@@ -13,67 +13,13 @@
 <script src="{{ URL::asset('admin_assets/dist/js/adminlte.js') }}"></script>
 <script src="{{ URL::asset('admin_assets/dist/js/pages/dashboard.js') }}"></script>
 <script src="{{ URL::asset('assets/js/jquery.validate.min.js') }}"></script>
-<script src="{{ URL::asset('admin_assets/plugins/toastr/toastr.min.js') }}"></script>
+<script src="{{ URL::asset('resorts_assets/js/wai-toast.js') }}?v={{ @filemtime(public_path('resorts_assets/js/wai-toast.js')) }}"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/6.6.9/sweetalert2.min.js"></script>
 <script src="{{ URL::asset('admin_assets/plugins/bs-custom-file-input/bs-custom-file-input.min.js') }}"></script>
 <script src="{{ URL::asset('admin_assets/plugins/holdon/holdon.min.js') }}"></script>
 <script src="{{URL::asset('admin_assets/js/parsley.min.js')}}"></script>
 <script src="{{ URL::asset('assets/js/bootstrap-datepicker.min.js') }}"></script>
 <script>
-  // Toastr re-theme glue (see toastr-theme.css, shared with the resort-admin
-  // portal). Pure CSS drives the countdown/hover-pause motion; this only
-  // wires the one small progress-bar element the CSS animates, since
-  // toastr's own JS-interval progress bar can't pause cleanly on hover (it
-  // resets to empty instead of pausing — verified in toastr's own source),
-  // and provides wisdomToast(), the one helper for flash messages / sticky
-  // validation-error lists. The Session::has('message') switch below is
-  // untouched — still the exact same trigger, just rendered with the new look.
-  toastr.options.closeButton = true;
-  toastr.options.progressBar = false; // replaced by our own CSS-driven .wt-prog bar
-  toastr.options.closeOnHover = false; // toastr's native hover-pause snaps the bar to empty; ours pauses in place
-  toastr.options.showMethod = 'show';
-  toastr.options.hideMethod = 'hide';
-  var WT_DURATION = 5000; // visible-toast duration for the .wt-prog bar
-  toastr.options.timeOut = 0; // toastr's own internal auto-hide timer would race our .wt-prog bar's animationend
-  toastr.options.extendedTimeOut = 0;
-  var wtPendingSticky = false;
-  toastr.options.onShown = function () {
-      var $t = $(this);
-      if (wtPendingSticky) { wtPendingSticky = false; return; }
-      $t.append(
-          $('<span class="wt-prog"></span>')
-              .css('animation-duration', WT_DURATION + 'ms')
-              .on('animationend', function () {
-                  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) {
-                      toastr.clear($t);
-                      return;
-                  }
-                  $t.addClass('wt-out').one('animationend', function () { toastr.clear($t); });
-              })
-      );
-  };
-
-  function wisdomToast(type, title, message, opts) {
-      opts = opts || {};
-      var sticky = !!opts.sticky || !!(opts.list && opts.list.length);
-      var esc = function (s) {
-          return String(s).replace(/[&<>"']/g, function (c) {
-              return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-          });
-      };
-      var html = esc(message || '');
-      if (opts.list && opts.list.length) {
-          html += '<ul class="wt-errlist">' + opts.list.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>';
-      }
-      wtPendingSticky = sticky;
-      var $toast = toastr[type](html, title, {
-          timeOut: 0,
-          extendedTimeOut: 0,
-          escapeHtml: false
-      });
-      return $toast;
-  }
-
   var baseUrl = "{{url('/')}}";
   var dt_format = "{{Common::getDateAndSetFormateToDatepicker()}}";
 

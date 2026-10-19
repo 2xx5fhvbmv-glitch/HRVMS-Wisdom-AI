@@ -9,7 +9,7 @@
 <script src="{{ URL::asset('applicant_form_assets/js/script.js')}}"></script>
 
 <script src="{{ URL::asset('applicant_form_assets/js/parsley.min.js')}}"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script src="{{ URL::asset('resorts_assets/js/wai-toast.js') }}?v={{ @filemtime(public_path('resorts_assets/js/wai-toast.js')) }}"></script>
 <script src="{{ URL::asset('applicant_form_assets/js/croppie.js')}}"></script>
 <script>
     var dt_format = 'd-m-Y';;

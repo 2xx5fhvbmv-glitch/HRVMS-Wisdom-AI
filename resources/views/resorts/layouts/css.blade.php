@@ -17,10 +17,8 @@
 <link href="{{ URL::asset('resorts_assets/css/header-band.css')}}?v={{ @filemtime(public_path('resorts_assets/css/header-band.css')) }}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/wai-markdown.css')}}?v={{ @filemtime(public_path('resorts_assets/css/wai-markdown.css')) }}" rel=stylesheet>
 <link rel="apple-touch-icon" sizes="180x180" href="{{ URL::asset('resorts_assets/images/apple-touch-icon.png')}}">
-<link href="{{ URL::asset('resorts_assets/css/toastr.min.css')}}" rel=stylesheet>
-<link href="{{ URL::asset('resorts_assets/css/toastr-theme.css')}}" rel=stylesheet>
+<link rel="stylesheet" href="{{ URL::asset('resorts_assets/css/wai-toast.css') }}?v={{ @filemtime(public_path('resorts_assets/css/wai-toast.css')) }}">
 <link href="{{ URL::asset('resorts_assets/css/sweetalert2.min.css')}}" rel=stylesheet>
-{{-- <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet" /> --}}
 {{-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/6.6.9/sweetalert2.min.css"> --}}
 <link href="{{ URL::asset('resorts_assets/css/flatpickr.min.css')}}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/flatpickr-theme.css')}}" rel=stylesheet>
