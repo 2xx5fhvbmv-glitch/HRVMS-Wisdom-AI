@@ -2,10 +2,13 @@
     Master dashboard for NON-HR leaders: non-HR department HODs, non-HR ExComs and the General Manager.
     HR roles keep resorts/master-dashboard/hrdashboard.blade.php (untouched).
 
-    Presentation only. Every figure comes from variables MasterDashboardController::hod_dashboard() /
-    gm_dashboard() already pass (names below); anything those do not provide reads an OPTIONAL $leader array
-    (see docs/leader-master-dashboard-backend-notes.md) and shows an honest empty state / "—" until it exists.
-    No fake data. Styles: public/resorts_assets/css/leader-dashboard.css, behaviour: .../js/leader-dashboard.js.
+    Every figure comes from variables MasterDashboardController::hod_dashboard() / gm_dashboard() already
+    pass (names below); whatever those don't provide is filled in by LeaderDashboard::viewData(), called
+    right below (app/Services/LeaderDashboard.php — $leader['requests'/'events'/'health'/'absent_delta'],
+    plus pendingResignationsForHod/monthlyCheckinPerformance/totalOverallWorkingHours when missing). Still
+    shows an honest empty state / "—" for anyone with no linked employee record
+    (LeaderDashboard::forCurrentUser() returns null) rather than fake data.
+    Styles: public/resorts_assets/css/leader-dashboard.css, behaviour: .../js/leader-dashboard.js.
 --}}
 @extends('resorts.layouts.app')
 @section('page_tab_title' ,"Dashboard")
@@ -22,6 +25,16 @@
 
 @section('content')
 @php
+    // Fills in {leader, pendingResignationsForHod, monthlyCheckinPerformance, totalOverallWorkingHours}
+    // from LeaderDashboard (app/Services/LeaderDashboard.php) for whichever of these the controller
+    // didn't already pass — e.g. gm_dashboard() passes none of the three today; hod_dashboard() already
+    // passes pendingResignationsForHod. get_defined_vars() here is only the controller's own compact()
+    // variables, since nothing below has been defined yet; viewData() never overrides a key that's
+    // already present, and EXTR_SKIP is a second guard against that.
+    $ldSvc  = \App\Services\LeaderDashboard::forCurrentUser();
+    $ldData = $ldSvc ? $ldSvc->viewData(get_defined_vars()) : ['leader' => []];
+    extract($ldData, EXTR_SKIP);
+
     $none       = new \Illuminate\Database\Eloquent\Collection();
     $today      = \Carbon\Carbon::today();
     $horizon    = $today->copy()->addDays(60);
@@ -123,7 +136,7 @@
             'url' => route('people.employee-resignation.show', ['id' => base64_encode($r->id)]),
         ];
     })->values();
-    // Requests awaiting this user's approval: no controller variable yet — optional $leader['requests'] (see md).
+    // Requests awaiting this user's approval — $leader['requests'], from LeaderDashboard::requests().
     $inboxReq = collect($leader['requests'] ?? [])->map(fn ($q) => array_merge(['photo' => '', 'dl' => '', 'od' => false], (array) $q, ['t' => 'req']))->values();
     $inbox = $inboxExit->concat($inboxRes)->concat($inboxReq)->values();
 
@@ -146,7 +159,8 @@
         $nm = trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? ''));
         $events[] = ['date' => \Carbon\Carbon::parse($c->date_discussion)->toDateString(), 'title' => 'Monthly check-in · ' . $nm, 'sub' => $c->PositionName ?? '', 'people' => [['n' => $nm, 'p' => '']]];
     }
-    // Team events (drills, trainings), Employee of the Month: optional $leader['events'].
+    // Team events (upcoming trainings) — $leader['events'], from LeaderDashboard::events(). No drills or
+    // Employee of the Month: neither is scheduled/tracked in the system, so neither is shown (no fake data).
     foreach ($leader['events'] ?? [] as $ev) { $events[] = (array) $ev + ['sub' => '', 'people' => []]; }
     usort($events, fn ($a, $b) => strcmp($a['date'], $b['date']));
 
