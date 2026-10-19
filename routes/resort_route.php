@@ -164,6 +164,10 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
         Route::get('/master/hod-dashboard','MasterDashboardController@hod_dashboard')->name('resort.master.hod_dashboard');
         Route::get('/master/gm-dashboard','MasterDashboardController@gm_dashboard')->name('resort.master.gm_dashboard');
         Route::get('/master/admin-dashboard','MasterDashboardController@admin_dashboard')->name('resort.master.admin_dashboard');
+        // Leader master dashboard widgets (non-HR HOD / ExCom / GM) — JSON only.
+        Route::get('/master/leader-roster', 'LeaderDashboardController@roster')->name('resort.master.leader_roster');
+        Route::post('/master/leader-requests/{type}/{decision}', 'LeaderDashboardController@decide')
+            ->whereIn('type', ['leave', 'overtime'])->whereIn('decision', ['approve', 'reject'])->name('resort.master.leader_request');
 
         // XCOM Dashboard Routes (reuse HOD dashboards with XCOM title)
         Route::get('workforce-planning/xcom-dashboard', 'WorkforcePlanningDashboardController@excom_dashboard')->name('resort.workforceplan.excomdashboard');

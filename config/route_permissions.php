@@ -77,6 +77,11 @@ return [
         'sos.emergency.update.status'  => ['sos.dashboard.index', 'edit'],
         'sos.updateMassInstruction'    => ['sos.dashboard.index', 'edit'],
 
+        // Leader master dashboard widgets: data is scoped in LeaderDashboard; decisions go
+        // through the Leave / T&A endpoints' own approver checks.
+        'resort.master.leader_roster'  => ['*', 'any_authenticated'],
+        'resort.master.leader_request' => ['*', 'any_authenticated'],
+
     ],
 
 ];

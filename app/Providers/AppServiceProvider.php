@@ -39,6 +39,14 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Queue::before(fn () => \App\Support\Demo\DemoMail::reset());
         Schema::defaultStringLength(191);
 
+        // Leader master dashboard: adds $leader (and GM's missing cards) without touching the
+        // controller's own variables — LeaderDashboard only fills keys the controller didn't pass.
+        \Illuminate\Support\Facades\View::composer('resorts.master-dashboard.leaderdashboard', function ($view) {
+            if ($dashboard = \App\Services\LeaderDashboard::forCurrentUser()) {
+                $view->with($dashboard->viewData($view->getData()));
+            }
+        });
+
         // Mobile personal access tokens defaulted to Passport's 1-year
         // lifetime (S4-04). Product-owner decision 2026-09-26: Option A,
         // 90 days — staff re-enter their password every 90 days.

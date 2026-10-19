@@ -1098,7 +1098,10 @@ class MasterDashboardController extends Controller
             // hod_dashboard() with dashboard_label='XCOM', so detect
             // that label here to pick the right scope.
             $myEmpId = optional($this->globalUser->GetEmployee)->id;
-            $isXcomScope = strtoupper((string) request('dashboard_label', 'HOD')) === 'XCOM';
+            // Founder 2026-10-19: a non-HR ExCom sees their own department / own queue like a
+            // HOD (invariant 5). Was: the XCOM label widened these two cards to the whole
+            // resort. The GM's resort-wide view comes from gm_dashboard().
+            $isXcomScope = false;
 
             $pendingFormsQuery = ExitClearanceFormAssignment::with([
                     'exitClearanceForm:id,form_name',
@@ -1156,52 +1159,9 @@ class MasterDashboardController extends Controller
 
             $pending_learning_request = LearningRequest::with('learning')->where('status','Pending')->where('resort_id',$resort_id)->where('created_by',$this->globalUser->GetEmployee->Admin_Parent_id)->get();
 
-            $monthly = MonthlyCheckingModel::join("employees as t1", "t1.id", "=", "monthly_checking_models.emp_id")
-                ->join("resort_admins as t2", "t2.id", "=", "t1.Admin_Parent_id")
-                ->join("resort_positions as t3", "t3.id", "=", "t1.Position_id")
-                ->leftjoin("learning_programs as t4", "t4.id", "=", "monthly_checking_models.tranining_id")
-                ->where("t1.resort_id", $this->globalUser->resort_id)
-
-
-                ->orderBy("monthly_checking_models.id", "desc")
-                ->select([
-                    't1.id as emp_orignal_id',
-                    't4.name as traniningname',
-                    't2.first_name',
-                    't2.last_name',
-                    't3.position_title as PositionName',
-                    'monthly_checking_models.*'
-                ]);
-
-            // Get the collection after executing the query
-            $monthlyCollection = $monthly->limit(5)->orderBy('monthly_checking_models.created_at','DESC')->get();
-
-            // Process each record
-            $monthlyCheckinPerformance = $monthlyCollection->map(function($ak) {
-                if (isset($ak->tranining_id)) {
-                    $l = LearningRequest::with('employees')
-                        ->where("learning_id", $ak->tranining_id)
-                        ->where("resort_id", $this->globalUser->resort_id)
-                        ->whereHas('employees', function($q) use ($ak) {
-                            $q->where('id', $ak->emp_orignal_id);
-                        })
-                        ->latest('id')
-                        ->first();
-
-                    $ak->duration = isset($l->start_date) && isset($l->end_date)
-                        ? $l->start_date . '-' . $l->end_date
-                        : '-';
-
-                    $ak->status = isset($l->status) && $l->status == 'Approved'
-                        ? 'In Progress'
-                        : (isset($l->status) ? $l->status : 'Pending');
-                } else {
-                    $ak->duration = '-';
-                    $ak->status = 'Pending';
-                }
-                $ak->new_date_of_dicussion = date("d M Y",strtotime($ak->date_discussion));
-                return $ak;
-            });
+            // Own department's latest check-ins (was: the whole resort's, for every HOD), with
+            // Admin_Parent_id selected so the dashboard can show photos.
+            $monthlyCheckinPerformance = \App\Services\LeaderDashboard::monthlyCheckins($resort_id, [$Dept_id]);
 
             $attendanceDataTodoList = app(TimeandAttendanceDashboardController::class)->Tododata();
 

@@ -117,16 +117,20 @@ class WisdomChatController extends Controller
             ], 502);
         }
 
-        $history[] = ['role' => 'assistant', 'content' => $result['reply']];
+        [$reply, $label, $source] = self::splitSourceTag($result['reply']);
+        $history[] = ['role' => 'assistant', 'content' => $reply];
         session([self::SESSION_KEY => $this->trim($history)]);
 
-        return response()->json([
+        return response()->json(array_filter([
             'success'    => true,
-            'reply'      => $result['reply'],
+            'reply'      => $reply,
             'tier'       => $ctx['tier'],
             'tier_label' => $ctx['tier_label'],
             'usage'      => self::usage(),
-        ]);
+            // Policy / employment-law answers only (leader dashboard shows them when present).
+            'label'      => $label,
+            'source'     => $source,
+        ], fn ($v) => $v !== null));
     }
 
     public function history(Request $request)
@@ -173,6 +177,39 @@ class WisdomChatController extends Controller
             'remaining' => max(0, $limit - $used),
             'resets_at' => today()->addDay()->toIso8601String(),
         ];
+    }
+
+    /** The law sources actually embedded in the system prompt — a tag naming anything else is dropped. */
+    private const SOURCES = [
+        'employment_act'         => 'Maldives Employment Act (Law No. 2/2008, as amended)',
+        'pension_act'            => 'Maldives Pension Act (Act No. 8/2009, as amended)',
+        'ewt'                    => 'Income Tax Act (Law No. 25/2019) — MIRA EWT guide',
+        'income_tax_regulation'  => 'Income Tax Regulation 2020/R-21',
+        'minimum_wage_order'     => 'Minimum Wage Order (in force 1 Jan 2022)',
+        'expatriates_regulation' => 'Employment of Expatriates Regulation 2023/R-111',
+        'hr_guidance'            => 'General HR practice — confirm against your company policy',
+    ];
+
+    /**
+     * Pulls the model's trailing "[[topic: … | source: key]]" line off a reply (see the
+     * SOURCE TAG prompt rule). Returns [reply without the tag, label|null, source|null].
+     * There are no company-policy documents in the system, so the label is
+     * "Employment law · topic" or "HR guidance · topic" — never "Company policy".
+     * A cut-off tag (small reply budget) is stripped too.
+     */
+    public static function splitSourceTag(string $reply): array
+    {
+        $label = $source = null;
+        if (preg_match('/\n?\[\[\s*topic:\s*([a-z][a-z \-]{0,30}?)\s*\|\s*source:\s*([a-z_]+)\s*\]\]\s*$/i', $reply, $m)) {
+            $reply = substr($reply, 0, strlen($reply) - strlen($m[0]));
+            $key = strtolower($m[2]);
+            if (isset(self::SOURCES[$key])) {
+                $label = ($key === 'hr_guidance' ? 'HR guidance' : 'Employment law') . ' · ' . strtolower(trim($m[1]));
+                $source = self::SOURCES[$key];
+            }
+        }
+        $reply = preg_replace('/\n?\[\[\s*topic:[^\]]*\]?\]?\s*$/i', '', $reply); // partial / malformed tag
+        return [rtrim($reply), $label, $source];
     }
 
     /** The 429 body the chat screens read: `message` is shown as the assistant's reply. */
