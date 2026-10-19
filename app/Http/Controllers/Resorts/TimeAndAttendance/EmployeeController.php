@@ -1167,8 +1167,8 @@ class EmployeeController extends Controller
 
                     // Time add
                     $UpdatedShiftEndTime = $ShiftEndTime->copy()
-                    ->addHours($overtimeHours)
-                    ->addMinutes($overtimeMinutes);
+                    ->addHours((int) $overtimeHours)
+                    ->addMinutes((int) $overtimeMinutes);
                     $ParentAttendace->CheckingOutTime = $UpdatedShiftEndTime->format('H:i');
                 // Add the Updated Shift End Time to DayWiseTotalHours
                     // $DayWiseTotalHours = Carbon::createFromTimeString($ParentAttendace->DayWiseTotalHours); //its stored as HH:MM

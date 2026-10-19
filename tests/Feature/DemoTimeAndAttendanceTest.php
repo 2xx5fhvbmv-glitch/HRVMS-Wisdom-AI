@@ -66,6 +66,23 @@ class DemoTimeAndAttendanceTest extends TestCase
             ->where('p.resort_id', $this->resortId)->where('b.Break_InTime', '')->where('b.Total_Break_Time', '!=', '')->count());
     }
 
+    public function test_the_attendance_register_lists_everyone_for_hr_and_only_their_department_for_a_hod()
+    {
+        // It used to crash on Carbon 3 (a string hour from explode() into addHours) and took seconds to count.
+        $ids = fn () => preg_match_all('/<td>(DMT-\d+)\s*<\/td>/', (string) $this->getJson(route('resort.timeandattendance.ResigterRosterSearch'),
+            ['X-Requested-With' => 'XMLHttpRequest'])->assertOk()->json('view'), $m) ? array_unique($m[1]) : [];
+        $this->signInHr();
+        $this->assertCount(10, $ids(), 'HR sees a full first page of staff');
+
+        auth('resort-admin')->logout();
+        $this->post(route('resort.login'), ['email' => 'hod.housekeeping@demo.thewisdom.ai', 'password' => 'Demo#Pass2026'])->assertOk();
+        $housekeeping = DB::table('employees as e')->join('resort_departments as d', 'd.id', '=', 'e.Dept_id')
+            ->where('e.resort_id', $this->resortId)->where('d.name', 'Housekeeping')->pluck('e.Emp_id')->all();
+        $seen = $ids();
+        $this->assertNotEmpty($seen);
+        $this->assertSame([], array_values(array_diff($seen, $housekeeping)), 'a HOD sees only their own department');
+    }
+
     public function test_hr_fills_a_missing_checkout_on_a_mobile_punch()
     {
         $hr = $this->signInHr();

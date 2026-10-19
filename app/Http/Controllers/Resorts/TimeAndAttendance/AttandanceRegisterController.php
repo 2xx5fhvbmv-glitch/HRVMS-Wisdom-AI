@@ -671,11 +671,10 @@ class AttandanceRegisterController extends Controller
                 $attandanceregister = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                                         ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
                                         ->join('duty_rosters as t3', 't3.Emp_id', '=', 'employees.id')
-                                        ->leftJoin('parent_attendaces as t4', function ($join) use ($date) {
-                                            // Fix the join condition - should likely be resort_id from duty_rosters
-                                            $join->on('t4.Emp_id', '=', 't3.Emp_id'); // Changed to match employee IDs
-
-                        })->select(
+                        // No attendance join here: nothing reads it, and every roster x every attendance row
+                        // made the paginator's count take seconds. Any of the employee's rosters works as the
+                        // anchor (GetAttandanceRegister joins attendance by Emp_id), so take one deterministically.
+                        ->select(
                                 't1.id as Parentid',
                                 't1.first_name',
                                 't1.last_name',
@@ -683,8 +682,7 @@ class AttandanceRegisterController extends Controller
                                 'employees.id as emp_id',
                                 'employees.Emp_id as EmployeeId',
                                 't2.position_title',
-                                't3.id as duty_roster_id',
-                                't4.date'
+                                DB::raw('MAX(t3.id) as duty_roster_id')
                             )
                             ->groupBy('employees.id')
 
@@ -693,12 +691,11 @@ class AttandanceRegisterController extends Controller
                             ->where('t1.resort_id', $this->resort->resort_id)
                             ->where('employees.status', 'Active');
 
-                            $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
-                            $userDeptId = $this->resort->GetEmployee->Dept_id ?? '';
-
-                            if($employeeRankPosition['position'] != "HR" && $employeeRankPosition['position'] != "EXCOM"){
-                                // Non-HR/EXCOM users only see their own department
-                                $attandanceregister->where('employees.Dept_id', $userDeptId);
+                            // Full access (GM, HR, master admin — also with no employee record) sees everyone;
+                            // everyone else only their own department.
+                            $scopedDeptIds = Common::getScopedDepartmentIds();
+                            if ($scopedDeptIds !== null) {
+                                $attandanceregister->whereIn('employees.Dept_id', $scopedDeptIds);
                             }
 
                         // Apply search filter

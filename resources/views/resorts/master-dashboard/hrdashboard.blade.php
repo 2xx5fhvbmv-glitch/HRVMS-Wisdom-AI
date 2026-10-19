@@ -193,6 +193,20 @@
         <div class="hm-card metric-c"><div class="m-val"><span class="mn tnum">{{ $absent_employee_counts }}</span> <span class="sec tnum">{{ $absentPct }}%</span></div><div class="m-lbl">Absent</div></div>
       </div>
 
+      <!-- Workforce planning: positions filled vs vacant (the figures the HOD and GM dashboards show) -->
+      @php
+        $wfpTotal = (int) ($manning_response->total_budgeted_employees ?? 0);
+        $wfpFilled = (int) ($manning_response->total_filled_positions_count ?? 0);
+        $wfpVacant = (int) ($manning_response->total_vacant_count ?? 0);
+        $wfpPct = fn ($n) => $wfpTotal > 0 ? round($n * 100 / $wfpTotal) : 0;
+      @endphp
+      <div class="m-grid" id="wfpGrid">
+        <div class="hm-card metric-c"><div class="m-val"><span class="mn tnum">{{ $wfpTotal }}</span></div><div class="m-lbl">Positions · <a href="{{ route('resort.workforceplan.dashboard') }}">Workforce planning</a></div></div>
+        <div class="hm-card metric-c"><div class="m-val"><span class="mn tnum">{{ $wfpFilled }}</span> <span class="sec tnum">{{ $wfpPct($wfpFilled) }}%</span></div><div class="m-lbl">Filled positions</div></div>
+        <div class="hm-card metric-c"><div class="m-val"><span class="mn tnum">{{ $wfpVacant }}</span> <span class="sec tnum">{{ $wfpPct($wfpVacant) }}%</span></div><div class="m-lbl">Vacant positions</div></div>
+        <div class="hm-card metric-c"><div class="m-val"><span class="mn tnum">{{ (int) ($manning_response->TotalBudgtedemp ?? 0) }}</span></div><div class="m-lbl">Staff in those positions</div></div>
+      </div>
+
       <!-- Attendance trend -->
       <div class="hm-card att-card">
         <div class="att-h">
