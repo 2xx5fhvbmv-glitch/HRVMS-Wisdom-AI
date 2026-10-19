@@ -11,7 +11,7 @@ return array (
     0 => 
     array (
       'currency' => 'Dollar',
-      'casual_payment_model' => 'lump_sum',
+      'casual_payment_model' => 'direct_pay', // casual staff paid by the resort (+ agency fee), so the Casual payroll run is available
       'MVRtoDoller' => 0.06485084306096,
       'DollertoMVR' => 15.42,
       'MVR_img' => 'maldives-currency-icon-new.svg',

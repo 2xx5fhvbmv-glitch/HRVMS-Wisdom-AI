@@ -37,7 +37,7 @@ class DemoPayrollTest extends TestCase
         $this->artisan('demo:reset', ['--force' => true])->assertSuccessful();
         Demo::refresh();
         $this->resortId = Demo::resortId();
-        $this->run = DB::table('payroll')->where('resort_id', $this->resortId)->where('status', 'pending_approval')->first();
+        $this->run = DB::table('payroll')->where('resort_id', $this->resortId)->where('payroll_category', 'Permanent')->where('status', 'pending_approval')->first();
         $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
     }
 
@@ -78,9 +78,29 @@ class DemoPayrollTest extends TestCase
         $this->getJson(route('payroll.dashboard.estimate-breakdown'))->assertOk();
     }
 
+    public function test_the_casual_run_screen_agrees_with_the_seeded_casual_run()
+    {
+        $this->signIn('finance');
+        $run = DB::table('payroll')->where('resort_id', $this->resortId)->where('payroll_category', 'Casual')->where('status', 'pending_approval')->first();
+        $reviews = DB::table('payroll_reviews')->where('payroll_id', $run->id)->get()->keyBy('employee_id');
+        $this->assertNotEmpty($reviews);
+
+        $result = collect($this->post(route('resort.casualPayroll.fetchTimeAttendance'), [
+            'employees' => $reviews->keys()->all(), 'startDate' => $run->start_date, 'endDate' => $run->end_date, 'currency' => 'USD',
+        ])->assertOk()->json('data'))->keyBy('employee_id');
+
+        $this->assertCount($reviews->count(), $result);
+        foreach ($reviews as $id => $review) {
+            $this->assertEqualsWithDelta((float) $review->earned_salary, $result[$id]['earned_salary'], 0.011, "earned salary of casual {$id}");
+            $this->assertEqualsWithDelta((float) $review->earnings_overtime, $result[$id]['total_ot_pay'], 0.011, "OT pay of casual {$id}");
+            $this->assertEqualsWithDelta((float) $review->service_provider_commission, $result[$id]['service_provider_commission'], 0.011, "agency fee of casual {$id}");
+        }
+        $this->followingRedirects()->get(route('resort.casualPayroll.index'))->assertOk()->assertSee('Casual Payroll');
+    }
+
     public function test_the_pending_run_is_approved_by_finance_hr_and_gm_and_locks_itself()
     {
-        $this->assertSame(12, DB::table('payroll')->where('resort_id', $this->resortId)->where('status', 'locked')->count());
+        $this->assertSame(12, DB::table('payroll')->where('resort_id', $this->resortId)->where('payroll_category', 'Permanent')->where('status', 'locked')->count());
         $due = DB::table('payroll_recovery_schedule as s')->join('payroll_deductions as d', 'd.employee_id', '=', 's.employee_id')
             ->where('d.payroll_id', $this->run->id)->where('d.advance_loan', '>', 0)
             ->whereBetween('s.repayment_date', [$this->run->start_date, $this->run->end_date])->pluck('s.id');

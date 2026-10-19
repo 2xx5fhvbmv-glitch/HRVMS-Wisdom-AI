@@ -184,10 +184,19 @@ class DemoVerifier
 
         // Slice 4: payroll.
         $this->check('12 locked payroll runs, last month waiting on Finance → HR → GM', function () use ($resortId) {
-            $locked = DB::table('payroll')->where('resort_id', $resortId)->where('status', 'locked')->count();
-            $pending = DB::table('payroll')->where('resort_id', $resortId)->where('status', 'pending_approval')->pluck('id');
+            $locked = DB::table('payroll')->where('resort_id', $resortId)->where('payroll_category', 'Permanent')->where('status', 'locked')->count();
+            $pending = DB::table('payroll')->where('resort_id', $resortId)->where('payroll_category', 'Permanent')->where('status', 'pending_approval')->pluck('id');
             $steps = DB::table('payroll_approvals')->whereIn('payroll_id', $pending)->where('status', 'pending')->orderBy('step_order')->pluck('role_title')->all();
             return ($locked === 12 && $pending->count() === 1 && $steps === ['Finance EXCOM', 'HR EXCOM', 'GM']) ?: "{$locked} locked, {$pending->count()} pending";
+        });
+        $this->check('Casual payroll: 12 locked runs and last month waiting, casual staff only', function () use ($resortId) {
+            $runs = DB::table('payroll')->where('resort_id', $resortId)->where('payroll_category', 'Casual');
+            $locked = (clone $runs)->where('status', 'locked')->count();
+            $pending = (clone $runs)->where('status', 'pending_approval')->count();
+            $others = DB::table('payroll_reviews')->whereIn('payroll_id', (clone $runs)->select('id'))
+                ->whereNotIn('employee_id', DB::table('employees')->where('resort_id', $resortId)->where('employment_type', 'Casual')->select('id'))->count();
+            $model = DB::table('resort_site_settings')->where('resort_id', $resortId)->value('casual_payment_model');
+            return ($locked === 12 && $pending === 1 && $others === 0 && $model === 'direct_pay') ?: "{$locked} locked, {$pending} pending, {$others} non-casual payslips, model {$model}";
         });
         $this->check('Every locked run totals its payslips', function () use ($resortId) {
             $off = DB::table('payroll as p')->where('p.resort_id', $resortId)->where('p.status', 'locked')

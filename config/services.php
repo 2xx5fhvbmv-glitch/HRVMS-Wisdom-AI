@@ -94,6 +94,12 @@ return [
         'url' => env('AI_BASE_URL', env('AI_URL', 'http://localhost:8001')),
     ],
 
+    // The AI service's base URL for everything else (staffing forecast, budget recommendations…).
+    // Read through config, never env() at call time: env() is null once config is cached.
+    'ai_service' => [
+        'url' => env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001'),
+    ],
+
     // R-04: same env()-at-call-time problem as ai_extract/cv_extractor
     // above — ReportController::aiAnalysisText() and
     // Concerns\PredefinedReportActions::computeAiInsightsText() both read

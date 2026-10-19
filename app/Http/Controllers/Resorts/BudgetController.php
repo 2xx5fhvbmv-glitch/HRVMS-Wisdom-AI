@@ -837,7 +837,7 @@ class BudgetController extends Controller
         // the live .env actually defines, so without this fallback the
         // controller silently hit localhost:8001 on prod and Regenerate
         // AI looked like a no-op.
-        $url = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/budget_recommendations';
+        $url = rtrim((string) config('services.ai_service.url'), '/') . '/budget_recommendations';
 
         $curl = curl_init();
         curl_setopt_array($curl, [

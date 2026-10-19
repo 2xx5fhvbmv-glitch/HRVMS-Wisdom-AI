@@ -297,7 +297,8 @@ class DemoOrganisationSeeder
         foreach (DB::table('resort_positions')->where('resort_id', $this->resortId)->whereNotNull('employee_category')->get(['id', 'employee_category']) as $pos) {
             DB::table('casual_position_pay_configs')->insert(['resort_id' => $this->resortId, 'position_id' => $pos->id,
                 'basic_salary' => $this->data['salary'][$pos->employee_category][0], 'basic_salary_currency' => 'USD',
-                'commission_amount' => 0, 'commission_currency' => 'USD', 'created_at' => now(), 'updated_at' => now()]);
+                // The agency's admin fee per casual (the 'direct_pay' model); interns have none.
+                'commission_amount' => $pos->employee_category === 'Casual' ? 50 : 0, 'commission_currency' => 'USD', 'created_at' => now(), 'updated_at' => now()]);
         }
 
         // Every demo login uses DEMO_PASSWORD and goes straight in (no forced change).
