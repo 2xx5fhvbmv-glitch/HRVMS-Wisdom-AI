@@ -343,7 +343,7 @@ class ComplianceController extends Controller
 
         // Resolve the AI host — prefer AI_BASE_URL but fall back to
         // the existing AI_URL the live .env defines.
-        $url = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/compliance_scan';
+        $url = rtrim((string) config('services.ai_service.url'), '/') . '/compliance_scan';
 
         $curl = curl_init();
         curl_setopt_array($curl, [
@@ -351,7 +351,7 @@ class ComplianceController extends Controller
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => json_encode($payload),
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+            CURLOPT_HTTPHEADER     => ['X-Internal-Key: ' . config('services.wisdom_ai.internal_key'), 'Content-Type: application/json', 'Accept: application/json'],
             // Longer than the per-row enrichment because this is a single
             // big-context LLM call. Still under Hostinger's ~60 s wall by
             // having the FE button confirm with the user first.
@@ -465,7 +465,7 @@ class ComplianceController extends Controller
 
         // Resolve the AI host — prefer AI_BASE_URL but fall back to
         // the existing AI_URL the live .env defines.
-        $url = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/compliance_explain';
+        $url = rtrim((string) config('services.ai_service.url'), '/') . '/compliance_explain';
         $payload = [
             'rule_name'             => (string) $compliance->compliance_breached_name,
             'rule_module'           => (string) $compliance->module_name,
@@ -493,7 +493,7 @@ class ComplianceController extends Controller
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POST           => true,
                 CURLOPT_POSTFIELDS     => json_encode($payload),
-                CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+                CURLOPT_HTTPHEADER     => ['X-Internal-Key: ' . config('services.wisdom_ai.internal_key'), 'Content-Type: application/json', 'Accept: application/json'],
                 // 45 s leaves enough room for one retry inside Hostinger's
                 // ~60 s reverse-proxy wall when this helper is called from
                 // a non-batched code path. The batched (regenerateAi) caller

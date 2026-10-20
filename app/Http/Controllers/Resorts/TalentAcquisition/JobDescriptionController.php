@@ -320,7 +320,7 @@ class JobDescriptionController extends Controller
             ];
             $advisory = null;
             try {
-                $aiUrl = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/check_compliance';
+                $aiUrl = rtrim((string) config('services.ai_service.url'), '/') . '/check_compliance';
                 $curl = curl_init();
                 curl_setopt_array($curl, [
                     CURLOPT_URL            => $aiUrl,
@@ -329,7 +329,7 @@ class JobDescriptionController extends Controller
                     CURLOPT_POSTFIELDS     => [
                         'job_description' => new \CURLFile($absolute_path, 'application/pdf', $filename),
                     ],
-                    CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+                    CURLOPT_HTTPHEADER     => ['X-Internal-Key: ' . config('services.wisdom_ai.internal_key'), 'Accept: application/json'],
                     // OCR + LLM can be slow; allow generous wall before giving up.
                     CURLOPT_TIMEOUT        => 90,
                     CURLOPT_CONNECTTIMEOUT => 5,

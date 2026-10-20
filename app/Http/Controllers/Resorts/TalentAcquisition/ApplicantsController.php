@@ -138,7 +138,7 @@ class ApplicantsController extends Controller
         file_put_contents($jdTmp, $jdPdf);
         file_put_contents($cvTmp, $cvBytes);
 
-        $url  = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/score_resume';
+        $url  = rtrim((string) config('services.ai_service.url'), '/') . '/score_resume';
         $curl = curl_init();
         curl_setopt_array($curl, [
             CURLOPT_URL            => $url,
@@ -148,7 +148,7 @@ class ApplicantsController extends Controller
                 'job_description' => curl_file_create($jdTmp, 'application/pdf', 'job_description.pdf'),
                 'resume'          => curl_file_create($cvTmp, 'application/pdf', 'cv.pdf'),
             ],
-            CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+            CURLOPT_HTTPHEADER     => ['X-Internal-Key: ' . config('services.wisdom_ai.internal_key'), 'Accept: application/json'],
             CURLOPT_TIMEOUT        => 120,
             CURLOPT_CONNECTTIMEOUT => 5,
         ]);
