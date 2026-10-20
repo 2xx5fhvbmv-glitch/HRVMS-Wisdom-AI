@@ -173,8 +173,8 @@ class DemoLeaveSeeder
             if (!$this->isLogin($approver) || $this->waitingOn($approver->id)) {
                 continue;
             }
-            // A HOD's only report can be their manager, whose annual leave may be used up — then unpaid leave.
-            foreach (['Annual Leave', 'Unpaid Leave'] as $type) {
+            // A HOD's only report can be their manager, whose annual leave may be used up — then any other leave they're entitled to.
+            foreach (array_unique(array_merge(['Annual Leave', 'Unpaid Leave'], array_keys($this->categories))) as $type) {
                 foreach ($this->staff->where('reporting_to', $approver->id)->shuffle() as $e) {
                     $step = array_search($approver->id, $this->chain($e), true);
                     $from = $this->today->copy()->addDays(5);

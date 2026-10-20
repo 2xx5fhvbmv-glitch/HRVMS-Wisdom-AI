@@ -60,6 +60,11 @@ class DemoReset
         $say("Demo resort is #{$built->id} (code {$built->resort_id}, \"{$built->resort_name}\") — config demo.resort_code = " . config('demo.resort_code') . '.');
         $say('Verifying…');
         $report['verify'] = (new DemoVerifier)->run();
+        // A module seeder that failed is a failed reset, whatever the other checks say.
+        foreach ($report['seeded']['failed'] ?? [] as $label => $error) {
+            $report['verify']['checks'][] = ['name' => "{$label} seeded", 'ok' => false, 'detail' => $error];
+            $report['verify']['passed'] = false;
+        }
         $report['seconds'] = round(microtime(true) - $started, 1);
         $report['finished_at'] = now()->toDateTimeString();
         Cache::forever('demo:last_reset', $report);

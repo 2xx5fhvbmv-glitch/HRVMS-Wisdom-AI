@@ -422,7 +422,7 @@ class EWTController extends Controller
         }
     }
 
-    public function getformerEmployeesEWTData(Request $request, $year){
+    public function getformerEmployeesEWTData(Request $request, $year = null){
         $page_title ='Former Employees EWT';
         $resort_id = $this->resort->resort_id;
         $employees = Employee::with('resortAdmin')->where('resort_id',$resort_id)->whereIn('status', ['Inactive', 'Terminated','Resigned'])->get();

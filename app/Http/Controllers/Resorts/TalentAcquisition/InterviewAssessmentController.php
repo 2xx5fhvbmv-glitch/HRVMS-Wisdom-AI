@@ -29,7 +29,7 @@ class InterviewAssessmentController extends Controller
         }
         $page_title="Interview Assessment";
         $positionsQuery = ResortPosition::where('status','active')->where('resort_id',$this->resort->resort_id);
-        if(in_array((int) $this->rank, [1, 2], true)) {
+        if(in_array((int) $this->rank, [1, 2], true) && !Common::hasFullDataAccess()) {
             $positionsQuery->where('dept_id', $this->resort->GetEmployee->Dept_id);
         }
         $positions = $positionsQuery->get();
@@ -50,7 +50,7 @@ class InterviewAssessmentController extends Controller
         ->join('resort_positions as t4', 't4.id', '=', 'interview_assessment_forms.position')
         ->where('interview_assessment_forms.resort_id', $this->resort->resort_id);
 
-        if(in_array((int) $this->rank, [1, 2], true)) {
+        if(in_array((int) $this->rank, [1, 2], true) && !Common::hasFullDataAccess()) {
             $forms->where('t4.dept_id', $this->resort->GetEmployee->Dept_id);
         }
 
@@ -99,11 +99,11 @@ class InterviewAssessmentController extends Controller
 
     public function listResponses(Request $request, $formId)
     {
-        // Same visibility rule as list(): rank 1/2 only see their own department's forms.
+        // Same visibility rule as list(): rank 1/2 outside HR only see their own department's forms.
         $form = InterviewAssessmentForm::join('resort_positions as t4', 't4.id', '=', 'interview_assessment_forms.position')
             ->where('interview_assessment_forms.resort_id', $this->resort->resort_id)
             ->where('interview_assessment_forms.id', $formId)
-            ->when(in_array((int) $this->rank, [1, 2], true), function ($q) {
+            ->when(in_array((int) $this->rank, [1, 2], true) && !Common::hasFullDataAccess(), function ($q) {
                 $q->where('t4.dept_id', $this->resort->GetEmployee->Dept_id);
             })
             ->select('interview_assessment_forms.id')

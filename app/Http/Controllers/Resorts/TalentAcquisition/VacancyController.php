@@ -1582,7 +1582,20 @@ class VacancyController extends Controller
     public function ViewAllToDo(Request $request)
     {
         $config = config('settings.Position_Rank');
-        $rank = $this->resort->GetEmployee->rank;
+        $employee = $this->resort->GetEmployee;
+        $rank = (int) $employee->rank;
+        // Same effectiveRank promotion as the dashboard's to-do widget this page is "View all" of — an HR or
+        // Finance HOD/EXCOM (raw rank 1/2) approves as 3/7, so their approved vacancies are filed under that rank.
+        if (!in_array($rank, [3, 7, 8], true)) {
+            $userDeptName = ResortDepartment::where('id', $employee->Dept_id)->value('name') ?? '';
+            $userPositionTitle = $employee->position->position_title ?? '';
+            if (stripos($userDeptName, 'Accounting') !== false || stripos($userDeptName, 'Finance') !== false
+                || stripos($userPositionTitle, 'Finance') !== false) {
+                $rank = 7;
+            } elseif (stripos($userDeptName, 'Human Resources') !== false || stripos($userPositionTitle, 'Human Resources') !== false) {
+                $rank = 3;
+            }
+        }
 
         $resort_id = $this->resort->resort_id;
         $Vacancies  = Vacancies::join('employees as t1','t1.id','=','vacancies.reporting_to')
