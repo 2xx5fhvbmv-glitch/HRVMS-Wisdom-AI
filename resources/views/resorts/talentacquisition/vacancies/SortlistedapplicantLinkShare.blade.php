@@ -519,7 +519,7 @@ $(document).ready(function() {
             { data: 'Position', name: 'Position', visible: false },
             { data: 'Email', name: 'Email', visible: false },
             { data: 'Contact', name: 'Contact', visible: false },
-            { data: 'AppliedDate', name: 'AppliedDate', visible: false },
+            { data: 'AppliedDate', name: 'applied_date_raw', visible: false }, // server sorts/searches the raw date
             { data: 'last_name', name: 'last_name', visible: false },
         ],
         drawCallback: function() {

@@ -9003,7 +9003,7 @@ class Common
         $currency = 'USD';
         try { $currency = self::getDisplayCurrency() ?: 'USD'; } catch (\Throwable $e) {}
 
-        $url = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/dashboard_insights';
+        $url = rtrim((string) config('services.ai_service.url'), '/') . '/dashboard_insights';
         $payload = [
             'domain'         => $domain,
             'resort_country' => 'Maldives',
@@ -9017,7 +9017,7 @@ class Common
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => json_encode($payload),
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+            CURLOPT_HTTPHEADER     => ['X-Internal-Key: ' . config('services.wisdom_ai.internal_key'), 'Content-Type: application/json', 'Accept: application/json'],
             CURLOPT_TIMEOUT        => 45,
             CURLOPT_CONNECTTIMEOUT => 5,
         ]);

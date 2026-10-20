@@ -845,7 +845,7 @@ class BudgetController extends Controller
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => json_encode($payload),
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+            CURLOPT_HTTPHEADER     => ['X-Internal-Key: ' . config('services.wisdom_ai.internal_key'), 'Content-Type: application/json', 'Accept: application/json'],
             // Same Hostinger-proxy guardrails as the visa AI calls — 90 s
             // upper bound (the page intentionally has a longer budget than
             // the OCR endpoints because this is a one-shot text-only LLM

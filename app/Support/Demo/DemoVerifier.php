@@ -70,7 +70,7 @@ class DemoVerifier
         $this->check('Everyone is rostered this week and next', function () use ($resortId, $employees) {
             $nextWeek = now()->addWeek()->endOfWeek()->format('Y-m-d');
             $rostered = DB::table('duty_roster_entries')->where('resort_id', $resortId)->where('date', $nextWeek)->distinct()->count('Emp_id');
-            $n = $employees()->where('status', 'Active')->count();
+            $n = $employees()->whereIn('status', ['Active', 'Offboarding'])->count(); // someone serving notice still works
             return $rostered === $n ?: "{$rostered} of {$n} rostered through {$nextWeek}";
         });
         $this->check('12 months of attendance, payroll-ready before the last 10 days', function () use ($resortId) {
@@ -203,6 +203,59 @@ class DemoVerifier
                 ->whereRaw('ABS(p.total_payroll - (SELECT COALESCE(SUM(r.net_salary), 0) FROM payroll_reviews r WHERE r.payroll_id = p.id)) > 0.01')->count();
             return $off === 0 ?: "{$off} runs don't add up";
         });
+
+        // Module seeders: every list the client opens has rows in each state it can show.
+        $has = function (string $table, string $column, array $want) use ($resortId) {
+            $missing = array_values(array_diff($want, DB::table($table)->where('resort_id', $resortId)->distinct()->pluck($column)->all()));
+            return $missing ? "{$table}: no " . implode(', ', $missing) : true;
+        };
+        $all = fn (...$results) => collect($results)->first(fn ($r) => $r !== true) ?? true;
+        $this->check('Leavers: resignations in every state, settlements, former staff in Pension', function () use ($resortId, $has, $all) {
+            $settlements = DB::table('final_settlements as f')->join('employees as e', 'e.id', '=', 'f.employee_id')->where('e.resort_id', $resortId)->distinct()->pluck('f.status')->all();
+            $former = DB::table('employees as e')->where('e.resort_id', $resortId)->where('e.nationality', 'Maldivian')->whereIn('e.status', ['Inactive', 'Terminated'])
+                ->whereExists(fn ($q) => $q->from('payroll_deductions as d')->join('payroll as p', 'p.id', '=', 'd.payroll_id')
+                    ->whereColumn('d.employee_id', 'e.id')->where('p.status', 'locked')->where('d.pension', '>', 0))->count();
+            return $all($has('employee_resignation', 'status', ['Pending', 'Approved', 'Withdraw', 'Rejected']),
+                array_diff(['finalized', 'review'], $settlements) ? 'settlements: ' . implode(', ', $settlements) : true,
+                $former >= 2 ?: "{$former} former Maldivian staff with pension");
+        });
+        $this->check('Talent Acquisition: vacancies at every approval stage, applicants at every stage', function () use ($resortId, $has, $all) {
+            $chain = DB::table('t_anotification_children as c')->join('t_anotification_parents as p', 'p.id', '=', 'c.Parent_ta_id')
+                ->where('p.Resort_id', $resortId)->distinct()->pluck('c.status')->all();
+            $latest = DB::table('applicant_wise_statuses as s')->join('applicant_form_data as a', 'a.id', '=', 's.Applicant_id')->where('a.resort_id', $resortId)
+                ->whereRaw('s.id = (SELECT MAX(id) FROM applicant_wise_statuses WHERE Applicant_id = s.Applicant_id)')->distinct()->pluck('s.status')->all();
+            $booked = DB::table('applicant_inter_view_details')->where('resort_id', $resortId)->where('Status', 'Slot Booked')->where('InterViewDate', '>=', now()->format('Y-m-d'))->count();
+            $missing = array_merge(array_diff(['Active', 'Approved', 'Hold', 'ForwardedToNext'], $chain), array_diff(['Sortlisted By Wisdom AI', 'Selected', 'Offer Letter Sent', 'Contract Accepted', 'Rejected'], $latest));
+            return $all($has('vacancies', 'status', ['Active', 'Closed', 'Draft']), $missing ? 'missing ' . implode(', ', $missing) : true, $booked > 0 ?: 'no upcoming interview');
+        });
+        $this->check('People: promotions, transfers, increments, info updates, announcements, onboarding', function () use ($resortId, $has, $all) {
+            $logins = DB::table('employees as e')->join('resort_admins as a', 'a.id', '=', 'e.Admin_Parent_id')->where('e.resort_id', $resortId)
+                ->where('a.email', 'not like', strtolower(config('demo.prefix')) . '-%')->whereNotExists(fn ($q) => $q->from('employees_education as x')->whereColumn('x.employee_id', 'e.id'))->count();
+            return $all($has('employee_promotions', 'status', ['Approved', 'Pending', 'On Hold', 'Rejected']),
+                $has('employee_transfers', 'status', ['Approved', 'Pending', 'On Hold', 'Rejected']),
+                $has('people_salary_increment', 'status', ['Approved', 'Pending', 'Hold', 'Change-Request', 'Rejected']),
+                $has('employee_info_update_request', 'status', ['Pending', 'Approved', 'Rejected']),
+                $has('announcement', 'status', ['Published', 'Scheduled', 'Draft']),
+                DB::table('employee_itineraries')->where('resort_id', $resortId)->exists() ?: 'no onboarding itineraries',
+                $logins === 0 ?: "{$logins} logins without a qualification");
+        });
+        $this->check('Performance: a closed and a running cycle, KPIs, check-ins, PIP and PDP', fn () => $all(
+            $has('performance_cycles', 'status', ['Close', 'OnGoing']),
+            DB::table('performance_kpi_parents')->where('resort_id', $resortId)->exists() ?: 'no KPIs',
+            DB::table('monthly_checking_models')->where('resort_id', $resortId)->exists() ?: 'no check-ins',
+            DB::table('employee_pip_plans')->where('resort_id', $resortId)->exists() ?: 'no PIP',
+            DB::table('employee_pdp_plans')->where('resort_id', $resortId)->exists() ?: 'no PDP'));
+        $this->check('Accommodation: staff housed, maintenance requests open and closed, housekeeping', function () use ($resortId, $has, $all) {
+            $housed = DB::table('assing_accommodations')->where('resort_id', $resortId)->where('emp_id', '>', 0)->count();
+            return $all($housed >= 80 ?: "{$housed} housed", $has('maintanace_requests', 'Status', ['pending', 'Open', 'In-Progress', 'Closed']),
+                DB::table('housekeeping_requests')->where('resort_id', $resortId)->exists() ?: 'no housekeeping requests');
+        });
+        $this->check('Incidents in every state, with investigation meetings', fn () => $all(
+            $has('incidents', 'status', ['Reported', 'Assigned To', 'Investigation In Progress', 'Approval Pending', 'Approved', 'Rejected', 'Resolved']),
+            DB::table('incidents_investigation_meetings as m')->join('incidents as i', 'i.id', '=', 'm.incident_id')->where('i.resort_id', $resortId)->exists() ?: 'no meetings'));
+        $this->check('Surveys: finished with answers, running, draft', fn () => $all(
+            $has('parent_surveys', 'Status', ['Complete', 'OnGoing', 'SaveAsDraft']),
+            DB::table('survey_results as r')->join('parent_surveys as s', 's.id', '=', 'r.Parent_survey_id')->where('s.resort_id', $resortId)->exists() ?: 'no answers'));
 
         return ['passed' => !collect($this->checks)->contains('ok', false), 'checks' => $this->checks];
     }

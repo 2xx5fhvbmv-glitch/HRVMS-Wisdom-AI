@@ -19,6 +19,18 @@ use Illuminate\Support\Facades\Log;
  */
 class DemoEnvSeeder
 {
+    /** Module seeders run after the core (organisation, workforce, time, leave, payroll), in this order. */
+    const MODULES = [
+        // first: leavers are no longer Active, so the module seeders below leave them out
+        'Exit & settlement' => DemoExitSeeder::class,
+        'Talent Acquisition' => DemoTalentSeeder::class,
+        'People' => DemoPeopleSeeder::class,
+        'Performance' => DemoPerformanceSeeder::class,
+        'Accommodation' => DemoAccommodationSeeder::class,
+        'Incidents' => DemoIncidentSeeder::class,
+        'Surveys' => DemoSurveySeeder::class,
+    ];
+
     public function seed(int $seed, ?callable $say = null): array
     {
         $say ??= fn () => null;
@@ -44,13 +56,31 @@ class DemoEnvSeeder
         $counts += (new DemoPayrollSeeder($resortId, $admin->id))->seed();
         $say("{$counts['payroll runs']} payroll runs ready.");
 
+        // Module seeders: each in its own savepoint, so one failing leaves the rest of the demo built
+        // and is reported as a FAIL instead of stopping the reset after the purge.
+        $failed = [];
+        foreach (self::MODULES as $label => $class) {
+            DB::beginTransaction();
+            try {
+                $part = (new $class($resortId, $admin->id))->seed();
+                DB::commit();
+                $counts += $part;
+                $say("{$label} ready: " . implode(', ', array_map(fn ($k, $v) => "{$v} {$k}", array_keys($part), $part)) . '.');
+            } catch (\Throwable $e) {
+                DB::rollBack();
+                $failed[$label] = $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine();
+                Log::error("Demo ENV: {$label} seeder failed", ['error' => $failed[$label]]);
+                $say("{$label} FAILED: {$failed[$label]}");
+            }
+        }
+
         try {
             Common::createFolderByResort($resortId);
         } catch (\Throwable $e) {
             Log::warning('Demo ENV: resort storage folder not created: ' . $e->getMessage());
         }
 
-        return ['resort_id' => $resortId, 'counts' => $counts];
+        return ['resort_id' => $resortId, 'counts' => $counts, 'failed' => $failed];
     }
 
     /** The resort row: created once, then kept (name/logo are the client's branding). */

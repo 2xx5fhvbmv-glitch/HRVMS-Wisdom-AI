@@ -1863,7 +1863,7 @@ class WorkforcePlanningDashboardController extends Controller
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_POST           => true,
                     CURLOPT_POSTFIELDS     => json_encode(['items' => $batchItems]),
-                    CURLOPT_HTTPHEADER     => ['Accept: application/json', 'Content-Type: application/json'],
+                    CURLOPT_HTTPHEADER     => ['X-Internal-Key: ' . config('services.wisdom_ai.internal_key'), 'Accept: application/json', 'Content-Type: application/json'],
                     CURLOPT_CONNECTTIMEOUT => 3,
                     // Tighter cap than per-call × N: the AI service does
                     // a pure-Python loop for each item, so the whole
@@ -1916,7 +1916,7 @@ class WorkforcePlanningDashboardController extends Controller
                                 'month'             => $m['month_name'],
                                 'occupancy_percent' => $m['occupancy'] / 100, // 0-1, as above
                             ]),
-                            CURLOPT_HTTPHEADER     => ['Accept: application/json', 'Content-Type: application/json'],
+                            CURLOPT_HTTPHEADER     => ['X-Internal-Key: ' . config('services.wisdom_ai.internal_key'), 'Accept: application/json', 'Content-Type: application/json'],
                             CURLOPT_CONNECTTIMEOUT => 3,
                             CURLOPT_TIMEOUT        => 8,
                         ]);

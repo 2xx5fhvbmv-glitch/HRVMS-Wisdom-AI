@@ -938,7 +938,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::get('payroll/pension', 'Payroll\PensionController@index')->name('payroll.pension.index');
     Route::get('payroll/ewt', 'Payroll\EWTController@index')->name('payroll.ewt.index');
     Route::get('payroll/pension/former-employees', 'Payroll\PensionController@formerEmployees')->name('payroll.pension.former-employees');
-    Route::get('payroll/get-EWT-Data/{year}', 'Payroll\EWTController@getEWTData')->name('payroll.ewt.getdata');
+    Route::get('payroll/get-EWT-Data/{year}', 'Payroll\EWTController@getEWTData')->where('year', '[0-9]{4}')->name('payroll.ewt.getdata');
     Route::get('payroll/get-Pension-Data', 'Payroll\PensionController@getPensionData')->name('payroll.pension.getdata');
     Route::get('payroll/get-EWT-Data/former-employees/{year?}', 'Payroll\EWTController@getformerEmployeesEWTData')->name('payroll.ewt.getdata.former-employees');
 
