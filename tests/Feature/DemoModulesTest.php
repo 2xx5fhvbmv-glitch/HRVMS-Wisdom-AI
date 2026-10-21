@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Helpers\StorageHelper;
 use App\Support\Demo\Demo;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -30,7 +31,7 @@ class DemoModulesTest extends TestCase
         Storage::fake(config('settings.storage_driver'));
         (new \ReflectionClass(StorageHelper::class))->setStaticPropertyValue('cachedDisk', null);
         Mail::fake();
-        Http::fake();
+        Http::fake(['api.aladhan.com/*' => Http::response(['data' => ['hijri' => ['month' => ['number' => 3]]]]), '*' => Http::response()]);
         $this->artisan('demo:reset', ['--force' => true])->assertSuccessful();
         Demo::refresh();
         $this->resortId = Demo::resortId();
@@ -89,5 +90,28 @@ class DemoModulesTest extends TestCase
         // Info-update requests come back as rendered rows, pending ones first.
         $this->withHeaders(['X-Requested-With' => 'XMLHttpRequest'])->get(route('people.info-update.list'))->assertOk()->assertSee('Personal Information');
         $this->get(route('resort.accommodation.release-decisions'))->assertOk()->assertSee('Yes, vacate');
+        $this->get(route('payroll.ewt.getdata.former-employees'))->assertOk();
+    }
+
+    public function test_settlements_open_and_count_the_leavers_days_and_used_leave()
+    {
+        $this->signIn('hr');
+        $settled = DB::table('final_settlements as f')->join('employees as e', 'e.id', '=', 'f.employee_id')
+            ->where('e.resort_id', $this->resortId)->get(['f.id', 'f.status', 'e.id as employee_id']);
+        $this->assertEqualsCanonicalizing(['finalized', 'review'], $settled->pluck('status')->all());
+        foreach ($settled as $s) {
+            $this->get(route('final.settlement.review', $s->id))->assertOk();
+        }
+        // The settled leaver's last month: paid days found (attendance + roster day offs), leave already taken subtracted.
+        $leaver = \App\Models\Employee::find($settled->firstWhere('status', 'finalized')->employee_id);
+        $calc = (new \App\Services\FinalSettlementService)->calculateFinalMonthData($leaver, $this->resortId);
+        $this->assertGreaterThan(0, $calc['worked_days']);
+        $this->assertLessThanOrEqual($calc['expected_working_days'], $calc['worked_days']);
+        $annual = fn ($c) => (float) collect($c['leave_breakdown'])->firstWhere('leave_type', 'Annual Leave')['available_days'];
+        $withLeave = $annual($calc);
+        // Without the leave they took, more annual leave would be left to pay out.
+        DB::table('employees_leaves')->where('emp_id', $leaver->id)->where('status', 'Approved')->update(['status' => 'Rejected']);
+        $this->assertGreaterThan($withLeave, $annual((new \App\Services\FinalSettlementService)->calculateFinalMonthData($leaver->fresh(), $this->resortId)),
+            'approved leave is subtracted from the balance');
     }
 }

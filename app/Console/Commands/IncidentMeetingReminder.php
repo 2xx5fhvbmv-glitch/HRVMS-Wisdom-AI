@@ -24,20 +24,26 @@ class IncidentMeetingReminder extends Command
 
     public function handle()
     {
-        $configRaw = DB::table('incident_configuration')
-            ->where('key', 'meeting_reminder')
-            ->value('setting_value');
-
-        if (!$configRaw) {
+        // Each resort has its own reminder setting; its meetings belong to it through their incident
+        // (incidents_investigation_meetings has no resort_id).
+        $configs = DB::table('incident_configuration')->where('setting_key', 'meeting_reminder')->pluck('setting_value', 'resort_id');
+        if ($configs->isEmpty()) {
             $this->warn('No meeting_reminder config found.');
             return;
         }
+        foreach ($configs as $resortId => $configRaw) {
+            $this->remind((int) $resortId, $configRaw);
+        }
+        $this->info('Incident meeting reminders processed.');
+    }
 
-        $config = json_decode($configRaw, true);
+    private function remind(int $resortId, ?string $configRaw): void
+    {
+        $config = json_decode((string) $configRaw, true);
         preg_match('/(\d+)\s*(Business|Calendar)/i', $config['reminder_days'] ?? '', $matches);
 
         if (count($matches) < 3) {
-            $this->warn('Invalid reminder_days format.');
+            $this->warn("Resort {$resortId}: invalid reminder_days format.");
             return;
         }
 
@@ -46,7 +52,9 @@ class IncidentMeetingReminder extends Command
 
         $today = now()->toDateString();
 
-        $meetings = IncidentsMeeting::whereDate('meeting_date', '>=', $today)->get();
+        $meetings = IncidentsMeeting::whereDate('meeting_date', '>=', $today)
+            ->whereIn('incident_id', DB::table('incidents')->where('resort_id', $resortId)->select('id'))
+            ->get();
 
         foreach ($meetings as $meeting) {
             $meetingDate = Carbon::parse($meeting->meeting_date);
@@ -79,20 +87,23 @@ class IncidentMeetingReminder extends Command
                         $msg = "📝 Meeting: {$meeting->meeting_subject}\n📅 Date: " . Common::formatDate($meeting->meeting_date)
                             . "\n⏰ Time: " . Common::formatDisplayTime($meeting->meeting_time) . "\n📍 Location: {$meeting->location}";
 
-                        // notifyEmployees = in-app row + mobile push (was in-app only).
-                        Common::notifyEmployees(
-                            $meeting->resort_id,
-                            [$employeeId],
-                            'Upcoming Investigation Meeting Reminder',
-                            $msg,
-                            'Incident',
-                            $meeting->id
-                        );
+                        // notifyEmployees = in-app row + mobile push (was in-app only). One failed push
+                        // must not stop the other participants' / resorts' reminders.
+                        try {
+                            Common::notifyEmployees(
+                                $resortId,
+                                [$employeeId],
+                                'Upcoming Investigation Meeting Reminder',
+                                $msg,
+                                'Incident',
+                                $meeting->id
+                            );
+                        } catch (\Throwable $e) {
+                            \Log::warning("Incident meeting reminder failed for meeting {$meeting->id}, employee {$employeeId}: " . $e->getMessage());
+                        }
                     }
                 }
             }
         }
-
-        $this->info('Incident meeting reminders processed.');
     }
 }

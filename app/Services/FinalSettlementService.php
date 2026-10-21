@@ -70,7 +70,8 @@ class FinalSettlementService
             ? ((int) $effectiveEnd->diffInDays($effectiveStart, true) + 1)
             : 0;
 
-        $attendance = ParentAttendace::where('Emp_id', $employee->Emp_id)
+        // parent_attendaces.Emp_id holds employees.id (not the Emp_id code).
+        $attendance = ParentAttendace::where('Emp_id', $employee->id)
             ->whereBetween('date', [$effectiveStart, $effectiveEnd])
             ->get();
 
@@ -90,9 +91,11 @@ class FinalSettlementService
         $daysPresent = $presentWithCheckIn->pluck('date')->map(function ($d) {
             return is_object($d) ? $d->format('Y-m-d') : $d;
         })->unique()->count();
-        $daysOff = $attendance->filter(fn($r) => $r->Status === 'Day Off')
-            ->pluck('date')->map(fn($d) => is_object($d) ? $d->format('Y-m-d') : $d)
-            ->unique()->count();
+        // Day offs come from the roster as well as attendance (nothing writes DayOff attendance rows) —
+        // the same rule the payroll run pays them by (Common::payrollDayMarks).
+        $rosterContext = Common::payrollRosterContext($resortId, [$employee->id], $effectiveStart->format('Y-m-d'),
+            $effectiveEnd->format('Y-m-d'), $attendance->pluck('id'));
+        $daysOff = Common::payrollDayMarks($attendance->all(), $rosterContext, $employee->id)['day_off_dates']->count();
         // Total paid days for the worked-salary line. Encashment-side
         // leave is a separate calc and isn't included here.
         $daysWorked = $daysPresent + $daysOff;
@@ -164,10 +167,15 @@ class FinalSettlementService
             'is_ramadan_' . $nextMonth->format('Y_m'),
             now()->addDays(10),
             function () use ($nextMonth) {
-                $response = Http::get("https://api.aladhan.com/v1/gToH", [
-                    'date' => $nextMonth->format('d M Y')
-                ]);
-                return $response->successful() && ($response['data']['hijri']['month']['number'] == 9);
+                // Same guard as PayrollController's lookup: a slow / unreachable / odd answer means
+                // "not Ramadan" instead of breaking the settlement page.
+                try {
+                    $response = Http::timeout(5)->get("https://api.aladhan.com/v1/gToH", ['date' => $nextMonth->format('d M Y')]);
+                    return $response->successful() && (int) data_get($response->json(), 'data.hijri.month.number') === 9;
+                } catch (\Throwable $e) {
+                    \Log::warning('Ramadan lookup failed: ' . $e->getMessage());
+                    return false;
+                }
             }
         );
 
@@ -511,7 +519,7 @@ class FinalSettlementService
 
         $leaveUsage = DB::table('employees_leaves')
             ->select('leave_category_id', DB::raw('SUM(total_days) as used_days'))
-            ->where('emp_id', $employee->emp_id)
+            ->where('emp_id', $employee->id) // employees_leaves.emp_id = employees.id
             ->where('status', 'Approved')
             ->where(function ($query) use ($cycleStartStr, $cycleEndStr) {
                 $query->whereBetween('from_date', [$cycleStartStr, $cycleEndStr])
@@ -633,7 +641,7 @@ class FinalSettlementService
             ->value('id');
         if ($phCategoryId) {
             $phUsedDays = (float) (DB::table('employees_leaves')
-                ->where('emp_id', $employee->emp_id)
+                ->where('emp_id', $employee->id)
                 ->where('leave_category_id', $phCategoryId)
                 ->where('status', 'Approved')
                 ->where(function ($q) use ($phWindowStart, $phWindowEnd) {

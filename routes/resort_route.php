@@ -108,7 +108,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
 
          //Payroll Module
          Route::get('payroll/hr-dashboard', 'Payroll\DashboardController@HR_Dashobard')->name('payroll.dashboard');
-         Route::get('payroll/admin-dashboard', 'Payroll\DashboardController@admin_dashboard')->name('payroll.admindashboard');
+         // There is no separate admin payroll dashboard — the master admin gets the same one (same payroll.access gate).
+         Route::get('payroll/admin-dashboard', 'Payroll\DashboardController@HR_Dashobard')->name('payroll.admindashboard');
          Route::get('payroll/drafts', 'Payroll\DashboardController@draftsList')->name('payroll.drafts.list');
          // Read-only "how is this calculated" breakdown for the Estimated Payroll card — no writes.
          Route::get('payroll/dashboard/estimate-breakdown', 'Payroll\DashboardController@estimateBreakdownJson')->name('payroll.dashboard.estimate-breakdown');
