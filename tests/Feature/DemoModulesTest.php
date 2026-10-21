@@ -86,7 +86,19 @@ class DemoModulesTest extends TestCase
             ['incident.list', [], 5], ['incident.resolved.list', [], 2], ['incident.meeting.list', [], 3], ['incident.pending-approvals', [], 1],
             // Surveys
             ['Survey.Surveylist', [], 1], ['Survey.CompleteSurvey', [], 1], ['Survey.DarftSurvey', [], 1],
+            // Visa: payment requests (paid and open), wallets, wallet + fee transaction history
+            ['resort.visa.PaymentRequestIndex', [], 4], ['resort.visa.WalletIndex', [], 4], ['resort.visa.TransectionHistory', [], 10],
         ]);
+        // An expat's own Visa pages: paid fee history and this cycle's quota / permit schedule.
+        $expat = base64_encode((string) DB::table('employees')->where('resort_id', $this->resortId)->where('status', 'Active')
+            ->where('nationality', '!=', 'Maldivian')->whereNotIn('employment_type', ['Casual', 'Internship'])->value('id'));
+        $this->assertRows([
+            ['resort.visa.PastTransectionHistory', ['employee_id' => $expat, 'SelectYear' => 'ALL'], 1],
+            ['resort.visa.Quota_Slot_PendingFee', ['employee_id' => $expat, 'flag' => 'Quota_Slot_Fee'], 12],
+            ['resort.visa.Quota_Slot_PendingFee', ['employee_id' => $expat, 'flag' => 'Work_Permit_Fee'], 12],
+        ]);
+        // Visa dashboard: the wallets, and the Xpat portal's Available balance one slot fee off the system's.
+        $this->get(route('visa.hr.dashboard'))->assertOk()->assertSee('Not Reconciled - Difference');
         // Info-update requests come back as rendered rows, pending ones first.
         $this->withHeaders(['X-Requested-With' => 'XMLHttpRequest'])->get(route('people.info-update.list'))->assertOk()->assertSee('Personal Information');
         $this->get(route('resort.accommodation.release-decisions'))->assertOk()->assertSee('Yes, vacate');

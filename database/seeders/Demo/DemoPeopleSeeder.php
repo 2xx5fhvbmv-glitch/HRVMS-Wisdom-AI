@@ -449,60 +449,61 @@ class DemoPeopleSeeder
     private function compliances(): void
     {
         $title = fn ($p) => DB::table('resort_positions')->where('id', $p->Position_id)->value('position_title');
-        $pick = fn (callable $where) => $this->people()->first(fn ($p) => !isset($this->used[$p->id]) && $where($p));
+        // Prefer someone not already in another story; a breach may still land on someone who is (some seats have one holder).
+        $pick = fn (callable $where) => $this->people()->first(fn ($p) => !isset($this->used[$p->id]) && $where($p)) ?? $this->people()->first($where);
         $line = fn (string $dept) => $pick(fn ($p) => (int) $p->rank === 6 && $p->dept === $dept && !in_array($p->employment_type, ['Casual', 'Internship'], true));
         $week = Carbon::today()->subWeeks(2)->startOfWeek();
         $rows = [];
-        $add = function (?object $p, string $module, string $breach, string $text, int $daysAgo, ?array $ai = null, bool $resolved = false) use (&$rows) {
+        // $text builds the rules engine's wording for that employee; nothing is written when no one fits.
+        $add = function (?object $p, string $module, string $breach, callable $text, int $daysAgo, ?array $ai = null, bool $resolved = false) use (&$rows) {
             if (!$p) {
                 return;
             }
             $this->used[$p->id] = true;
             $at = now()->subDays($daysAgo)->setTime(6, 30);
             $rows[] = ['resort_id' => $this->resortId, 'employee_id' => $p->id, 'module_name' => $module, 'compliance_breached_name' => $breach,
-                'description' => $text, 'severity_ai' => $ai[0] ?? null, 'description_ai' => $ai[1] ?? null, 'remediation_ai' => $ai[2] ?? null,
+                'description' => $text($p), 'severity_ai' => $ai[0] ?? null, 'description_ai' => $ai[1] ?? null, 'remediation_ai' => $ai[2] ?? null,
                 'ai_status' => $ai ? 'ready' : null, 'ai_generated_at' => $ai ? $at : null, 'reported_on' => $at,
                 'status' => $resolved ? 'Resolved' : 'Breached', 'Dismissal_status' => $resolved ? 'Resolved' : 'Pending',
                 'created_at' => $at, 'updated_at' => $resolved ? $at->copy()->addDays(3) : $at];
         };
+        $weekly = fn (string $hours, Carbon $of) => fn ($p) => "Employee {$this->name($p)} ({$title($p)}) worked {$hours} normal hours (breaks and approved overtime excluded) in the week of "
+            . $of->format('d M Y') . '. Adjust the schedule to comply with the 48-hour weekly limit.';
 
         foreach (['F&B Service' => '52.5', 'Kitchen' => '50'] as $dept => $hours) {
-            $p = $line($dept);
-            $add($p, 'Time & Attendance', 'Weekly Working Hours Limit', "Employee {$this->name($p)} ({$title($p)}) worked {$hours} normal hours (breaks and approved overtime excluded) in the week of "
-                . $week->format('d M Y') . '. Adjust the schedule to comply with the 48-hour weekly limit.', 9,
-                ['High', "Rostered above the 48-hour weekly limit in the Employment Act during a high-occupancy week.", 'Rebalance next week\'s roster across the section and record the extra hours as overtime.']);
+            $add($line($dept), 'Time & Attendance', 'Weekly Working Hours Limit', $weekly($hours, $week), 9,
+                ['High', 'Rostered above the 48-hour weekly limit in the Employment Act during a high-occupancy week.', 'Rebalance next week\'s roster across the section and record the extra hours as overtime.']);
         }
-        $p = $line('Housekeeping');
-        $add($p, 'Time & Attendance', 'Without Mandatory Break', "Employee {$this->name($p)} ({$title($p)}) worked 9 hours without a break. Review schedule to ensure adherence to labor laws.", 5,
+        $add($line('Housekeeping'), 'Time & Attendance', 'Without Mandatory Break',
+            fn ($p) => "Employee {$this->name($p)} ({$title($p)}) worked 9 hours without a break. Review schedule to ensure adherence to labor laws.", 5,
             ['Medium', 'A shift over 6 hours had no recorded break.', 'Ask the supervisor to confirm the break and correct the punch, or schedule a fixed break slot.']);
-        $p = $pick(fn ($p) => (int) $p->rank === 4);
-        $add($p, 'Time and Attendance', 'Over Time Not Eligibile', "{$this->name($p)} ({$p->Emp_id} - {$title($p)}) is not eligible for overtime.", 12);
+        $add($pick(fn ($p) => (int) $p->rank === 4), 'Time and Attendance', 'Over Time Not Eligibile',
+            fn ($p) => "{$this->name($p)} ({$p->Emp_id} - {$title($p)}) is not eligible for overtime.", 12);
         $rate = (float) DB::table('resort_site_settings')->where('resort_id', $this->resortId)->value('DollertoMVR') ?: 15.42;
         foreach ($this->people()->where('rank', '2')->filter(fn ($p) => $p->nationality !== 'Maldivian')->take(2) as $p) {
-            $mvr = number_format(round((float) DB::table('employees')->where('id', $p->id)->value('basic_salary') * $rate / 100) * 100); // expat pay is USD
-            $add($p, 'People Management', 'TIN Requirement', "{$this->name($p)} ({$p->Emp_id} - {$title($p)}) (RSWT: MVR {$mvr}/month) not registered. Submit MIRA 118 form.", 20,
-                ['High', 'Earnings are above the MIRA withholding threshold but no TIN is on file.', 'Collect the TIN or file MIRA 118 for this employee before the next payroll run.']);
+            $add($p, 'People Management', 'TIN Requirement', function ($p) use ($title, $rate) {
+                $mvr = number_format(round((float) DB::table('employees')->where('id', $p->id)->value('basic_salary') * $rate / 100) * 100); // expat pay is USD
+                return "{$this->name($p)} ({$p->Emp_id} - {$title($p)}) (RSWT: MVR {$mvr}/month) not registered. Submit MIRA 118 form.";
+            }, 20, ['High', 'Earnings are above the MIRA withholding threshold but no TIN is on file.', 'Collect the TIN or file MIRA 118 for this employee before the next payroll run.']);
         }
-        $p = $pick(fn ($p) => $p->nationality === 'Maldivian' && (int) $p->rank === 6);
-        $basic = number_format((float) DB::table('employees')->where('id', $p->id)->value('basic_salary'), 2, '.', '');
-        $add($p, 'Pension Compliance', 'Pension Deduction Below 7%', "Employee {$this->name($p)} is eligible for pension (age " . mt_rand(24, 45) . " years). Pension deduction is below the required 7% of basic salary ({$basic}).", 30,
-            ['Critical', 'Last month\'s pension deduction was taken on earned salary, below 7% of the full basic.', 'Top up the difference in the next run and report the correction to the Maldives Pension Administration Office.']);
+        $add($pick(fn ($p) => $p->nationality === 'Maldivian' && (int) $p->rank === 6), 'Pension Compliance', 'Pension Deduction Below 7%', function ($p) {
+            $basic = number_format((float) DB::table('employees')->where('id', $p->id)->value('basic_salary'), 2, '.', '');
+            return "Employee {$this->name($p)} is eligible for pension (age " . mt_rand(24, 45) . " years). Pension deduction is below the required 7% of basic salary ({$basic}).";
+        }, 30, ['Critical', 'Last month\'s pension deduction was taken on earned salary, below 7% of the full basic.', 'Top up the difference in the next run and report the correction to the Maldives Pension Administration Office.']);
         if ($promotion = DB::table('employee_promotions')->where('resort_id', $this->resortId)->where('status', 'Approved')->orderByDesc('effective_date')->first()) {
-            $p = $this->people()[$promotion->employee_id] ?? null;
             $new = DB::table('resort_positions')->where('id', $promotion->new_position_id)->value('position_title');
-            $add($p, 'Employee Promotion', 'Job Description Not Received', "Employee " . ($p ? $this->name($p) : '') . " (" . ($p ? $title($p) : '') . ") was promoted to {$new} on "
-                . Carbon::parse($promotion->effective_date)->format('d M Y') . ' but has not received the job description.', 14);
+            $add($this->people()[$promotion->employee_id] ?? null, 'Employee Promotion', 'Job Description Not Received',
+                fn ($p) => "Employee {$this->name($p)} ({$title($p)}) was promoted to {$new} on " . Carbon::parse($promotion->effective_date)->format('d M Y')
+                    . ' but has not received the job description.', 14);
         }
         if ($extended = DB::table('employees')->where('resort_id', $this->resortId)->where('probation_status', 'Extended')->first(['id', 'joining_date', 'probation_end_date'])) {
-            $p = $this->people()[$extended->id] ?? null;
             $months = (int) round(Carbon::parse($extended->joining_date)->diffInMonths(Carbon::parse($extended->probation_end_date), true));
-            $add($p, 'Probation', 'Extended Probation Period', 'Probation period for ' . ($p ? $this->name($p) : '') . '(' . ($p ? $title($p) : '') . ") is set to {$months} months. Reduce to comply with the 3-month maximum", 1);
+            $add($this->people()[$extended->id] ?? null, 'Probation', 'Extended Probation Period',
+                fn ($p) => "Probation period for {$this->name($p)}({$title($p)}) is set to {$months} months. Reduce to comply with the 3-month maximum", 1);
         }
-        $p = $line('Front Office');
-        $add($p, 'Time & Attendance', 'Weekly Working Hours Limit', "Employee {$this->name($p)} ({$title($p)}) worked 49 normal hours (breaks and approved overtime excluded) in the week of "
-            . $week->copy()->subWeeks(6)->format('d M Y') . '. Adjust the schedule to comply with the 48-hour weekly limit.', 50, null, true);
-        $p = $line('Engineering');
-        $add($p, 'Payroll Compliance', 'Service Charge Compliance', "Employee {$this->name($p)} is eligible for service charge but receiving less than the required amount. Expected: 1.00, Received: 0.80", 70, null, true);
+        $add($line('Front Office'), 'Time & Attendance', 'Weekly Working Hours Limit', $weekly('49', $week->copy()->subWeeks(6)), 50, null, true);
+        $add($line('Engineering'), 'Payroll Compliance', 'Service Charge Compliance',
+            fn ($p) => "Employee {$this->name($p)} is eligible for service charge but receiving less than the required amount. Expected: 1.00, Received: 0.80", 70, null, true);
         $this->rows('compliances', $rows);
         $this->counts['compliance breaches'] = count($rows);
     }

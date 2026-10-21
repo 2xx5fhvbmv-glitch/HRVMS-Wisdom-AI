@@ -254,6 +254,10 @@ class DemoVerifier
         $this->check('Incidents in every state, with investigation meetings', fn () => $all(
             $has('incidents', 'status', ['Reported', 'Assigned To', 'Investigation In Progress', 'Approval Pending', 'Approved', 'Rejected', 'Resolved']),
             DB::table('incidents_investigation_meetings as m')->join('incidents as i', 'i.id', '=', 'm.incident_id')->where('i.resort_id', $resortId)->exists() ?: 'no meetings'));
+        $this->check('Visa: permit and quota installments, payment requests paid and open, wallets', fn () => $all(
+            $has('work_permits', 'Status', ['Paid', 'Unpaid']),
+            $has('payment_requests', 'Status', ['Approved', 'Pending']),
+            DB::table('visa_wallets')->where('resort_id', $resortId)->where('Amt', '>', 0)->count() === 4 ?: 'wallets not funded'));
         $this->check('Surveys: finished with answers, running, draft', fn () => $all(
             $has('parent_surveys', 'Status', ['Complete', 'OnGoing', 'SaveAsDraft']),
             DB::table('survey_results as r')->join('parent_surveys as s', 's.id', '=', 'r.Parent_survey_id')->where('s.resort_id', $resortId)->exists() ?: 'no answers'));
