@@ -237,6 +237,7 @@ class DemoVerifier
                 $has('employee_info_update_request', 'status', ['Pending', 'Approved', 'Rejected']),
                 $has('announcement', 'status', ['Published', 'Scheduled', 'Draft']),
                 DB::table('employee_itineraries')->where('resort_id', $resortId)->exists() ?: 'no onboarding itineraries',
+                DB::table('compliances')->where('resort_id', $resortId)->where('Dismissal_status', 'Pending')->exists() ?: 'no compliance breaches',
                 $logins === 0 ?: "{$logins} logins without a qualification");
         });
         $this->check('Performance: a closed and a running cycle, KPIs, check-ins, PIP and PDP', fn () => $all(

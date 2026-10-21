@@ -29,6 +29,7 @@ class DemoEnvSeeder
         'Accommodation' => DemoAccommodationSeeder::class,
         'Incidents' => DemoIncidentSeeder::class,
         'Surveys' => DemoSurveySeeder::class,
+        'Visa' => DemoVisaSeeder::class,
     ];
 
     public function seed(int $seed, ?callable $say = null): array

@@ -167,9 +167,41 @@ class DemoTalentSeeder
         foreach ($plans as $plan) {
             $this->applicant($ids[$plan[0]], $plan[1], $plan[2] ?? null);
         }
+        // Walk-in candidates interviewed offline, against approved vacancies. None is finalized as Selected
+        // (that creates the employee); the wizard's other end states are.
+        foreach ([[$ids['bartender'][0], 2, 'In Progress', [0, 0, 'Pending', 'Pending', 'Pending']],
+            [$ids['waiter'][0], 4, 'In Progress', [1, 1, 'Passed', 'Passed', 'Pending']],
+            [$ids['plumber'][0], 5, 'Rejected', [0, 1, 'Passed', 'Failed', 'Skipped']]] as $i => [$vacancyId, $step, $state, [$ai, $hr, $hrRound, $hodRound, $gmRound]]) {
+            $this->offlineInterview($vacancyId, $step, $state, $ai, $hr, $hrRound, $hodRound, $gmRound, $now->copy()->subDays(12 - $i * 4));
+        }
 
         Cache::forget("ta_insights:{$this->resortId}");
         return $this->counts;
+    }
+
+    /** OfflineInterviewController's row: vacancy terms copied in (step 1), the candidate (step 2), rounds (step 4), the decision (step 5). */
+    private function offlineInterview(int $vacancyId, int $step, string $state, int $ai, int $hr, string $hrRound, string $hodRound, string $gmRound, Carbon $at): void
+    {
+        $v = DB::table('vacancies')->where('id', $vacancyId)->first();
+        [$first, $last, $gender, $country] = self::NAMES[$this->nameIndex++ % count(self::NAMES)];
+        $applicantId = $this->row('applicant_form_data', ['resort_id' => $this->resortId, 'first_name' => $first, 'last_name' => $last, 'gender' => $gender,
+            'email' => strtolower("{$first}.{$last}") . '.walkin@example.com', 'mobile_number' => mt_rand(7000000, 9999999),
+            'country_phone_code' => self::PHONE[$country], 'country' => $this->countries[$country] ?? null, 'city' => 'Malé',
+            'passport_no' => strtoupper(Str::random(2)) . mt_rand(1000000, 9999999), 'Application_date' => $at->format('Y-m-d'),
+            'created_at' => $at, 'updated_at' => $at]);
+        $by = $this->hr->admin;
+        $this->row('offline_interviews', ['resort_id' => $this->resortId, 'applicant_form_data_id' => $applicantId, 'wizard_status' => $state, 'current_step' => $step,
+            'budgeted_or_out_of_budget' => $v->budgeted, 'division_id' => $v->division, 'department_id' => $v->department, 'section_id' => $v->section,
+            'position_id' => $v->position, 'reporting_to' => $v->reporting_to, 'position_title' => DB::table('resort_positions')->where('id', $v->position)->value('position_title'),
+            'rank' => $v->rank, 'required_starting_date' => $v->required_starting_date, 'employee_type' => $v->employee_type, 'salary' => $v->salary,
+            'food' => $v->food, 'accommodation' => $v->accomodation, 'budget_salary' => $v->budgeted_salary, 'proposed_salary' => $v->propsed_salary,
+            'allowances' => $v->allowance, 'medical' => $v->medical, 'insurance' => $v->insurance, 'pension' => $v->pension,
+            'service_charge' => $v->service_charge === 'YES' ? 'Yes' : 'No', 'uniform' => $v->uniform === 'YES' ? 'Yes' : 'No',
+            'recruitment_methods' => json_encode(explode(',', (string) $v->recruitment)),
+            'shortlisted_by_ai' => $ai, 'hr_shortlisted' => $hr, 'hr_round_status' => $hrRound, 'hod_round_status' => $hodRound, 'gm_round_status' => $gmRound,
+            'round_comments' => $step >= 4 ? 'Interviewed in person at the resort.' : null, 'is_selected' => $state === 'Rejected' ? 'No' : null,
+            'created_by' => $by, 'modified_by' => $by, 'created_at' => $at, 'updated_at' => $at->copy()->addDays(2)]);
+        $this->counts['applicants']++;
     }
 
     /** One vacancy with its approval chain (and job link once the GM forwarded it). Returns [vacancy id, position, HOD]. */

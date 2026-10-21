@@ -67,12 +67,12 @@ class DemoModulesTest extends TestCase
             ['resort.ta.GetAllVacancies', [], 1], ['resort.ta.alltodolist', [], 1], ['resort.vacancies.FreshApplicant', [], 3],
             ['resort.ta.shortlistedapplicants', [], 3], ['resort.ta.UpcomingApplicants', [], 1], ['resort.ta.GetRejectedApplicants', [], 3],
             ['resort.ta.TalentPool', [], 3], ['resort.ta.getResortWiseQuestion', [], 1], ['resort.ta.jobdescription.GetJobDescList', ['compliance_status' => 'Approved'], 3],
-            ['interview-assessment.list', [], 3], ['resort.ta.get.source', [], 4], ['resort.ta.get.provider', [], 1], ['resort.ta.jobadvertisment.getList', [], 1],
+            ['interview-assessment.list', [], 3], ['offline-interview.index', [], 3], ['resort.ta.get.source', [], 4], ['resort.ta.get.provider', [], 1], ['resort.ta.jobadvertisment.getList', [], 1],
             // People
             ['people.promotion.list', [], 5], ['people.promotion.history', [], 3], ['people.transfer.list', [], 2], ['people.transfer.history', [], 5],
             ['people.salary-increment.summary-list', [], 3], ['people.salary-increment.history-list', [], 3], ['people.announcements', [], 5],
             ['people.employee-resignation.index', [], 4], ['people.exit-clearance.list', [], 4], ['people.onboarding.itinerary.list', [], 3],
-            ['people.probation', [], 1],
+            ['people.probation', [], 1], ['people.compliance.list', [], 5],
             // Payroll: leavers
             ['payroll.pension.former-employees', [], 2], ['final.settlement.getdata', [], 2],
             // Performance
@@ -91,6 +91,11 @@ class DemoModulesTest extends TestCase
         $this->withHeaders(['X-Requested-With' => 'XMLHttpRequest'])->get(route('people.info-update.list'))->assertOk()->assertSee('Personal Information');
         $this->get(route('resort.accommodation.release-decisions'))->assertOk()->assertSee('Yes, vacate');
         $this->get(route('payroll.ewt.getdata.former-employees'))->assertOk();
+        // Initial Liability Estimation: the renewal legs (visa, insurance, permit, medical, quota) carry this year's costs.
+        $legs = collect($this->get(route('people.liability.index'))->assertOk()->viewData('currentLegs'))->pluck('value', 'label');
+        foreach (['Insurance', 'Work Permit', 'Medical', 'Quota Slot'] as $leg) {
+            $this->assertGreaterThan(0, (float) $legs->first(fn ($v, $label) => str_starts_with($label, $leg)), "{$leg} on the liability page");
+        }
     }
 
     public function test_settlements_open_and_count_the_leavers_days_and_used_leave()
@@ -107,11 +112,20 @@ class DemoModulesTest extends TestCase
         $calc = (new \App\Services\FinalSettlementService)->calculateFinalMonthData($leaver, $this->resortId);
         $this->assertGreaterThan(0, $calc['worked_days']);
         $this->assertLessThanOrEqual($calc['expected_working_days'], $calc['worked_days']);
-        $annual = fn ($c) => (float) collect($c['leave_breakdown'])->firstWhere('leave_type', 'Annual Leave')['available_days'];
-        $withLeave = $annual($calc);
-        // Without the leave they took, more annual leave would be left to pay out.
-        DB::table('employees_leaves')->where('emp_id', $leaver->id)->where('status', 'Approved')->update(['status' => 'Rejected']);
-        $this->assertGreaterThan($withLeave, $annual((new \App\Services\FinalSettlementService)->calculateFinalMonthData($leaver->fresh(), $this->resortId)),
-            'approved leave is subtracted from the balance');
+        // Approved annual leave in the leaver's last leave year (which ends on their last working day) comes off what is
+        // paid out — the balance is max(0, accrued - used).
+        $lastDay = DB::table('employee_resignation')->where('employee_id', $leaver->id)->where('status', 'Approved')->value('last_working_day');
+        $annual = fn () => (float) collect((new \App\Services\FinalSettlementService)->calculateFinalMonthData($leaver->fresh(), $this->resortId)['leave_breakdown'])
+            ->firstWhere('leave_type', 'Annual Leave')['available_days'];
+        $before = $annual();
+        if ($before > 0) {
+            DB::table('employees_leaves')->insert(['resort_id' => $this->resortId, 'emp_id' => $leaver->id, 'total_days' => 1, 'status' => 'Approved',
+                'leave_category_id' => DB::table('leave_categories')->where('resort_id', $this->resortId)->where('leave_type', 'Annual Leave')->value('id'),
+                'from_date' => $lastDay, 'to_date' => $lastDay, 'created_at' => now(), 'updated_at' => now()]);
+            $this->assertLessThan($before, $annual(), 'approved leave is subtracted from the balance');
+        } else {
+            DB::table('employees_leaves')->where('emp_id', $leaver->id)->where('status', 'Approved')->update(['status' => 'Rejected']);
+            $this->assertGreaterThan($before, $annual(), 'approved leave is subtracted from the balance');
+        }
     }
 }
