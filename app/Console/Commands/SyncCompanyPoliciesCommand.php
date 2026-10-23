@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Services\Wisdom\PolicyLibrary;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Hourly backstop for Wisdom AI's company policy index: catches what file events can't see (a whole folder
@@ -18,8 +17,7 @@ class SyncCompanyPoliciesCommand extends Command
     public function handle(): int
     {
         $resorts = $this->argument('resort') ? [(int) $this->argument('resort')]
-            : DB::table('filemangement_systems')->where('Folder_Type', 'uncategorized')
-                ->whereIn(DB::raw('LOWER(TRIM(Folder_Name))'), PolicyLibrary::FOLDER_NAMES)->distinct()->pluck('resort_id')->all();
+            : PolicyLibrary::rootFolders()->distinct()->pluck('resort_id')->all();
         foreach ($resorts as $resortId) {
             try {
                 $r = PolicyLibrary::sync((int) $resortId);

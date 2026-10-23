@@ -21,15 +21,24 @@ class PolicyLibrary
     /** Folder names HR may give the policy folder (compared trimmed and lower-cased). */
     const FOLDER_NAMES = ['company policies', 'company policy', 'policies'];
 
-    /** The resort's policy folder(s) and their direct sub-folders. */
+    /**
+     * The resort's policy folder(s) and their direct sub-folders. A policy folder is a top-level folder (HR may
+     * create it as categorized or uncategorized) with one of the names above; top-level only, so an employee's
+     * own sub-folder that happens to be called "Policies" is never read.
+     */
     public static function folderIds(int $resortId): array
     {
-        $roots = DB::table('filemangement_systems')->where('resort_id', $resortId)->where('Folder_Type', 'uncategorized')
-            ->whereIn(DB::raw('LOWER(TRIM(Folder_Name))'), self::FOLDER_NAMES)->pluck('id')->all();
+        $roots = self::rootFolders()->where('resort_id', $resortId)->pluck('id')->all();
         if (!$roots) {
             return [];
         }
         return array_merge($roots, DB::table('filemangement_systems')->where('resort_id', $resortId)->whereIn('UnderON', $roots)->pluck('id')->all());
+    }
+
+    /** Top-level folders named like a policy folder, across resorts. */
+    public static function rootFolders()
+    {
+        return DB::table('filemangement_systems')->where('UnderON', 0)->whereIn(DB::raw('LOWER(TRIM(Folder_Name))'), self::FOLDER_NAMES);
     }
 
     /** Called on every file create / move / delete: re-sync that resort when a policy folder is involved. */
