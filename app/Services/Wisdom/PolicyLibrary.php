@@ -60,7 +60,7 @@ class PolicyLibrary
     {
         // A re-upload with the same name keeps the old row as a version; only the newest is the policy.
         $files = ChildFileManagement::where('resort_id', $resortId)->whereIn('Parent_File_ID', self::folderIds($resortId) ?: [0])
-            ->orderByDesc('id')->get(['id', 'Parent_File_ID', 'File_Name', 'File_Path', 'is_secure'])
+            ->orderByDesc('id')->get(['id', 'Parent_File_ID', 'File_Name', 'File_Path'])
             ->unique(fn ($f) => $f->Parent_File_ID . '|' . mb_strtolower(trim($f->File_Name)));
         $indexed = collect(self::http()->get("/policies/{$resortId}")->throw()->json('documents') ?? [])->keyBy('file_id');
 
@@ -70,8 +70,12 @@ class PolicyLibrary
                 continue;
             }
             try {
-                $bytes = StorageHelper::disk()->get($f->File_Path);
-                if ($f->is_secure) {
+                $bytes = (string) StorageHelper::disk()->get($f->File_Path);
+                if ($bytes === '') {
+                    throw new \RuntimeException('the stored file is missing or empty — re-upload it');
+                }
+                // Same rule as File Management's viewer: the AES pipeline names its files *.enc (is_secure isn't reliable).
+                if (str_ends_with($f->File_Path, '.enc')) {
                     $bytes = Common::decryptFileBytes($bytes);
                 }
                 $chunks = self::http()->attach('file', $bytes, $f->File_Name)
