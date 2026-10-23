@@ -155,11 +155,6 @@ class LeaderDashboard
                 ->where('s.status', 'Pending')->whereIn('s.approver_id', $acting))
             ->orderBy('l.created_at')->limit(50)
             ->get(['l.id', 'l.from_date', 'l.to_date', 'l.total_days', 'l.created_at', 'a.id as admin_id', 'a.first_name', 'a.last_name', 'c.leave_type']);
-        foreach ($leaves as $l) {
-            $rows[] = $this->requestRow('leave', $l->id, $l, ($l->leave_type ?: 'Leave') . ' · ' . (float) $l->total_days . ' day(s), '
-                . Carbon::parse($l->from_date)->format('d M') . '–' . Carbon::parse($l->to_date)->format('d M Y') . ', awaiting your decision',
-                route('leave.details', ['leave_id' => base64_encode($l->id)]));
-        }
 
         $overtime = DB::table('employee_overtimes as o')
             ->join('employees as e', 'e.id', '=', 'o.Emp_id')->join('resort_admins as a', 'a.id', '=', 'e.Admin_Parent_id')
@@ -167,24 +162,31 @@ class LeaderDashboard
             ->when($this->deptIds !== null, fn ($q) => $q->whereIn('e.Dept_id', $this->deptIds))
             ->orderBy('o.date')->limit(50)
             ->get(['o.id', 'o.Emp_id', 'o.date', 'o.total_time', 'o.created_at', 'a.id as admin_id', 'a.first_name', 'a.last_name']);
+        // One picture lookup for every row instead of one per row.
+        $pics = Common::getResortUserPicturesBatch($leaves->pluck('admin_id')->merge($overtime->pluck('admin_id'))->all());
+        foreach ($leaves as $l) {
+            $rows[] = $this->requestRow('leave', $l->id, $l, $pics[$l->admin_id] ?? '', ($l->leave_type ?: 'Leave') . ' · ' . (float) $l->total_days . ' day(s), '
+                . Carbon::parse($l->from_date)->format('d M') . '–' . Carbon::parse($l->to_date)->format('d M Y') . ', awaiting your decision',
+                route('leave.details', ['leave_id' => base64_encode($l->id)]));
+        }
         foreach ($overtime as $o) {
             // Same gate UpdateOvertimeStatus() applies per entry.
             if (!Common::canManageAttendanceFor($o->Emp_id, $this->employee)) {
                 continue;
             }
-            $rows[] = $this->requestRow('overtime', $o->id, $o, 'Overtime · ' . ($o->total_time ?: '—') . ' hrs on ' . Carbon::parse($o->date)->format('d M Y')
+            $rows[] = $this->requestRow('overtime', $o->id, $o, $pics[$o->admin_id] ?? '', 'Overtime · ' . ($o->total_time ?: '—') . ' hrs on ' . Carbon::parse($o->date)->format('d M Y')
                 . ', awaiting your decision', route('resort.timeandattendance.OverTime'));
         }
         return $rows;
     }
 
-    private function requestRow(string $type, int $id, object $row, string $detail, string $view): array
+    private function requestRow(string $type, int $id, object $row, string $photo, string $detail, string $view): array
     {
         return [
             'id' => $id,
             'type' => $type,
             'n' => trim($row->first_name . ' ' . $row->last_name),
-            'photo' => Common::getResortUserPicture($row->admin_id),
+            'photo' => $photo,
             'r' => 'Request #' . $id,
             'd' => $detail,
             'm' => 'Submitted ' . Carbon::parse($row->created_at)->format('d M Y'),
@@ -225,12 +227,28 @@ class LeaderDashboard
     }
 
     /** Resignations waiting at the HOD step — the GM's resort-wide oversight list. */
-    public function pendingResignations(): Collection
+    private function pendingResignations(): Collection
     {
         return \App\Models\EmployeeResignation::with(['employee.resortAdmin', 'employee.department', 'employee.position'])
             ->where('resort_id', $this->resortId)->where('hod_status', 'Pending')
             ->whereNotIn('status', ['Withdraw', 'Approved', 'Rejected'])
             ->whereHas('employee', fn ($q) => $q->when($this->deptIds !== null, fn ($d) => $d->whereIn('Dept_id', $this->deptIds)))
+            ->orderByDesc('created_at')->get();
+    }
+
+    /**
+     * HOD-approved resignations waiting on THIS user's HR sign-off (their own or as a delegate) — the HR
+     * dashboard's queue. Same gate as EmployeeResignationController::updateStatus(): HR acts only after the HOD
+     * approves, and a NULL/empty hr_status counts as Pending.
+     */
+    public function pendingHrResignations(): Collection
+    {
+        $acting = Common::actingEmployees($this->employee, $this->resortId)->pluck('id')->all();
+        return \App\Models\EmployeeResignation::with(['employee.resortAdmin', 'employee.department', 'employee.position'])
+            ->where('resort_id', $this->resortId)->where('hod_status', 'Approved')
+            ->where(fn ($q) => $q->whereNull('hr_status')->orWhereIn('hr_status', ['', 'Pending']))
+            ->whereNotIn('status', ['Withdraw', 'Approved', 'Rejected'])
+            ->whereIn('hr_id', $acting)
             ->orderByDesc('created_at')->get();
     }
 

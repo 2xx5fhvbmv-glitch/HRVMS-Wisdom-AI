@@ -331,5 +331,6 @@
 
 @section('import-scripts')
 <script>window.LD = @json($LD);</script>
+<script src="{{ URL::asset('resorts_assets/js/roster-inbox.js') }}?v={{ @filemtime(public_path('resorts_assets/js/roster-inbox.js')) }}"></script>
 <script src="{{ URL::asset('resorts_assets/js/leader-dashboard.js') }}?v={{ @filemtime(public_path('resorts_assets/js/leader-dashboard.js')) }}"></script>
 @endsection
