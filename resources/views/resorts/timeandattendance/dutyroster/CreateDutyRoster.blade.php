@@ -1825,64 +1825,6 @@
     }
     #overtimeSummary .alert-info strong { color: var(--teal); }
 
-    /* ==================================================================
-       Toastr notifications — restyled to match the brand instead of the
-       plugin's default solid-color/base64-icon look. toastr.js itself
-       (positioning, timing, show/hide, every toastr.success/.error/.info/
-       .warning(...) call across this page) is completely untouched —
-       these overrides only change how the same #toast-container markup
-       is painted. Scoped by simply living in this page's own <style>
-       block: a page's <style> tag only ever applies to that page's own
-       document, so this can't leak onto other pages that also use
-       toastr, without needing extra selector scoping. Literal hex
-       values rather than this page's --teal/--ink/etc. custom
-       properties, because toastr.js appends #toast-container straight
-       to <body> — a sibling of .drc-page, not a descendant — so those
-       custom properties don't cascade down to it (same reason the
-       Manage Overtime modal's CSS above uses literal hex too). */
-    #toast-container > div {
-        background-image: none !important;
-        background-color: #fff;
-        color: var(--ink);
-        border-radius: 12px;
-        padding: 14px 16px 14px 46px;
-        width: 320px;
-        box-shadow: 0 10px 28px rgba(var(--teal-rgb),0.16);
-        opacity: 1;
-        border-left: 4px solid var(--faint);
-        position: relative;
-    }
-    #toast-container > div:hover {
-        box-shadow: 0 12px 32px rgba(var(--teal-rgb),0.22);
-        opacity: 1;
-    }
-    #toast-container > div::before {
-        font-family: "Font Awesome 6 Free";
-        font-weight: 900;
-        position: absolute;
-        left: 16px;
-        top: 15px;
-        font-size: 15px;
-    }
-    .toast-success { border-left-color: var(--teal); }
-    .toast-success::before { content: '\f058'; color: var(--teal); }
-    .toast-error { border-left-color: var(--error); }
-    .toast-error::before { content: '\f057'; color: var(--error); }
-    .toast-warning { border-left-color: var(--warning); }
-    .toast-warning::before { content: '\f071'; color: var(--warning); }
-    .toast-info { border-left-color: var(--teal); }
-    .toast-info::before { content: '\f05a'; color: var(--teal); }
-    .toast-title { color: var(--ink); font-weight: 700; font-size: 13px; margin-bottom: 2px; }
-    .toast-message { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
-    .toast-message a, .toast-message label { color: var(--teal); }
-    .toast-close-button {
-        color: var(--faint);
-        text-shadow: none;
-        opacity: 1;
-        font-size: 15px;
-    }
-    .toast-close-button:hover { color: var(--ink); opacity: 1; }
-    .toast-progress { background-color: var(--faint); opacity: 0.3; }
 </style>
 @endsection
 

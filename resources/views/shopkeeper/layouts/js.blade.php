@@ -21,59 +21,7 @@
 <script src="{{ URL::asset('resorts_assets/additionalJs/swatalart.min.js') }}"></script>
 <script src="{{ URL::asset('resorts_assets/additionalJs/sweetalert2.js') }}"></script>
 @include('resorts.layouts._confirm')
-<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
-<script>
-    // Toastr re-theme glue (see toastr-theme.css, shared with the resort-admin
-    // and admin portals). One place so every existing toastr call in the
-    // shopkeeper portal gets the new frosted look automatically.
-    var WT_DURATION = 5000; // visible-toast duration for the .wt-prog bar
-    var wtPendingSticky = false;
-    if (window.toastr) {
-        toastr.options.closeButton = true;
-        toastr.options.progressBar = false;
-        toastr.options.closeOnHover = false;
-        toastr.options.showMethod = 'show';
-        toastr.options.hideMethod = 'hide';
-        toastr.options.timeOut = 0; // toastr's own internal auto-hide timer would race our .wt-prog bar's animationend (see WT_DURATION above)
-        toastr.options.extendedTimeOut = 0;
-        toastr.options.onShown = function () {
-            var $t = $(this);
-            if (wtPendingSticky) { wtPendingSticky = false; return; }
-            $t.append(
-                $('<span class="wt-prog"></span>')
-                    .css('animation-duration', WT_DURATION + 'ms')
-                    .on('animationend', function () {
-                        if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) {
-                            toastr.clear($t);
-                            return;
-                        }
-                        $t.addClass('wt-out').one('animationend', function () { toastr.clear($t); });
-                    })
-            );
-        };
-    }
-    function wisdomToast(type, title, message, opts) {
-        if (!window.toastr) return;
-        opts = opts || {};
-        var sticky = !!opts.sticky || !!(opts.list && opts.list.length);
-        var esc = function (s) {
-            return String(s).replace(/[&<>"']/g, function (c) {
-                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-            });
-        };
-        var html = esc(message || '');
-        if (opts.list && opts.list.length) {
-            html += '<ul class="wt-errlist">' + opts.list.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>';
-        }
-        wtPendingSticky = sticky;
-        var $toast = toastr[type](html, title, {
-            timeOut: 0,
-            extendedTimeOut: 0,
-            escapeHtml: false
-        });
-        return $toast;
-    }
-</script>
+<script src="{{ URL::asset('resorts_assets/js/wai-toast.js') }}?v={{ @filemtime(public_path('resorts_assets/js/wai-toast.js')) }}"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.3/jquery.validate.min.js"></script>
 
 

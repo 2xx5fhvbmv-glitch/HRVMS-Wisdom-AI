@@ -70,6 +70,52 @@
     if (($UnassignedDocumentsCounts ?? 0) > 0) {
         $insights[] = ['module' => 'File Management', 'sev' => 'watch', 'title' => 'Unassigned documents', 'html' => '<b>' . $plural((int) $UnassignedDocumentsCounts, 'document') . '</b> not yet assigned to an employee.', 'url' => route('FileManagment.hr.dashboard')];
     }
+
+    // Duty roster + Action inbox — the same LeaderDashboard service and routes the non-HR
+    // Leader dashboard uses (app/Services/LeaderDashboard.php); HR already resolves to
+    // resort-wide scope there via Common::getScopedDepartmentIds(), so this needs no backend
+    // change. get_defined_vars() here is only hr_dashboard()'s own compact() variables, since
+    // nothing below has been defined yet; viewData() never overrides a variable this controller
+    // already passed (e.g. monthlyCheckinPerformance), it only fills in what's missing
+    // (pendingResignationsForHod, pendingExitClearanceForms) and adds 'leader'.
+    $hrLdSvc  = \App\Services\LeaderDashboard::forCurrentUser();
+    $hrLdData = $hrLdSvc ? $hrLdSvc->viewData(get_defined_vars()) : ['leader' => []];
+    extract($hrLdData, EXTR_SKIP);
+    $hrRequests = $leader['requests'] ?? [];
+    $hrResignC  = $pendingResignationsForHod ?? collect();
+    $hrExitC    = $pendingExitClearanceForms ?? collect();
+    $hrRosterUrl = \Illuminate\Support\Facades\Route::has('resort.master.leader_roster') ? route('resort.master.leader_roster') : null;
+    $today = \Carbon\Carbon::today();
+    $hrNameOf = fn ($emp) => optional(optional($emp)->resortAdmin)->full_name ?: '—';
+    $hrPosOf  = fn ($emp) => optional(optional($emp)->position)->position_title ?: '';
+    $hrPicIds = $hrResignC->map(fn ($r) => optional($r->employee)->Admin_Parent_id)
+        ->merge($hrExitC->map(fn ($f) => optional(optional($f->employeeResignation)->employee)->Admin_Parent_id))
+        ->filter()->unique()->values()->all();
+    $hrPics   = \App\Helpers\Common::getResortUserPicturesBatch($hrPicIds);
+    $hrPhotoOf = fn ($adminId) => (($u = $hrPics[$adminId] ?? '') && $u !== $defaultPic) ? $u : '';
+    $hrInboxRes = $hrResignC->map(function ($r) use ($hrNameOf, $hrPosOf, $hrPhotoOf) {
+        $emp = $r->employee;
+        return [
+            't' => 'res', 'n' => $hrNameOf($emp), 'r' => $hrPosOf($emp), 'photo' => $hrPhotoOf(optional($emp)->Admin_Parent_id),
+            'd' => $r->resignation_date ? 'Resignation submitted ' . \Carbon\Carbon::parse($r->resignation_date)->format('d M Y') : 'Resignation submitted',
+            'm' => $r->last_working_day ? 'Last working day ' . \Carbon\Carbon::parse($r->last_working_day)->format('d M Y') : '',
+            'dl' => '', 'od' => false,
+            'url' => route('people.employee-resignation.show', ['id' => base64_encode($r->id)]),
+        ];
+    })->values();
+    $hrInboxExit = $hrExitC->map(function ($f) use ($hrNameOf, $hrPosOf, $hrPhotoOf) {
+        $rs = $f->employeeResignation; $emp = optional($rs)->employee;
+        $dl = $f->deadline_date ? \Carbon\Carbon::parse($f->deadline_date) : null;
+        return [
+            't' => 'exit', 'n' => $hrNameOf($emp), 'r' => $hrPosOf($emp), 'photo' => $hrPhotoOf(optional($emp)->Admin_Parent_id),
+            'd' => optional($f->exitClearanceForm)->form_name ?: 'Exit clearance form',
+            'm' => optional($rs)->last_working_day ? 'Last day ' . \Carbon\Carbon::parse($rs->last_working_day)->format('d M Y') : '',
+            'dl' => $dl ? 'Deadline ' . $dl->format('d M Y') . ($dl->isPast() ? ', overdue' : '') : '', 'od' => (bool) ($dl && $dl->isPast()),
+            'url' => route('people.exit-clearance.department-form', base64_encode($f->emp_resignation_id)),
+        ];
+    })->values();
+    $hrInboxReq = collect($hrRequests)->map(fn ($q) => array_merge(['photo' => '', 'dl' => '', 'od' => false], (array) $q, ['t' => 'req']))->values();
+    $hrInbox = $hrInboxExit->concat($hrInboxRes)->concat($hrInboxReq)->values();
 @endphp
 <div class="body-wrapper pb-5">
         <div class="container-fluid">
@@ -80,6 +126,12 @@
                             <span>Master</span>
                             <h1>HR Dashboard</h1>
                         </div>
+                    </div>
+                    <div class="col-auto ms-auto">
+                        <a href="{{ route('people.employees') }}"
+                           class="wai-btn wai-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('people.employees', config('settings.resort_permissions.view')) == false) d-none @endif">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>View Employees
+                        </a>
                     </div>
                 </div>
             </div>
@@ -241,6 +293,39 @@
 
   </div>
 
+  <!-- Duty roster + Action inbox — full width, below the 3-column layout (same data/behaviour as the
+       Leader dashboard's cards: app/Services/LeaderDashboard.php, resources/views/.../leaderdashboard.blade.php) -->
+  <div class="hr-more">
+    <div class="hm-card rs-card">
+      <div class="rs-h">
+        <span class="t">Duty roster</span><span class="n" id="tlCount">0 rostered</span>
+        <span class="rs-ctl">
+          <select class="rs-sel" id="tlPos" aria-label="Position"><option value="all">All positions</option></select>
+          <input class="rs-sel" id="tlDate" type="date" value="{{ $today->toDateString() }}" aria-label="Date">
+        </span>
+      </div>
+      <div class="tl">
+        <div class="tl-now" id="tlNow"><span id="tlNowLbl">Now</span></div>
+        <div class="tl-axis"><span></span><div class="tl-ticks"><span style="left:0">00:00</span><span style="left:16.667%">04:00</span><span style="left:33.333%">08:00</span><span style="left:50%">12:00</span><span style="left:66.667%">16:00</span><span style="left:83.333%">20:00</span><span style="left:100%">24:00</span></div></div>
+        <div class="tl-wrap">
+          <div class="tl-body" id="tlBody"></div>
+        </div>
+      </div>
+      <div class="tl-leg" id="tlLeg"></div>
+    </div>
+
+    <section class="hm-card ai-card" aria-labelledby="aiTitle">
+      <div class="ai-h"><h3 id="aiTitle">Action inbox</h3><span class="ai-cnt" id="aiCnt">0</span></div>
+      <div class="ai-f" id="aiFilters" role="tablist" aria-label="Filter actions">
+        <button type="button" class="ai-fc on" data-f="all">All <b data-c="all">0</b></button>
+        <button type="button" class="ai-fc" data-f="res">Resignations <b data-c="res">0</b></button>
+        <button type="button" class="ai-fc" data-f="req">Requests <b data-c="req">0</b></button>
+        <button type="button" class="ai-fc" data-f="exit">Exit clearance <b data-c="exit">0</b></button>
+      </div>
+      <div id="aiList"></div>
+    </section>
+  </div>
+
   <!-- PAYROLL EXPANDED VIEW -->
   <div class="px" id="px" role="dialog" aria-modal="true" aria-label="Payroll details">
     <div class="px-panel">
@@ -293,8 +378,7 @@
         <div class="fp-head"><span class="t">WAI Intelligence</span><button type="button" class="fp-close" id="fpClose" aria-label="Close">✕</button></div>
         <div class="fp-body" id="fpBody"></div>
         <div class="fp-foot">
-          <div class="wai-foot-row"><label class="wai-field"><input id="fpInput" type="text" placeholder="Ask a follow-up…" autocomplete="off" maxlength="2000"></label><button type="button" class="wai-orb" id="fpGo" aria-label="Ask WAI"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><span class="orb-glass"></span><span class="orb-sheen"></span><svg class="orb-ar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
-          <div class="fp-use" id="fpUse" hidden></div>
+          <div class="wai-foot-row"><label class="wai-field"><input id="fpInput" type="text" placeholder="Ask a follow-up…" autocomplete="off" maxlength="2000"><span class="wai-quota" id="fpUse" hidden aria-live="polite"><span class="n" id="fpUseN"></span>&nbsp;left</span></label><button type="button" class="wai-orb" id="fpGo" aria-label="Ask WAI"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><span class="orb-glass"></span><span class="orb-sheen"></span><svg class="orb-ar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
           <div class="wai-disclaimer">WAI is smart, not perfect yet — double-check key details. Always improving!</div>
         </div>
       </div>
@@ -317,7 +401,7 @@
   --shadow:0 1px 2px rgba(1,70,83,.04),0 8px 22px rgba(1,70,83,.05);
   --font:'Poppins',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
-#hrmd *{box-sizing:border-box;margin:0;padding:0}
+#hrmd *:not(.a-md *){box-sizing:border-box;margin:0;padding:0} /* answers (.a-md) keep their own spacing from wai-markdown.css */
 #hrmd .tnum{font-variant-numeric:tabular-nums}
 #hrmd .hm-card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
 #hrmd .cols{display:grid;grid-template-columns:minmax(0,23fr) minmax(0,54fr) minmax(0,23fr);gap:16px;align-items:start}
@@ -685,6 +769,101 @@
 @media (prefers-reduced-transparency:reduce){
   #hrmd .wi-mh,#hrmd .wai-hero{background-image:none}
 }
+
+/* Duty roster + Action inbox — ported from leader-dashboard.css (#ldmd), same design tokens */
+#hrmd .hr-more{margin-top:16px;display:flex;flex-direction:column;gap:16px}
+#hrmd .rs-card{padding:16px 18px}
+#hrmd .rs-h{display:flex;align-items:center;gap:10px;margin-bottom:2px}
+#hrmd .rs-h .t{font-size:14px;font-weight:600}
+#hrmd .rs-ctl{margin-left:auto;display:flex;gap:8px}
+#hrmd .rs-sel{font:inherit;font-size:11.5px;color:var(--g1);background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px 10px;outline:none;cursor:pointer}
+#hrmd .rs-sel:hover{border-color:#cfdcde}
+#hrmd .rs-sel:focus{border-color:var(--teal)}
+#hrmd .tl{--nw:168px;margin-top:14px;position:relative;padding-top:30px}
+#hrmd .tl-axis,#hrmd .tl-row{display:grid;grid-template-columns:var(--nw) minmax(0,1fr);align-items:center}
+#hrmd .tl-ticks{position:relative;height:16px}
+#hrmd .tl-ticks span{position:absolute;transform:translateX(-50%);font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums}
+#hrmd .tl-ticks span:first-child{transform:none}
+#hrmd .tl-ticks span:last-child{transform:translateX(-100%)}
+#hrmd .tl-body{position:relative}
+#hrmd .tl-row{padding:7px 0;border-top:1px solid var(--line-2)}
+#hrmd .tl-row:first-child{border-top:none}
+#hrmd .tl-who{display:flex;align-items:center;gap:10px;min-width:0;padding-right:12px}
+#hrmd .tl-who .rs-main{min-width:0}
+#hrmd .rs-nm{font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hrmd .rs-ps{font-size:10.5px;color:var(--muted);margin-top:1px}
+#hrmd .tl-track{position:relative;height:30px;border-radius:8px;background:repeating-linear-gradient(90deg,var(--line-2) 0 1px,transparent 1px calc(100%/6)),#fafcfc}
+#hrmd .tl-bar{position:absolute;top:3px;bottom:3px;left:calc(var(--s)/24*100%);width:calc((var(--e) - var(--s))/24*100%);border-radius:7px;display:flex;align-items:center;padding:0 10px;font-size:11px;font-weight:500;white-space:nowrap;overflow:visible;cursor:default}
+#hrmd .tl-bar.am{background:var(--teal);color:#fff}
+#hrmd .tl-bar.pm{background:#CFE0E3;color:var(--teal)}
+#hrmd .tl-bar.miss{background:#fff;color:var(--err);border:1px dashed rgba(229,87,63,.55)}
+#hrmd .tl-bar.lv{color:var(--violet);background:repeating-linear-gradient(135deg,rgba(107,95,199,.10) 0 6px,rgba(107,95,199,.04) 6px 12px);border:1px solid rgba(107,95,199,.22)}
+#hrmd .tl-bar[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%);z-index:5;font-size:11px;font-weight:500;color:#fff;white-space:nowrap;padding:7px 11px;border-radius:10px;background:rgba(20,35,42,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 20px rgba(1,45,54,.25);pointer-events:none}
+#hrmd .tl-bar[data-tip]:hover::before{content:"";position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);z-index:5;border:6px solid transparent;border-bottom:0;border-top-color:rgba(20,35,42,.82);pointer-events:none}
+#hrmd .tl-now{position:absolute;top:0;bottom:0;left:calc(var(--nw) + (100% - var(--nw)) * var(--t) / 24);width:0;z-index:3;pointer-events:none}
+#hrmd .tl-now::before{content:"";position:absolute;top:20px;bottom:0;left:-.75px;width:1.5px;background:var(--lime,#E0FF02);border-radius:1px}
+#hrmd .tl-now span{position:absolute;top:0;left:50%;transform:translateX(-50%);font-size:10.5px;font-weight:600;color:#4a5a00;background:var(--lime,#E0FF02);border-radius:7px;padding:3px 9px;line-height:1.3;white-space:nowrap;font-variant-numeric:tabular-nums}
+#hrmd .tl-wrap{position:relative;padding-top:6px}
+#hrmd .tl-leg{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2)}
+#hrmd .tl-leg span{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+#hrmd .tl-leg i{width:10px;height:10px;border-radius:3px;display:inline-block}
+#hrmd .tl-empty{display:block;padding:18px 0;font-size:12px;color:var(--muted);text-align:center}
+@media(max-width:760px){#hrmd .tl{--nw:118px}
+#hrmd .tl-who .rs-ps{display:none}}
+
+#hrmd .ai-card{padding:16px 18px}
+#hrmd .ai-card button{font-family:inherit}
+#hrmd .ai-card svg{display:block}
+#hrmd .ai-h{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+#hrmd .ai-h h3{font-size:13.5px;font-weight:600}
+#hrmd .ai-cnt{font-size:10.5px;font-weight:600;border-radius:10px;padding:2px 7px;background:#fdeeea;color:var(--err)}
+#hrmd .ai-f{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+#hrmd .ai-fc{font-size:12px;font-weight:500;color:var(--muted);background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:6px 11px;cursor:pointer;display:inline-flex;gap:6px;align-items:center;transition:background .15s,border-color .15s,color .15s}
+#hrmd .ai-fc b{font-weight:600;color:var(--ink)}
+#hrmd .ai-fc:hover{border-color:#7FBEC6}
+#hrmd .ai-fc.on{background:var(--teal);border-color:var(--teal);color:#fff}
+#hrmd .ai-fc.on b{color:var(--lime,#E0FF02)}
+#hrmd .ai-row{display:grid;grid-template-columns:112px minmax(0,1.3fr) minmax(0,1.5fr) 164px;gap:14px;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line-2);transition:opacity .28s,transform .28s,background .15s}
+#hrmd .ai-row:last-child{border-bottom:none}
+#hrmd .ai-row:hover{background:#fafcfc}
+#hrmd .ai-row.gone{opacity:0;transform:translateX(20px)}
+#hrmd .ai-tag{display:inline-block;font-size:10.5px;font-weight:600;border-radius:6px;padding:3px 7px;white-space:nowrap}
+#hrmd .ai-row>span:first-child{justify-self:start}
+#hrmd .ai-tag.res{color:#8a3d2c;background:#fdeeea}
+#hrmd .ai-tag.req{color:var(--teal);background:var(--teal-3)}
+#hrmd .ai-tag.exit{color:#7a5410;background:#fbf1de}
+#hrmd .ai-pp{display:flex;align-items:center;gap:10px;min-width:0}
+#hrmd .ai-av{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:11.5px;font-weight:600;flex:none;color:var(--teal);background:#E1EBEC;overflow:hidden}
+#hrmd .ai-av img{width:100%;height:100%;object-fit:cover}
+#hrmd .ai-nm{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hrmd .ai-rl{font-size:11.5px;color:var(--muted)}
+#hrmd .ai-md{font-size:12px;color:var(--g1);min-width:0}
+#hrmd .ai-mt{font-size:11.5px;color:var(--muted);margin-top:2px}
+#hrmd .ai-od{color:var(--err);font-weight:600}
+#hrmd .ai-ac{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+#hrmd a.ai-act{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--teal);background:var(--teal-soft);border:1.5px solid var(--line);border-radius:10px;padding:7px 12px;cursor:pointer;white-space:nowrap;text-decoration:none;transition:background .15s,border-color .15s,box-shadow .15s,transform .12s}
+#hrmd a.ai-act:hover{border-color:var(--teal);background:#f7ffd1;box-shadow:0 4px 14px rgba(224,255,2,.35)}
+#hrmd a.ai-act:active{transform:scale(.97)}
+#hrmd .ai-act svg{width:13px;height:13px}
+#hrmd .ai-icb{width:30px;height:30px;border-radius:9px;border:1.5px solid var(--line);background:#fff;display:grid;place-items:center;cursor:pointer;color:inherit;text-decoration:none;transition:background .15s,border-color .15s}
+#hrmd .ai-icb svg{width:14px;height:14px}
+#hrmd .ai-icb.ok{color:var(--ok)}
+#hrmd .ai-icb.ok:hover{background:#e8f6ef;border-color:var(--ok)}
+#hrmd .ai-icb.no{color:var(--err)}
+#hrmd .ai-icb.no:hover{background:#fdeeea;border-color:var(--err)}
+#hrmd .ai-icb.vw{color:var(--teal)}
+#hrmd .ai-icb.vw:hover{background:var(--teal-soft);border-color:var(--teal)}
+#hrmd a.ai-act:focus-visible,#hrmd .ai-icb:focus-visible,#hrmd .ai-fc:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+#hrmd .ai-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:24px 10px;color:var(--faint,#93A4A9);font-size:12px}
+#hrmd .ai-empty .ei{width:36px;height:36px;border-radius:11px;background:var(--teal-soft);display:grid;place-items:center;color:#7FBEC6}
+#hrmd .ai-empty .ei svg{width:18px;height:18px}
+#hrmd .ai-empty b{color:var(--g1);font-weight:600;font-size:12.5px}
+@media (max-width:760px){#hrmd .ai-row{grid-template-columns:1fr auto;grid-template-areas:"tag ac" "pp pp" "md md";row-gap:8px}
+#hrmd .ai-row>span:first-child{grid-area:tag}
+#hrmd .ai-pp{grid-area:pp}
+#hrmd .ai-md{grid-area:md}
+#hrmd .ai-ac{grid-area:ac}}
+@media (prefers-reduced-motion:reduce){#hrmd .ai-row,#hrmd .ai-fc,#hrmd a.ai-act{transition:none}}
 </style>
 @endsection
 
@@ -695,6 +874,9 @@
   var TOTAL = @json((int) $total_employees);
   var INSIGHTS = @json($insights);
   var EVENTS = @json($events);
+  var INBOX = @json($hrInbox);
+  var TODAY = @json($today->toDateString());
+  var NOW_HM = @json(now()->format('H:i'));
   var URLS = {
     expenses: @json(route('payroll.getExpenses')),
     estimate: @json(route('payroll.dashboard.estimate-breakdown')),
@@ -705,7 +887,8 @@
     compliance: @json(route('people.compliance.list')),
     compliancePage: @json(route('people.compliance.index')),
     wai: @json(route('resort.wisdom.chat')),
-    waiHistory: @json(route('resort.wisdom.history'))
+    waiHistory: @json(route('resort.wisdom.history')),
+    roster: @json($hrRosterUrl)
   };
   var CSRF = document.querySelector('meta[name="csrf-token"]');
   CSRF = CSRF ? CSRF.content : '';
@@ -713,6 +896,11 @@
   var $ = function (id) { return document.getElementById(id); };
   var AJAX = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
   function getJson(url) { return fetch(url, { headers: AJAX, credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+  function postJson(url, body) {
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', body: JSON.stringify(body || {}) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { j.__ok = r.ok; return j; }); });
+  }
+  function toast(type, title, msg, opts) { if (window.wisdomToast) window.wisdomToast(type, title, msg, opts); }
   function initials(n) { return (String(n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(function (p) { return p[0].toUpperCase(); }).join('')) || '?'; }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function fillAvatar(box, photo, name) {
@@ -861,7 +1049,10 @@
         : low ? 'Only ' + rem + ' message' + (rem === 1 ? '' : 's') + ' left today'
         : rem + ' of ' + u.limit + ' messages left today';
       usageOut = rem === 0;
-      [askUse, fpUse].forEach(function (n) { n.hidden = false; n.textContent = txt; n.className = (n.id === 'askUse' ? 'wai-use' : 'fp-use') + (usageOut ? ' is-out' : low ? ' is-low' : ''); });
+      askUse.hidden = false; askUse.textContent = txt; askUse.className = 'wai-use' + (usageOut ? ' is-out' : low ? ' is-low' : '');
+      // follow-up field: "N left" inside the field, full sentence as the tooltip
+      fpUse.hidden = false; fpUse.className = 'wai-quota' + (usageOut ? ' is-out' : rem <= 10 ? ' is-low' : '');
+      fpUse.setAttribute('data-tip', usageOut ? txt : rem + ' of ' + u.limit + ' messages left today'); WaiMd.roll($('fpUseN'), rem);
       [askInput, fpInput, askGo, fpGo].forEach(function (n) { n.disabled = usageOut; });
       if (!fromEvent) document.dispatchEvent(new CustomEvent('wai:usage', { detail: u })); // keep the chat panel in step
     }
@@ -874,15 +1065,15 @@
     function close() { focus.classList.remove('open'); document.body.style.overflow = ''; askInput.value = ''; }
     function ask(q) {
       if (usageOut) return;
-      body.appendChild(el('div', 'q', q));
-      var a = el('div', 'a'); a.appendChild(el('div', 'a-tag', 'WAI')); var p = thinking(); a.appendChild(p); body.appendChild(a);
+      var qb = el('div', 'q', q); body.appendChild(qb); WaiMd.tideIn(qb);
+      var a = el('div', 'a'); a.appendChild(el('div', 'a-tag', 'WAI')); var p = thinking(); a.appendChild(p); body.appendChild(a); WaiMd.tideIn(a, 120);
       body.scrollTop = body.scrollHeight;
       fetch(URLS.wai, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', body: JSON.stringify({ message: q }) })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
-        .then(function (j) { if (j && j.usage) applyUsage(j.usage); var md = el('div', 'a-md'); WaiMd.render(md, j.success ? j.reply : (j.message || 'Something went wrong. Please try again.')); a.replaceChild(md, p); body.scrollTop = body.scrollHeight; })
+        .then(function (j) { if (j && j.usage) applyUsage(j.usage); var md = el('div', 'a-md'); WaiMd.render(md, j.success ? j.reply : (j.message || 'Something went wrong. Please try again.'), { thread: body, reveal: true }); a.replaceChild(md, p); body.scrollTop = body.scrollHeight; })
         .catch(function () { if (p.parentNode) a.replaceChild(el('p', '', 'Something went wrong. Please try again.'), p); });
     }
-    function submitAsk() { var v = askInput.value.trim(); if (!v) return; body.textContent = ''; ask(v); open(); }
+    function submitAsk() { var v = askInput.value.trim(); if (!v) return; body.textContent = ''; body._waiSubj = null; ask(v); open(); }
     function submitFp() { var v = fpInput.value.trim(); if (!v) return; ask(v); fpInput.value = ''; }
     $('askGo').addEventListener('click', submitAsk);
     askInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') submitAsk(); });
@@ -1122,6 +1313,148 @@
       right.appendChild(el('span', 'uw' + (days === 0 ? ' today' : days <= 3 ? ' soon' : ''), days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : days <= 3 ? days + ' days' : d.getDate() + ' ' + MS[d.getMonth()]));
       ue.appendChild(chip); ue.appendChild(ub); ue.appendChild(right); up.appendChild(ue);
     });
+  })();
+
+  /* ---------- Duty roster timeline (same backend as the Leader dashboard: LeaderDashboard::roster()) ---------- */
+  (function () {
+    var body = $('tlBody'), pos = $('tlPos'), date = $('tlDate'), now = $('tlNow'), lbl = $('tlNowLbl'), cnt = $('tlCount'), leg = $('tlLeg');
+    if (!body) return;
+    var rows = [], serverOffset = 0;
+    function hm(s) { var p = String(s || '').split(':'); return (+p[0] || 0) + (+p[1] || 0) / 60; }
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function nowHours() { var d = new Date(); return ((d.getHours() + d.getMinutes() / 60 + serverOffset) % 24 + 24) % 24; }
+    // Server clock (app timezone) minus browser clock, so the Now line follows the property's time, not the viewer's.
+    serverOffset = hm(NOW_HM) - (new Date().getHours() + new Date().getMinutes() / 60);
+    function tick() {
+      var isToday = date.value === TODAY, h = nowHours();
+      now.style.display = isToday ? '' : 'none';
+      now.style.setProperty('--t', h);
+      lbl.textContent = 'Now ' + pad(Math.floor(h)) + ':' + pad(Math.floor(h % 1 * 60));
+    }
+    function legend(list) {
+      leg.textContent = '';
+      var seen = {};
+      function item(sw, text, st) { var s = el('span'), i = el('i'); if (st) i.setAttribute('style', st); else i.style.background = sw; s.appendChild(i); s.appendChild(document.createTextNode(text)); leg.appendChild(s); }
+      list.forEach(function (r) {
+        if (r.state === 'lv' || r.state === 'miss' || seen[r.shift]) return; seen[r.shift] = 1;
+        item(r.tone === 'am' ? 'var(--teal)' : '#CFE0E3', r.shift + ' · ' + pad(Math.floor(r.start)) + ':' + pad(Math.round(r.start % 1 * 60)) + '–' + pad(Math.floor(r.end)) + ':' + pad(Math.round(r.end % 1 * 60)));
+      });
+      item('', 'No check-in', 'background:#fff;border:1px dashed rgba(229,87,63,.6)');
+      item('', 'On leave', 'background:rgba(107,95,199,.16)');
+      item('var(--lime,#E0FF02)', 'Now');
+    }
+    function render() {
+      var f = pos.value, list = rows.filter(function (r) { return f === 'all' || r.position === f; });
+      cnt.textContent = list.length + ' rostered';
+      body.textContent = '';
+      if (!list.length) { body.appendChild(el('div', 'tl-empty', URLS.roster ? 'No one rostered for this position on this date.' : 'The duty roster is not connected to this dashboard yet.')); legend([]); return; }
+      list.forEach(function (r) {
+        var row = el('div', 'tl-row'), who = el('div', 'tl-who'), av = el('span', 'cmp-av'), main = el('div', 'rs-main'), track = el('div', 'tl-track');
+        var s = Math.max(0, Math.min(24, +r.start || 0)), e = Math.max(0, Math.min(24, +r.end || 24)); if (e <= s) e = 24;
+        var cls = r.state === 'miss' ? 'miss' : r.state === 'lv' ? 'lv' : r.tone, txt = r.state === 'miss' ? 'No check-in' : r.state === 'lv' ? 'On leave' : r.shift;
+        fillAvatar(av, r.photo, r.name);
+        main.appendChild(el('div', 'rs-nm', r.name)); main.appendChild(el('div', 'rs-ps', r.position));
+        who.appendChild(av); who.appendChild(main);
+        var bar = el('div', 'tl-bar ' + cls, txt); bar.style.setProperty('--s', s); bar.style.setProperty('--e', e);
+        if (r.tip) bar.setAttribute('data-tip', r.tip);
+        track.appendChild(bar); row.appendChild(who); row.appendChild(track); body.appendChild(row);
+      });
+      legend(list);
+    }
+    function load() {
+      if (!URLS.roster) { rows = []; render(); return; }
+      body.textContent = ''; body.appendChild(el('div', 'tl-empty', 'Loading…'));
+      getJson(URLS.roster + '?date=' + encodeURIComponent(date.value)).then(function (res) {
+        rows = (res.rows || []).map(function (r) { r.start = +r.start; r.end = +r.end; r.tone = r.tone || (r.start < 12 ? 'am' : 'pm'); return r; });
+        var cur = pos.value, seen = {}; pos.textContent = ''; pos.appendChild(new Option('All positions', 'all'));
+        rows.forEach(function (r) { if (!seen[r.position]) { seen[r.position] = 1; pos.appendChild(new Option(r.position, r.position)); } });
+        pos.value = seen[cur] ? cur : 'all';
+        render(); tick();
+      }).catch(function () { rows = []; body.textContent = ''; body.appendChild(el('div', 'tl-empty', 'Could not load the roster. Please try again.')); });
+    }
+    pos.addEventListener('change', render);
+    date.addEventListener('change', function () { load(); tick(); });
+    load(); tick(); setInterval(tick, 60000);
+  })();
+
+  /* ---------- Action inbox (resignations, leave/overtime requests, exit clearance) ---------- */
+  (function () {
+    var list = $('aiList'); if (!list) return;
+    var ITEMS = (INBOX || []).slice(), filt = 'all';
+    var SVG = {
+      ok: 'M20 6L9 17l-5-5', no: 'M18 6L6 18M6 6l12 12', chev: 'M9 18l6-6-6-6', pen: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
+      eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'
+    };
+    function icon(k, sw) {
+      var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', sw || '2.6'); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('stroke-linejoin', 'round'); s.setAttribute('aria-hidden', 'true');
+      var p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', SVG[k]); s.appendChild(p);
+      if (k === 'eye') { var c = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('cx', '12'); c.setAttribute('cy', '12'); c.setAttribute('r', '3'); s.appendChild(c); }
+      return s;
+    }
+    var TL = { res: 'Resignation', req: 'Request', exit: 'Exit clearance' };
+    function btn(cls, label, k, attrs) {
+      var b = el(attrs.href ? 'a' : 'button', cls); if (!attrs.href) b.type = 'button';
+      Object.keys(attrs).forEach(function (a) { b.setAttribute(a, attrs[a]); });
+      b.appendChild(icon(k, '2.6'));
+      return b;
+    }
+    function row(x) {
+      var r = el('div', 'ai-row'), t = el('span'), pp = el('div', 'ai-pp'), av = el('span', 'ai-av'), who = el('div'), md = el('div', 'ai-md'), ac = el('div', 'ai-ac');
+      t.appendChild(el('span', 'ai-tag ' + x.t, TL[x.t]));
+      fillAvatar(av, x.photo, x.n); who.style.minWidth = '0';
+      who.appendChild(el('div', 'ai-nm', x.n)); who.appendChild(el('div', 'ai-rl', x.r));
+      pp.appendChild(av); pp.appendChild(who);
+      md.appendChild(document.createTextNode(x.d));
+      var mt = el('div', 'ai-mt', x.m || '');
+      if (x.dl) { if (x.m) mt.appendChild(document.createTextNode(' · ')); mt.appendChild(el('span', x.od ? 'ai-od' : '', x.dl)); }
+      md.appendChild(mt);
+      if (x.t === 'req') {
+        if (x.view) ac.appendChild(btn('ai-icb vw', '', 'eye', { href: x.view, title: 'View', 'aria-label': 'View request' }));
+        if (x.ok) ac.appendChild(btn('ai-icb ok', '', 'ok', { title: 'Approve', 'aria-label': 'Approve', 'data-do': 'ok', 'data-i': ITEMS.indexOf(x) }));
+        if (x.no) ac.appendChild(btn('ai-icb no', '', 'no', { title: 'Reject', 'aria-label': 'Reject', 'data-do': 'no', 'data-i': ITEMS.indexOf(x) }));
+      } else {
+        var a = el('a', 'ai-act'); a.href = x.url;
+        if (x.t === 'res') { a.appendChild(document.createTextNode('Review & approve')); a.appendChild(icon('chev', '2.4')); }
+        else { a.appendChild(icon('pen', '2')); a.appendChild(document.createTextNode('Fill form')); }
+        ac.appendChild(a);
+      }
+      r.appendChild(t); r.appendChild(pp); r.appendChild(md); r.appendChild(ac);
+      return r;
+    }
+    function counts() {
+      var c = { all: ITEMS.length, res: 0, req: 0, exit: 0 }; ITEMS.forEach(function (x) { c[x.t]++; });
+      Array.prototype.forEach.call(document.querySelectorAll('#hrmd [data-c]'), function (b) { b.textContent = c[b.getAttribute('data-c')]; });
+      $('aiCnt').textContent = c.all;
+    }
+    function renderInbox() {
+      list.textContent = '';
+      var rows = ITEMS.filter(function (x) { return filt === 'all' || x.t === filt; });
+      if (!rows.length) {
+        var e = el('div', 'ai-empty'), ei = el('span', 'ei'); ei.appendChild(icon('ok')); e.appendChild(ei); e.appendChild(el('b', '', 'All caught up')); e.appendChild(document.createTextNode('Nothing waiting on you here.'));
+        list.appendChild(e); return;
+      }
+      rows.forEach(function (x) { list.appendChild(row(x)); });
+    }
+    $('aiFilters').addEventListener('click', function (e) {
+      var b = e.target.closest('.ai-fc'); if (!b) return; filt = b.getAttribute('data-f');
+      Array.prototype.forEach.call(document.querySelectorAll('#hrmd .ai-fc'), function (x) { x.classList.toggle('on', x === b); });
+      renderInbox();
+    });
+    list.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-do]'); if (!b || b.disabled) return;
+      var x = ITEMS[+b.getAttribute('data-i')], d = b.getAttribute('data-do'), ok = d === 'ok', rowEl = b.closest('.ai-row');
+      b.disabled = true;
+      postJson(ok ? x.ok : x.no, { id: x.id }).then(function (j) {
+        if (!j.__ok || j.success === false) { b.disabled = false; toast('err', 'Couldn’t ' + (ok ? 'approve' : 'reject') + ' request', j.message || 'Nothing was changed. Please try again.'); return; }
+        rowEl.classList.add('gone');
+        setTimeout(function () {
+          var k = ITEMS.indexOf(x); if (k > -1) ITEMS.splice(k, 1); counts(); renderInbox();
+          toast(ok ? 'ok' : 'info', ok ? 'Request approved' : 'Request rejected', x.n + '’s request ' + (x.r || '').replace('Request ', '') + ' has been ' + (ok ? 'approved.' : 'rejected.'));
+        }, 280);
+      }).catch(function () { b.disabled = false; toast('err', 'Couldn’t ' + (ok ? 'approve' : 'reject') + ' request', 'Nothing was changed. Please try again.'); });
+    });
+    renderInbox(); counts();
   })();
 })();
 </script>

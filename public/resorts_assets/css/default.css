@@ -1734,16 +1734,11 @@ strong {
 }
 
 .notification-box .ntf-av-wisdom {
-    background: var(--teal);
-    display: grid;
-    place-items: center;
+    background: var(--teal) url('../images/wisdom-logo-round.png') center / cover no-repeat; /* the real round Wisdom logo */
 }
 
 .notification-box .ntf-av-wisdom .ntf-mk {
-    width: 14px;
-    height: 14px;
-    border-radius: 4px;
-    background: var(--lime);
+    display: none; /* old placeholder square; markup still emits it */
 }
 
 .notification-box .ntf-av-sos {
