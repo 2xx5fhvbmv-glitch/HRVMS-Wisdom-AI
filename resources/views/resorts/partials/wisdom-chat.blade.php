@@ -36,7 +36,27 @@
     }
 @endphp
 
+@php
+    // Deep links WAI answers may offer: key => route template. Whitelist only, filtered by what THIS user can already open;
+    // `__id__` is replaced client-side by base64(employee id) from a numeric marker, never by model-written text.
+    $waiRoutes = [];
+    foreach ([
+        'profile'       => ['people.employees.details', 'people.employees', 'Profile', 'Open profile'],
+        'accommodation' => ['resort.accommodation.AccommodationEmployeeDetails', 'resort.accommodation.EmployeeAccommodation', 'Accommodation', 'Open in Accommodation'],
+        'attendance'    => ['resort.timeandattendance.employee.details', 'resort.timeandattendance.employee', 'Attendance', 'Open in Attendance'],
+        'visa'          => ['resort.visa.XpactEmpDetails', 'resort.visa.xpactEmployee', 'Visa', 'Open in Visa'],
+    ] as $waiKey => [$waiRoute, $waiPerm, $waiLabel, $waiBtn]) {
+        if (\Illuminate\Support\Facades\Route::has($waiRoute) && \App\Helpers\Common::checkRouteWisePermission($waiPerm, config('settings.resort_permissions.view'))) {
+            $waiRoutes[$waiKey] = ['url' => route($waiRoute, ['id' => '__id__']), 'label' => $waiLabel, 'btn' => $waiBtn];
+        }
+    }
+    // Leave-type colours come from leave configuration (same colour as everywhere else), one cached read per resort.
+    $waiResortId = auth()->guard('resort-admin')->user()->resort_id ?? 0;
+    $waiLeaveColours = \Illuminate\Support\Facades\Cache::remember('wai_leave_colours_' . $waiResortId, 300, fn () => \App\Models\LeaveCategory::where('resort_id', $waiResortId)->pluck('color', 'leave_type')->all());
+@endphp
 <div id="wai-root"
+     data-wai-routes='@json($waiRoutes)'
+     data-wai-leave='@json($waiLeaveColours)'
      data-chat-url="{{ route('resort.wisdom.chat') }}"
      data-history-url="{{ route('resort.wisdom.history') }}"
      data-clear-url="{{ route('resort.wisdom.clear') }}"
@@ -108,12 +128,8 @@
 
         <div class="wai-input" id="wai-form">
             <textarea id="wai-text" rows="1" placeholder="Ask WAI…" maxlength="2000"></textarea>
+            <span class="wai-quota" id="wai-quota" hidden aria-live="polite"><span class="n" id="wai-quota-n"></span>&nbsp;left</span>
             <button type="button" id="wai-send" aria-label="Send" disabled><i class="fa-solid fa-paper-plane"></i></button>
-        </div>
-        {{-- Daily message allowance. Hidden until the server sends a `usage` object ({limit, used, remaining}). --}}
-        <div class="wai-usage" id="wai-usage" hidden aria-live="polite">
-            <div class="u-row"><span id="wai-usage-txt"></span></div>
-            <div class="u-bar"><i id="wai-usage-bar"></i></div>
         </div>
         <div class="wai-foot">WAI is smart, not perfect yet — double-check key details. Always improving!</div>
     </div>
@@ -357,7 +373,7 @@
 /* WAI answers are formatted by the shared wai-markdown.js/.css; only bubble-specific spacing here */
 .wai-bubble.a-md > :first-child { margin-top: 0; }
 .wai-bubble.a-md > :last-child { margin-bottom: 0; }
-.wai-bot .wai-bubble:has(.a-tbl) { max-width: calc(100% - 37px); } /* tables get the full row (minus avatar + gap) */
+.wai-bot .wai-bubble:has(.a-tbl, .tbl, .acc, .fig) { max-width: calc(100% - 37px); } /* tables get the full row (minus avatar + gap) */
 .uc-bt { font-size: 10px; margin-top: 4px; opacity: .65; }
 .wai-user .uc-bt { text-align: right; }
 
@@ -391,17 +407,9 @@
 #wai-send:hover, #uc-send:hover { transform: scale(1.05); }
 #wai-send:active, #uc-send:active { transform: scale(.96); }
 #wai-send:disabled, #uc-send:disabled { background: var(--wai-g6); color: var(--wai-g4); cursor: default; transform: none; }
-/* Daily message allowance (shown only when the server reports it) */
-.wai-usage { flex: none; margin: -4px 20px 10px; }
-.wai-usage .u-row { font-size: 11px; color: var(--muted); text-align: center; }
-.wai-usage .u-bar { height: 3px; border-radius: 3px; background: var(--line); margin-top: 6px; overflow: hidden; }
-.wai-usage .u-bar i { display: block; height: 100%; width: 100%; border-radius: 3px; background: var(--teal); transition: width .3s ease; }
-.wai-usage.is-low .u-row { color: #B7791F; }
-.wai-usage.is-low .u-bar i { background: #B7791F; }
-.wai-usage.is-out .u-row { color: #E5573F; }
-.wai-usage.is-out .u-bar i { background: #E5573F; }
+/* Daily message allowance: shown as "N left" inside the input (.wai-quota, wai-markdown.css) */
+#wai-form .wai-quota { align-self: center; }
 #wai-text:disabled { cursor: not-allowed; }
-@media (prefers-reduced-motion: reduce) { .wai-usage .u-bar i { transition: none; } }
 .wai-foot { display: flex; align-items: center; justify-content: center; gap: 5px; text-align: center; font-size: 11px; color: #93A4A9; padding: 0 16px 14px; flex: none; }
 
 @media (max-width: 480px) {
@@ -575,18 +583,15 @@
     var loaded = false, busy = false, usageOut = false;
 
     // ---- daily allowance (server sends `usage: {limit, used, remaining}`; nothing is shown without it) ----
-    var usageEl = document.getElementById('wai-usage'), usageTxt = document.getElementById('wai-usage-txt'), usageBar = document.getElementById('wai-usage-bar');
+    var quotaEl = document.getElementById('wai-quota'), quotaN = document.getElementById('wai-quota-n');
     function applyUsage(u, fromEvent) {
-        if (!u || !(u.limit > 0) || !usageEl) return;
+        if (!u || !(u.limit > 0) || !quotaEl) return;
         var rem = Math.max(0, u.remaining != null ? u.remaining : u.limit - (u.used || 0));
-        var low = rem > 0 && rem <= Math.max(5, Math.ceil(u.limit * 0.2));
         usageOut = rem === 0;
-        usageEl.hidden = false;
-        usageEl.className = 'wai-usage' + (usageOut ? ' is-out' : low ? ' is-low' : '');
-        usageTxt.textContent = usageOut ? 'Daily limit reached. Try again later.'
-            : low ? 'Only ' + rem + ' message' + (rem === 1 ? '' : 's') + ' left today'
-            : rem + ' of ' + u.limit + ' messages left today';
-        usageBar.style.width = (rem / u.limit * 100) + '%';
+        quotaEl.hidden = false;
+        quotaEl.className = 'wai-quota' + (usageOut ? ' is-out' : rem <= 10 ? ' is-low' : '');
+        quotaEl.setAttribute('data-tip', usageOut ? 'Daily limit reached. Try again later.' : rem + ' of ' + u.limit + ' messages left today');
+        WaiMd.roll(quotaN, rem);
         input.disabled = usageOut;
         input.placeholder = usageOut ? 'Daily limit reached' : 'Ask WAI\u2026';
         sendBtn.disabled = usageOut || !input.value.trim();
@@ -612,7 +617,7 @@
             : '<div class="wai-mini-avatar"><i class="fa-solid fa-user"></i></div>';
     }
 
-    function addMessage(role, text) {
+    function addMessage(role, text, fresh) {
         clearWelcome();
         var row = document.createElement('div');
         row.className = 'wai-row ' + (role === 'user' ? 'wai-user' : 'wai-bot');
@@ -623,10 +628,11 @@
             row.innerHTML = botAvatar();
             var bubble = document.createElement('div');
             bubble.className = 'wai-bubble a-md';
-            WaiMd.render(bubble, text);
+            WaiMd.render(bubble, text, { thread: msgs, reveal: !!fresh });
             row.appendChild(bubble);
         }
         msgs.appendChild(row);
+        if (fresh) WaiMd.tideIn(row);
         scrollDown();
     }
 
@@ -690,7 +696,7 @@
         var text = input.value.trim();
         if (!text || busy || usageOut) return;
         busy = true; sendBtn.disabled = true;
-        addMessage('user', text);
+        addMessage('user', text, true);
         input.value = ''; autoGrow(); toggleSuggestions(false); showTyping();
 
         fetch(CHAT_URL, {
@@ -703,7 +709,7 @@
             hideTyping();
             if (res.body && res.body.usage) applyUsage(res.body.usage);
             if (res.ok && res.body.success) {
-                addMessage('assistant', res.body.reply);
+                addMessage('assistant', res.body.reply, true);
             } else {
                 addMessage('assistant', '⚠️ ' + (res.body.message || 'Something went wrong. Please try again.'));
             }
@@ -716,7 +722,7 @@
         if (busy) return;
         fetch(CLEAR_URL, { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' } })
             .then(function () {
-                msgs.innerHTML = ''; showWelcome(); toggleSuggestions(true);
+                msgs.innerHTML = ''; msgs._waiSubj = null; showWelcome(); toggleSuggestions(true);
             });
     }
 

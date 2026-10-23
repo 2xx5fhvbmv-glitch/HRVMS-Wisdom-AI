@@ -134,7 +134,10 @@
         : low ? 'Only ' + rem + ' message' + (rem === 1 ? '' : 's') + ' left today'
         : rem + ' of ' + u.limit + ' messages left today';
       usageOut = rem === 0;
-      [askUse, fpUse].forEach(function (n) { n.hidden = false; n.textContent = txt; n.className = (n.id === 'askUse' ? 'wai-use' : 'fp-use') + (usageOut ? ' is-out' : low ? ' is-low' : ''); });
+      askUse.hidden = false; askUse.textContent = txt; askUse.className = 'wai-use' + (usageOut ? ' is-out' : low ? ' is-low' : '');
+      // follow-up field: "N left" inside the field, full sentence as the tooltip
+      fpUse.hidden = false; fpUse.className = 'wai-quota' + (usageOut ? ' is-out' : rem <= 10 ? ' is-low' : '');
+      fpUse.setAttribute('data-tip', usageOut ? txt : rem + ' of ' + u.limit + ' messages left today'); window.WaiMd.roll($('fpUseN'), rem);
       [askInput, fpInput, askGo, fpGo].forEach(function (n) { n.disabled = usageOut; });
       if (!fromEvent) document.dispatchEvent(new CustomEvent('wai:usage', { detail: u })); // keeps the floating chat in step
     }
@@ -157,20 +160,20 @@
       // Optional labels from the endpoint, rendered only when it sends them (see backend notes): label = "Company policy · leave", source = citation.
       if (j.success && j.label) a.appendChild(el('div', 'a-tag', j.label));
       var md = el('div', 'a-md');
-      if (window.WaiMd) window.WaiMd.render(md, text); else md.textContent = text;
+      if (window.WaiMd) window.WaiMd.render(md, text, { thread: body, reveal: true }); else md.textContent = text;
       a.appendChild(md);
       if (j.success && j.source) { var s = el('div', 'a-src', 'Source · '); s.appendChild(el('b', '', j.source)); a.appendChild(s); }
     }
     function exchange(q) {
       busy = true;
-      body.appendChild(el('div', 'q', q));
-      var a = el('div', 'a'); a.appendChild(thinking()); body.appendChild(a);
+      var qb = el('div', 'q', q); body.appendChild(qb); window.WaiMd.tideIn(qb);
+      var a = el('div', 'a'); a.appendChild(thinking()); body.appendChild(a); window.WaiMd.tideIn(a, 120);
       body.scrollTop = body.scrollHeight;
       postJson(U.wai, { message: q }).then(function (j) { if (j && j.usage) applyUsage(j.usage); answer(a, j); })
         .catch(function () { answer(a, { success: false, message: 'Something went wrong. Please try again.' }); })
         .then(function () { busy = false; body.scrollTop = body.scrollHeight; });
     }
-    function open(q) { body.textContent = ''; focus.classList.add('open'); document.body.style.overflow = 'hidden'; exchange(q); setTimeout(function () { fpInput.focus(); }, 60); }
+    function open(q) { body.textContent = ''; body._waiSubj = null; focus.classList.add('open'); document.body.style.overflow = 'hidden'; exchange(q); setTimeout(function () { fpInput.focus(); }, 60); }
     function close() { focus.classList.remove('open'); document.body.style.overflow = ''; askInput.value = ''; }
     function submitAsk() { var v = (askInput.value || '').trim(); if (v && !busy && !usageOut) open(v); }
     function submitFp() { var v = (fpInput.value || '').trim(); if (v && !busy && !usageOut) { exchange(v); fpInput.value = ''; } }

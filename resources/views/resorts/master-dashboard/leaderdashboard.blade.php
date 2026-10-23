@@ -315,10 +315,9 @@
         <div class="fp-body" id="fpBody"></div>
         <div class="fp-foot">
           <div class="wai-foot-row">
-            <label class="wai-field"><input id="fpInput" type="text" placeholder="Ask a follow-up…" autocomplete="off" maxlength="2000"></label>
+            <label class="wai-field"><input id="fpInput" type="text" placeholder="Ask a follow-up…" autocomplete="off" maxlength="2000"><span class="wai-quota" id="fpUse" hidden aria-live="polite"><span class="n" id="fpUseN"></span>&nbsp;left</span></label>
             <button type="button" class="orb" id="fpGo" aria-label="Ask"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><span class="orb-glass"></span><span class="orb-sheen"></span><svg class="orb-ar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
           </div>
-          <div class="fp-use" id="fpUse" hidden></div>
           <div class="wai-disclaimer">WAI is smart, not perfect yet — double-check key details. Always improving!</div>
         </div>
       </div>
