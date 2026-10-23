@@ -635,6 +635,8 @@
             serverSide: true,
             ajax: {
                 url: '{{ route("people.liabilities.data") }}',
+                // POST, not GET: one column per cost line makes the GET URL too long for nginx (414).
+                type: 'POST',
                 data: function (d) {
                     // Forward the in-header Search input + Department picker
                     // to the server. Without this the controls did nothing

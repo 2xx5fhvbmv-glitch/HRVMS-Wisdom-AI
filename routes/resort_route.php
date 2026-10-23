@@ -2039,7 +2039,8 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
 
       Route::get('/people/initial-liability-estimation/add-cost', 'People\Liability\LiabilityEstimationController@addCost')->name('people.liability.addCost');
       Route::post('/people/initial-liability-estimation/add-cost', 'People\Liability\LiabilityEstimationController@storeCost')->name('people.liability.storeCost');
-      Route::get('/people/initial-liability-estimation/get-data', 'People\Liability\LiabilityEstimationController@getLiabilityData')->name('people.liabilities.data');
+      // POST: the table sends one column per cost line, which overflows nginx's URL limit (414) as a GET.
+      Route::match(['get', 'post'], '/people/initial-liability-estimation/get-data', 'People\Liability\LiabilityEstimationController@getLiabilityData')->name('people.liabilities.data');
 
       Route::get('/people/initial-liability-estimation/get-employee-data/{empId}', 'People\Liability\LiabilityEstimationController@getLiabilityEmployeeData')->name('people.liabilities.emp-data');
       //End of Initial Liability Estimation

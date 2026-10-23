@@ -96,7 +96,7 @@ class DemoModulesTest extends TestCase
         $columns = collect(['Emp_id', 'employee_name', 'salary'])->merge(collect($types)->map(fn ($t) => preg_replace('/[^a-z0-9]+/', '_', strtolower($t))))
             ->map(fn ($c) => ['data' => $c, 'name' => $c, 'searchable' => 'false', 'orderable' => 'false'])->values()->all();
         $res = $this->withHeaders(['X-Requested-With' => 'XMLHttpRequest', 'Accept' => 'application/json'])
-            ->get(route('people.liabilities.data', ['draw' => 1, 'start' => 0, 'length' => 10, 'columns' => $columns]));
+            ->post(route('people.liabilities.data'), ['draw' => 1, 'start' => 0, 'length' => 10, 'columns' => $columns]);
         $res->assertOk();
         $this->assertNotEmpty($res->json('data'), 'liability employee rows');
 
