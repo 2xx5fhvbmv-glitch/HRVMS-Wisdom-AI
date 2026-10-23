@@ -73,11 +73,19 @@ class WisdomTools
      */
     public static function definitions(array $ctx): array
     {
+        // Policy & law search is for every tier with chat access — the policy tier (HOD / EXCOM / managers) has
+        // no database tools, but company policy and employment law are exactly what it is for.
+        $policySearch = self::fn('search_policy_documents',
+            "Search this resort's own company policy documents (the staff handbook and policies HR uploaded to the File Management \"Company Policies\" folder) together with the Maldives employment-law library (Employment Act and amendments, Pension Act, Regulation on Employment of Expatriates, income / withholding tax, minimum wage). Returns the best-matching passages, each with its document name and page, split into company_policy and law. Call it BEFORE answering any question about company policy, the handbook, internal rules or employment law, and base the answer on what it returns.",
+            [
+                'question' => ['type' => 'string', 'description' => 'The policy or law question, in plain words (e.g. "notice period for termination", "annual leave carry forward").'],
+            ], ['question']);
         if (empty($ctx['can_db'])) {
-            return [];
+            return [$policySearch];
         }
 
         $tools = [
+            $policySearch,
             self::fn('get_headcount',
                 'Get the number of active employees at the resort. Optionally filter by a department name.',
                 [
@@ -514,6 +522,9 @@ class WisdomTools
         // The ad-hoc SQL + schema-discovery tools are full-access (HR) only.
         if (in_array($name, ['run_read_query', 'list_tables', 'describe_table'], true) && empty($ctx['can_payroll'])) {
             return ['error' => 'Access denied: custom queries are restricted for your role.'];
+        }
+        if ($name === 'search_policy_documents') {
+            return self::searchPolicyDocuments((int) $ctx['resort_id'], $args);
         }
         if (empty($ctx['can_db'])) {
             return ['error' => 'Access denied: your role does not have database access.'];
@@ -2979,6 +2990,35 @@ class WisdomTools
             'document_count' => $list->count(),
             'documents'      => $list,
             'note'           => 'Open the actual files in the File Management module.',
+        ];
+    }
+
+    /** Company policy + employment-law passages from the AI service's policy library (see PolicyLibrary). */
+    private static function searchPolicyDocuments(int $rid, array $args): array
+    {
+        $question = trim((string) ($args['question'] ?? ''));
+        if ($question === '') {
+            return ['error' => 'Please provide the policy or law question to search for.'];
+        }
+        try {
+            $found = \App\Services\Wisdom\PolicyLibrary::search($rid, $question);
+        } catch (\Throwable $e) {
+            Log::warning('Wisdom AI policy search failed', ['error' => $e->getMessage()]);
+            return ['error' => 'The policy library is not reachable right now, so no company policy or law text could be checked.'];
+        }
+        $passages = fn (array $hits) => array_map(fn ($h) => [
+            'document' => $h['document'] ?? null,
+            'page'     => $h['page'] ?? null,
+            'text'     => mb_strimwidth((string) ($h['text'] ?? ''), 0, 900, '…'),
+        ], $hits);
+
+        return [
+            'company_policy_passages' => $passages($found['company_policy'] ?? []),
+            'law_passages'            => $passages($found['law'] ?? []),
+            'company_documents_uploaded' => (int) ($found['company_documents'] ?? 0),
+            'note' => empty($found['company_documents'])
+                ? 'This resort has not uploaded any company policy documents yet (File Management → a folder named "Company Policies"). Answer from law only and say so.'
+                : null,
         ];
     }
 

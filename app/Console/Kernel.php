@@ -25,6 +25,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('links:survey-change-status')->dailyAt("00:00");
         $schedule->command('links:survey-reminder-notification')->dailyAt('09:00');
         $schedule->command('incident:send-meeting-reminders')->dailyAt('09:00');
+        $schedule->command('wisdom:sync-policies')->hourly()->withoutOverlapping();
         $schedule->command('announcements:publish-scheduled')->daily(); // or hourly()
         $schedule->command('monthly-check-in:update-status')->hourly();
         $schedule->command('links:onboarding-new-emp-hire-notification')->dailyAt('09:00');

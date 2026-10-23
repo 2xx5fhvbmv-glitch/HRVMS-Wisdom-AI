@@ -17,6 +17,11 @@ class ChildFileManagement extends Model
     public static function boot(){
         parent::boot();
 
+        // Wisdom AI reads the resort's "Company Policies" folder; keep its index in step with uploads, moves and deletes.
+        self::created(fn ($model) => \App\Services\Wisdom\PolicyLibrary::fileChanged($model));
+        self::updated(fn ($model) => $model->wasChanged('Parent_File_ID') && \App\Services\Wisdom\PolicyLibrary::fileChanged($model));
+        self::deleted(fn ($model) => \App\Services\Wisdom\PolicyLibrary::fileChanged($model));
+
         self::saving(function ($model) {
             // if (!$model->exists) {
             //     $model->File_Upload_By = Auth::guard('resort-admin')->user()->id;

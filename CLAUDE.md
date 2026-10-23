@@ -7,7 +7,7 @@ Read this file fully before starting ANY task in this repo. It exists so every s
 HR / Workforce Management system for Maldives resorts, multi-tenant (one resort = one `resort_id`). Covers the full employee lifecycle: onboarding, time & attendance, duty rosters, leave, island pass (inter-island travel approval), payroll & salary advances, benefit grids (rank-based compensation policy), performance reviews, grievance & disciplinary, incidents, accommodation/maintenance requests, visa/document management, survey, learning & development, workforce planning, talent acquisition. Two front doors:
 - **Web portal** (`resort-admin` guard, session) — HR/HOD/EXCOM/GM staff manage their resort.
 - **Mobile app** (`api` guard, Passport token) — employees self-serve (apply leave, punch attendance, request island pass, etc.) and managers approve from their phone.
-- **Wisdom AI** — a tier-gated HR chatbot addon (`app/Services/Wisdom`, OpenRouter + tool-calling), separate concern from the modules above.
+- **Wisdom AI** — a tier-gated HR chatbot addon (`app/Services/Wisdom`, OpenRouter + tool-calling), separate concern from the modules above. Company policy answers come from the resort's File Management folder named "Company Policies": `PolicyLibrary` sends those files (decrypted) to the Python AI service (`HRVMS-Wisdom-AI-Code`, `/policies/*`, a per-resort index next to the shared employment-law PDFs), kept in step by `ChildFileManagement` model events + hourly `wisdom:sync-policies`; WAI's `search_policy_documents` tool (offered to every tier) returns cited passages. WAI must not describe screens it wasn't told about — verified how-to paths live in `OpenRouterClient::systemPrompt()`.
 
 ## Architecture map
 
