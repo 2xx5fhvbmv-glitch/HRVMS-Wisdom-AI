@@ -142,7 +142,7 @@ class LeaderDashboard
      * ok/no POST {id} to LeaderDashboardController::decide(), which runs the module's own
      * approve/reject. No undo: neither module can reverse a decision.
      */
-    private function requests(): array
+    public function requests(): array
     {
         $acting = Common::actingEmployees($this->employee, $this->resortId)->pluck('id')->all();
         $rows = [];
@@ -225,13 +225,29 @@ class LeaderDashboard
     }
 
     /** Resignations waiting at the HOD step — the GM's resort-wide oversight list. */
-    private function pendingResignations(): Collection
+    public function pendingResignations(): Collection
     {
         return \App\Models\EmployeeResignation::with(['employee.resortAdmin', 'employee.department', 'employee.position'])
             ->where('resort_id', $this->resortId)->where('hod_status', 'Pending')
             ->whereNotIn('status', ['Withdraw', 'Approved', 'Rejected'])
             ->whereHas('employee', fn ($q) => $q->when($this->deptIds !== null, fn ($d) => $d->whereIn('Dept_id', $this->deptIds)))
             ->orderByDesc('created_at')->get();
+    }
+
+    /** Unfinished department exit-clearance forms in scope — same query as gm_dashboard()'s resort-wide list. */
+    public function pendingExitClearance(): Collection
+    {
+        return \App\Models\ExitClearanceFormAssignment::with([
+                'exitClearanceForm:id,form_name',
+                'employeeResignation:id,employee_id,last_working_day',
+                'employeeResignation.employee:id,Admin_Parent_id,Position_id,Dept_id',
+                'employeeResignation.employee.resortAdmin:id,first_name,last_name',
+                'employeeResignation.employee.position:id,position_title',
+            ])
+            ->where('resort_id', $this->resortId)->where('assigned_to_type', 'department')
+            ->whereIn('status', ['Pending', 'In Progress', 'On Hold'])
+            ->when($this->deptIds !== null, fn ($q) => $q->whereHas('employeeResignation.employee', fn ($e) => $e->whereIn('Dept_id', $this->deptIds)))
+            ->orderByRaw('CASE WHEN deadline_date IS NULL THEN 1 ELSE 0 END, deadline_date ASC')->get();
     }
 
     /**

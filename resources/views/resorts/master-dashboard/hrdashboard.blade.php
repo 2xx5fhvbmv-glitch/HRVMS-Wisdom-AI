@@ -72,18 +72,13 @@
     }
 
     // Duty roster + Action inbox — the same LeaderDashboard service and routes the non-HR
-    // Leader dashboard uses (app/Services/LeaderDashboard.php); HR already resolves to
-    // resort-wide scope there via Common::getScopedDepartmentIds(), so this needs no backend
-    // change. get_defined_vars() here is only hr_dashboard()'s own compact() variables, since
-    // nothing below has been defined yet; viewData() never overrides a variable this controller
-    // already passed (e.g. monthlyCheckinPerformance), it only fills in what's missing
-    // (pendingResignationsForHod, pendingExitClearanceForms) and adds 'leader'.
-    $hrLdSvc  = \App\Services\LeaderDashboard::forCurrentUser();
-    $hrLdData = $hrLdSvc ? $hrLdSvc->viewData(get_defined_vars()) : ['leader' => []];
-    extract($hrLdData, EXTR_SKIP);
-    $hrRequests = $leader['requests'] ?? [];
-    $hrResignC  = $pendingResignationsForHod ?? collect();
-    $hrExitC    = $pendingExitClearanceForms ?? collect();
+    // Leader dashboard uses (app/Services/LeaderDashboard.php); HR resolves to resort-wide
+    // scope there via Common::getScopedDepartmentIds(). Only the three inbox lists are
+    // fetched — not viewData(), which also builds health/events this page doesn't show.
+    $hrLdSvc    = \App\Services\LeaderDashboard::forCurrentUser();
+    $hrRequests = $hrLdSvc ? $hrLdSvc->requests() : [];
+    $hrResignC  = $hrLdSvc ? $hrLdSvc->pendingResignations() : collect();
+    $hrExitC    = $hrLdSvc ? $hrLdSvc->pendingExitClearance() : collect();
     $hrRosterUrl = \Illuminate\Support\Facades\Route::has('resort.master.leader_roster') ? route('resort.master.leader_roster') : null;
     $today = \Carbon\Carbon::today();
     $hrNameOf = fn ($emp) => optional(optional($emp)->resortAdmin)->full_name ?: '—';
