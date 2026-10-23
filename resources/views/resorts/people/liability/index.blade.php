@@ -598,8 +598,8 @@
         // Inject dynamic allowance columns
         allowanceColumns.forEach(type => {
             columns.push({
-                data: type.toLowerCase().replace(/\s+/g, '_'), // example: food_allowance
-                name: type.toLowerCase().replace(/\s+/g, '_'),
+                data: type.toLowerCase().replace(/[^a-z0-9]+/g, '_'), // example: food_allowance — same key as the controller
+                name: type.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
                 title: type
             });
         });

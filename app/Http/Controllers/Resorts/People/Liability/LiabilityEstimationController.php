@@ -1377,7 +1377,9 @@ class LiabilityEstimationController extends Controller
 
         // One DataTable column per dynamic allowance label.
         foreach ($allowanceLabels as $label) {
-            $columnKey = strtolower(str_replace(' ', '_', $label));
+            // Same key the view builds (index.blade.php allowanceColumns): any run of non-alphanumerics -> '_'.
+            // DataTables refuses column names with characters like '/' ("Male-Based/Airport Based Allowance").
+            $columnKey = strtolower(preg_replace('/[^a-z0-9]+/i', '_', $label));
             $costs = $allowanceCostsByLabel[$label];
             $datatable->addColumn($columnKey, function ($row) use ($costs, $costBucketTotal) {
                 return Common::formatCurrency($costBucketTotal($row, $costs), 'USD');

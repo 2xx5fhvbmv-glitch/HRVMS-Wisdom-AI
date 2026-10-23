@@ -89,6 +89,17 @@ class DemoModulesTest extends TestCase
             // Visa: payment requests (paid and open), wallets, wallet + fee transaction history
             ['resort.visa.PaymentRequestIndex', [], 4], ['resort.visa.WalletIndex', [], 4], ['resort.visa.TransectionHistory', [], 10],
         ]);
+        // Liability → Employees tab, asked for with the columns the page builds (one per cost line). A cost line
+        // like "Male-Based/Airport Based Allowance" must not make DataTables refuse the column name.
+        $types = $this->get(route('people.liability.index'))->viewData('allowanceTypes');
+        $this->assertNotEmpty($types);
+        $columns = collect(['Emp_id', 'employee_name', 'salary'])->merge(collect($types)->map(fn ($t) => preg_replace('/[^a-z0-9]+/', '_', strtolower($t))))
+            ->map(fn ($c) => ['data' => $c, 'name' => $c, 'searchable' => 'false', 'orderable' => 'false'])->values()->all();
+        $res = $this->withHeaders(['X-Requested-With' => 'XMLHttpRequest', 'Accept' => 'application/json'])
+            ->get(route('people.liabilities.data', ['draw' => 1, 'start' => 0, 'length' => 10, 'columns' => $columns]));
+        $res->assertOk();
+        $this->assertNotEmpty($res->json('data'), 'liability employee rows');
+
         // An expat's own Visa pages: paid fee history and this cycle's quota / permit schedule.
         $expat = base64_encode((string) DB::table('employees')->where('resort_id', $this->resortId)->where('status', 'Active')
             ->where('nationality', '!=', 'Maldivian')->whereNotIn('employment_type', ['Casual', 'Internship'])->value('id'));
