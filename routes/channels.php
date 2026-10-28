@@ -14,11 +14,11 @@ use Illuminate\Support\Facades\Broadcast;
 */
 Broadcast::channel('conversation.{receiver_id}', function ($user, $receiver_id) {
    return (int) $user->id === (int) $receiver_id;
-});
+}, ['guards' => ['resort-admin', 'api']]);
 
 Broadcast::channel('chat.{receiver_id}', function ($user, $receiver_id) {
     return (int) $user->id === (int) $receiver_id;
-});
+}, ['guards' => ['resort-admin', 'api']]);
 
 // Support ticket live chat (Admin + Resort panels). Scoped per ticket, not
 // per user id, since one ticket's admin and employee sides must share a
@@ -35,7 +35,7 @@ Broadcast::channel('group.{group_id}', function ($user, $group_id) {
         ->where('user_id', $user->id)
         ->exists();
     return $isMember ? ['id' => $user->id, 'name' => $user->full_name] : false;
-});
+}, ['guards' => ['resort-admin', 'api']]);
 
 // Presence roster only — join on login/foreground, leave on background.
 // Pusher's member_added/member_removed events on this channel ARE the
@@ -55,6 +55,6 @@ Broadcast::channel('resort.{resort_id}.sos', function ($user, $resort_id) {
 Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     \Log::info('Broadcasting channel for user: ' . $id);
     return (int) $user->id === (int) $id;
-});
+}, ['guards' => ['resort-admin', 'api']]);
 
 

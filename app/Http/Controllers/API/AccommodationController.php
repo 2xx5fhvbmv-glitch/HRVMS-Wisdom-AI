@@ -2864,6 +2864,7 @@ class AccommodationController extends Controller
             
             $maintanance                                    =   MaintanaceRequest::where('id', $requestId)
                                                                     ->where('Status', 'Assigned')
+                                                                    ->where('Assigned_To', $employee_id)
                                                                     ->where('resort_id', $this->resort_id)
                                                                     ->first();
             

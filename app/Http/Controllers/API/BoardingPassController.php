@@ -1330,6 +1330,7 @@ class BoardingPassController extends Controller
                                                             'employee.resortAdmin:id,first_name,last_name,profile_picture',
                                                             'employee.position:id,position_title',
                                                             ])
+                                                            ->where('resort_id', $resortId)
                                                             ->where('status', 'Approved')
                                                             ->where(function ($q) use ($startDate, $endDate) {
                                                                 // Filter by date ranges
@@ -2667,6 +2668,9 @@ class BoardingPassController extends Controller
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
 
         $validator = Validator::make($request->all(), [
             'manifest_type' => 'required|in:arrival,departure',
@@ -2792,6 +2796,9 @@ class BoardingPassController extends Controller
 
             if (!$assignment) {
                 return response()->json(['success' => false, 'message' => 'Assignment not found.'], 200);
+            }
+            if ((int) $assignment->employee_id !== (int) optional($this->user->GetEmployee)->id && !$this->userCanManageManifests()) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
             }
 
             $officer                                 =   Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')

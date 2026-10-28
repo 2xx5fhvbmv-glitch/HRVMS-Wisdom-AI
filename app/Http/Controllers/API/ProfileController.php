@@ -56,6 +56,9 @@ class ProfileController extends Controller
         if (!$this->user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
+        if (!Common::hasFullDataAccess($this->user->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'Only HR or the GM can send a resort-wide test push.'], 403);
+        }
 
         return response()->json(Common::sendTestPushToResort($this->resort_id));
     }

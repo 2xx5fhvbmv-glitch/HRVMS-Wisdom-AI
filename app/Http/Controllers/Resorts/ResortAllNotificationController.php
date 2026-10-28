@@ -37,6 +37,9 @@ class ResortAllNotificationController extends Controller
         if (!$resort) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
+        if (!Common::hasFullDataAccess()) {
+            return response()->json(['success' => false, 'message' => 'Only HR or the GM can send a resort-wide test push.'], 403);
+        }
 
         return response()->json(Common::sendTestPushToResort($resort->resort_id));
     }

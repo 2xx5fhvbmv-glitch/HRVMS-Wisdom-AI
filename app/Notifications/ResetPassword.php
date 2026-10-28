@@ -113,7 +113,7 @@ class ResetPassword extends ResetPasswordNotification implements ShouldQueue
     $data['name'] =  $name;
     $data['aboveBody'] = EmailTemplate::get_string_between($body, '[textAboveLink]', '[/textAboveLink]');
     $data['belowBody'] = EmailTemplate::get_string_between($body, '[textBelowLink]', '[/textBelowLink]');
-    $data['resetUrl'] = url('/').route($this->user . '.password.reset', ['token' => $this->token, 'email' => $notifiable->getEmailForPasswordReset()], false);
+    $data['resetUrl'] = rtrim(config('app.url'), '/').route($this->user . '.password.reset', ['token' => $this->token, 'email' => $notifiable->getEmailForPasswordReset()], false);
     return (new MailMessage)
     ->view(
       'emails.passwordEmail', $data

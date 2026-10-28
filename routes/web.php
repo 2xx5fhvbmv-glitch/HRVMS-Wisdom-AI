@@ -12,12 +12,13 @@ use Illuminate\Support\Facades\Broadcast;
 // middleware group already behaves elsewhere.
 Route::post('/broadcasting/auth', function (\Illuminate\Http\Request $request) {
     if (Auth::guard('admin')->check()) {
+        abort_if(Auth::guard('admin')->user()->status !== 'active', 403);
         Auth::shouldUse('admin');
     } elseif (Auth::guard('resort-admin')->check()) {
         Auth::shouldUse('resort-admin');
     }
     return Broadcast::auth($request);
-});
+})->middleware('account.active');
 
 /*
 |--------------------------------------------------------------------------

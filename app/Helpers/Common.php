@@ -257,6 +257,7 @@ class Common
 
         $plainPassword = self::generateUniquePassword(8);
         $resortAdmin->password = \Hash::make($plainPassword);
+        $resortAdmin->must_change_password = true; // it was emailed in clear
         $resortAdmin->save();
         // Revoke every live mobile token — a reset password means the
         // old one must stop working everywhere, same as self-service
