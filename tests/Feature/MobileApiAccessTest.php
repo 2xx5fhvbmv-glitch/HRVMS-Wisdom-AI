@@ -39,11 +39,31 @@ class MobileApiAccessTest extends TestCase
 
     public function test_hod_of_another_department_is_refused_hr_only_actions()
     {
-        $hod = Employee::where('status', 'Active')->where('rank', 2)->whereHas('resortAdmin', fn ($q) => $q->where('status', 'Active'))->get()
-            ->first(fn ($e) => !Common::isHR($e)) ?? $this->markTestSkipped('No non-HR HOD.');
+        $hods = Employee::where('status', 'Active')->where('rank', 2)->whereHas('resortAdmin', fn ($q) => $q->where('status', 'Active'))->get();
+        $housekeeping = fn ($e) => in_array($e->id, Common::getResortHousekeepingHodXcomEmployeeIds($e->resort_id));
+        $hod = $hods->first(fn ($e) => !Common::isHR($e) && !$housekeeping($e)) ?? $this->markTestSkipped('No HOD outside HR/Housekeeping.');
         Passport::actingAs($hod->resortAdmin, [], 'api');   // passes check.rank:HR,GM,HOD,EXCOM; the method gate must refuse
         $this->postJson('/api/accommodation/hr-maintenance-req-action', ['request_id' => 1, 'action' => 'Approved'])->assertForbidden();
         $this->postJson('/api/employee-management/hr-employee-overview', [])->assertForbidden();
+        $this->postJson('/api/accommodation/housekeeping-add-schedules', [])->assertForbidden();
+    }
+
+    // Own test: the router reuses a controller (and its constructor's user) within one test, unlike real requests.
+    public function test_housekeeping_hod_can_still_raise_a_schedule()
+    {
+        $hk = Employee::where('status', 'Active')->where('rank', 2)->whereHas('resortAdmin', fn ($q) => $q->where('status', 'Active'))->get()
+            ->first(fn ($e) => in_array($e->id, Common::getResortHousekeepingHodXcomEmployeeIds($e->resort_id))) ?? $this->markTestSkipped('No Housekeeping HOD.');
+        Passport::actingAs($hk->resortAdmin, [], 'api');
+        $this->assertNotSame(403, $this->postJson('/api/accommodation/housekeeping-add-schedules', [])->status());
+    }
+
+    public function test_mobile_user_with_a_temporary_password_can_only_change_it()   // W1-30
+    {
+        $user = $this->lineWorker()->resortAdmin;
+        $user->forceFill(['must_change_password' => 1])->save();
+        Passport::actingAs($user, [], 'api');
+        $this->assertNotSame(403, $this->getJson('/api/resort/profile')->status());
+        $this->getJson('/api/resort/test-push-notification')->assertForbidden()->assertJson(['must_change_password' => true]);
     }
 
     public function test_reissued_credentials_must_be_changed_at_first_login()

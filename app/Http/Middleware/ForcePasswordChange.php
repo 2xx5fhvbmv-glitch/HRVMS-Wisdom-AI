@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Auth;
 /**
  * Enforces must_change_password: until the account sets a new password,
  * only the profile / change-password / logout routes are reachable.
- * Usage: forcePasswordChange:<guard>
+ * Usage: forcePasswordChange:<guard>. The mobile API ('api') has no route names, so its list is URI patterns.
  */
 class ForcePasswordChange
 {
@@ -16,6 +16,7 @@ class ForcePasswordChange
         'resort' => ['resort.logout', 'resort.user.profile', 'resort.profile.changePassword'],
         'admin' => ['admin.logout', 'admin.profile', 'admin.changePassword', 'admin.checkPassword'],
         'shopkeeper' => ['shopkeeper.logout', 'shopkeeper.profile', 'shopkeeper.update.profile'],
+        'api' => ['api/logout', 'api/remove-device-token', 'api/resort/profile', 'api/resort/profile-change-password'],
     ];
 
     private const PROFILE = [
@@ -28,7 +29,8 @@ class ForcePasswordChange
     {
         $user = Auth::guard($guard === 'resort' ? 'resort-admin' : $guard)->user();
 
-        if (!$user || !$user->must_change_password || in_array($request->route()?->getName(), self::ALLOWED[$guard], true)) {
+        if (!$user || !$user->must_change_password || in_array($request->route()?->getName(), self::ALLOWED[$guard], true)
+            || ($guard === 'api' && $request->is(...self::ALLOWED['api']))) {
             return $next($request);
         }
 

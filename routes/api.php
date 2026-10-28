@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Route;
 	Route::post('login', [App\Http\Controllers\API\LoginController::class, 'apiLogin'])->middleware('throttle:mobile-login')->name('api.resort.login');
 	Route::post('forgotpassword', [App\Http\Controllers\API\LoginController::class, 'apiForgotPassword'])->middleware('throttle:mobile-password-reset')->name('api.resort.forgotpassword');
 
-	Route::middleware(['auth:api', 'account.active', 'applyResortSmtp'])->group(function () {
+	Route::middleware(['auth:api', 'account.active', 'forcePasswordChange:api', 'applyResortSmtp'])->group(function () {
 
 		Route::get('on-boarding/get-onboarding-virtual-facility', [App\Http\Controllers\API\OnBoardingController::class, 'getOnboardingVirtualFacility']);
 
@@ -741,9 +741,9 @@ use Illuminate\Support\Facades\Route;
 	// group above (not just re-widened in place inside it — that alone
 	// doesn't work, see the comment left where these used to be), or a
 	// temp-clinic-doctor's token can never reach them.
-	Route::middleware(['auth:api,temp-clinic-doctor', 'account.active'])->get('clinic/appointment-categories', [App\Http\Controllers\API\ClinicController::class, 'appointmentCategories']);
-	Route::middleware(['auth:api,temp-clinic-doctor', 'account.active'])->get('clinic/appointment-details/{appointment_id}', [App\Http\Controllers\API\ClinicController::class, 'appointmentDetails']);
-	Route::middleware(['auth:api,temp-clinic-doctor', 'account.active'])->get('clinic/treatment-details/{treatment_id}', [App\Http\Controllers\API\ClinicController::class, 'treatmentDetails']);
+	Route::middleware(['auth:api,temp-clinic-doctor', 'account.active', 'forcePasswordChange:api'])->get('clinic/appointment-categories', [App\Http\Controllers\API\ClinicController::class, 'appointmentCategories']);
+	Route::middleware(['auth:api,temp-clinic-doctor', 'account.active', 'forcePasswordChange:api'])->get('clinic/appointment-details/{appointment_id}', [App\Http\Controllers\API\ClinicController::class, 'appointmentDetails']);
+	Route::middleware(['auth:api,temp-clinic-doctor', 'account.active', 'forcePasswordChange:api'])->get('clinic/treatment-details/{treatment_id}', [App\Http\Controllers\API\ClinicController::class, 'treatmentDetails']);
 
 	// Clinic Manager tier, reachable by either identity — 'clinic.manager'
 	// accepts a real rank-12 employee (unrestricted, same as before) OR an
@@ -759,7 +759,7 @@ use Illuminate\Support\Facades\Route;
 	// approver identity to act as, and shouldn't be editing the resort's
 	// permanent category list. Those two stay auth:api-only (real
 	// employees, unchanged).
-	Route::middleware(['auth:api,temp-clinic-doctor', 'account.active', 'applyResortSmtp', 'clinic.manager'])->group(function () {
+	Route::middleware(['auth:api,temp-clinic-doctor', 'account.active', 'forcePasswordChange:api', 'applyResortSmtp', 'clinic.manager'])->group(function () {
 		// clinic/appointment-categories moved to the unrestricted
 		// registration above (its own guard now covers temp-clinic-doctor
 		// too) — it was duplicated here under the rank-12-only

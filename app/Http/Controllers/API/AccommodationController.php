@@ -1432,6 +1432,12 @@ class AccommodationController extends Controller
         if (!$this->user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
+        // Raised by HR or by the Housekeeping HOD/XCOM (who are notified below); other departments' HOD/EXCOM/GM pass the
+        // route's rank check but don't run housekeeping.
+        $emp = $this->user->GetEmployee;
+        if (!Common::canWriteAccommodation($emp) && !in_array($emp->id ?? null, Common::getResortHousekeepingHodXcomEmployeeIds($this->resort_id))) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized: HR or Housekeeping HOD only.'], 403);
+        }
 
         $validator = Validator::make($request->all(), [
             'building_id'                                       =>    'required',
