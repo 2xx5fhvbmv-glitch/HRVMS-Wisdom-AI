@@ -84,7 +84,10 @@
     $today = \Carbon\Carbon::today();
     $hrNameOf = fn ($emp) => optional(optional($emp)->resortAdmin)->full_name ?: '—';
     $hrPosOf  = fn ($emp) => optional(optional($emp)->position)->position_title ?: '';
-    $hrPicIds = $hrResignC->map(fn ($r) => optional($r->employee)->Admin_Parent_id)
+    // Start from a plain collection (like leaderdashboard): ->map() on an EMPTY Eloquent collection stays
+    // Eloquent, and its merge() calls getKey() on the ids.
+    $hrPicIds = collect()
+        ->merge($hrResignC->map(fn ($r) => optional($r->employee)->Admin_Parent_id))
         ->merge($hrExitC->map(fn ($f) => optional(optional($f->employeeResignation)->employee)->Admin_Parent_id))
         ->filter()->unique()->values()->all();
     $hrPics   = \App\Helpers\Common::getResortUserPicturesBatch($hrPicIds);
