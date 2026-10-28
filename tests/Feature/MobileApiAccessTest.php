@@ -37,6 +37,15 @@ class MobileApiAccessTest extends TestCase
         $this->postJson('/api/boarding/boarding-pass-status-update', ['manifest_type' => 'departure'])->assertForbidden();
     }
 
+    public function test_hod_of_another_department_is_refused_hr_only_actions()
+    {
+        $hod = Employee::where('status', 'Active')->where('rank', 2)->whereHas('resortAdmin', fn ($q) => $q->where('status', 'Active'))->get()
+            ->first(fn ($e) => !Common::isHR($e)) ?? $this->markTestSkipped('No non-HR HOD.');
+        Passport::actingAs($hod->resortAdmin, [], 'api');   // passes check.rank:HR,GM,HOD,EXCOM; the method gate must refuse
+        $this->postJson('/api/accommodation/hr-maintenance-req-action', ['request_id' => 1, 'action' => 'Approved'])->assertForbidden();
+        $this->postJson('/api/employee-management/hr-employee-overview', [])->assertForbidden();
+    }
+
     public function test_reissued_credentials_must_be_changed_at_first_login()
     {
         $employee = Employee::where('status', 'Active')->where('employment_type', 'Full-Time')

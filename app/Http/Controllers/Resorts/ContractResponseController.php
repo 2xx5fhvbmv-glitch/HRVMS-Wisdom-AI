@@ -216,6 +216,11 @@ class ContractResponseController extends Controller
             ->where('email', $applicant->email)
             ->first();
 
+        if ($existingAdmin && (int) $existingAdmin->resort_id !== (int) $contract->resort_id) {
+            // Another resort's account: never delete, restore or re-password it from this resort's contract link.
+            \Log::warning('Contract accept: applicant email belongs to another resort', ['contract_id' => $contract->id, 'resort_admin_id' => $existingAdmin->id]);
+            return null;
+        }
         if ($existingAdmin) {
             $existingEmployee = Employee::withTrashed()->where('Admin_Parent_id', $existingAdmin->id)->first();
             if ($existingEmployee && !$existingEmployee->trashed()) {

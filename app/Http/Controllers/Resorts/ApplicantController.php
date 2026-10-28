@@ -93,7 +93,9 @@ class ApplicantController extends Controller
             }
         }
 
-        $get_vacancies = Vacancies::where('id', $v_id)->where('Resort_id', $resort_id)->first();
+        // Only the vacancy this link was issued for (child -> parent -> V_id); the v_id in the URL can be edited.
+        $linkVacancyId = \App\Models\TAnotificationParent::whereKey(\App\Models\TAnotificationChild::whereKey($ta_childid)->value('Parent_ta_id'))->value('V_id');
+        $get_vacancies = (int) $linkVacancyId === (int) $v_id ? Vacancies::where('id', $v_id)->where('Resort_id', $resort_id)->first() : null;
         if (!$get_vacancies) {
             return redirect()->back()->with('error', 'Application link not found.');
         }

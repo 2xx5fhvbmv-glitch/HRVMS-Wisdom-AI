@@ -41,7 +41,7 @@ class ClinicController extends Controller
         if (Auth::guard('api')->check()) {
             $this->user                             =   Auth::guard('api')->user();
             $this->resort_id                        =   $this->user->resort_id;
-        } elseif (Auth::guard('temp-clinic-doctor')->check()) {
+        } elseif (Auth::guard('temp-clinic-doctor')->check() && Auth::guard('temp-clinic-doctor')->user()->isActive()) { // expired contract = no actor
             $this->user                             =   Auth::guard('temp-clinic-doctor')->user();
             $this->resort_id                        =   $this->user->resort_id;
         }
@@ -394,7 +394,7 @@ class ClinicController extends Controller
             // clinic staff/doctor. Was scoped only by resort_id, so any
             // employee could view any other employee's appointment by
             // guessing the id.
-            $isClinicStaff = Auth::guard('temp-clinic-doctor')->check() || (int) ($this->user->GetEmployee->rank ?? 0) === 12;
+            $isClinicStaff = ($this->user instanceof \App\Models\TemporaryClinicDoctor && $this->user->can_view_appointments) || (int) ($this->user->GetEmployee->rank ?? 0) === 12;
             if (!$isClinicStaff && (int) $appointment->employee_id !== (int) $this->actorEmployeeId()) {
                 return response()->json(['success' => false, 'message' => 'Appointment not found'], 200);
             }
@@ -1095,7 +1095,7 @@ class ClinicController extends Controller
             // own treatment) as well as clinic staff/doctor (to view any
             // patient's) — was scoped only by resort_id, so any employee
             // could view any other employee's treatment by guessing the id.
-            $isClinicStaff = Auth::guard('temp-clinic-doctor')->check() || (int) ($this->user->GetEmployee->rank ?? 0) === 12;
+            $isClinicStaff = ($this->user instanceof \App\Models\TemporaryClinicDoctor && $this->user->can_manage_treatment) || (int) ($this->user->GetEmployee->rank ?? 0) === 12;
             if (!$isClinicStaff && (int) $treatmentData->employee_id !== (int) $this->actorEmployeeId()) {
                 return response()->json(['success' => false, 'message' => 'Treatment not found'], 200);
             }

@@ -38,6 +38,9 @@ class EmployeeManagementController extends Controller
         if (!$this->user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
+        if (!Common::hasFullDataAccess($this->user->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized: HR or GM only.'], 403);
+        }
        
         try {
             $employees                                  =   Employee::select([

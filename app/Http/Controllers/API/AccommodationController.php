@@ -1638,6 +1638,9 @@ class AccommodationController extends Controller
         if (!$this->user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
+        if (!Common::canWriteAccommodation($this->user->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized: HR access only.'], 403);
+        }
 
         $validator = Validator::make($request->all(), [
             'hod_id'                                            =>    'required',
@@ -2346,6 +2349,9 @@ class AccommodationController extends Controller
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!Common::canWriteAccommodation($this->user->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized: HR access only.'], 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -3188,6 +3194,9 @@ class AccommodationController extends Controller
     {
         if (!$this->user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!Common::canWriteAccommodation($this->user->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized: HR access only.'], 403);
         }
 
         $validator = Validator::make($request->all(), [
