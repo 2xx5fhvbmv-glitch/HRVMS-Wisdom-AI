@@ -29,6 +29,7 @@ class SitesettignsController extends Controller
 
     public function getCurrencyRates($resortId)
     {
+        $resortId = Auth::guard('resort-admin')->user()->resort_id;
         $settings = ResortSiteSettings::where('resort_id', $resortId)->first();
 
         // Per the FX-rate developer reference (May 2026):
@@ -48,12 +49,13 @@ class SitesettignsController extends Controller
 
     public function UpdateSiteSettings(Request $request)
     {
+        abort_unless(Common::checkRouteWisePermission('resort.sitesettings', config('settings.resort_permissions.edit')), 403);
 
 
 
         $signature_img = $request->signature_img;
         $footer_img = $request->footer_img;
-        $resort_id = $request->resort_id;
+        $resort_id = Auth::guard('resort-admin')->user()->resort_id; // never the posted id
         $currency = $request->currency;
 
         $validator = Validator::make($request->all(), [
@@ -244,7 +246,7 @@ class SitesettignsController extends Controller
 
            try{
 
-                $resource =    ResortSiteSettings::where('resort_id' , $request->resortid)->first();
+                $resource =    ResortSiteSettings::where('resort_id' , Auth::guard('resort-admin')->user()->resort_id)->first();
 
                 if(isset($resource))
                 {

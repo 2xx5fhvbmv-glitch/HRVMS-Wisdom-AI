@@ -147,6 +147,7 @@ class ResortInternalPermission extends Controller
 
     public function UpdateInternalPermissions(Request $request)
     {
+        abort_unless(\App\Helpers\Common::checkRouteWisePermission('resort.sitesettings', config('settings.resort_permissions.edit')), 403);
 
         DB::beginTransaction();
         try

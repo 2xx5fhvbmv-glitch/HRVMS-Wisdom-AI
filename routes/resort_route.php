@@ -2252,7 +2252,6 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
     Route::post('/people/compliance/anomaly-scan','People\Compliances\ComplianceController@runAnomalyScan')->name('people.compliance.anomalyScan');
     Route::get('/people/compliance/dismiss/{id?}','People\Compliances\ComplianceController@DismissCompliance')->name('people.compliances.dismiss');
     Route::get('/people/compliance/download','People\Compliances\ComplianceController@download')->name('people.compliance.download');
-    Route::get('/people/compliance/test','People\Compliances\ComplianceController@test')->name('people.compliance.test');
 
     Route::get('/people/Calendar', 'People\Compliances\ComplianceController@Calendar')->name('people.compliance.Calendar');
 

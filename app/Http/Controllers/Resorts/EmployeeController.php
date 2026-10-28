@@ -231,6 +231,7 @@ class EmployeeController extends Controller
     }
     public function ImportEmployee(Request $request)
     {
+        abort_unless(Common::checkRouteWisePermission('resort.masterimport.index', config('settings.resort_permissions.create')), 403);
         $validator = Validator::make($request->all(), [
             'Employeefile' => 'required|file|mimes:xls,xlsx', // Accept only Excel files up to 5MB
         ],[

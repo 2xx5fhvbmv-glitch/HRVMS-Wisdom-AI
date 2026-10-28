@@ -230,6 +230,11 @@ class EmployeeImport implements ToModel, WithHeadingRow
         ])->filter(fn($v) => !is_null($v) && trim((string) $v) !== '')->implode(', ');
 
         $existingResortAdmin = ResortAdmin::where('email', $row['email'])->first();
+        // A re-import may only update this resort's own staff accounts, never another resort's or a master admin.
+        if ($existingResortAdmin && ($existingResortAdmin->resort_id != $this->resort->resort_id || $existingResortAdmin->type === 'super' || $existingResortAdmin->is_master_admin)) {
+            $this->addError($excelRowNumber, $row, "Email '{$row['email']}' is already in use.");
+            return null;
+        }
 
         // License cap — resorts.no_of_users. Only rows that would CREATE
         // a new employee count; re-imports updating an existing employee

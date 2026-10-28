@@ -22,6 +22,7 @@ class EmailConfigController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless(Common::checkRouteWisePermission('resort.emailconfig.index', config('settings.resort_permissions.edit')), 403);
         $resort_id = Auth::guard('resort-admin')->user()->resort_id;
 
         $validator = Validator::make($request->all(), [
@@ -53,6 +54,7 @@ class EmailConfigController extends Controller
 
     public function test(Request $request)
     {
+        abort_unless(Common::checkRouteWisePermission('resort.emailconfig.index', config('settings.resort_permissions.edit')), 403);
         $resort_id = Auth::guard('resort-admin')->user()->resort_id;
 
         $validator = Validator::make($request->all(), [

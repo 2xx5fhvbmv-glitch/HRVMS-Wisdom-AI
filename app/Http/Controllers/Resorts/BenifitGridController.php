@@ -182,6 +182,7 @@ class BenifitGridController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless(Common::checkRouteWisePermission('resort.benifitgrid.index', config('settings.resort_permissions.create')), 403);
         try {
             DB::beginTransaction();
 
@@ -397,7 +398,7 @@ class BenifitGridController extends Controller
             $accomodation_type = AccommodationType::where('resort_id', $resort_id)->get();
 
             // Fetch the existing benefit grid record by ID
-            $benefit_grid = ResortBenifitGrid::findOrFail($id);
+            $benefit_grid = ResortBenifitGrid::where('resort_id', Auth::guard('resort-admin')->user()->resort_id)->findOrFail($id);
             $currentGradeName = optional(ResortBenefitGradeLevel::find($benefit_grid->emp_grade))->name ?? '';
             $currentGradeRanks = ResortBenefitGradeLevelRank::where('resort_id', $resort_id)
                 ->where('grade_level_id', $benefit_grid->emp_grade)
@@ -438,6 +439,7 @@ class BenifitGridController extends Controller
 
     public function update(Request $request, $id)
     {
+        abort_unless(Common::checkRouteWisePermission('resort.benifitgrid.index', config('settings.resort_permissions.edit')), 403);
         DB::beginTransaction(); // ✅ Begin transaction
         try {
             $resort_id = Auth::guard('resort-admin')->user()->resort_id;
@@ -718,7 +720,7 @@ class BenifitGridController extends Controller
 
     public function pdf($id){
         try{ 
-            $benefit_grid = ResortBenifitGrid::findOrFail($id);
+            $benefit_grid = ResortBenifitGrid::where('resort_id', Auth::guard('resort-admin')->user()->resort_id)->findOrFail($id);
             $sitesettings = ResortSiteSettings::where('resort_id', $benefit_grid->resort_id)->first(['resort_id','header_img','footer_img','Footer']);
             $ResortData = Resort::find($benefit_grid->resort_id);
             $resort_id = $ResortData->resort_id;
