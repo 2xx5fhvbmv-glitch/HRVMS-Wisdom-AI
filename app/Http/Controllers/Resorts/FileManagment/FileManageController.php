@@ -366,7 +366,7 @@ class FileManageController extends Controller
                 $id = $request->id;
                 $FolderFiles = $request->FolderFiles;
                 $FolderName = base64_decode($request->FolderName);
-                $My_file_key = env('ENCRYPTION_KEY');
+                $My_file_key = config('app.file_encryption_key');
                 $File_structure = FilemangementSystem::where('resort_id', $this->resort->resort_id)->where('id', $FolderName)->first();
                 if (!$File_structure) {
                     return response()->json(['success' => false, 'message' => 'Folder not found.'], 404);
@@ -425,7 +425,7 @@ class FileManageController extends Controller
         
                  
                         // AES-256-CBC Encryption setup
-                        $key = hash('sha256', env('ENCRYPTION_KEY'), true); // AES-256 key
+                        $key = hash('sha256', config('app.file_encryption_key'), true); // AES-256 key
                         $iv = random_bytes(16); // Generate IV (16 bytes for AES-256-CBC)
         
                         $dataToEncrypt = $fileContent;
@@ -1039,7 +1039,7 @@ class FileManageController extends Controller
                 return response()->json(['success' => false, 'message' => 'Only HR may generate a public share link for a file.'], 403);
             }
             try {
-                $key = hash('sha256', env('ENCRYPTION_KEY'), true);
+                $key = hash('sha256', config('app.file_encryption_key'), true);
                 $encryptedData = StorageHelper::disk()->get($File->File_Path);
                 if (empty($encryptedData) || strlen($encryptedData) < 16) {
                     throw new \Exception('Invalid or corrupted encrypted data');
@@ -1459,7 +1459,7 @@ class FileManageController extends Controller
                                 ], 422);
                             }
 
-                            $key = hash('sha256', env('ENCRYPTION_KEY'), true);
+                            $key = hash('sha256', config('app.file_encryption_key'), true);
                             $iv  = substr($rawData, 0, 16);
                             $cipherText = substr($rawData, 16);
 

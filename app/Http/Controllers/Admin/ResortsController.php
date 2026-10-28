@@ -302,7 +302,7 @@ class ResortsController extends Controller
           $resort->Support_SLA = $request->Support_SLA;
           $resort->Position_access = $request->Position_access;
           if (isset($request->logo)) {
-              $fileName = "brand_logo." . $request->logo->getClientOriginalExtension();
+              $fileName = "brand_logo." . Common::imageExtension($request->logo);
               Common::uploadFile($request->logo, $fileName, $path_logo);
               $resort->logo = $fileName;
           }
@@ -348,7 +348,7 @@ class ResortsController extends Controller
               $resortAdmin->must_change_password = false;
 
               if (isset($request->profile_picture)) {
-                  $fileName = $request->profile_picture->getClientOriginalName();
+                  $fileName = uniqid('resort_profile_') . '.' . Common::imageExtension($request->profile_picture);
                   Common::uploadFile($request->file('profile_picture'), $fileName, $path_profile_image);
                   $resortAdmin->profile_picture = $fileName;
               }
@@ -579,7 +579,7 @@ class ResortsController extends Controller
         $resort->Support_SLA = $request->Support_SLA;
         $resort->Position_access = $request->Position_access;
         if (isset($request->logo)) {
-            $fileName = "brand_logo." . $request->logo->getClientOriginalExtension();
+            $fileName = "brand_logo." . Common::imageExtension($request->logo);
             Common::uploadFile($request->logo, $fileName, $path_logo);
             $resort->logo = $fileName;
         }
@@ -604,7 +604,7 @@ class ResortsController extends Controller
             $resortAdmin->Position_access = $request->Position_access;
 
             if (isset($request->profile_picture)) {
-                $fileName = $request->profile_picture->getClientOriginalName();
+                $fileName = uniqid('resort_profile_') . '.' . Common::imageExtension($request->profile_picture);
                 Common::uploadFile($request->file('profile_picture'), $fileName, $path_profile_image);
                 $resortAdmin->profile_picture = $fileName;
             }

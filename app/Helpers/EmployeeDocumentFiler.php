@@ -93,7 +93,7 @@ class EmployeeDocumentFiler
 
             // AES-256-CBC — identical scheme to FileManageController / the
             // transfer-letter flow, so the file manager can decrypt it.
-            $key = hash('sha256', env('ENCRYPTION_KEY'), true);
+            $key = hash('sha256', config('app.file_encryption_key'), true);
             $iv  = random_bytes(16);
             $encrypted = $iv . openssl_encrypt($binary, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
 

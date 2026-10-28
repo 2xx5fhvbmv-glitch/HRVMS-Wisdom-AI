@@ -1977,7 +1977,7 @@ class TransferController extends Controller
             $path = $resortFolder . '/public/categorized/' . $folder->Folder_unique_id . '/' . $newFileName;
 
             // AES-256-CBC encryption — identical scheme to FileManageController.
-            $key = hash('sha256', env('ENCRYPTION_KEY'), true);
+            $key = hash('sha256', config('app.file_encryption_key'), true);
             $iv  = random_bytes(16);
             $encrypted = $iv . openssl_encrypt($pdfBinary, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
 

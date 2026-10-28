@@ -1100,7 +1100,7 @@ class XpactEmployeeController extends Controller
         if (isset($ChildFiles) && StorageHelper::disk()->exists($ChildFiles->File_Path))
         {
 
-            $key = hash('sha256', env('ENCRYPTION_KEY'), true);
+            $key = hash('sha256', config('app.file_encryption_key'), true);
             $encryptedData = StorageHelper::disk()->get($ChildFiles->File_Path);
             if (empty($encryptedData) || strlen($encryptedData) < 16) 
             {

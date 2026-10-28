@@ -63,6 +63,18 @@ class ResortPortalAccessTest extends TestCase
         $this->assertSame($other->currency, DB::table('resort_site_settings')->where('resort_id', $other->resort_id)->value('currency'));
     }
 
+    public function test_notifications_go_to_a_private_channel_per_resort()   // NV01
+    {
+        $this->assertSame(['private-resort-notifications.5', 'private-resort-notifications.7'],
+            array_map(fn ($c) => $c->name, \App\Events\ResortNotificationEvent::channelsFor('5, 7,5')));
+
+        $me = $this->staffWithoutTicks();
+        $other = DB::table('resorts')->where('id', '!=', $me->resort_id)->value('id');
+        $auth = fn ($rid) => $this->post('/broadcasting/auth', ['socket_id' => '1234.5678', 'channel_name' => 'private-resort-notifications.' . $rid]);
+        $auth($me->resort_id)->assertOk();
+        $auth($other)->assertForbidden();
+    }
+
     public function test_master_admin_still_passes_the_gates()
     {
         $master = ResortAdmin::where('type', 'super')->where('status', 'Active')->firstOrFail();

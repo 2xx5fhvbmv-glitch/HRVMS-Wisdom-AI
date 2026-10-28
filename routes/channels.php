@@ -40,6 +40,11 @@ Broadcast::channel('group.{group_id}', function ($user, $group_id) {
 // Presence roster only — join on login/foreground, leave on background.
 // Pusher's member_added/member_removed events on this channel ARE the
 // online-status list; no backend event/table needed for "who's online".
+// Resort notification cards (ResortNotificationEvent and siblings): each resort's own users only.
+Broadcast::channel('resort-notifications.{resortId}', function ($user, $resortId) {
+    return (int) $user->resort_id === (int) $resortId;
+}, ['guards' => ['resort-admin', 'api']]);
+
 Broadcast::channel('resort-online.{resort_id}', function ($user, $resort_id) {
     return (int) $user->resort_id === (int) $resort_id
         ? ['id' => $user->id, 'name' => $user->full_name]

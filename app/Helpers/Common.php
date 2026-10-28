@@ -701,6 +701,17 @@ class Common
 	}
 
 
+	/**
+	 * Extension for an uploaded image, read from its content (never the client's file name); anything that isn't a plain
+	 * image is refused. uploadFile() writes under public/, where nginx runs .php files.
+	 */
+	public static function imageExtension($file): string
+	{
+		$ext = strtolower((string) $file->guessExtension());
+		abort_unless(in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true), 422, 'Please upload a JPG, PNG, GIF or WEBP image.');
+		return $ext;
+	}
+
 	public static function uploadFile($file, $name, $path)
 	{
         // dd($file, $name, $path);
@@ -10091,7 +10102,7 @@ class Common
     //         $main_folder = $Resort->resort_id;
     //         ini_set('memory_limit', '-1');
     //         $file = $FolderFiles;
-    //         $My_file_key = env('ENCRYPTION_KEY');
+    //         $My_file_key = config('app.file_encryption_key');
 
     //         if (!$My_file_key)
     //         {
@@ -10994,7 +11005,7 @@ class Common
     //         $main_folder = $Resort->resort_id;
     //         ini_set('memory_limit', '-1');
     //         $file = $FolderFiles;
-    //         $My_file_key = env('ENCRYPTION_KEY');
+    //         $My_file_key = config('app.file_encryption_key');
 
     //         if (!$My_file_key)
     //         {

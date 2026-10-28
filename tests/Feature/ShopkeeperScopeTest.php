@@ -59,6 +59,15 @@ class ShopkeeperScopeTest extends TestCase
             'qr_code' => 'data:image/png;base64,AA'])->assertStatus(422)->assertJsonValidationErrors(['emp_id', 'product_id']);
     }
 
+    public function test_uploads_must_be_real_images()   // NV08: names come from content, a script can't land under public/
+    {
+        $this->assertSame('png', \App\Helpers\Common::imageExtension(\Illuminate\Http\UploadedFile::fake()->image('photo.png')));
+        $script = tempnam(sys_get_temp_dir(), 'probe');
+        file_put_contents($script, "<?php echo 1;\n");   // a real upload is typed by content (a fake one by its name)
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        \App\Helpers\Common::imageExtension(new \Illuminate\Http\UploadedFile($script, 'probe.png', null, null, true));
+    }
+
     public function test_mark_notification_only_touches_own_rows()
     {
         $foreign = DB::table('resort_notifications')->insertGetId(['resort_id' => $this->shop->resort_id, 'user_id' => 0, 'module' => 'People', 'type' => 1,

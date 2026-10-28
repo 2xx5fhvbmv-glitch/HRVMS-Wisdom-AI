@@ -32,7 +32,7 @@ class AdvanceSalaryNotificationEvent implements ShouldBroadcast
      */
     public function broadcastOn()
     {
-        return new Channel('Resortevent-channel');
+        return ResortNotificationEvent::channelsFor($this->html['resortid'] ?? '');
     }
 
      public function broadcastAs()

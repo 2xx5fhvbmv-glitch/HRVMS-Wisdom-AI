@@ -1079,7 +1079,7 @@
         });
 
         // === Real-time resort notifications via Laravel Echo / Pusher ===
-        // The server fires ResortNotificationEvent on the public 'Resortevent-channel'
+        // The server fires ResortNotificationEvent on this resort's private 'resort-notifications.{id}' channel
         // (broadcastAs: ResorteNotification-event). This subscriber routes each
         // notification to the right card by `type`. Guarded so it silently
         // no-ops if Echo isn't loaded (e.g. when BROADCAST_DRIVER=log).
@@ -1088,7 +1088,7 @@
             const RankOfResort     = '{{ isset(Auth::guard("resort-admin")->user()->GetEmployee) ? Auth::guard("resort-admin")->user()->GetEmployee->rank : "" }}';
             const Dept_id          = parseInt('{{ isset(Auth::guard("resort-admin")->user()->GetEmployee) ? Auth::guard("resort-admin")->user()->GetEmployee->Dept_id : "0" }}', 10);
 
-            window.Echo.channel('Resortevent-channel')
+            window.Echo.private('resort-notifications.' + ReciverResortId)
                 .listen('.ResorteNotification-event', function (data) {
                     if (!data || !data.html) return;
                     const htmlview            = data.html.html;

@@ -33,7 +33,18 @@ class ResortNotificationEvent implements ShouldBroadcast
      */
     public function broadcastOn()
     {
-         return new Channel('Resortevent-channel');
+        return self::channelsFor($this->html['resortid'] ?? '');
+    }
+
+    /**
+     * One private channel per resort named in the payload (admin fan-out sends a CSV of ids). routes/channels.php
+     * admits only that resort's own users; the old shared public channel let anyone with the Pusher key read every
+     * resort's notifications.
+     */
+    public static function channelsFor($resortIds): array
+    {
+        return collect(explode(',', (string) $resortIds))->map(fn ($id) => (int) trim($id))->filter()->unique()
+            ->map(fn ($id) => new \Illuminate\Broadcasting\PrivateChannel('resort-notifications.' . $id))->values()->all();
     }
     public function broadcastAs()
     {

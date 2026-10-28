@@ -183,7 +183,7 @@ class DashboardController extends Controller
 
             if ($request->file('profile_photo'))
             {
-                $fileName = $request->profile_photo->getClientOriginalName();
+                $fileName = uniqid('shopkeeper_') . '.' . Common::imageExtension($request->profile_photo);
                 Common::uploadFile($request->profile_photo, $fileName, $path_profile_image);
                 if (File::exists(public_path($path_profile_image.'/'.$shopkeeper->profile_photo)))
                 {

@@ -56,7 +56,7 @@ class AdminController extends Controller
           }
         }
 
-        $imgName = "admin_profile_".$admin->id."_" . date('mdYHis') . uniqid() . "." . $request->profile_picture->getClientOriginalExtension();
+        $imgName = "admin_profile_".$admin->id."_" . date('mdYHis') . uniqid() . "." . Common::imageExtension($request->profile_picture);
 
         if( !File::isDirectory($path) ) {
           Common::makeDiractory($path);

@@ -30,7 +30,7 @@ class NotificationEvent implements ShouldBroadcast
 
     public function broadcastOn()
     {
-        return new Channel('Resortevent-channel');
+        return ResortNotificationEvent::channelsFor($this->resort_id);
     }
 
     public function broadcastAs()
