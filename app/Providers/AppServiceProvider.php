@@ -37,6 +37,9 @@ class AppServiceProvider extends ServiceProvider
         // Demo ENV: the demo resort's email only ever reaches the demo inbox (no-op unless DEMO_MODE).
         \Illuminate\Support\Facades\Event::listen(\Illuminate\Mail\Events\MessageSending::class, [\App\Support\Demo\DemoMail::class, 'redirect']);
         \Illuminate\Support\Facades\Queue::before(fn () => \App\Support\Demo\DemoMail::reset());
+        // AuthenticateSession keys the stored password hash by guard, not user: drop it on every login so a new user in
+        // the same session (re-login, switching impersonated resort) isn't compared with the previous user's hash.
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Login::class, fn ($e) => session()->forget('password_hash_' . $e->guard));
         Schema::defaultStringLength(191);
 
         // Leader master dashboard: adds $leader (and GM's missing cards) without touching the

@@ -31,6 +31,8 @@ class ResortLoginController extends Controller
     public function logout()
     {
       Auth::guard('resort-admin')->logout();
+      session()->invalidate(); // nothing of this user's session (e.g. Wisdom chat history) survives for the next one
+      session()->regenerateToken();
       return redirect()->route('resort.loginindex');
     }
 

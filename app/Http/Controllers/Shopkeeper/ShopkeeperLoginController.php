@@ -28,6 +28,8 @@ class ShopkeeperLoginController extends Controller
     public function logout()
     {
       Auth::guard('shopkeeper')->logout();
+      session()->invalidate(); // nothing of this user's session (e.g. Wisdom chat history) survives for the next one
+      session()->regenerateToken();
       return redirect()->route('shopkeeper.loginindex');
     }
 

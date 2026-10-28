@@ -95,6 +95,8 @@ class ResortSetupAccessTest extends TestCase
         $hold = route('resort.accommodation.HoldMaintanaceRequest');
         // Only the accommodation HR gate is under test here, not per-position page grants.
         $this->withoutMiddleware(\App\Http\Middleware\CheckResortPermission::class);
+        // Users are switched with actingAs (no login), so the session's stored password hash isn't under test either.
+        $this->withoutMiddleware(\Illuminate\Session\Middleware\AuthenticateSession::class);
 
         // HR Director: EXCOM level (rank 1) in Human Resources, HR role in main_rank.
         $this->actingAs($person('HUMAN RESOURCES', 1, 3), 'resort-admin');

@@ -29,7 +29,8 @@ class LoginController extends Controller
   public function logout(Request $request)
   {
     Auth::guard('admin')->logout();
-    $request->session()->forget(['admin_last_activity', 'admin_reauth_at', 'admin_2fa_pending']);
+    $request->session()->invalidate(); // also ends a resort impersonation started from this session
+    $request->session()->regenerateToken();
     return redirect()->route('admin.loginindex');
   }
 

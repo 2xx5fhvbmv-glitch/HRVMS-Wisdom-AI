@@ -83,6 +83,7 @@ class SecurityAuditLeaveAccessTest extends TestCase
     private function web(Employee $e)
     {
         $this->app['auth']->forgetGuards();
+        $this->withoutMiddleware(\Illuminate\Session\Middleware\AuthenticateSession::class); // users switch via actingAs, not a login
         return $this->withServerVariables(['HTTPS' => 'on'])->actingAs($this->admin($e), 'resort-admin');
     }
 
