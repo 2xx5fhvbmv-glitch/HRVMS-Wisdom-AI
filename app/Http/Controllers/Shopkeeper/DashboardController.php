@@ -218,9 +218,6 @@ class DashboardController extends Controller
             'deduction_amt'  => 'required|numeric|min:0',
         ]);
 
-        $payment = Payment::where('id', $request->paymentID)
-            ->where('shopkeeper_id', $this->shopkeeper->id)
-            ->firstOrFail();
         $cutoff_day = PayrollConfig::where('resort_id', $this->shopkeeper->resort_id)->value('cutoff_day');
         $current_day = now()->day; // Get current day (1-31)
 
@@ -228,16 +225,24 @@ class DashboardController extends Controller
             return response()->json(['error' => 'Manual deduction is not allowed after the cutoff date.'], 403);
         }
 
-        // Deduct amount and update payment status
-        $payment->cash_paid  = $request->deduction_amt;
-        if ($payment->cash_paid + $payment->payroll_deducted >= $payment->price) {
-            $payment->status = 'Paid';
-        } else {
-            $payment->status = 'Partial Paid';
-        }
-        $payment->save();
+        // Cash only on an employee-approved purchase, added to what was already paid and never above the outstanding
+        // balance: payroll deducts any Consented/Partial Paid balance, so the status must not be set without consent.
+        return DB::transaction(function () use ($request) {
+            $payment = Payment::where('id', $request->paymentID)
+                ->where('shopkeeper_id', $this->shopkeeper->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $outstanding = $payment->price - $payment->cash_paid - $payment->payroll_deducted;
+            if (!in_array($payment->status, ['Consented', 'Partial Paid'], true) || $request->deduction_amt <= 0 || $request->deduction_amt > $outstanding) {
+                return response()->json(['error' => 'Cash can only be recorded on a consented purchase, up to its outstanding amount.'], 422);
+            }
 
-        return response()->json(['success' => 'Cash payment recorded.']);
+            $payment->cash_paid += $request->deduction_amt;
+            $payment->status = $payment->cash_paid + $payment->payroll_deducted >= $payment->price ? 'Paid' : 'Partial Paid';
+            $payment->save();
+
+            return response()->json(['success' => 'Cash payment recorded.']);
+        });
     }
 
     /**
@@ -291,6 +296,9 @@ class DashboardController extends Controller
     {
         DB::table('resort_notifications')
             ->where('id', $request->id)
+            ->where('resort_id', $this->shopkeeper->resort_id)
+            ->where('user_id', $this->shopkeeper->id)
+            ->where('module', 'Staff Shop')
             ->update(['status' => 'read']);
 
         return response()->json(['success' => true]);

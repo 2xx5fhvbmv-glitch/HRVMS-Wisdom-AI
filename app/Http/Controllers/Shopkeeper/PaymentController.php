@@ -3,6 +3,7 @@ namespace App\Http\Controllers\Shopkeeper;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -198,7 +199,7 @@ class PaymentController extends Controller
 
     public function getEmpDetails($id)
     {
-        $employee = Employee::with('resortAdmin')->find($id);
+        $employee = Employee::with('resortAdmin')->where('resort_id', $this->shopkeeper->resort_id)->find($id);
 
         if (!$employee) {
             return response()->json(['error' => 'Employee not found'], 404);
@@ -220,10 +221,10 @@ class PaymentController extends Controller
     {
         $shopkeeper = $this->shopkeeper;
         $request->validate([
-            'emp_id' => 'required|exists:employees,id',
-            'product_id' => 'required|exists:products,id',
+            'emp_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $shopkeeper->resort_id)],
+            'product_id' => ['required', Rule::exists('products', 'id')->where('shopkeeper_id', $shopkeeper->id)],
             'quantity' => 'required|integer|min:1',
-            'price' => 'required',
+            'price' => 'required|numeric|min:0',
             'qr_code' => ['required', 'regex:/^data:image\/(png|jpeg|jpg);base64,/',], // Validate QR code as base64 string
         ]);
 
@@ -319,7 +320,7 @@ class PaymentController extends Controller
 
     public function getProductPrice(Request $request)
     {
-        $product = Product::find($request->product_id);
+        $product = Product::where('shopkeeper_id', $this->shopkeeper->id)->find($request->product_id);
 
         if (!$product) {
             return response()->json(['success' => false, 'message' => 'Product not found']);

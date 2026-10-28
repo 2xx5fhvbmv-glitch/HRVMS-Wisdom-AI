@@ -229,7 +229,7 @@ class ConfigurationController extends Controller
             'currency_type' => 'required|in:USD,MVR',
         ]);
 
-        $product = Product::findOrFail($id);
+        $product = Product::where('shopkeeper_id', $this->shopkeeper->id)->findOrFail($id);
         $product->name = $request->name;
         $product->price = $request->price;
         $product->currency_type = $request->currency_type;
