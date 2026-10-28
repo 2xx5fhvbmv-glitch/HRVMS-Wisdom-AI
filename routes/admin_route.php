@@ -73,7 +73,7 @@ Route::prefix(config('settings.route_prefix.admin'))->namespace('Admin')->group(
         Route::get('/profile/edit', 'AdminController@profile')->name('admin.profile');
         Route::post('/profile/update', 'AdminController@profileUpdate')->name('admin.updateProfile');
         Route::post('/change-password', 'AdminController@changePassword')->name('admin.changePassword');
-        Route::post('/check-password', 'AdminController@checkPassword')->name('admin.checkPassword');
+        Route::post('/check-password', 'AdminController@checkPassword')->middleware('throttle:admin-login')->name('admin.checkPassword');
 
         /**Role Module **/
         Route::get('/roles', 'RolePermissionController@index')->name('admin.role.index');

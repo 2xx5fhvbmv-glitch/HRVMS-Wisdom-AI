@@ -9,59 +9,47 @@ use Illuminate\Support\Str;
 
 class CheckAdminModuleAccess
 {
+    /** First path segment (inside the admin prefix) => key in config('settings.admin_modules'). */
+    private const MODULES = [
+        'admins' => 'admin_users', 'settings' => 'settings', 'roles' => 'roles_permissions', 'email-templates' => 'email_templates',
+        'resorts' => 'resorts', 'resort' => 'resorts', 'get-positions-by-department' => 'resorts',
+        'divisions' => 'divisions', 'department' => 'departments', 'sections' => 'sections', 'positions' => 'positions',
+        'notifications' => 'notifications', 'modules' => 'modules', 'module-pages' => 'Pages', 'public_holidays' => 'public_holidays',
+        'ewt_brackets' => 'ewt_brackets', 'support-categories' => 'support_categories', 'supports' => 'supports',
+    ];
+
+    /** The caller's own account (AdminController scopes these to the signed-in admin), and controllers with their own checks. */
+    private const OPEN = ['profile', 'change-password', 'check-password', 'resort-data-setup', 'demo-env'];
+
     public function handle($request, Closure $next)
     {
-        
-        if(Auth::guard('admin')->check() && Auth::guard('admin')->user()->role_id != 0 && request()->route()->getPrefix() == config('settings.route_prefix.admin'))
+        $admin = Auth::guard('admin')->user();
+        if ($admin && $admin->type !== 'super' && request()->route()->getPrefix() == config('settings.route_prefix.admin'))
         {
-            
-            $url = $request->url();
-            $dashboardRoute = Common::getDashboardLink();
-        
-            /*** Check role vise module access ***/
-            if(Str::contains($url, 'admins')) {
-                $moduleId = config('settings.admin_modules.admin_users');                
-            } else if(Str::contains($url, 'settings')) {
-                $moduleId = config('settings.admin_modules.settings');
-            } else if(Str::contains($url, 'roles')) {
-                $moduleId = config('settings.admin_modules.roles_permissions');     
-            } else if(Str::contains($url, 'email-templates')) {
-                $moduleId = config('settings.admin_modules.email_templates');
-            } else if(Str::contains($url, 'clients')) {
-                $moduleId = config('settings.admin_modules.clients');
-            } else if(Str::contains($url, 'manufacturer')) {
-                $moduleId = config('settings.admin_modules.manufacturers');
-            } else if(Str::contains($url, 'oils')) {
-                $moduleId = config('settings.admin_modules.oils');
-            } else if(Str::contains($url, 'transformer_ratings')) {
-                $moduleId = config('settings.admin_modules.transformer_ratings');
-            } else if(Str::contains($url, 'tests_tobe_done')) {
-                $moduleId = config('settings.admin_modules.test_tobe_done');
-            } else if(Str::contains($url, 'sample_details')) {
-                $moduleId = config('settings.admin_modules.sample_details');
-            } else if(Str::contains($url, 'sample_vessel')) {
-                $moduleId = config('settings.admin_modules.sample_vessel');
-            } else if(Str::contains($url, 'employees')) {
-                $moduleId = config('settings.admin_modules.employees');
-            } else {
+            // Match on the path inside the admin prefix, never the full URL (host or prefix could contain a module word).
+            $path = Str::after($request->path(), trim(config('settings.route_prefix.admin'), '/') . '/');
+            $seg = array_values(array_diff(explode('/', $path), ['admin'])); // "/admin/supports/view/1" -> supports
+            $key = ($seg[0] ?? '') === 'admins' && in_array($seg[1] ?? '', ['modules', 'module-pages'], true) ? $seg[1] : ($seg[0] ?? '');
+
+            if (in_array($key, self::OPEN, true) || $request->routeIs('admin.supports.counts')) {
                 return $next($request);
             }
-         
-            if(Str::contains($url, 'create') || Str::contains($url, 'save') || Str::contains($url, 'store')) {
-                $permissionId = config('settings.permissions.create');
-            } else if(Str::contains($url, 'edit') || Str::contains($url, 'update') || Str::contains($url, 'active') || Str::contains($url, 'inactive')  || Str::contains($url, 'block') ) {
-                $permissionId = config('settings.permissions.edit');  
-            } else if(Str::contains($url, 'delete') || Str::contains($url, 'destroy')) {
-                $permissionId = config('settings.permissions.delete');   
-            } else {                
-                $permissionId = config('settings.permissions.view');  
-            }
-            
-            // dd($moduleId,$permissionId);
+            $moduleId = isset(self::MODULES[$key]) ? config('settings.admin_modules.' . self::MODULES[$key]) : null;
 
-            $accessible = Common::hasPermission($moduleId,$permissionId);
-            
-            if(!$accessible) {
+            // Whole words only: "restore" is not "store", "massremove" is a delete.
+            $is = fn ($words) => preg_match('#(^|[/_-])(' . $words . ')([/_-]|$)#', $path);
+            if ($is('create|save|store|import')) {
+                $permissionId = config('settings.permissions.create');
+            } else if ($is('delete|destroy|remove|massremove')) {
+                $permissionId = config('settings.permissions.delete');
+            } else if ($is('edit|update|active|inactive|block|restore|assign|send|reply')) {
+                $permissionId = config('settings.permissions.edit');
+            } else {
+                $permissionId = config('settings.permissions.view');
+            }
+
+            // Unknown module = denied, not allowed.
+            if (!$moduleId || !Common::hasPermission($moduleId, $permissionId)) {
                 return redirect(route('admin.permission.denied'))->withErrors([__('messages.nopermission')]);
             }
         }

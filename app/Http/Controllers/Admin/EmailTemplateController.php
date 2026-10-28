@@ -50,7 +50,7 @@ class EmailTemplateController extends Controller
         }
        
       })
-      ->escapeColumns([])
+      ->rawColumns(['updated_at', 'action']) // only the HTML built here; stored text (names) stays escaped
       ->make(true);
     } catch( \Exception $e ) {
       \Log::emergency( "File: ".$e->getFile() );

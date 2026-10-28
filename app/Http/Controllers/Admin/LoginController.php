@@ -77,8 +77,6 @@ class LoginController extends Controller
         return response()->json($response);
       }
 
-      Common::registerSuccessfulLogin($admin);
-
       // MFA (decision A1): an enrolled account only gets a pending marker
       // here — the guard login happens after TwoFactorController::verify().
       if ($admin->two_factor_confirmed_at) {
@@ -90,6 +88,8 @@ class LoginController extends Controller
         return response()->json($response);
       }
 
+      // Only now, or after verify()/passkey login: resetting the counter at the password step let MFA guesses go on forever.
+      Common::registerSuccessfulLogin($admin);
       self::completeLogin($request, $admin);
 
       // Security hardening (S4): a freshly-created admin account is
@@ -158,6 +158,7 @@ class LoginController extends Controller
 
   public function AdminToResort(Request $request)
   {
+      abort_unless(Common::hasPermission(config('settings.admin_modules.resorts'), config('settings.permissions.edit')), 403);
       $resort_id = $request->resort_id;
       try {
         // Find active resort admin

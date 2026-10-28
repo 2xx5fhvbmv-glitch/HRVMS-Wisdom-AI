@@ -40,8 +40,9 @@ class AdminController extends Controller
   public function profileUpdate( Request $request )
   {
     try {
-      $input = $request->except('_token','img_path');
-      $admin = Admin::where( "id", $request->id )->first();
+      // Own row only, and only profile fields: never type, role_id, status or password from this form.
+      $admin = Auth::guard('admin')->user();
+      $input = $request->only(['first_name', 'middle_name', 'last_name', 'email', 'home_phone', 'cell_phone', 'address', 'notes']);
 
       if( isset( $request->profile_picture ) ) {
         $path = config('settings.admin_folder');
@@ -154,7 +155,7 @@ class AdminController extends Controller
                   $actions .= '</div>';
                   return $actions;
               })
-              ->escapeColumns([]) // Allow HTML
+              ->rawColumns(['checkbox', 'status', 'action']) // only the HTML built here; stored text (names) stays escaped
               ->setTotalRecords($total)
               ->make(true);
 
@@ -213,6 +214,9 @@ class AdminController extends Controller
   {
     try {
       $input = $request->except(['_token']);
+      if (Auth::guard('admin')->user()->type !== 'super') {
+        $input['type'] = 'sub';
+      }
 
       $input['password'] = bcrypt($input['password']);
       $input['status'] = 'active';
@@ -294,13 +298,30 @@ class AdminController extends Controller
     }
   }
 
+  /**
+   * Target of an edit/status change from the Admin Users screen. Admin id 1 is never changed here (edit() already
+   * hides it); a non-super admin can't change a super admin, nor their own status. Called outside each method's
+   * try/catch, which would otherwise swallow the 403.
+   */
+  private function editableAdmin($id, bool $statusChange = false): Admin
+  {
+    $caller = Auth::guard('admin')->user();
+    $target = Admin::findOrFail($id);
+    abort_if($target->id == 1 || ($caller->type !== 'super' && ($target->type === 'super' || ($statusChange && $target->id == $caller->id))), 403);
+    return $target;
+  }
+
   public function update(Request $request, $id)
   {
+    $admin = $this->editableAdmin($id);
     try {
-      $input = $request->except(['_token']);
-      $admin = Admin::where('id', $id)->first();
-
-      $input['password'] = (isset($input['password']) && !empty($input['password'])) ? bcrypt($input['password']) : $admin->password;
+      $input = $request->only(['first_name', 'middle_name', 'last_name', 'email', 'role_id']);
+      if (Auth::guard('admin')->user()->type === 'super') {
+        $input += $request->only(['type']);
+      }
+      if ($request->filled('password')) {
+        $input['password'] = bcrypt($request->password);
+      }
 
       $admin->update($input);
 
@@ -322,13 +343,9 @@ class AdminController extends Controller
   public function checkPassword(Request $request)
   {
     try {
-      $admin = Admin::where( 'id', $request->id )->first();
+      $admin = Auth::guard('admin')->user();
 
-      if( Hash::check( $request->old_pass, $admin->password ) ) {
-        echo "true";
-      } else {
-        echo "false";
-      }
+      return Hash::check( $request->old_pass, $admin->password ) ? 'true' : 'false';
     } catch( \Exception $e ) {
       \Log::emergency( "File: ".$e->getFile() );
       \Log::emergency( "Line: ".$e->getLine() );
@@ -360,8 +377,8 @@ class AdminController extends Controller
 
   public function block($id)
   {
+    $data = $this->editableAdmin($id, true);
     try {
-      $data = Admin::where('id',$id)->first();
       $data->status ='inactive';
       $data->save();
 
@@ -379,8 +396,8 @@ class AdminController extends Controller
 
   public function active($id)
   {
+    $data = $this->editableAdmin($id, true);
     try {
-      $data = Admin::where('id',$id)->first();
       $data->status ='active';
       $data->save();
 

@@ -149,7 +149,7 @@ class TwoFactorController extends Controller
     /** TOTP (single-use within its window) or a single-use recovery code. */
     private function checkSecondFactor(Admin $admin, string $code): bool
     {
-        $code = trim($code);
+        $code = preg_replace('/\s+/', '', $code);
         if ($admin->two_factor_secret && Totp::verify($admin->two_factor_secret, $code)) {
             return Cache::add('admin_totp_used:' . $admin->id . ':' . $code, 1, 120);
         }

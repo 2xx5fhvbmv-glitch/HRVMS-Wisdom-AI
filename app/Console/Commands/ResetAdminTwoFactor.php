@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Helpers\Common;
 use App\Models\Admin;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Super-admin MFA recovery path of last resort (lost device + lost recovery
@@ -30,6 +31,7 @@ class ResetAdminTwoFactor extends Command
         $admin->failed_login_attempts = 0;
         $admin->locked_until = null;
         $admin->save();
+        DB::table('admin_passkeys')->where('admin_id', $admin->id)->delete();
 
         Common::alertSuperAdmins($admin, 'Super-admin MFA reset', 'MFA was reset from the server console for ' . $admin->email . '. If this wasn\'t planned, investigate immediately.');
         $this->info('MFA cleared for ' . $admin->email . '. They will be asked to enrol at next sign-in.');

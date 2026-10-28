@@ -62,7 +62,7 @@ class RolePermissionController extends Controller
 
       return $action_links;
     })
-    ->escapeColumns([])
+    ->rawColumns(['checkbox', 'status', 'action']) // only the HTML built here; stored text (names) stays escaped
     ->make(true);
   }
 

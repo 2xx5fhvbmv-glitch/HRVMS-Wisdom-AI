@@ -117,7 +117,7 @@ class ResortsController extends Controller
               return $action_links;
           })
 
-          ->escapeColumns([]) // Allow HTML rendering in all columns
+          ->rawColumns(['checkbox', 'status', 'payment_status', 'action']) // only the HTML built here; stored text (names) stays escaped
           ->make(true);
   }
 
@@ -160,7 +160,7 @@ class ResortsController extends Controller
 
       return $action_links;
     })
-    ->escapeColumns([])
+    ->rawColumns(['checkbox', 'status', 'payment_status', 'action']) // only the HTML built here; stored text (names) stays escaped
     ->make(true);
   }
 

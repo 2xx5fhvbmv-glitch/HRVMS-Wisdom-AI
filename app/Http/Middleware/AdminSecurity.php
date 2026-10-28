@@ -23,8 +23,9 @@ class AdminSecurity
     /** Reachable before MFA enrolment: enrolment itself, logout, and the must_change_password flow (ForcePasswordChange runs first). */
     private const ALLOWED_BEFORE_MFA = ['admin.2fa.setup', 'admin.2fa.confirm', 'admin.logout', 'admin.profile', 'admin.changePassword', 'admin.checkPassword'];
 
-    /** GET routes that change state (legacy) — audited like POST/DELETE. */
-    private const STATE_CHANGING_GETS = ['admin.inactive', 'admin.active', 'admin.block', 'admin.massremove', 'endImpersonation', 'admin.logout'];
+    /** GET routes that change state (legacy): block/active/massremove... by URI, plus these names. Audited like POST/DELETE. */
+    private const STATE_CHANGING_GET_URI = '#(^|/)(massremove|mass-remove|block|active|inactive|restore|destroy|delete)(/|$)#';
+    private const STATE_CHANGING_GETS = ['endImpersonation', 'admin.logout'];
 
     private const REDACT = ['password', 'password_confirmation', 'current_password', 'new_password', 'confirm_password', 'code', '_token'];
 
@@ -55,9 +56,18 @@ class AdminSecurity
                 : redirect()->route('admin.2fa.setup');
         }
 
+        // These GETs carry no CSRF token, so only accept them from this site's own pages (Fetch Metadata, else Referer).
+        $stateGet = $request->isMethod('GET') && preg_match(self::STATE_CHANGING_GET_URI, (string) $request->route()?->uri());
+        if ($stateGet) {
+            $site = $request->header('Sec-Fetch-Site');
+            $sameSite = $site ? in_array($site, ['same-origin', 'none'], true)
+                : parse_url((string) $request->header('Referer'), PHP_URL_HOST) === $request->getHost();
+            abort_unless($sameSite, 403);
+        }
+
         $response = $next($request);
 
-        if (!$request->isMethod('GET') || in_array($routeName, self::STATE_CHANGING_GETS, true)) {
+        if (!$request->isMethod('GET') || $stateGet || in_array($routeName, self::STATE_CHANGING_GETS, true)) {
             try {
                 DB::table('admin_audit_logs')->insert([
                     'admin_id'    => $admin->id,
@@ -65,7 +75,7 @@ class AdminSecurity
                     'method'      => $request->method(),
                     'route_name'  => $routeName,
                     'url'         => substr($request->fullUrl(), 0, 2048),
-                    'payload'     => substr(json_encode($request->except(self::REDACT)) ?: '{}', 0, 60000),
+                    'payload'     => substr(json_encode(array_filter($request->except(self::REDACT), fn ($k) => !preg_match('/pass|secret|token/i', $k), ARRAY_FILTER_USE_KEY)) ?: '{}', 0, 60000),
                     'status_code' => $response->getStatusCode(),
                     'ip_address'  => $request->ip(),
                     'user_agent'  => substr((string) $request->userAgent(), 0, 255),
