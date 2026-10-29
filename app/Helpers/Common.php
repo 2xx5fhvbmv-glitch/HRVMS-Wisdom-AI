@@ -13520,27 +13520,6 @@ class Common
      */
     public static function calculateOvertimeEntries($checkInTime, $checkOutTime, $shiftStartTime, $shiftEndTime, $date, $breakData = [], $expectedOvertime = '00:00')
     {
-        // #region agent log
-        $logFile = 'c:\wamp64\www\Wisdom-Ai\HRVMS-Wisdom-AI\.cursor\debug.log';
-        $logEntry = json_encode([
-            'sessionId' => 'debug-session',
-            'runId' => 'run1',
-            'hypothesisId' => 'A',
-            'location' => 'Common.php:calculateOvertimeEntries:ENTRY',
-            'message' => 'Function entry with parameters',
-            'data' => [
-                'checkInTime' => $checkInTime,
-                'checkOutTime' => $checkOutTime,
-                'shiftStartTime' => $shiftStartTime,
-                'shiftEndTime' => $shiftEndTime,
-                'date' => $date,
-                'expectedOvertime' => $expectedOvertime,
-                'breakDataCount' => is_array($breakData) ? count($breakData) : (is_object($breakData) ? count((array)$breakData) : 0)
-            ],
-            'timestamp' => round(microtime(true) * 1000)
-        ]) . "\n";
-        @file_put_contents($logFile, $logEntry, FILE_APPEND);
-        // #endregion
 
         $overtimeEntries = [];
 
@@ -13625,28 +13604,6 @@ class Common
             $actualWorkMinutes = 0;
         }
 
-        // #region agent log
-        $logEntry = json_encode([
-            'sessionId' => 'debug-session',
-            'runId' => 'run1',
-            'hypothesisId' => 'A,B',
-            'location' => 'Common.php:calculateOvertimeEntries:CALCULATIONS',
-            'message' => 'Time calculations before overtime logic',
-            'data' => [
-                'shiftDurationMinutes' => $shiftDurationMinutes,
-                'totalBreakMinutes' => $totalBreakMinutes,
-                'actualWorkMinutes' => $actualWorkMinutes,
-                'normalShiftMinutes' => $shiftDurationMinutes,
-                'expectedOvertimeMinutes' => $expectedOvertimeMinutes,
-                'checkInDateTime' => $checkInDateTime->format('Y-m-d H:i:s'),
-                'checkOutDateTime' => $checkOutDateTime->format('Y-m-d H:i:s'),
-                'shiftStartDateTime' => $shiftStartDateTime->format('Y-m-d H:i:s'),
-                'shiftEndDateTime' => $shiftEndDateTime->format('Y-m-d H:i:s')
-            ],
-            'timestamp' => round(microtime(true) * 1000)
-        ]) . "\n";
-        @file_put_contents($logFile, $logEntry, FILE_APPEND);
-        // #endregion
 
         // Calculate normal shift time (shift end - shift start)
         $normalShiftMinutes = $shiftDurationMinutes;
@@ -13657,23 +13614,6 @@ class Common
         if ($checkInDateTime->lt($shiftStartDateTime)) {
             // Case 1: Work entirely before shift (check-out before or at shift start)
             if ($checkOutDateTime->lte($shiftStartDateTime)) {
-                // #region agent log
-                $logEntry = json_encode([
-                    'sessionId' => 'debug-session',
-                    'runId' => 'run1',
-                    'hypothesisId' => 'BEFORE_SHIFT',
-                    'location' => 'Common.php:calculateOvertimeEntries:WORK_BEFORE_SHIFT',
-                    'message' => 'Work entirely before shift detected',
-                    'data' => [
-                        'checkInTime' => $checkInDateTime->format('H:i'),
-                        'checkOutTime' => $checkOutDateTime->format('H:i'),
-                        'shiftStartTime' => $shiftStartDateTime->format('H:i'),
-                        'actualWorkMinutes' => $actualWorkMinutes
-                    ],
-                    'timestamp' => round(microtime(true) * 1000)
-                ]) . "\n";
-                @file_put_contents($logFile, $logEntry, FILE_APPEND);
-                // #endregion
 
                 // All work time is overtime before shift
                 $overtimeBeforeStart = $actualWorkMinutes;
@@ -13789,41 +13729,9 @@ class Common
         // BUT only if work extends into the shift (check-out is after shift start)
         // AND work entirely before shift was NOT already handled
         // Work entirely before shift is handled in SCENARIO 1 Case 1
-        // #region agent log
-        $logEntry = json_encode([
-            'sessionId' => 'debug-session',
-            'runId' => 'run1',
-            'hypothesisId' => 'C',
-            'location' => 'Common.php:calculateOvertimeEntries:SCENARIO3_CHECK',
-            'message' => 'SCENARIO 3 guard check',
-            'data' => [
-                'workEntirelyBeforeShift' => $workEntirelyBeforeShift,
-                'checkOutLtShiftEnd' => $checkOutDateTime->lt($shiftEndDateTime),
-                'checkOutGtShiftStart' => $checkOutDateTime->gt($shiftStartDateTime),
-                'checkInLtShiftStart' => $checkInDateTime->lt($shiftStartDateTime)
-            ],
-            'timestamp' => round(microtime(true) * 1000)
-        ]) . "\n";
-        @file_put_contents($logFile, $logEntry, FILE_APPEND);
-        // #endregion
 
         if (!$workEntirelyBeforeShift) {
             if ($checkOutDateTime->lt($shiftEndDateTime) && $checkOutDateTime->gt($shiftStartDateTime) && $checkInDateTime->lt($shiftStartDateTime)) {
-            // #region agent log
-            $logEntry = json_encode([
-                'sessionId' => 'debug-session',
-                'runId' => 'run1',
-                'hypothesisId' => 'C',
-                'location' => 'Common.php:calculateOvertimeEntries:SCENARIO3_ENTRY',
-                'message' => 'Early check-out scenario detected',
-                'data' => [
-                    'checkOutBeforeShiftEnd' => true,
-                    'checkInBeforeShiftStart' => true
-                ],
-                'timestamp' => round(microtime(true) * 1000)
-            ]) . "\n";
-            @file_put_contents($logFile, $logEntry, FILE_APPEND);
-            // #endregion
 
             // Calculate total time worked (check-out - check-in - breaks)
             $totalTimeWorked = (int) $checkInDateTime->diffInMinutes($checkOutDateTime, true) - $totalBreakMinutes;
@@ -13837,21 +13745,6 @@ class Common
             // If total time worked is less than normal shift, no overtime before shift
             // The time before shift is just part of normal attendance to make up for early check-out
             if ($totalTimeWorked < $normalShiftMinutes) {
-                // #region agent log
-                $logEntry = json_encode([
-                    'sessionId' => 'debug-session',
-                    'runId' => 'run1',
-                    'hypothesisId' => 'C',
-                    'location' => 'Common.php:calculateOvertimeEntries:SCENARIO3_NO_OT',
-                    'message' => 'No overtime - total worked less than normal shift',
-                    'data' => [
-                        'totalTimeWorked' => $totalTimeWorked,
-                        'normalShiftMinutes' => $normalShiftMinutes
-                    ],
-                    'timestamp' => round(microtime(true) * 1000)
-                ]) . "\n";
-                @file_put_contents($logFile, $logEntry, FILE_APPEND);
-                // #endregion
 
                 // Remove any before_shift overtime entries we might have added
                 $overtimeEntries = array_filter($overtimeEntries, function($entry) {
@@ -13869,24 +13762,6 @@ class Common
                 // Time before shift = 2 hours, so overtime = min(2, 1) = 1 hour
                 $actualOvertimeBefore = min($overtimeBeforeStart, $excessTime);
 
-                // #region agent log
-                $logEntry = json_encode([
-                    'sessionId' => 'debug-session',
-                    'runId' => 'run1',
-                    'hypothesisId' => 'C',
-                    'location' => 'Common.php:calculateOvertimeEntries:SCENARIO3_CALC',
-                    'message' => 'Early check-out overtime calculation',
-                    'data' => [
-                        'totalTimeWorked' => $totalTimeWorked,
-                        'normalShiftMinutes' => $normalShiftMinutes,
-                        'excessTime' => $excessTime,
-                        'overtimeBeforeStart' => $overtimeBeforeStart,
-                        'actualOvertimeBefore' => $actualOvertimeBefore
-                    ],
-                    'timestamp' => round(microtime(true) * 1000)
-                ]) . "\n";
-                @file_put_contents($logFile, $logEntry, FILE_APPEND);
-                // #endregion
 
                 if ($actualOvertimeBefore > 0) {
                     // Update or add before_shift entry
@@ -13922,21 +13797,6 @@ class Common
         // SCENARIO 4: Late check-in handling
         // If check-in is after shift start and check-out is after shift end
         if ($checkInDateTime->gt($shiftStartDateTime) && $checkOutDateTime->gt($shiftEndDateTime)) {
-            // #region agent log
-            $logEntry = json_encode([
-                'sessionId' => 'debug-session',
-                'runId' => 'run1',
-                'hypothesisId' => 'D',
-                'location' => 'Common.php:calculateOvertimeEntries:SCENARIO4_ENTRY',
-                'message' => 'Late check-in scenario detected',
-                'data' => [
-                    'checkInAfterShiftStart' => true,
-                    'checkOutAfterShiftEnd' => true
-                ],
-                'timestamp' => round(microtime(true) * 1000)
-            ]) . "\n";
-            @file_put_contents($logFile, $logEntry, FILE_APPEND);
-            // #endregion
 
             $timeWorkedDuringShift = (int) $checkInDateTime->diffInMinutes($shiftEndDateTime, true);
             $overtimeAfterEnd = (int) $shiftEndDateTime->diffInMinutes($checkOutDateTime, true);
@@ -13945,23 +13805,6 @@ class Common
             if ($timeWorkedDuringShift < $normalShiftMinutes) {
                 $shortfall = $normalShiftMinutes - $timeWorkedDuringShift;
 
-                // #region agent log
-                $logEntry = json_encode([
-                    'sessionId' => 'debug-session',
-                    'runId' => 'run1',
-                    'hypothesisId' => 'D',
-                    'location' => 'Common.php:calculateOvertimeEntries:SCENARIO4_ADJUST',
-                    'message' => 'Late check-in - adjusting overtime',
-                    'data' => [
-                        'timeWorkedDuringShift' => $timeWorkedDuringShift,
-                        'normalShiftMinutes' => $normalShiftMinutes,
-                        'shortfall' => $shortfall,
-                        'overtimeAfterEnd' => $overtimeAfterEnd
-                    ],
-                    'timestamp' => round(microtime(true) * 1000)
-                ]) . "\n";
-                @file_put_contents($logFile, $logEntry, FILE_APPEND);
-                // #endregion
 
                 // Adjust after_shift overtime entries
                 foreach ($overtimeEntries as &$entry) {
@@ -13987,21 +13830,6 @@ class Common
             }
         }
 
-        // #region agent log
-        $logEntry = json_encode([
-            'sessionId' => 'debug-session',
-            'runId' => 'run1',
-            'hypothesisId' => 'E,F',
-            'location' => 'Common.php:calculateOvertimeEntries:EXIT',
-            'message' => 'Function exit with overtime entries',
-            'data' => [
-                'overtimeEntriesCount' => count($overtimeEntries),
-                'overtimeEntries' => $overtimeEntries
-            ],
-            'timestamp' => round(microtime(true) * 1000)
-        ]) . "\n";
-        @file_put_contents($logFile, $logEntry, FILE_APPEND);
-        // #endregion
 
         return $overtimeEntries;
     }

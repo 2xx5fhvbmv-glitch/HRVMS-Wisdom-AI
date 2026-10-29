@@ -981,19 +981,11 @@
 
     function DutyRosterList()
     {
-        // #region agent log
-        console.log('[DEBUG] DutyRosterList called');
-        fetch('http://127.0.0.1:7242/ingest/f9694a9e-af15-42e2-8444-553f0ae8bbff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'hoddashboard.blade.php:643','message':'DutyRosterList called','data':{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch((e)=>{console.error('[DEBUG] Log fetch failed:',e);});
-        // #endregion
         if ($.fn.DataTable.isDataTable('#DutyRoster'))
             {
                 $('#DutyRoster').DataTable().destroy();
             }
             var ajaxUrl = "{{ route('resort.timeandattendance.DutyRosterdashboardTable')}}";
-            // #region agent log
-            console.log('[DEBUG] AJAX URL:', ajaxUrl);
-            fetch('http://127.0.0.1:7242/ingest/f9694a9e-af15-42e2-8444-553f0ae8bbff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'hoddashboard.blade.php:649','message':'AJAX URL prepared','data':{ajaxUrl:ajaxUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch((e)=>{console.error('[DEBUG] Log fetch failed:',e);});
-            // #endregion
 
             // Fetch data via AJAX first, then initialize DataTables with client-side processing
             $.ajax({
@@ -1003,16 +995,8 @@
                     'X-Requested-With': 'XMLHttpRequest'
                 },
                 success: function(response) {
-                    // #region agent log
-                    console.log('[DEBUG] AJAX success, response:', response);
-                    fetch('http://127.0.0.1:7242/ingest/f9694a9e-af15-42e2-8444-553f0ae8bbff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'hoddashboard.blade.php:658','message':'AJAX success','data':{dataCount:response.data?response.data.length:0,recordsTotal:response.recordsTotal,hasError:!!response.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch((e)=>{console.error('[DEBUG] Log fetch failed:',e);});
-                    // #endregion
                     // Initialize DataTables with the fetched data
                     var tableData = response.data || [];
-                    // #region agent log
-                    console.log('[DEBUG] Table data length:', tableData.length, 'Data:', tableData);
-                    fetch('http://127.0.0.1:7242/ingest/f9694a9e-af15-42e2-8444-553f0ae8bbff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'hoddashboard.blade.php:660','message':'Table data extracted','data':{tableDataLength:tableData.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch((e)=>{console.error('[DEBUG] Log fetch failed:',e);});
-                    // #endregion
                     var DutyRoster = $('#DutyRoster').DataTable({
                         searching: false,
                         bLengthChange: false,
@@ -1037,15 +1021,8 @@
                             {data:'created_at', visible:false, searchable:false},
                         ]
                     });
-                    // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/f9694a9e-af15-42e2-8444-553f0ae8bbff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'hoddashboard.blade.php:686','message':'DataTable initialized','data':{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-                    // #endregion
                 },
                 error: function(xhr, error, thrown) {
-                    // #region agent log
-                    console.error('[DEBUG] AJAX error:', {status:xhr.status,error:error,thrown:thrown,responseText:xhr.responseText});
-                    fetch('http://127.0.0.1:7242/ingest/f9694a9e-af15-42e2-8444-553f0ae8bbff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'hoddashboard.blade.php:687','message':'AJAX error','data':{status:xhr.status,error:error,thrown:thrown,responseText:xhr.responseText},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch((e)=>{console.error('[DEBUG] Log fetch failed:',e);});
-                    // #endregion
                     // Initialize empty table on error
                     var DutyRoster = $('#DutyRoster').DataTable({
                         searching: false,

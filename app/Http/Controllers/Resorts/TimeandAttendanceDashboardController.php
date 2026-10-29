@@ -449,10 +449,6 @@ class TimeandAttendanceDashboardController extends Controller
 
     public function HrDashobard()
     {
-         // #region agent log
-         $logPath = base_path('.cursor/debug.log');
-         @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'A','location'=>'TimeandAttendanceDashboardController.php:222','message'=>'HrDashobard entry','data'=>['resort_id'=>$this->resort->resort_id??null,'hasGetEmployee'=>isset($this->resort->GetEmployee)],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-         // #endregion
 
          $page_title ='Time And Attendance';
          $Dept_id = $this->resort->GetEmployee->Dept_id ?? null;
@@ -460,9 +456,6 @@ class TimeandAttendanceDashboardController extends Controller
          $canViewAll = $this->canViewAllDepartments();
          $isDeptHOD = $this->isDepartmentHOD();
 
-         // #region agent log
-         @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'A','location'=>'TimeandAttendanceDashboardController.php:230','message'=>'User permissions check','data'=>['Dept_id'=>$Dept_id,'Rank'=>$Rank,'canViewAll'=>$canViewAll,'isDeptHOD'=>$isDeptHOD],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-         // #endregion
 
          $attendanceDataTodoList = $this->Tododata();
 
@@ -522,17 +515,6 @@ class TimeandAttendanceDashboardController extends Controller
 
         $totalPresentEmployee = $totalPresentEmployeeQuery->distinct('employees.id')->count('employees.id');
 
-        // #region agent log
-        $logPath = base_path('.cursor/debug.log');
-        // Check if there are any attendance records at all for today
-        $todayAttendanceCheck = DB::table('parent_attendaces as t3')
-            ->join('duty_rosters as t2', 't3.roster_id', '=', 't2.id')
-            ->join('employees', 't2.Emp_id', '=', 'employees.id')
-            ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
-            ->where('t3.date', date('Y-m-d'))
-            ->where('t1.resort_id', $this->resort->resort_id)
-            ->whereNotNull('t3.CheckingTime')
-            ->count();
             $absentQuery = DB::table('parent_attendaces as t3')
             ->join('duty_rosters as t2', 't3.roster_id', '=', 't2.id')
             ->join('employees', 't2.Emp_id', '=', 'employees.id')
@@ -547,8 +529,6 @@ class TimeandAttendanceDashboardController extends Controller
                 $absentQuery->whereIn('employees.id', $this->underEmp_id);
             }
             $todayAbsentCount = $absentQuery->count();
-        @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'B','location'=>'TimeandAttendanceDashboardController.php:318','message'=>'HrDashobard present query check','data'=>['canViewAll'=>$canViewAll,'isDeptHOD'=>$isDeptHOD,'totalPresentEmployee'=>$totalPresentEmployee,'todayAttendanceRecords'=>$todayAttendanceCheck,'underEmpCount'=>count($this->underEmp_id)],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-        // #endregion
         $totalPresentEmployee = $totalPresentEmployee ?? 0;
 
         // Total leave employees (distinct count of employees on approved leave today)
@@ -586,9 +566,6 @@ class TimeandAttendanceDashboardController extends Controller
             // dd($totalAbsentEmployee);
 
 
-        // #region agent log
-        @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'B','location'=>'TimeandAttendanceDashboardController.php:345','message'=>'Final dashboard counts','data'=>['EmployeesCount'=>$EmployeesCount,'totalPresentEmployee'=>$totalPresentEmployee,'totalLeaveEmployee'=>$totalLeaveEmployee,'totalAbsantEmployee'=>$totalAbsantEmployee,'todoListCount'=>count($attendanceDataTodoList)],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-        // #endregion
 
         $attendanceCounts = [];
 
@@ -621,19 +598,12 @@ class TimeandAttendanceDashboardController extends Controller
 
     public function HrDashboardCount($date)
     {
-        // #region agent log
-        $logPath = base_path('.cursor/debug.log');
-        @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'C','location'=>'TimeandAttendanceDashboardController.php:310','message'=>'HrDashboardCount entry','data'=>['date'=>$date],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-        // #endregion
 
         $Dept_id = $this->resort->GetEmployee->Dept_id ?? null;
         $Rank = $this->resort->GetEmployee->rank ?? null;
         $canViewAll = $this->canViewAllDepartments();
         $isDeptHOD = $this->isDepartmentHOD();
 
-        // #region agent log
-        @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'C','location'=>'TimeandAttendanceDashboardController.php:316','message'=>'HrDashboardCount permissions','data'=>['canViewAll'=>$canViewAll,'isDeptHOD'=>$isDeptHOD],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-        // #endregion
 
         // Employee count - all departments if can view all (only active employees)
         $EmployeesCountQuery = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
@@ -849,10 +819,6 @@ class TimeandAttendanceDashboardController extends Controller
 
     public function HRMonthOverTimeChart($Dept_id,$date)
     {
-        // #region agent log
-        $logPath = base_path('.cursor/debug.log');
-        @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'E','location'=>'TimeandAttendanceDashboardController.php:560','message'=>'HRMonthOverTimeChart entry','data'=>['Dept_id'=>$Dept_id,'date'=>$date],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-        // #endregion
 
         $Dept_id = base64_decode($Dept_id);
         $currentMonth = Carbon::now()->startOfMonth();
@@ -868,9 +834,6 @@ class TimeandAttendanceDashboardController extends Controller
         $isDeptHOD = $this->isDepartmentHOD();
         $resort_id = $this->resort->resort_id;
 
-        // #region agent log
-        @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'E','location'=>'TimeandAttendanceDashboardController.php:575','message'=>'HRMonthOverTimeChart permissions','data'=>['decodedDept_id'=>$Dept_id,'canViewAll'=>$canViewAll,'isDeptHOD'=>$isDeptHOD],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-        // #endregion
 
         // Calculate date range for last 4 months
         $startDate = $currentMonth->copy()->subMonths(3)->startOfMonth();
@@ -1417,16 +1380,8 @@ class TimeandAttendanceDashboardController extends Controller
                 ->orderBy('latest_roster_id', 'DESC')
                 ->limit(5)
                 ->pluck('latest_roster_id');
-            // #region agent log
-            $logPath = base_path('.cursor/debug.log');
-            @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'C','location'=>'TimeandAttendanceDashboardController.php:760','message'=>'First query result','data'=>['latestRosterIds_count'=>$latestRosterIds->count(),'latestRosterIds'=>$latestRosterIds->toArray()],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-            // #endregion
 
             if ($latestRosterIds->isEmpty()) {
-                // #region agent log
-                $logPath = base_path('.cursor/debug.log');
-                @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'C','location'=>'TimeandAttendanceDashboardController.php:762','message'=>'Empty roster IDs - returning empty','data'=>[],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-                // #endregion
                 return response()->json([
                     'data' => [],
                     'recordsTotal' => 0,
@@ -1436,10 +1391,6 @@ class TimeandAttendanceDashboardController extends Controller
 
             // Now get the full data for these latest duty rosters
             // Using LEFT JOIN for parent_attendaces and shift_settings since they might not exist
-            // #region agent log
-            $logPath = base_path('.cursor/debug.log');
-            @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'D','location'=>'TimeandAttendanceDashboardController.php:772','message'=>'Before second query','data'=>['rosterIds'=>$latestRosterIds->toArray()],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-            // #endregion
             try {
                 $Rosterdata = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
                     ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
@@ -1468,15 +1419,7 @@ class TimeandAttendanceDashboardController extends Controller
                     ->groupBy('t3.id', 't3.DayOfDate', 't3.created_at', 't1.id', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id', 't2.position_title', 't5.ShiftName', 't5.StartTime', 't5.EndTime', 't7.InTime_Location', 't7.OutTime_Location')
                     ->orderBy('t3.created_at', 'DESC')
                     ->get();
-                // #region agent log
-                $logPath = base_path('.cursor/debug.log');
-                @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'D','location'=>'TimeandAttendanceDashboardController.php:797','message'=>'Second query result','data'=>['count'=>$Rosterdata->count()],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-                // #endregion
             } catch (\Exception $e) {
-                // #region agent log
-                $logPath = base_path('.cursor/debug.log');
-                @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'D','location'=>'TimeandAttendanceDashboardController.php:799','message'=>'Query exception','data'=>['error'=>$e->getMessage()],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-                // #endregion
                 return response()->json([
                     'data' => [],
                     'recordsTotal' => 0,
@@ -1507,16 +1450,8 @@ class TimeandAttendanceDashboardController extends Controller
                 'recordsTotal' => $Rosterdata->count(),
                 'recordsFiltered' => $Rosterdata->count()
             ];
-            // #region agent log
-            $logPath = base_path('.cursor/debug.log');
-            @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'E','location'=>'TimeandAttendanceDashboardController.php:832','message'=>'Response data','data'=>['data_count'=>count($responseData['data']),'recordsTotal'=>$responseData['recordsTotal']],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-            // #endregion
             return response()->json($responseData);
         }
-        // #region agent log
-        $logPath = base_path('.cursor/debug.log');
-        @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'B','location'=>'TimeandAttendanceDashboardController.php:838','message'=>'Not AJAX request','data'=>[],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-        // #endregion
 
     }
 

@@ -1949,25 +1949,6 @@ class TimeAndAttendanceController extends Controller
                 $rosterId = $ParentAttendance->roster_id ?? null;
                 $expectedOvertime = '00:00';
 
-                // #region agent log
-                $logFile = 'c:\wamp64\www\Wisdom-Ai\HRVMS-Wisdom-AI\.cursor\debug.log';
-                $logEntry = json_encode([
-                    'sessionId' => 'debug-session',
-                    'runId' => 'run1',
-                    'hypothesisId' => 'G',
-                    'location' => 'TimeAndAttendanceController.php:manualCheckOut:OVERTIME_START',
-                    'message' => 'Starting overtime calculation',
-                    'data' => [
-                        'shiftId' => $shiftId,
-                        'rosterId' => $rosterId,
-                        'date' => $date,
-                        'checkInTime' => $ParentAttendance->CheckingTime,
-                        'checkOutTime' => $checkOutTime
-                    ],
-                    'timestamp' => round(microtime(true) * 1000)
-                ]) . "\n";
-                @file_put_contents($logFile, $logEntry, FILE_APPEND);
-                // #endregion
 
                 // Get expected overtime from duty_roster_entries if roster exists
                 if ($rosterId) {
@@ -1979,21 +1960,6 @@ class TimeAndAttendanceController extends Controller
                         $expectedOvertime = $dutyRosterEntry->OverTime;
                     }
 
-                    // #region agent log
-                    $logEntry = json_encode([
-                        'sessionId' => 'debug-session',
-                        'runId' => 'run1',
-                        'hypothesisId' => 'G',
-                        'location' => 'TimeAndAttendanceController.php:manualCheckOut:ROSTER_OT',
-                        'message' => 'Retrieved expected overtime from roster',
-                        'data' => [
-                            'dutyRosterEntryFound' => $dutyRosterEntry ? true : false,
-                            'expectedOvertime' => $expectedOvertime
-                        ],
-                        'timestamp' => round(microtime(true) * 1000)
-                    ]) . "\n";
-                    @file_put_contents($logFile, $logEntry, FILE_APPEND);
-                    // #endregion
                 }
 
                 // Get shift settings for shift start and end times
@@ -2009,22 +1975,6 @@ class TimeAndAttendanceController extends Controller
                     $shiftStartTime = $shiftData->StartTime; // Format: H:i
                     $shiftEndTime = $shiftData->EndTime; // Format: H:i
 
-                    // #region agent log
-                    $logEntry = json_encode([
-                        'sessionId' => 'debug-session',
-                        'runId' => 'run1',
-                        'hypothesisId' => 'E',
-                        'location' => 'TimeAndAttendanceController.php:manualCheckOut:BEFORE_CALC',
-                        'message' => 'Before calling calculateOvertimeEntries',
-                        'data' => [
-                            'shiftStartTime' => $shiftStartTime,
-                            'shiftEndTime' => $shiftEndTime,
-                            'breakDataCount' => $breakData->count()
-                        ],
-                        'timestamp' => round(microtime(true) * 1000)
-                    ]) . "\n";
-                    @file_put_contents($logFile, $logEntry, FILE_APPEND);
-                    // #endregion
 
                     // Calculate overtime entries using helper function
                     $overtimeEntries = Common::calculateOvertimeEntries(
@@ -2037,21 +1987,6 @@ class TimeAndAttendanceController extends Controller
                         $expectedOvertime // Expected overtime from roster
                     );
 
-                    // #region agent log
-                    $logEntry = json_encode([
-                        'sessionId' => 'debug-session',
-                        'runId' => 'run1',
-                        'hypothesisId' => 'E',
-                        'location' => 'TimeAndAttendanceController.php:manualCheckOut:AFTER_CALC',
-                        'message' => 'After calculateOvertimeEntries',
-                        'data' => [
-                            'overtimeEntriesCount' => count($overtimeEntries),
-                            'overtimeEntries' => $overtimeEntries
-                        ],
-                        'timestamp' => round(microtime(true) * 1000)
-                    ]) . "\n";
-                    @file_put_contents($logFile, $logEntry, FILE_APPEND);
-                    // #endregion
 
                     // Create overtime entries in database if any
                     if (!empty($overtimeEntries)) {
@@ -2080,37 +2015,10 @@ class TimeAndAttendanceController extends Controller
                             $overtimeEntries
                         );
 
-                        // #region agent log
-                        $logEntry = json_encode([
-                            'sessionId' => 'debug-session',
-                            'runId' => 'run1',
-                            'hypothesisId' => 'E',
-                            'location' => 'TimeAndAttendanceController.php:manualCheckOut:OT_CREATED',
-                            'message' => 'Overtime entries created in database',
-                            'data' => [
-                                'createdCount' => count($createdOvertimeEntries),
-                                'createdIds' => array_map(function($entry) { return $entry->id ?? null; }, $createdOvertimeEntries)
-                            ],
-                            'timestamp' => round(microtime(true) * 1000)
-                        ]) . "\n";
-                        @file_put_contents($logFile, $logEntry, FILE_APPEND);
-                        // #endregion
 
                         $timeAttendance['overtime_entries'] = $createdOvertimeEntries;
                     }
                 } else {
-                    // #region agent log
-                    $logEntry = json_encode([
-                        'sessionId' => 'debug-session',
-                        'runId' => 'run1',
-                        'hypothesisId' => 'E',
-                        'location' => 'TimeAndAttendanceController.php:manualCheckOut:NO_SHIFT',
-                        'message' => 'No shift data found - skipping overtime calculation',
-                        'data' => ['shiftId' => $shiftId],
-                        'timestamp' => round(microtime(true) * 1000)
-                    ]) . "\n";
-                    @file_put_contents($logFile, $logEntry, FILE_APPEND);
-                    // #endregion
                 }
             }
 
