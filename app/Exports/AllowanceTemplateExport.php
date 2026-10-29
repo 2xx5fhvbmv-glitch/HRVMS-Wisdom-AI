@@ -49,7 +49,7 @@ class AllowanceTemplateExport implements FromCollection, WithHeadings, WithEvent
                     $highestRow = $sheet->getHighestRow();
                     // dd($highestRow);
                     // Create dropdown validation for column C (Status)
-                    $validation = $sheet->getDataValidation('C2:C200');
+                    $validation = tap(new \PhpOffice\PhpSpreadsheet\Cell\DataValidation, fn ($v) => $sheet->setDataValidation('C2:C200', $v));
                     $validation->setType(DataValidation::TYPE_LIST)
                         ->setErrorStyle(DataValidation::STYLE_STOP)
                         ->setAllowBlank(true)

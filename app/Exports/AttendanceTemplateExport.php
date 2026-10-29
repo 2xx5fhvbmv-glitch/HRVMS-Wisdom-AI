@@ -98,7 +98,7 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithEven
 
                 // Create dropdown validation for Employee Id (Column A)
                 if (!empty($employees)) {
-                    $validation = $sheet->getDataValidation('A2:A1000');
+                    $validation = tap(new \PhpOffice\PhpSpreadsheet\Cell\DataValidation, fn ($v) => $sheet->setDataValidation('A2:A1000', $v));
                     $validation->setType(DataValidation::TYPE_LIST)
                         ->setErrorStyle(DataValidation::STYLE_STOP)
                         ->setAllowBlank(true)
@@ -114,7 +114,7 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithEven
 
                 // Create dropdown validation for Shift (Column C)
                 if (!empty($shifts)) {
-                    $validation = $sheet->getDataValidation('C2:C1000');
+                    $validation = tap(new \PhpOffice\PhpSpreadsheet\Cell\DataValidation, fn ($v) => $sheet->setDataValidation('C2:C1000', $v));
                     $validation->setType(DataValidation::TYPE_LIST)
                         ->setErrorStyle(DataValidation::STYLE_STOP)
                         ->setAllowBlank(true)
@@ -130,7 +130,7 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithEven
 
                 // Create dropdown validation for Status (Column G)
                 if (!empty($statusOptions)) {
-                    $validation = $sheet->getDataValidation('G2:G1000');
+                    $validation = tap(new \PhpOffice\PhpSpreadsheet\Cell\DataValidation, fn ($v) => $sheet->setDataValidation('G2:G1000', $v));
                     $validation->setType(DataValidation::TYPE_LIST)
                         ->setErrorStyle(DataValidation::STYLE_STOP)
                         ->setAllowBlank(true)
@@ -146,7 +146,7 @@ class AttendanceTemplateExport implements FromCollection, WithHeadings, WithEven
 
                 // Create dropdown validation for Leave Type (Column H)
                 if (!empty($leaveTypes)) {
-                    $validation = $sheet->getDataValidation('H2:H1000');
+                    $validation = tap(new \PhpOffice\PhpSpreadsheet\Cell\DataValidation, fn ($v) => $sheet->setDataValidation('H2:H1000', $v));
                     $validation->setType(DataValidation::TYPE_LIST)
                         ->setErrorStyle(DataValidation::STYLE_STOP)
                         ->setAllowBlank(true)

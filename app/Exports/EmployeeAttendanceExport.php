@@ -196,7 +196,7 @@ class EmployeeAttendanceExport implements FromCollection, WithHeadings, WithEven
                     $highestRow = $sheet->getHighestRow();
 
                     // Create dropdown validation for column D (Shift)
-                    $validation = $sheet->getDataValidation('D2:D' . $highestRow);
+                    $validation = tap(new \PhpOffice\PhpSpreadsheet\Cell\DataValidation, fn ($v) => $sheet->setDataValidation('D2:D' . $highestRow, $v));
                     $validation->setType(DataValidation::TYPE_LIST)
                         ->setErrorStyle(DataValidation::STYLE_STOP)
                         ->setAllowBlank(true)
@@ -217,7 +217,7 @@ class EmployeeAttendanceExport implements FromCollection, WithHeadings, WithEven
                     $highestRow = $sheet->getHighestRow();
 
                     // Create dropdown validation for column H (Status)
-                    $validation = $sheet->getDataValidation('H2:H' . $highestRow);
+                    $validation = tap(new \PhpOffice\PhpSpreadsheet\Cell\DataValidation, fn ($v) => $sheet->setDataValidation('H2:H' . $highestRow, $v));
                     $validation->setType(DataValidation::TYPE_LIST)
                         ->setErrorStyle(DataValidation::STYLE_STOP)
                         ->setAllowBlank(true)
@@ -250,7 +250,7 @@ class EmployeeAttendanceExport implements FromCollection, WithHeadings, WithEven
                     $highestRow = $sheet->getHighestRow();
 
                     // Create dropdown validation for column J (LeaveType)
-                    $validation = $sheet->getDataValidation('J2:J' . $highestRow);
+                    $validation = tap(new \PhpOffice\PhpSpreadsheet\Cell\DataValidation, fn ($v) => $sheet->setDataValidation('J2:J' . $highestRow, $v));
                     $validation->setType(DataValidation::TYPE_LIST)
                         ->setErrorStyle(DataValidation::STYLE_STOP)
                         ->setAllowBlank(true)

@@ -908,7 +908,6 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
 
     Route::post('payroll/fetch-time-attendance', 'Payroll\PayrollController@fetchTimeAttendance')->name('fetch.time.attendance');
     Route::post('payroll/fetch-service-charges', 'Payroll\PayrollController@fetchServiceCharge')->name('fetch.service.charge');
-    Route::get('payroll/city-ladger/download-template', 'Payroll\PayrollController@downloadCityLadgerTemplate')->name('payroll.download-cityladger.template');
     Route::get('payroll/export-review/{payrollId}/{type}', 'Payroll\PayrollController@exportReview')->name('payroll.export.review');
     Route::post('payroll/fetch-staff-shop', 'Payroll\PayrollController@fetchStaffShop')->name('payroll.fetch.staffshop');
     Route::post('payroll/fetch-pension-ewt', 'Payroll\PayrollController@calculatePensionAndEWT')->name('payroll.calculate.pensionandewt');

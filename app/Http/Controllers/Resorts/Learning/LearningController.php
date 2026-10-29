@@ -235,7 +235,7 @@ class LearningController extends Controller
     {
         try {
             $resort_id = $this->resort->resort_id;
-            $loginEmployee = $this->resort->GetEmployee->id;
+            $loginEmployee = $this->resort->GetEmployee?->id;
 
             $rank = config('settings.Position_Rank');
             $current_rank = $this->resort->getEmployee->rank ?? null;
