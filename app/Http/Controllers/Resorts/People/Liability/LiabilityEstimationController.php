@@ -1402,7 +1402,7 @@ class LiabilityEstimationController extends Controller
         $datatable->addColumn('details', fn($row) => '');
         $datatable->rawColumns(['details']);
 
-        return $datatable->make(true);
+        return Common::withBudgetConfigCache(fn () => $datatable->make(true));
     }
 
     public function getLiabilityEmployeeData($empId)

@@ -59,16 +59,6 @@ class AccommodationMasterController extends Controller
 
 
 
-        $accommodations = AvailableAccommodationModel::where('available_accommodation_models.resort_id', $this->resort->resort_id)
-                                ->where("BuildingName", $building->id)
-                                ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType')
-                                ->get()
-                                ->map(function ($accommodation)
-                                {
-                                    $accommodation->AssingAccommodationCount = AssingAccommodation::where("available_a_id", $accommodation->id)->where('resort_id', $this->resort->resort_id)->where('emp_id', 0)->count();
-                                    $accommodation->bedAvailable = $accommodation->AssingAccommodationCount;
-                                    return $accommodation;
-                                });
                                 // Rooms Available = every room in the building that has at
                                 // least one free (unassigned, emp_id = 0) bed. The old query
                                 // used ->first() + a hard-coded 1, so it could only ever return

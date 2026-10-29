@@ -3694,7 +3694,13 @@ class Common
         }
         if($flag =="Monthwise")
         {
-                $LeaveCategory = LeaveCategory::where('resort_id', $resort_id)->get(['leave_type', 'color']);
+                // Called once per employee on roster pages; the resort's leave colours are the same each time.
+                // ponytail: per-process memo refreshed every 60s (only long-running workers keep it across requests).
+                static $leaveColors = [];
+                if (!isset($leaveColors[$resort_id]) || $leaveColors[$resort_id]['at'] < time() - 60) {
+                    $leaveColors[$resort_id] = ['at' => time(), 'rows' => LeaveCategory::where('resort_id', $resort_id)->get(['leave_type', 'color'])];
+                }
+                $LeaveCategory = $leaveColors[$resort_id]['rows'];
                 $leaveColorByType = $LeaveCategory->pluck('color', 'leave_type');
                 // Use the EMPLOYEE id to scope the entries — the previous
                 // filter `where('duty_rosters.id', '=', $duty_roster_id)`
@@ -8500,14 +8506,44 @@ class Common
      * (computeBudgetCostMonthlyValue) for any month that has no saved row.
      * Mirrors how Budget → View Budget renders the cell.
      */
+    /** Saved budget-cost months per employee, filled only inside withBudgetConfigCache() (null = off). */
+    private static ?array $budgetConfigCache = null;
+
+    /**
+     * Run a read-only render with saved budget configs loaded once per employee instead of once per employee x cost
+     * (annualCostForEmployee is called for every cost column of every row). Never wrap code that saves configs.
+     */
+    public static function withBudgetConfigCache(callable $fn)
+    {
+        $previous = self::$budgetConfigCache;
+        self::$budgetConfigCache = [];
+        try {
+            return $fn();
+        } finally {
+            self::$budgetConfigCache = $previous;
+        }
+    }
+
     public static function annualCostForEmployee($resortId, int $year, $cost, $employee): float
     {
-        $savedByMonth = \DB::table('resort_employee_budget_cost_configurations')
-            ->where('employee_id', $employee->id)
-            ->where('resort_id', $resortId)
-            ->where('year', $year)
-            ->where('resort_budget_cost_id', $cost->id)
-            ->pluck('value', 'month');
+        if (self::$budgetConfigCache !== null) {
+            $key = "{$resortId}:{$year}:{$employee->id}";
+            self::$budgetConfigCache[$key] ??= \DB::table('resort_employee_budget_cost_configurations')
+                ->where('employee_id', $employee->id)
+                ->where('resort_id', $resortId)
+                ->where('year', $year)
+                ->get(['resort_budget_cost_id', 'month', 'value'])
+                ->groupBy('resort_budget_cost_id')
+                ->map(fn ($rows) => $rows->pluck('value', 'month'));
+            $savedByMonth = self::$budgetConfigCache[$key]->get($cost->id) ?? collect();
+        } else {
+            $savedByMonth = \DB::table('resort_employee_budget_cost_configurations')
+                ->where('employee_id', $employee->id)
+                ->where('resort_id', $resortId)
+                ->where('year', $year)
+                ->where('resort_budget_cost_id', $cost->id)
+                ->pluck('value', 'month');
+        }
 
         // Cost TEMPLATES with amount_unit='MVR' return live-fallback values
         // in MVR; per project convention we always emit USD totals so the
@@ -8594,16 +8630,16 @@ class Common
         foreach ($employees as $emp) {
             $effective = (float) ($emp->proposed_salary > 0 ? $emp->proposed_salary : ($emp->basic_salary ?? 0));
             if ($effective > 0) $candidates[] = $effective;
-
-            $monthly = \DB::table('resort_employee_monthly_salaries')
-                ->where('employee_id', $emp->id)
-                ->where('resort_id', $resortId)
-                ->where('year', $year)
-                ->get(['current_salary', 'proposed_salary']);
-            foreach ($monthly as $m) {
-                $eff = (float) ($m->proposed_salary > 0 ? $m->proposed_salary : ($m->current_salary ?? 0));
-                if ($eff > 0) $candidates[] = $eff;
-            }
+        }
+        // Per-month overrides of all those employees in one query (only the max is used, so order doesn't matter).
+        $monthly = $employees->isEmpty() ? collect() : \DB::table('resort_employee_monthly_salaries')
+            ->whereIn('employee_id', $employees->pluck('id'))
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->get(['current_salary', 'proposed_salary']);
+        foreach ($monthly as $m) {
+            $eff = (float) ($m->proposed_salary > 0 ? $m->proposed_salary : ($m->current_salary ?? 0));
+            if ($eff > 0) $candidates[] = $eff;
         }
 
         // 2. Vacant budget rows for this position
@@ -8617,18 +8653,17 @@ class Common
         foreach ($vacants as $v) {
             $effective = (float) ($v->current_salary > 0 ? $v->current_salary : ($v->basic_salary ?? 0));
             if ($effective > 0) $candidates[] = $effective;
-
-            $monthly = \DB::table('resort_vacant_monthly_salaries')
-                ->where('resort_id', $resortId)
-                ->where('position_id', $positionId)
-                ->where('department_id', $deptId)
-                ->where('year', $year)
-                ->where('vacant_index', $v->vacant_index)
-                ->get(['current_salary', 'proposed_salary']);
-            foreach ($monthly as $m) {
-                $eff = (float) ($m->proposed_salary > 0 ? $m->proposed_salary : ($m->current_salary ?? 0));
-                if ($eff > 0) $candidates[] = $eff;
-            }
+        }
+        $monthly = $vacants->isEmpty() ? collect() : \DB::table('resort_vacant_monthly_salaries')
+            ->where('resort_id', $resortId)
+            ->where('position_id', $positionId)
+            ->where('department_id', $deptId)
+            ->where('year', $year)
+            ->whereIn('vacant_index', $vacants->pluck('vacant_index'))
+            ->get(['current_salary', 'proposed_salary']);
+        foreach ($monthly as $m) {
+            $eff = (float) ($m->proposed_salary > 0 ? $m->proposed_salary : ($m->current_salary ?? 0));
+            if ($eff > 0) $candidates[] = $eff;
         }
 
         return $candidates ? (float) max($candidates) : 0.0;

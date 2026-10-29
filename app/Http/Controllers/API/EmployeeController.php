@@ -101,6 +101,21 @@ class EmployeeController extends Controller
                     'rd.name as department',
                 )->get();
 
+                // This year's approved leave days per employee and category, one query for the whole list
+                // (same filter as employeeLeaveCounts(), which ran once per employee per category).
+                $yearStart = Carbon::now()->startOfYear()->startOfMonth()->format('Y-m-d');
+                $yearEnd   = Carbon::now()->endOfYear()->endOfMonth()->format('Y-m-d');
+                $usedDays  = EmployeeLeave::whereIn('emp_id', $employeesAndLeaveData->pluck('emp_id'))
+                    ->where('status', 'Approved')
+                    ->where(function ($query) use ($yearStart, $yearEnd) {
+                        $query->whereBetween('from_date', [$yearStart, $yearEnd])
+                              ->orWhereBetween('to_date', [$yearStart, $yearEnd]);
+                    })
+                    ->groupBy('emp_id', 'leave_category_id')
+                    ->selectRaw('emp_id, leave_category_id, sum(total_days) as days')
+                    ->toBase()->get()
+                    ->keyBy(fn ($r) => $r->emp_id . ':' . $r->leave_category_id);
+
                 $leaveData = [];
                 foreach ($employeesAndLeaveData as $key => $value) {
 
@@ -156,10 +171,10 @@ class EmployeeController extends Controller
                                         })
                                     ->groupBy('resort_benefit_grid_child.id')
                                     ->get()
-                                    ->map(function ($i) use ($emp_id) {
+                                    ->map(function ($i) use ($emp_id, $usedDays) {
                                         $i->combine_with_other = isset($i->combine_with_other) ? $i->combine_with_other : 0;
                                         $i->leave_category = isset($i->leave_category) && $i->leave_category != "" ? $i->leave_category : 0;
-                                        $i->ThisYearOfused_days = $this->employeeLeaveCounts($emp_id, $i->leave_cat_id);
+                                        $i->ThisYearOfused_days = $usedDays->get($emp_id . ':' . $i->leave_cat_id)?->days ?: 0;
                                         return $i;
                         });
 

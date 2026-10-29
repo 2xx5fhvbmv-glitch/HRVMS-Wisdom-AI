@@ -109,54 +109,58 @@ class TimeAndAttendanceController extends Controller
             $dates                                          =   [];
             $totalOvertime                                  =   0;
 
+            // One query per measure for the whole month (was 4 queries per day), same filters, grouped by date.
+            $monthStart = $startOfMonth->format('Y-m-d');
+            $monthEnd   = $endOfMonth->format('Y-m-d');
+            $presentByDate = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
+                ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
+                ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
+                ->where('t3.Status', 'Present')
+                ->whereNotNull('t3.CheckingTime')
+                ->whereRaw("TRIM(COALESCE(t3.CheckingTime,'')) NOT IN ('','0','00:00','00:00:00')")
+                ->whereBetween('t3.date', [$monthStart, $monthEnd])
+                ->where("t1.resort_id", $resort_id)
+                ->where('employees.id', $emp_id)
+                ->groupBy('t3.date')
+                ->toBase()->selectRaw('t3.date as d, count(*) as c')->pluck('c', 'd');
+            $absentByDate = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
+                ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
+                ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
+                ->whereBetween('t3.date', [$monthStart, $monthEnd])
+                ->where("t3.Status", "Absent")
+                ->whereNull('t3.CheckingTime')
+                ->whereNull('t3.CheckingOutTime')
+                ->where("t1.resort_id", $resort_id)
+                ->where('employees.id', $emp_id)
+                ->groupBy('t3.date')
+                ->toBase()->selectRaw('t3.date as d, count(*) as c')->pluck('c', 'd');
+            $monthLeaves = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
+                ->join('employees_leaves as t2', "t2.emp_id", "=", "employees.id")
+                ->where('t2.from_date', "<=", $monthEnd)
+                ->where('t2.to_date', ">=", $monthStart)
+                ->where("t1.resort_id", $resort_id)
+                ->where('employees.id', $emp_id)
+                ->toBase()->get(['t2.from_date', 't2.to_date']);
+            $overtimeByDate = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
+                ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
+                ->join('parent_attendaces as pa', "pa.roster_id", "=", "t2.id")
+                ->join('shift_settings as ss', 'pa.Shift_id', '=', 'ss.id')
+                ->where('ss.resort_id', '=', $resort_id)
+                ->whereNotNull('pa.CheckingTime')
+                ->whereNotIn('pa.Status', ['Absent', 'DayOff'])
+                ->whereNotNull('pa.CheckingOutTime')
+                ->where('employees.id', $emp_id)
+                ->whereBetween(DB::raw('DATE(pa.date)'), [$monthStart, $monthEnd])
+                ->groupBy(DB::raw('DATE(pa.date)'))
+                ->toBase()->selectRaw('DATE(pa.date) as d, sum(TIME_TO_SEC(pa.OverTime) / 3600) as s')->pluck('s', 'd');
+
             for ($date = $startOfMonth; $date->lte($endOfMonth); $date->addDay()) {
 
                 $formattedDate                              =   $date->format('Y-m-d'); // Keep formatted date separate
-                // Present only when employee has real check-in (any date)
-                $totalPresentEmployee                       =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                                                                    ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
-                                                                    ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
-                                                                    ->where('t3.Status', 'Present')
-                                                                    ->whereNotNull('t3.CheckingTime')
-                                                                    ->whereRaw("TRIM(COALESCE(t3.CheckingTime,'')) NOT IN ('','0','00:00','00:00:00')")
-                                                                    ->where('t3.date', $formattedDate)
-                                                                    ->where("t1.resort_id", $resort_id)
-                                                                    ->where('employees.id', $emp_id)
-                                                                    ->count();
-
-                $totalPresentEmployee                       =   $totalPresentEmployee ?? 0;
-                $totalAbsentEmployee                        =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                                                                    ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
-                                                                    ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
-                                                                    ->where("t3.date", $formattedDate)
-                                                                    ->where("t3.Status", "Absent") // Ensure 'Absent' is a string
-                                                                    ->whereNull('t3.CheckingTime')
-                                                                    ->whereNull('t3.CheckingOutTime')
-                                                                    ->where("t1.resort_id", $resort_id)
-                                                                    ->where('employees.id', $emp_id)
-                                                                    ->count();
-
-                $totalAbsentEmployee                        =   $totalAbsentEmployee ?? 0;
-                $totalLeaveEmployee                         =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                                                                    ->join('employees_leaves as t2', "t2.emp_id", "=", "employees.id")
-                                                                    ->where('t2.from_date', "<=", $formattedDate) // Date should be within leave range
-                                                                    ->where('t2.to_date', ">=", $formattedDate)
-                                                                    ->where("t1.resort_id", $resort_id)
-                                                                    ->where('employees.id', $emp_id)
-                                                                    ->count();
-
-                $totalLeaveEmployee                         =   $totalLeaveEmployee ?? 0;
-                $overtimeData1                              =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                                                                ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
-                                                                ->join('parent_attendaces as pa', "pa.roster_id", "=", "t2.id")
-                                                                ->join('shift_settings as ss', 'pa.Shift_id', '=', 'ss.id')
-                                                                ->where('ss.resort_id', '=', $resort_id)
-                                                                ->whereNotNull('pa.CheckingTime')
-                                                                ->whereNotIn('pa.Status', ['Absent', 'DayOff'])
-                                                                ->whereNotNull('pa.CheckingOutTime')
-                                                                ->where('employees.id', $emp_id)
-                                                                ->whereDate('pa.date', $formattedDate)
-                                                                ->sum(DB::raw("TIME_TO_SEC(pa.OverTime) / 3600"));
+                $totalPresentEmployee                       =   (int) ($presentByDate[$formattedDate] ?? 0);
+                $totalAbsentEmployee                        =   (int) ($absentByDate[$formattedDate] ?? 0);
+                $totalLeaveEmployee                         =   $monthLeaves->filter(fn ($l) => $l->from_date <= $formattedDate && $l->to_date >= $formattedDate)->count();
+                $overtimeData1                              =   ($overtimeByDate[$formattedDate] ?? null) ?: 0;
 
                 $totalOvertime                              +=  $overtimeData1;
 
