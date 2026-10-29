@@ -704,17 +704,20 @@ class ConfigrationController extends Controller
                 {
                     $invQtyMap = ($request->InvQty && array_key_exists($i, $request->InvQty)) ? $request->InvQty[$i] : [];
 
-                    // Validate inventory stock before linking
+                    // Check and reserve stock in one conditional UPDATE per item, so two saves at the same
+                    // moment can't both take the last units (was: check, then read + save Occupied).
+                    // A failure rolls the whole save back, including items already reserved.
                     $outOfStock = [];
                     foreach ($request->Inv_Cat_id[$i] as $item) {
                         $qty = isset($invQtyMap[$item]) ? intval($invQtyMap[$item]) : 1;
-                        $inv = InventoryModule::where('id', $item)->where('resort_id', $resort_id)->first();
-                        if ($inv) {
-                            $available = ($inv->Quantity ?? 0) - ($inv->Occupied ?? 0);
-                            if ($qty > $available) {
-                                $outOfStock[] = $inv->ItemName . ' (Available: ' . $available . ', Requested: ' . $qty . ')';
-                            }
+                        $reserved = InventoryModule::where('id', $item)->where('resort_id', $resort_id)
+                            ->whereRaw('COALESCE(Quantity, 0) - COALESCE(Occupied, 0) >= ?', [$qty])
+                            ->update(['Occupied' => DB::raw('COALESCE(Occupied, 0) + ' . $qty)]);
+                        if (!$reserved && ($inv = InventoryModule::where('id', $item)->where('resort_id', $resort_id)->first())) {
+                            $outOfStock[] = $inv->ItemName . ' (Available: ' . (($inv->Quantity ?? 0) - ($inv->Occupied ?? 0)) . ', Requested: ' . $qty . ')';
+                            continue;
                         }
+                        AvailableAccommodationInvItem::create([ 'Available_Acc_id'=>$parent_id->id,'Item_id'=>$item,'quantity'=>$qty]);
                     }
 
                     if (!empty($outOfStock)) {
@@ -723,19 +726,6 @@ class ConfigrationController extends Controller
                             'success' => false,
                             'message' => 'Insufficient inventory: ' . implode(', ', $outOfStock)
                         ], 422);
-                    }
-
-                    foreach( $request->Inv_Cat_id[$i] as $item)
-                    {
-                        $qty = isset($invQtyMap[$item]) ? intval($invQtyMap[$item]) : 1;
-                        AvailableAccommodationInvItem::create([ 'Available_Acc_id'=>$parent_id->id,'Item_id'=>$item,'quantity'=>$qty]);
-
-                        // Increment Occupied count in inventory
-                        $inv = InventoryModule::where('id', $item)->where('resort_id', $resort_id)->first();
-                        if ($inv) {
-                            $inv->Occupied = ($inv->Occupied ?? 0) + $qty;
-                            $inv->save();
-                        }
                     }
                 }
 

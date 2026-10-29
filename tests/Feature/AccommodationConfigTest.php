@@ -70,6 +70,27 @@ class AccommodationConfigTest extends TestCase
         }
     }
 
+    public function test_room_setup_reserves_stock_and_refuses_more_than_is_left()   // §2.8
+    {
+        $rid = $this->master->resort_id;
+        $b = $this->postJson(route('resort.accommodation.StoreBuilding'), ['BuildingName' => 'Stock ' . substr(uniqid(), -5)])->json('id');
+        $cat = DB::table('inventory_category_models')->insertGetId(['resort_id' => $rid, 'CategoryName' => 'T', 'created_at' => now(), 'updated_at' => now()]);
+        $item = DB::table('inventory_modules')->insertGetId(['resort_id' => $rid, 'Inv_Cat_id' => $cat, 'ItemName' => 'Pillow', 'ItemCode' => 'P' . uniqid(),
+            'Quantity' => 3, 'Occupied' => 0, 'created_at' => now(), 'updated_at' => now()]);
+        $type = $this->postJson(route('resort.accommodation.AccommodationTypeStore'), ['AccommodationName' => 'Std ' . substr(uniqid(), -5)])->json('id');
+        $setup = fn ($room) => ['AvailableCount' => 1, 'BuildingName' => [1 => $b], 'Floor' => [1 => 1], 'RoomNo' => [1 => $room],
+            'Accommodation_type_id' => [1 => $type], 'Capacity' => [1 => 1],
+            'RoomType' => [1 => 1], 'BedNo' => [1 => 1], 'blockFor' => [1 => 'Male'], 'CleaningSchedule' => [1 => 'Daily'], 'Occupancytheresold' => [1 => 90],
+            'Inv_Cat_id' => [1 => [$item]], 'InvQty' => [1 => [$item => 2]]];
+        $rooms = fn () => DB::table('available_accommodation_models')->where('BuildingName', $b)->count();
+
+        $this->postJson(route('resort.accommodation.AvailableAccommodationStore'), $setup('101'))->assertOk();
+        $this->assertEquals(2, DB::table('inventory_modules')->where('id', $item)->value('Occupied'));
+        $this->postJson(route('resort.accommodation.AvailableAccommodationStore'), $setup('102'))->assertStatus(422)->assertJsonFragment(['success' => false]);
+        $this->assertEquals(2, DB::table('inventory_modules')->where('id', $item)->value('Occupied'), 'nothing reserved by the refused save');
+        $this->assertSame(1, $rooms(), 'the refused room was rolled back');
+    }
+
     public function test_hr_is_told_once_when_a_room_reaches_its_occupancy_level()   // §2.3
     {
         DB::table('employees')->update(['device_token' => null]);   // notifications also push to phones
