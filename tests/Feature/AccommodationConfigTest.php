@@ -48,6 +48,28 @@ class AccommodationConfigTest extends TestCase
         $this->assertNotNull(DB::table('inventory_category_models')->where('id', $c)->first());
     }
 
+    public function test_building_names_are_unique_per_resort_ignoring_case()   // §2.10
+    {
+        $url = route('resort.accommodation.StoreBuilding');
+        $name = 'Dup ' . substr(uniqid(), -5);
+        $this->postJson($url, ['BuildingName' => $name])->assertOk();
+        $this->postJson($url, ['BuildingName' => strtolower($name)])->assertStatus(422);
+        $this->postJson($url, ['BuildingName' => ' ' . strtoupper($name) . ' '])->assertStatus(422);
+    }
+
+    public function test_room_list_counts_beds_in_one_query()   // §2.7
+    {
+        DB::enableQueryLog();
+        $rows = $this->getJson(route('resort.accommodation.AvailableAccommodationIndex'), ['X-Requested-With' => 'XMLHttpRequest'])->assertOk()->json('data');
+        $bedQueries = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'assing_accommodations'))->count();
+        $this->assertSame(1, $bedQueries, 'one grouped bed query, not two per room');
+        foreach (array_slice($rows, 0, 5) as $r) {
+            $this->assertSame(DB::table('assing_accommodations')->where('available_a_id', $r['id'])->where('emp_id', '!=', 0)->count() . '/'
+                . DB::table('assing_accommodations')->where('available_a_id', $r['id'])->count(), $r['Beds']);
+            $this->assertEquals(DB::table('available_accommodation_models')->where('id', $r['id'])->value('BuildingName'), $r['building_id']);
+        }
+    }
+
     public function test_hr_is_told_once_when_a_room_reaches_its_occupancy_level()   // §2.3
     {
         DB::table('employees')->update(['device_token' => null]);   // notifications also push to phones

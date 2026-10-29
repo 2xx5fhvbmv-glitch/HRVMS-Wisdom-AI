@@ -404,12 +404,17 @@ class ConfigrationController extends Controller
         $resort_id = $this->resort->resort_id;
 
         if ($request->ajax()) {
+            // Beds and occupied beds for every room in one grouped query (was two count queries per room).
+            $bedCounts = \App\Models\AssingAccommodation::where('resort_id', $resort_id)
+                ->selectRaw('available_a_id, count(*) beds, sum(emp_id is not null and emp_id <> 0) occupied')
+                ->groupBy('available_a_id')->get()->keyBy('available_a_id');
             $data = AvailableAccommodationModel::join('building_models as b', 'b.id', '=', 'available_accommodation_models.BuildingName')
                 ->leftJoin('accommodation_types as at', 'at.id', '=', 'available_accommodation_models.Accommodation_type_id')
                 ->where('available_accommodation_models.resort_id', $resort_id)
                 ->select(
                     'available_accommodation_models.id',
                     'b.BuildingName',
+                    'available_accommodation_models.BuildingName as building_id', // match by id, not by name (names can repeat)
                     'available_accommodation_models.Floor',
                     'available_accommodation_models.RoomNo',
                     'available_accommodation_models.Capacity',
@@ -424,12 +429,11 @@ class ConfigrationController extends Controller
                 )
                 ->orderBy('available_accommodation_models.id', 'DESC')
                 ->get()
-                ->map(function ($row) {
+                ->map(function ($row) use ($bedCounts) {
                     $rankMap = config('settings.eligibilty');
                     $row->RoomTypeName = $rankMap[$row->RoomType] ?? 'Unknown';
-                    $beds = \App\Models\AssingAccommodation::where('available_a_id', $row->id)->count();
-                    $occupied = \App\Models\AssingAccommodation::where('available_a_id', $row->id)->where('emp_id', '!=', 0)->count();
-                    $row->Beds = $occupied . '/' . $beds;
+                    $c = $bedCounts[$row->id] ?? null;
+                    $row->Beds = (int) ($c->occupied ?? 0) . '/' . (int) ($c->beds ?? 0);
                     return $row;
                 });
 
