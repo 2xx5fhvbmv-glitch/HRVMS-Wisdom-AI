@@ -1,4 +1,9 @@
-
+{{--
+    Accommodation > Configuration — buildings, floors & rooms in one flow.
+    Presentation only. Data: the variables ConfigrationController@index already passes (types, inventory items, buildings,
+    escalation day) plus the existing list endpoints for the building/floor/room tree and room setups (loaded once by
+    public/resorts_assets/js/accommodation-config.js). Styles: public/resorts_assets/css/accommodation-config.css
+--}}
 @extends('resorts.layouts.app')
 @section('page_tab_title', $page_title)
 
@@ -9,6 +14,52 @@
 @endif
 
 @section('content')
+@php
+    $acfg = [
+        'urls' => [
+            // lists (existing DataTables endpoints, asked for every row at once)
+            'floorRooms' => route('resort.accommodation.config.FloorRoomIndex'),
+            'setups'     => route('resort.accommodation.AvailableAccommodationIndex'),
+            'buildings'  => route('resort.accommodation.config.BuildingIndex'),
+            'types'      => route('resort.accommodation.config.AccommodationIndex'),
+            'cats'       => route('resort.accommodation.config.InvenotryCatIndex'),
+            // writes (existing endpoints; __ID__ is replaced client-side)
+            'buildingStore'   => route('resort.accommodation.StoreBuilding'),
+            'buildingUpdate'  => route('resort.accommodation.BuildingUpdate'),
+            'buildingDestroy' => route('resort.accommodation.BuildingDestory', ['id' => '__ID__']),
+            'roomStore'       => route('resort.accommodation.StoreFloorandroom'),
+            'roomDestroy'     => route('resort.accommodation.FloorAndRoomDestroy', ['id' => '__ID__']),
+            'setupStore'      => route('resort.accommodation.AvailableAccommodationStore'),
+            'setupUpdate'     => route('resort.accommodation.AvailableAccommodationUpdate', ['id' => '__ID__']),
+            'setupDestroy'    => route('resort.accommodation.AvailableAccommodationDestroy', ['id' => '__ID__']),
+            'beds'            => route('resort.accommodation.getBeds', ['id' => '__ID__']),
+            'escalation'      => route('resort.accommodation.config.EscalationDay'),
+            'typeStore'       => route('resort.accommodation.AccommodationTypeStore'),
+            'typeDestroy'     => route('resort.accommodation.Accommodationdestory', ['id' => '__ID__']),
+            'catStore'        => route('resort.accommodation.StoreInvCategory'),
+            'catDestroy'      => route('resort.accommodation.Catdestory', ['id' => '__ID__']),
+            'uploadRooms'     => route('resort.accommodation.AccommodationAvailableFileStore'),
+            'uploadQuick'     => route('resort.accommodation.QuickAssignmentFileStore'),
+            // links
+            'assign'    => route('resort.accommodation.AssignAccommation'),
+            'inventory' => route('resort.accommodation.inventory'),
+        ],
+        'types'     => $AccommodationType->map(fn ($t) => ['id' => $t->id, 'n' => $t->AccommodationName])->values(),
+        'buildings' => $BuildingData->map(fn ($b) => ['id' => $b->id, 'n' => $b->BuildingName])->values(),
+        // only items that still have stock; "per bed" = the inventory item's own per-person flag
+        'items'     => $InventoryModule->map(fn ($i) => [
+            'id'    => $i->id,
+            'n'     => $i->ItemName,
+            'code'  => $i->ItemCode,
+            'cat'   => $i->Inv_Cat_id,
+            'avail' => max(0, (int) $i->Quantity - (int) ($i->Occupied ?? 0)),
+            'per'   => ($i->assignment_type ?? 'per_person') !== 'per_room',
+            'dq'    => (int) ($i->default_qty_per_unit ?? 0),
+        ])->values(),
+        'escalation' => optional($EscalationDay)->EscalationDay,
+        'cleaning'   => config('settings.CleaningSchedule'),
+    ];
+@endphp
 <style>
     #accommodation-config-hero { padding-bottom: 40px; }
     @media (max-width: 575.98px) {
@@ -25,1646 +76,148 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
-                <!-- <div class="col-auto">
-                    <div class="d-flex justify-content-end">
-                        <a href="#" class="btn btn-theme">Request Manning</a>
-                    </div>
-                </div> -->
             </div>
         </div>
 
-        <div class="row g-4">
+<div id="acfg">
+  <div class="tabs" id="tabs" role="tablist" aria-label="Accommodation configuration">
+    <span class="ind" id="ind"></span>
+    <button type="button" role="tab" class="on" data-t="rooms">Buildings &amp; rooms</button>
+    <button type="button" role="tab" data-t="types">Accommodation types</button>
+    <button type="button" role="tab" data-t="inv">Inventory categories</button>
+    <button type="button" role="tab" data-t="alerts">Alerts &amp; escalation</button>
+    <button type="button" role="tab" data-t="bulk">Bulk upload</button>
+  </div>
 
-            <div class="col-lg-6">
-                <div class="card h-100">
-                    <div class="card-title">
-                        <h3>Building Name</h3>
-                        <div class="text-end">
-                            <a href="{{ route('resort.accommodation.config.BuildingIndex') }}" class="a-link">View All</a>
-                        </div>
-                    </div>
-                    <form id="BuildingForm">
-                        @csrf
-                        <div class="row g-xl-4 g-3">
-                            <div class="col-md-12">
-                                <label for="BuildingName" class="form-label">Building Name</label>
-                                <input type="text" class="form-control" name="BuildingName" id="BuildingName" placeholder="Enter building name">
-                            </div>
-                        </div>
-                        <div class="card-footer text-end mt-3">
-                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-            <div class="col-lg-6">
-                <div class="card h-100">
-                    <div class="card-title">
-                        <h3>Accommodation Type</h3>
-                        <div class="text-end">
-                            <a href="{{ route('resort.accommodation.config.AccommodationIndex') }}" class="a-link">View All</a>
-                        </div>
-                    </div>
-                    <form id="AccommodationTypeForm">
-                        @csrf
-                        <div class="row g-xl-4 g-3">
-                            <div class="col-md-12">
-                                <label for="AccommodationName" class="form-label">Accommodation Name</label>
-                                <input type="text" class="form-control" name="AccommodationName" id="AccommodationName" placeholder="Enter accommodation type">
-                            </div>
-                            {{-- Color option commented out
-                            <div class="col-md-6">
-                                <label for="AccommodationColor" class="form-label">Color</label>
-                                <input type="color" class="form-control" name="Color" id="AccommodationColor">
-                            </div>
-                            --}}
-                        </div>
-                        <div class="card-footer text-end mt-3">
-                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-            <div class="col-lg-12">
-                <div class="card">
-                    <div class="card-title">
-                        <h3> Floor And Room Name </h3>
-                        <div class="text-end">
-                            <a href="{{ route('resort.accommodation.config.FloorRoomIndex') }}" class="a-link">View All</a>
-                        </div>
-                    </div>
-                    <form id="FloorAndRoomForm">
-                        @csrf
-                        <div class="row g-xl-4 g-3 ">
-                            <div class="col-md-4 col-md-4 col-sm-6">
-                                <label for="typeAccom" class=" form-label">Select Building</label>
-                                <select class="form-select dd-native-select" id="building_id" name="building_id">
-                                    <option value=""></option>
-                                    @if($BuildingData->isNotEmpty())
-                                            @foreach ($BuildingData as $a)
-                                                <option value="{{ $a->id }}">{{ $a->BuildingName }}</option>
-                                            @endforeach
-                                    @endif
-                                </select>
-                                <div class="dd" data-target="#building_id">
-                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                        <span class="dd-lbl">Select Building</span>
-                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                    </button>
-                                    <div class="dd-panel" role="listbox" aria-label="Building">
-                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a building…"></div>
-                                        <div class="dd-scroll">
-                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Building</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                            @if($BuildingData->isNotEmpty())
-                                                @foreach ($BuildingData as $a)
-                                                <div class="dd-item" role="option" data-value="{{ $a->id }}"><span class="dd-nm">{{ $a->BuildingName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                @endforeach
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-lg-4 col-md-4 col-sm-6">
-                                <label for="floor" class="form-label">FLOOR</label>
-                                <input type="number" min="0" class="form-control" id="Floor_1" name="Floor" placeholder="0 for Ground Floor">
-                            </div>
-                            <div class="col-lg-4 col-md-4 col-sm-6">
-                                <label for="roomNo" class=" form-label">ROOM NO.</label>
-                                <input type="number" min="1" class="form-control" id="Room" name="Room" placeholder="1st floor">
-                            </div>
-                        </div>
-
-                        <div class="card-footer text-end mt-3">
-                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-            <div class="col-lg-12 ">
-                <div class="card">
-                    <div class="card-title">
-                        <h3>Accommodation</h3>
-                        <div class="text-end">
-                            <a href="{{ route('resort.accommodation.AvailableAccommodationIndex') }}" class="a-link">View All</a>
-                        </div>
-                    </div>
-                    <div class="availabel-main">
-                        <div class="availabel-block mb-3">
-                            <form id="AvailableAccommodationFileForm">
-                                @csrf
-                                <div class="row g-2 align-items-center mb-3">
-                                    <div class="col-auto">
-                                        <a href="{{ route('resort.accommodation.config.AccommodationTemplete') }}" class="btn eb-btn-secondary btn-sm">Download Template</a>
-                                    </div>
-                                    <div class="col-auto">
-                                        <div class="uploadFile-block">
-                                            <div class="uploadFile-btn me-0">
-                                                <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
-                                                <input type="file" name="AvailableAccommodationFile" id="uploadFile" accept=".csv, .xls, .xlsx">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <button type="submit" class="btn eb-btn-primary btn-sm availableFormSubmit">Submit</button>
-                                    </div>
-                                </div>
-                            </form>
-                            <form id="AvailableAccommodationForm" data-parsley-validate>
-    @csrf
-                                <div class="row g-xl-4 g-3 appendAvailableAccommodation">
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="building" class="form-label">BUILDING NAME</label>
-
-                                        <select class="form-select dd-native-select buildingAvailable" data-flag="A" id="building_1"data-id= "1"
-                                        name="BuildingName[1]" placeholder=" Select Building"
-                                         required data-parsley-type="digits"
-                                        data-parsley-required-message="Building name is required."
-
-                                        data-parsley-errors-container="#type_accom_error_1">
-                                            <option> </option>
-                                            @if($BuildingData->isNotEmpty())
-                                                    @foreach ($BuildingData as $a)
-                                                        <option value="{{ $a->id }}">{{ $a->BuildingName }}</option>
-                                                    @endforeach
-                                            @endif
-                                        </select>
-                                        <div class="dd" data-target="#building_1">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Building</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Building">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a building…"></div>
-                                                <div class="dd-scroll">
-                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Building</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                    @if($BuildingData->isNotEmpty())
-                                                        @foreach ($BuildingData as $a)
-                                                        <div class="dd-item" role="option" data-value="{{ $a->id }}"><span class="dd-nm">{{ $a->BuildingName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                        @endforeach
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                       <div id="type_accom_error_1"></div>
-
-                                    </div>
-
-
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="floor" class="form-label">FLOOR</label>
-                                        <select class="form-select dd-native-select AvailableFloor" data-flag="A" id="AvailableFloor_1"
-                                        data-id= "1" name="Floor[1]" placeholder=" Select Building" required   required
-                                         data-parsley-trigger="keyup" data-parsley-required-message="Please select floor."
-                                             data-parsley-errors-container="#type_accom_error_2"
-                                         >
-
-                                        </select>
-                                        <div class="dd" data-target="#AvailableFloor_1">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Floor</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Floor">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a floor…"></div>
-                                                <div class="dd-scroll"></div>
-                                            </div>
-                                        </div>
-                                        <div id="type_accom_error_2"></div>
-
-
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="roomNo" class=" form-label">ROOM NO.</label>
-                                        <select class="form-select dd-native-select RoomNo" data-id= "1" id="RoomNo_1" name="RoomNo[1]"
-                                         required    data-parsley-type="digits" data-parsley-trigger="keyup"
-                                         data-parsley-required-message="Please select floor."  data-parsley-errors-container="#type_accom_error_3">
-
-                                        </select>
-                                        <div class="dd" data-target="#RoomNo_1">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Room</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Room">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a room…"></div>
-                                                <div class="dd-scroll"></div>
-                                            </div>
-                                        </div>
-                                        <div id="type_accom_error_3"></div>
-
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="typeAccom" class=" form-label">TYPE OF ACCOMMODATION</label>
-                                        <select class="form-select dd-native-select" id="TypeAccommodation_1" name="Accommodation_type_id[1]"
-                                        required data-parsley-trigger="change".
-                                         data-parsley-required-message="Please select accommodation type."
-                                         data-parsley-errors-container="#type_accom_error_4">
-                                        <option value=""></option>
-                                        @if($AccommodationType->isNotEmpty())
-                                                @foreach ($AccommodationType as $a)
-                                                    <option value="{{ $a->id }}">{{ $a->AccommodationName }}</option>
-                                                @endforeach
-                                        @endif
-                                        </select>
-                                        <div class="dd" data-target="#TypeAccommodation_1">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Type</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Accommodation Type">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a type…"></div>
-                                                <div class="dd-scroll">
-                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                    @if($AccommodationType->isNotEmpty())
-                                                        @foreach ($AccommodationType as $a)
-                                                        <div class="dd-item" role="option" data-value="{{ $a->id }}"><span class="dd-nm">{{ $a->AccommodationName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                        @endforeach
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div id="type_accom_error_4"></div>
-
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="capacity" class="form-label">CAPACITY</label>
-                                        <input type="number" min="1" class="form-control" id="Capacity_1" name="Capacity[1]" placeholder="4 people"requireddata-parsley-trigger="keyup" data-parsley-required-message="Capacity is required.">
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="roomType" class="form-label">ROOM TYPE</label>
-                                        <select class="form-select dd-native-select" id="RoomType_1" name="RoomType[1]" required data-parsley-trigger="change" data-parsley-required-message="Room type is required."
-                                        data-parsley-errors-container="#type_accom_error_5">
-                                            <?php
-                                                $ROOM = config('settings.eligibilty');
-                                            ?>
-                                                @if($ROOM)
-                                                    @foreach ($ROOM as $k=>$a)
-                                                        <option value="{{ $k }}">{{ $a }}</option>
-                                                    @endforeach
-                                                @endif
-                                        </select>
-                                        @php $firstRoomType = $ROOM ? reset($ROOM) : null; @endphp
-                                        <div class="dd" data-target="#RoomType_1">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">{{ $firstRoomType ?? 'Select Room Type' }}</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Room Type">
-                                                <div class="dd-scroll">
-                                                    @if($ROOM)
-                                                        @foreach ($ROOM as $k=>$a)
-                                                        <div class="dd-item{{ $loop->first ? ' active' : '' }}" role="option" data-value="{{ $k }}"><span class="dd-nm">{{ $a }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                        @endforeach
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div id="type_accom_error_5"></div>
-
-                                    </div>
-                                    <div class="col-lg-12" id="bedNoContainer_1">
-                                        <label class="form-label">BED NAMES</label>
-                                        <div class="row g-2" id="bedNoFields_1">
-                                            <div class="col-auto"><small class="text-muted">Enter capacity first to generate bed fields</small></div>
-                                        </div>
-                                        <input type="hidden" name="BedNo[1]" id="BedNo_1" value="0">
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for=" " class="form-label d-block">BLOCK FOR?</label>
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input" type="radio" name="blockFor[1]" value="Male" id="male_1"
-                                               required data-parsley-required-message="Please select an option.">
-                                            <label class="form-check-label" for="male_1">Male</label>
-                                        </div>
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input" type="radio" name="blockFor[1]"  value="Female" id="female_1"
-                                                 checked required data-parsley-required-message="Please select an option.">
-                                            <label class="form-check-label" for="female_1">Female</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="roomStatus" class="form-label">CLEANING SCHEDULE</label>
-                                            <select class="form-select dd-native-select" id="CleaningSchedule_1" name="CleaningSchedule[1]" aria-label="Default select example" required data-parsley-required-message="Please select an option.">
-                                                <?php
-                                                    $CleaningSchedule = config('settings.CleaningSchedule');
-                                                ?>
-                                                    @if($CleaningSchedule)
-                                                        @foreach ($CleaningSchedule as $a)
-                                                            <option value="{{ $a }}">{{ $a }}</option>
-                                                        @endforeach
-                                                    @endif
-                                        </select>
-                                        <div class="dd" data-target="#CleaningSchedule_1">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">{{ $CleaningSchedule[0] ?? 'Select' }}</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Cleaning Schedule">
-                                                <div class="dd-scroll">
-                                                    @if($CleaningSchedule)
-                                                        @foreach ($CleaningSchedule as $a)
-                                                        <div class="dd-item{{ $loop->first ? ' active' : '' }}" role="option" data-value="{{ $a }}"><span class="dd-nm">{{ $a }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                        @endforeach
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="occupThres" class="form-label">OCCUPANCY THRESHOLDS</label>
-                                        <input type="number" min="0" max="100" class="form-control" id="Occupancytheresold_1" name="Occupancytheresold[1]" placeholder="90%" required data-parsley-type="digits" data-parsley-trigger="keyup" data-parsley-required-message="Occupancy threshold is required.">
-                                    </div>
-                                    <div class="col-lg-6 col-md-6 col-sm-6">
-                                        <label for="invent" class="form-label">WHAT ARE THE INVENTORIES?</label>
-                                        <select class="form-select select2-inventory" multiple id="Inv_Cat_id_1" data-row="1"
-                                        aria-label="Default select example"
-                                        data-parsley-errors-container="#type_accom_error_6"
-                                        data-placeholder="Select inventories">
-
-                                        @if($InventoryModule->isNotEmpty())
-                                            @foreach ($InventoryModule as $a)
-                                                <option value="{{ $a->id }}">{{ $a->ItemName }} / {{ $a->ItemCode }}</option>
-                                            @endforeach
-                                        @endif
-                                        </select>
-                                        <div id="type_accom_error_6"></div>
-                                    </div>
-                                    <div class="col-lg-6 col-md-6 col-sm-6">
-                                        <label for="invQty" class="form-label">INVENTORY QUANTITIES</label>
-                                        <div class="row g-2" id="invQtyFields_1">
-                                            <div class="col-auto"><small class="text-muted">Select inventories to set quantities</small></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <input type="hidden" name="AvailableCount" id="AvailableCount"  value="1">
-                                <div class="mb-4">
-                                    <button type="button" class="btn eb-btn-accent btn-sm addMore-availabel">Add More</a>
-                                </div>
-                                <div class="card-footer text-end">
-                                    <button type="submit" class="btn eb-btn-primary btn-sm availableFormSubmit">Submit</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-12 ">
-           
-                <form id="OccupancyThresholdForm" data-parsley-validate>
-    @csrf
-                    <div class="card">
-                        <div class="card-title">
-                            <h3>Occupancy Levels Hit A Critical Threshold</h3>
-                        </div>
-                        <div class="Occupancy-main">
-                            <input type="hidden" id="AvailablethreshodCount" name="AvailablethreshodCount" value="1">
-
-                            <div class="Occupancy-block mb-3 AppendOccupancyThreshold">
-                                <div class="row g-xl-4 g-3 ">
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="BuildingName" class="form-label">Building Name</label>
-
-                                        <select class="form-select dd-native-select OccupancybuildingAvailable" data-flag="Occupancy" id="building_occupancy_1" data-id="1"
-                                        name="building_id[1]" placeholder="Select Building"
-                                        required data-parsley-type="digits"
-                                        data-parsley-required-message="Please select building."
-                                        data-parsley-errors-container="#type_occupancy_error_0_1">
-                                        <option value=""></option>
-                                            @if($BuildingData->isNotEmpty())
-                                                @foreach ($BuildingData as $a)
-                                                    <option value="{{ $a->id }}">{{ $a->BuildingName }}</option>
-                                                @endforeach
-                                            @endif
-                                        </select>
-                                        <div class="dd" data-target="#building_occupancy_1">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Building</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Building">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a building…"></div>
-                                                <div class="dd-scroll">
-                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Building</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                    @if($BuildingData->isNotEmpty())
-                                                        @foreach ($BuildingData as $a)
-                                                        <div class="dd-item" role="option" data-value="{{ $a->id }}"><span class="dd-nm">{{ $a->BuildingName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                        @endforeach
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div id="type_occupancy_error_0_1"></div>
-                                    </div>
-                                    
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="Floor" class="form-label">Floor</label>
-
-                                        <select class="form-select dd-native-select AvailableFloor_Occupancy" id="AvailableFloor_Occupancy_1" data-flag="Occupancy"
-                                        data-id="1" name="Floor[1]" placeholder="Select Floor" required
-                                        data-parsley-trigger="change" data-parsley-required-message="Please select a floor."
-                                        data-parsley-errors-container="#type_occupancy_f_error_0_1">
-                                        </select>
-                                        <div class="dd" data-target="#AvailableFloor_Occupancy_1">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Floor</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Floor">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a floor…"></div>
-                                                <div class="dd-scroll"></div>
-                                            </div>
-                                        </div>
-                                        <div id="type_occupancy_f_error_0_1"></div>
-                                    </div>
-                                    
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="roomNo" class="form-label">Room No.</label>
-                                        <select class="form-select dd-native-select RoomNo" data-id="1" id="RoomNo_Occupancy_1"
-                                        name="RoomNo[1]" required data-parsley-trigger="change"
-                                        data-parsley-required-message="Please select a room number."
-                                        data-parsley-errors-container="#type_occupancy_room_error_0_1">
-                                        </select>
-                                        <div class="dd" data-target="#RoomNo_Occupancy_1">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Room</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Room">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a room…"></div>
-                                                <div class="dd-scroll"></div>
-                                            </div>
-                                        </div>
-                                        <div id="type_occupancy_room_error_0_1"></div>
-                                    </div>
-                                    
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="ThresSoldLevel_1" class="form-label">Set Occupancy Level</label>
-                                        <input type="number" min="0" max="100" class="form-control" 
-                                        name="ThresSoldLevel[1]" id="ThresSoldLevel_1" placeholder="Set Occupancy level" 
-                                        required data-parsley-type="number" data-parsley-min="0" data-parsley-max="100"
-                                        data-parsley-required-message="Occupancy level is required."
-                                        data-parsley-type-message="Please enter a valid number."
-                                        data-parsley-min-message="Minimum value is 0."
-                                        data-parsley-max-message="Maximum value is 100."
-                                        data-parsley-errors-container="#type_occupancy_level_error_0_1">
-                                        <div id="type_occupancy_level_error_0_1"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mb-4">
-                            <button type="button" class="btn eb-btn-accent btn-sm addMore-Occupancy_threshod">Add More</button>
-                        </div>
-                        <div class="card-footer text-end">
-                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
-                        </div>
-                    </div>
-                </form>
-
-            </div>
-            <div class="col-lg-6 ">
-                <div class="card h-100">
-                    <div class="card-title">
-                        <h3>Quick Assignment</h3>
-                    </div>
-                    <form id="QuickAssignmentForm">
-                        @csrf
-                        <div class="row g-2 align-items-center mb-3">
-                            <div class="col-auto"><a href="{{route('resort.accommodation.config.QuickAssignmentTemplete')}}" class="btn eb-btn-secondary btn-sm">Download
-                                    Template</a></div>
-                            <div class="col-auto">
-                                <div class="uploadFile-block">
-                                    <div class="uploadFile-btn me-0">
-                                        <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
-                                        <input type="file"  name="QuickAssignmentFile"id="uploadFile1">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-footer text-end"><button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-            <div class="col-lg-6 ">
-                <div class="card">
-                    <div class="card-title">
-                        <h3>Escalation Day</h3>
-                    </div>
-                    <form id="EscalationDay">
-    @csrf
-                        <div class="mb-3">
-                            <input type="number" name="EscalationDay"
-                            value="{{ old('EscalationDay', isset($EscalationDay) ? $EscalationDay->EscalationDay : '') }}"
-                            class="form-control" placeholder="Define Time Duration">
-                        </div>
-                        <div class="card-footer text-end"><button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-            <div class="col-lg-6 ">
-                <div class="card">
-                    <div class="card-title">
-                        <h3>Inventory Category</h3>
-                        <div class="text-end">
-                            <a href="{{ route('resort.accommodation.config.InvenotryCatIndex') }}" class="a-link">View All</a>
-                        </div>
-                    </div>
-                    <form id="InventoryCategoryForm">
-                        @csrf
-                        <div class="mb-3">
-                            <input type="text" class="form-control" name="CategoryName" placeholder="Category Name">
-                        </div>
-                        <div class="card-footer text-end"><button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-            {{-- Accommodation Type moved to top row alongside Building Name --}}
+  <!-- Buildings & rooms -->
+  <div class="pane" id="p-rooms">
+    <div class="acc">
+      <section class="ac-card rail" aria-labelledby="blT">
+        <div class="ch"><span class="t" id="blT">Buildings</span><span class="cnt" id="bc"></span>
+          <button class="ac-btn btn-main sm addtop" type="button" id="addB"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add building</button></div>
+        <label class="bsrch" id="bsW" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="bs" placeholder="Search buildings" aria-label="Search buildings" autocomplete="off"></label>
+        <div class="bfl" id="bfl" hidden></div>
+        <div class="bl" id="bl"><div class="skel"></div></div>
+        <div class="rlinks">
+          <a href="{{ route('resort.accommodation.config.BuildingIndex') }}">Building list</a>
+          <a href="{{ route('resort.accommodation.config.FloorRoomIndex') }}">Floor and room list</a>
+          <a href="{{ route('resort.accommodation.AvailableAccommodationIndex') }}">Room setup list</a>
         </div>
+      </section>
+      <section class="ac-card main" id="main" aria-live="polite"><div class="skel"></div></section>
+    </div>
+  </div>
+
+  <!-- Accommodation types -->
+  <div class="pane" id="p-types" hidden>
+    <div class="cols">
+      <section class="ac-card">
+        <div class="ch"><span class="t">Accommodation types</span><span class="cnt" id="tc"></span><a class="va" href="{{ route('resort.accommodation.config.AccommodationIndex') }}">View all</a></div>
+        <div class="sub">The names you use for room sharing, like Single share or Four share. You pick one when you set up rooms, and set the number of beds there.</div>
+        <div class="lst" id="tl"></div>
+        <div class="addrow"><input class="inp" id="tN" placeholder="e.g. Private, Triple share" maxlength="50" autocomplete="off" aria-label="New accommodation type"><button class="ac-btn btn-main" type="button" id="tAdd">Add type</button></div>
+        <div class="err" id="tE"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Inventory categories -->
+  <div class="pane" id="p-inv" hidden>
+    <div class="cols">
+      <section class="ac-card">
+        <div class="ch"><span class="t">Inventory categories</span><span class="cnt" id="cc"></span><a class="va" href="{{ route('resort.accommodation.inventory') }}">Add items<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        <div class="sub">Groups for the things you put in rooms, like furniture or bedding.</div>
+        <div class="chipl" id="cl"></div>
+        <div class="addrow"><input class="inp" id="cN" placeholder="e.g. Electronics" maxlength="50" autocomplete="off" aria-label="New inventory category"><button class="ac-btn btn-main" type="button" id="cAdd">Add category</button></div>
+        <div class="err" id="cE"></div>
+        <div class="rlinks"><a href="{{ route('resort.accommodation.config.InvenotryCatIndex') }}">Category list</a></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Alerts & escalation -->
+  <div class="pane" id="p-alerts" hidden>
+    <div class="cols">
+      <section class="ac-card">
+        <div class="ch"><span class="t">Occupancy alert</span></div>
+        <div class="sub">The occupancy alert level new rooms start with. You can change it for each room.</div>
+        <div class="rng"><input type="range" min="50" max="100" step="5" value="90" id="aR" aria-label="Default occupancy alert"><b id="aV">90%</b></div>
+        <div class="ac-row" style="margin-top:16px"><button class="ac-btn btn-main" type="button" id="aSave">Save</button></div>
+      </section>
+      <section class="ac-card">
+        <div class="ch"><span class="t">Escalation day</span></div>
+        <div class="sub">If a maintenance request stays open longer than this, the person it’s assigned to and HR are notified.</div>
+        <div class="ac-row"><div class="step" id="eS"><button type="button" data-d="-1" aria-label="Fewer days">−</button><input type="number" value="1" min="1" max="30" aria-label="Days"><button type="button" data-d="1" aria-label="More days">+</button></div><span style="font-size:13px;color:var(--muted)">day(s)</span></div>
+        <div class="err" id="eE"></div>
+        <div class="ac-row" style="margin-top:16px"><button class="ac-btn btn-main" type="button" id="eSave">Save</button></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Bulk upload -->
+  <div class="pane" id="p-bulk" hidden>
+    <div class="cols">
+      <section class="ac-card">
+        <div class="ch"><span class="t">Rooms from Excel</span></div>
+        <div class="sub">Set up many rooms at once: building, floor, room, type, beds, who stays and inventory.</div>
+        <div class="up" data-up="rooms"><span class="ui"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span><span class="ut" data-ut>Drop your filled template here<small>.xlsx · one row per room</small></span><input type="file" accept=".csv,.xls,.xlsx" aria-label="Rooms file"><button class="ac-btn btn-main" type="button" data-pick>Upload file</button></div>
+        <div class="ac-row" style="margin-top:12px"><a class="ac-btn btn-gh" href="{{ route('resort.accommodation.config.AccommodationTemplete') }}">Download template</a></div>
+        <div data-ures></div>
+      </section>
+      <section class="ac-card">
+        <div class="ch"><span class="t">Quick assignment</span></div>
+        <div class="sub">Assign staff to beds in bulk from a spreadsheet.</div>
+        <div class="up" data-up="quick"><span class="ui"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></span><span class="ut" data-ut>Drop your filled template here<small>.xlsx · one row per employee</small></span><input type="file" accept=".csv,.xls,.xlsx" aria-label="Quick assignment file"><button class="ac-btn btn-main" type="button" data-pick>Upload file</button></div>
+        <div class="ac-row" style="margin-top:12px"><a class="ac-btn btn-gh" href="{{ route('resort.accommodation.config.QuickAssignmentTemplete') }}">Download template</a></div>
+        <div data-ures></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- selection bar -->
+  <div class="sbar" id="sbar" role="region" aria-label="Selected rooms">
+    <span class="sc" id="sc"></span>
+    <button class="ac-btn btn-main" type="button" id="sSet">Set up rooms</button>
+    <button class="ac-btn btn-gh" type="button" id="sDel">Remove</button>
+    <button class="ib" type="button" id="sClr" aria-label="Clear selection" data-tip="Clear selection"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button>
+  </div>
+
+  <!-- room setup drawer -->
+  <div class="scrim" id="scrim"></div>
+  <aside class="dr" id="dr" role="dialog" aria-modal="true" aria-labelledby="drT" aria-hidden="true">
+    <div class="drh"><div><div class="dt" id="drT"></div><div class="ds" id="drS"></div></div>
+      <button class="ib" type="button" id="drX" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button></div>
+    <div class="drb" id="drb"></div>
+    <div class="drf"><span class="why" id="why"></span><button class="ac-btn btn-gh" type="button" id="drC">Cancel</button><button class="ac-btn btn-main btn-lg" type="button" id="drOk"></button></div>
+  </aside>
+
+  <!-- add building / floors modal -->
+  <div class="md" id="md" role="dialog" aria-modal="true" aria-labelledby="mT" aria-hidden="true">
+    <div class="mdb">
+      <div class="mt" id="mT"></div><div class="ms" id="mS"></div>
+      <div class="fs" id="mNameF"><label for="mName">Building name</label><input class="inp" id="mName" placeholder="e.g. Building C, GM Villa, Sup Block" maxlength="50" autocomplete="off"><div class="err" id="mE"></div></div>
+      <div class="mdiv" id="mDiv"></div>
+      <div class="grid2" style="align-items:end">
+        <div class="fs"><span class="lb">How many floors</span><div class="step" id="mF"><button type="button" data-d="-1" aria-label="Fewer floors">−</button><input type="number" value="3" min="1" max="40" aria-label="Floors"><button type="button" data-d="1" aria-label="More floors">+</button></div></div>
+        <label class="tg" id="mGF" style="padding-bottom:7px"><input type="checkbox" id="mG" checked><span class="sw"></span>Starts with a ground floor</label>
+      </div>
+      <div class="fs" id="mNS" style="margin-top:16px"><span class="lb">Room numbers</span><div class="seg" id="mNSs" role="radiogroup"><button type="button" role="radio" data-ns="F" class="on" aria-checked="true">By floor · 101, 102…</button><button type="button" role="radio" data-ns="C" aria-checked="false">Continuous · 1, 2, 3…</button></div></div>
+      <div class="ftab" id="mP" aria-live="polite"></div>
+      <div class="mres" id="mR" hidden></div>
+      <div class="mf"><span class="msum" id="mSum"></span><button class="ac-btn btn-gh" type="button" id="mC">Cancel</button><button class="ac-btn btn-main btn-lg" type="button" id="mOk"></button></div>
+    </div>
+  </div>
+</div>
 
     </div>
 </div>
-
-
-
-
-@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
-@include('resorts._dropdown_styles')
-<style>
-    .select2-inventory + .select2-container {
-        width: 100% !important;
-    }
-    .select2-inventory + .select2-container .select2-selection--multiple {
-        min-height: 38px;
-        border: 1px solid #ced4da;
-        border-radius: 6px;
-        padding: 4px 8px;
-    }
-    .select2-inventory + .select2-container .select2-selection--multiple .select2-selection__choice {
-        background-color: var(--teal);
-        color: #fff;
-        border: none;
-        border-radius: 4px;
-        padding: 2px 8px;
-        margin: 2px 4px 2px 0;
-        font-size: 12px;
-    }
-    .select2-inventory + .select2-container .select2-selection--multiple .select2-selection__choice__remove {
-        color: #fff;
-        margin-right: 4px;
-    }
-    .select2-inventory + .select2-container .select2-selection--multiple .select2-selection__choice__remove:hover {
-        color: #ff6b6b;
-    }
-</style>
+<link href="{{ URL::asset('resorts_assets/css/accommodation-config.css') }}?v={{ @filemtime(public_path('resorts_assets/css/accommodation-config.css')) }}" rel="stylesheet">
 @endsection
 
 @section('import-scripts')
-<script>
-$(document).ready(function()
-{
-    // Initialize inventory multi-select
-    $('.select2-inventory').select2({
-        placeholder: 'Select inventories',
-        allowClear: true,
-        width: '100%'
-    });
-
-    // Inventory stock data for validation
-    var invStock = {
-        @if($InventoryModule->isNotEmpty())
-            @foreach($InventoryModule as $a)
-                '{{ $a->id }}': {{ ($a->Quantity ?? 0) - ($a->Occupied ?? 0) }},
-            @endforeach
-        @endif
-    };
-
-    // Generate quantity fields when inventory items are selected/deselected
-    $(document).on('change', '.select2-inventory', function() {
-        var rowId = $(this).data('row') || '1';
-        var selected = $(this).val() || [];
-        var $container = $('#invQtyFields_' + rowId);
-        var existingQtys = {};
-
-        // Preserve existing quantities
-        $container.find('input[type="number"]').each(function() {
-            existingQtys[$(this).data('item-id')] = $(this).val();
-        });
-
-        $container.empty();
-
-        if (selected.length > 0) {
-            selected.forEach(function(itemId) {
-                var itemName = $('option[value="' + itemId + '"]', '#Inv_Cat_id_' + rowId).text().trim();
-                var qty = existingQtys[itemId] || 1;
-                var maxQty = invStock[itemId] || 999;
-                var shortName = itemName.split('/')[0].trim().substring(0, 15);
-                $container.append(
-                    '<div class="col-lg-4 col-md-4 col-sm-6">' +
-                        '<div class="input-group input-group-sm">' +
-                            '<span class="input-group-text" style="font-size:11px;" title="' + itemName + ' (Available: ' + maxQty + ')">' + shortName + '</span>' +
-                            '<input type="number" class="form-control" name="InvQty[' + rowId + '][' + itemId + ']" data-item-id="' + itemId + '" value="' + Math.min(qty, maxQty) + '" min="1" max="' + maxQty + '" placeholder="Qty">' +
-                            '<input type="hidden" name="Inv_Cat_id[' + rowId + '][]" value="' + itemId + '">' +
-                        '</div>' +
-                        '<small class="text-muted" style="font-size:10px;">Available: ' + maxQty + '</small>' +
-                    '</div>'
-                );
-            });
-        }
-    });
-
-    $("#Inv_Cat_id_1").select2({
-       placeholder:'Type of Inventory',
-    });
-
-    $('#InventoryCategoryForm').validate({
-        rules: {
-            CategoryName: {
-                required: true,
-            }
-        },
-        messages: {
-            CategoryName: {
-                required: "Please Enter Category Name.",
-            }
-        },
-        submitHandler: function(form) {
-            var formData = new FormData(form);
-
-            $.ajax({
-                url: "{{ route('resort.accommodation.StoreInvCategory') }}", // Your route for file upload
-                type: "POST",
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    if (response.success) {
-                        toastr.success(response.message, "Success", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        form.reset();
-
-
-                    } else {
-                        toastr.error(response.message, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                },
-                error: function(response) {
-                    var errors = response.responseJSON;
-                    var errs = '';
-                    $.each(errors.errors, function(key, error) {
-                        errs += error + '<br>';
-                    });
-                    toastr.error(errs, {
-                        positionClass: 'toast-bottom-right'
-                    });
-                }
-            });
-        }
-    });
-    $('#AccommodationTypeForm').validate({
-        rules: {
-            AccommodationName: {
-                required: true,
-            }
-        },
-        messages: {
-            AccommodationName: {
-                required: "Please Enter Accommodation Name.",
-            }
-        },
-        submitHandler: function(form) {
-            var formData = new FormData(form);
-
-            $.ajax({
-                url: "{{ route('resort.accommodation.AccommodationTypeStore') }}", // Your route for file upload
-                type: "POST",
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    if (response.success) {
-                        toastr.success(response.message, "Success", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        form.reset();
-
-                    } else {
-                        toastr.error(response.message, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                },
-                error: function(response) {
-                    var errors = response.responseJSON;
-                    var errs = '';
-                    $.each(errors.errors, function(key, error) {
-                        errs += error + '<br>';
-                    });
-                    toastr.error(errs, {
-                        positionClass: 'toast-bottom-right'
-                    });
-                }
-            });
-        }
-    });
-
-    $('#EscalationDay').validate({
-        rules: {
-            EscalationDay:
-            {
-                required: true,
-            }
-        },
-        messages:
-        {
-            EscalationDay:
-            {
-                required: "Please Enter Escalation Day.",
-            }
-        },
-        submitHandler: function(form) {
-            var formData = new FormData(form);
-
-            $.ajax({
-                url: "{{ route('resort.accommodation.config.EscalationDay') }}", // Your route for file upload
-                type: "POST",
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    if (response.success) {
-                        toastr.success(response.message, "Success", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        form.reset();
-
-                    } else {
-                        toastr.error(response.message, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                },
-                error: function(response) {
-                    var errors = response.responseJSON;
-                    var errs = '';
-                    $.each(errors.errors, function(key, error) {
-                        errs += error + '<br>';
-                    });
-                    toastr.error(errs, {
-                        positionClass: 'toast-bottom-right'
-                    });
-                }
-            });
-        }
-    });
-
-
-    $('#OccupancyThresholdForm').validate({
-        rules: {
-            "building_id[]": {
-                required: true,
-            },
-            "Floor[]": {
-                required: true,
-            },
-            "RoomNo[]": {
-                required: true,
-            },
-            "ThresSoldLevel[]": {
-                required: true,
-            },
-        },
-        messages: {
-            "building_id[]": {
-                required: "Please Select Building Name.",
-            },
-            "Floor[]": {
-                required: "Please Enter Floor Name.",
-            },
-            "RoomNo[]": {
-                required: "Please Enter Room Name.",
-            },
-            "ThresSoldLevel[]": {
-                required: "Please Enter Threshold level.",
-            },
-        },
-        submitHandler: function(form) {
-            var formData = new FormData(form);
-
-            $.ajax({
-                url: "{{ route('resort.accommodation.config.OccupancyThresholdForm') }}",
-                type: "POST",
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    if (response.success) {
-                        toastr.success(response.message, "Success", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        form.reset();
-
-                    } else {
-                        toastr.error(response.message, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                },
-                error: function(response) {
-                    var errors = response.responseJSON;
-                    var errs = '';
-                    $.each(errors.errors, function(key, error) {
-                        errs += error + '<br>';
-                    });
-                    toastr.error(errs, {
-                        positionClass: 'toast-bottom-right'
-                    });
-                }
-            });
-        }
-    });
-
-
-    $('#AvailableAccommodationForm').on('submit', function(e) {
-        e.preventDefault(); // Fix the typo here
-
-        var form = this; // Use the form being submitted
-        var formData = new FormData(form); // Create FormData object from the form
-        $('#AvailableAccommodationForm').parsley().validate();
-
-        $.ajax({
-            url: "{{ route('resort.accommodation.AvailableAccommodationStore') }}", // Your route for file upload
-            type: "POST",
-            data: formData,
-            contentType: false,
-            processData: false,
-            headers: {
-                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') // Include CSRF token
-            },
-            success: function(response) {
-                if (response.success) {
-                    toastr.success(response.message, "Success", {
-                        positionClass: 'toast-bottom-right'
-                    });
-                    form.reset();
-                    // Reset Select2 dropdowns
-                    $(form).find('select.select2-inventory').val(null).trigger('change');
-                    $(form).find('select.dd-native-select').val(null).trigger('change');
-                    $(form).find('.buildingAvailable').val(null).trigger('change');
-                    $(form).find('.AvailableFloor').each(function() {
-                        $(this).html('<option value="">Select Floor</option>');
-                        window.wisdomDD.rebuild('#' + this.id);
-                    });
-                    $(form).find('.RoomNo').each(function() {
-                        $(this).html('<option value="">Select Room</option>');
-                        window.wisdomDD.rebuild('#' + this.id);
-                    });
-                    // Reset bed name fields
-                    $('[id^="bedNoFields_"]').html('<div class="col-auto"><small class="text-muted">Enter capacity first to generate bed fields</small></div>');
-                    // Reset inventory quantity fields
-                    $('[id^="invQtyFields_"]').html('<div class="col-auto"><small class="text-muted">Select inventories to set quantities</small></div>');
-                    // Remove dynamically added rows
-                    $('.added-accommodation-row').remove();
-                    // Reset Parsley validation
-                    $(form).parsley().reset();
-                } else {
-                    toastr.error(response.message, "error", {
-                        positionClass: 'toast-bottom-right'
-                    });
-                }
-            },
-            error: function(response) {
-                    var msg = 'An unexpected error occurred.';
-                    if (response.responseJSON) {
-                        if (response.responseJSON.message) {
-                            msg = response.responseJSON.message;
-                        } else if (response.responseJSON.errors) {
-                            var errs = [];
-                            $.each(response.responseJSON.errors, function(key, error) {
-                                errs.push(Array.isArray(error) ? error.join(', ') : error);
-                            });
-                            msg = errs.join('<br>');
-                        }
-                    }
-                    toastr.error(msg, "Error", {
-                        positionClass: 'toast-bottom-right'
-                    });
-            }
-        });
-    });
-
-    $('#BuildingForm').validate({
-        rules: {
-            BuildingName: {
-                required: true,
-            }
-        },
-        messages: {
-            BuildingName: {
-                required: "Please Enter Building Name.",
-            }
-        },
-        submitHandler: function(form) {
-            var formData = new FormData(form);
-
-            $.ajax({
-                url: "{{ route('resort.accommodation.StoreBuilding') }}", // Your route for file upload
-                type: "POST",
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    if (response.success) {
-                        toastr.success(response.message, "Success", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        form.reset();
-                        window.location.reload();
-
-
-                    } else {
-                        toastr.error(response.message, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                },
-                error: function(response) {
-                    var errors = response.responseJSON;
-                    var errs = '';
-                    $.each(errors.errors, function(key, error) {
-                        errs += error + '<br>';
-                    });
-                    toastr.error(errs, {
-                        positionClass: 'toast-bottom-right'
-                    });
-                }
-            });
-        }
-    });
-
-
-
-    $('#FloorAndRoomForm').validate({
-        rules: {
-            SelectBuilding:
-            {
-                required: true,
-            },
-            Floor: {
-                required: true,
-            },
-            Room: {
-                required: true,
-            }
-        },
-        messages: {
-            SelectBuilding:
-            {
-                required: "Please Select Building Name.",
-            },
-            Floor:
-            {
-                required: "Please Enter Floor No.",
-            },
-            Room:
-            {
-                required: "Please Enter Room No.",
-                remote: "The Room already exists for the selected floor."
-            }
-        },
-        submitHandler: function(form) {
-            var formData = new FormData(form);
-            $.ajax({
-                url: "{{ route('resort.accommodation.StoreFloorandroom') }}", // Your route for file upload
-                type: "POST",
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    if (response.success) {
-                        toastr.success(response.message, "Success",
-                        {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        form.reset();
-                        window.location.reload();
-
-                    }
-                    else
-                    {
-                        toastr.error(response.message, "Error",
-                        {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                },
-                error: function(response) {
-                    var errors = response.responseJSON;
-                    var errs = '';
-                    $.each(errors.errors, function(key, error) {
-                        errs += error + '<br>';
-                    });
-                    toastr.error(errs, {
-                        positionClass: 'toast-bottom-right'
-                    });
-                }
-            });
-        }
-    });
-
-    $('#AvailableAccommodationFileForm').validate({
-        rules: {
-            AvailableAccommodationFile:
-            {
-                required: true,
-            }
-        },
-        messages: {
-            AvailableAccommodationFile:
-            {
-                required: "Please Select File.",
-            }
-        },
-        submitHandler: function(form) {
-            var formData = new FormData(form);
-            $.ajax({
-                url: "{{ route('resort.accommodation.AccommodationAvailableFileStore') }}", // Your route for file upload
-                type: "POST",
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    if (response.success) {
-                        toastr.success(response.message, "Success",
-                        {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        form.reset();
-                    }
-                    else
-                    {
-                        toastr.error(response.message, "Error",
-                        {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                },
-                error: function(response) {
-                    var errors = response.responseJSON;
-                    var errs = '';
-                    $.each(errors.errors, function(key, error) {
-                        errs += error + '<br>';
-                    });
-                    toastr.error(errs, {
-                        positionClass: 'toast-bottom-right'
-                    });
-                }
-            });
-        }
-    });
-
-    $('#QuickAssignmentForm').validate({
-        rules: {
-            QuickAssignmentFile:
-            {
-                required: true,
-            }
-        },
-        messages: {
-            QuickAssignmentFile:
-            {
-                required: "Please Select File.",
-            }
-        },
-        submitHandler: function(form) {
-            var formData = new FormData(form);
-            $.ajax({
-                url: "{{ route('resort.accommodation.QuickAssignmentFileStore') }}", // Your route for file upload
-                type: "POST",
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    if (response.success) {
-                        toastr.success(response.message, "Success",
-                        {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        form.reset();
-                    }
-                    else
-                    {
-                        toastr.error(response.message, "Error",
-                        {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                },
-                error: function(response) {
-                    var errors = response.responseJSON;
-                    var errs = '';
-                    $.each(errors.errors, function(key, error) {
-                        errs += error + '<br>';
-                    });
-                    toastr.error(errs, {
-                        positionClass: 'toast-bottom-right'
-                    });
-                }
-            });
-        }
-    });
-
-
-});
-
-    $(document).on('change','.buildingAvailable,.OccupancybuildingAvailable',function(){
-        var location = $(this).data('id');
-
-        var buildingId= $(this).val();
-        var flag= $(this).data('flag');
-
-            $.ajax({
-                url: "{{ route('resort.accommodation.config.getFloor') }}" ,
-                type: "get",
-                data: {"_token":"{{ csrf_token() }}","buildingId":buildingId},
-                success: function(response) {
-                    if (response.success)
-                    {
-                        var floor='<option value="">Select Floor</option>';
-                        $.each(response.data, function(i, v) {
-                            floor += `<option value="${v}">${v}</option>`;
-                        });
-
-                        if(flag=="Occupancy"){
-
-                            $("#RoomNo_Occupancy_"+location).html('<option value="">Select Room</option>');
-                            window.wisdomDD.rebuild('#RoomNo_Occupancy_'+location);
-                            $("#AvailableFloor_Occupancy_"+location).html(floor);
-                            window.wisdomDD.rebuild('#AvailableFloor_Occupancy_'+location);
-                        }
-                        else
-                        {
-                            $("#RoomNo_" + location).html('<option value="">Select Room</option>');
-                            window.wisdomDD.rebuild('#RoomNo_'+location);
-                            $("#AvailableFloor_" + location).html(floor);
-                            window.wisdomDD.rebuild('#AvailableFloor_'+location);
-                        }
-
-                    } else {
-                        toastr.error(response.message, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                },
-                error: function(response) {
-                    var errors = response.responseJSON;
-                    var errs = '';
-                    $.each(errors.errors, function(key, error) {
-                        errs += error + '<br>';
-                    });
-                    toastr.error(errs, {
-                        positionClass: 'toast-bottom-right'
-                    });
-                }
-            });
-    });
-
-    $(document).on('change','.AvailableFloor,.AvailableFloor_Occupancy',function()
-    {
-        var location = $(this).data('id');
-        var flag=$(this).data('flag');
-        if(flag=="Occupancy")
-        {
-            var building_id = $("#building_occupancy_"+location).val();
-            var AvailableFloor = $("#AvailableFloor_Occupancy_"+location).val();
-        }
-        else
-        {
-            var building_id = $("#building_"+location).val();
-            var AvailableFloor = $("#AvailableFloor_"+location).val();
-
-        }
-        $.ajax({
-                url: "{{ route('resort.accommodation.config.GetFloorWiseRooms') }}" ,
-                type: "get",
-                data: {"_token":"{{ csrf_token() }}","AvailableFloor":AvailableFloor,"building_id":building_id},
-                success: function(response) {
-                    if (response.success)
-                    {
-                        var rooms='<option value="">Select Room</option>';
-                        $.each(response.data, function(i, v) {
-                            rooms += `<option value="${v}">${v}</option>`;
-                        });
-                        if(flag=="Occupancy")
-                        {
-                            $("#RoomNo_Occupancy_"+location).html(rooms);
-                            window.wisdomDD.rebuild('#RoomNo_Occupancy_'+location);
-                        }
-                        else
-                        {
-                            $("#RoomNo_"+location).html(rooms);
-                            window.wisdomDD.rebuild('#RoomNo_'+location);
-                        }
-
-                    } else {
-                        toastr.error(response.message, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                },
-                error: function(response) {
-                    var errors = response.responseJSON;
-                    var errs = '';
-                    $.each(errors.errors, function(key, error) {
-                        errs += error + '<br>';
-                    });
-                    toastr.error(errs, {
-                        positionClass: 'toast-bottom-right'
-                    });
-                }
-            });
-    });
-    $(document).on('click','.addMore-availabel',function(){
-        var AvailableCount = $("#AvailableCount").val();
-        AvailableCount++;
-        var row =`<div class="col-12 added-accommodation-row" id="accommodation_row_${AvailableCount}">
-                        <hr class="my-3">
-                        <div class="d-flex justify-content-end mb-2">
-                            <button type="button" class="btn btn-sm eb-btn-critical remove-accommodation-row" data-row="${AvailableCount}"><i class="fa-solid fa-times me-1"></i>Remove</button>
-                        </div>
-                        <div class="row g-xl-4 g-3">
-                              <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="building" class="form-label">BUILDING NAME</label>
-
-                                        <select class="form-select dd-native-select buildingAvailable" id="building_${AvailableCount}"
-                                        data-id= "${AvailableCount}" name="BuildingName[${AvailableCount}]"
-                                         placeholder=" Select Building" required data-parsley-type="digits"
-                                          data-parsley-required-message="Building name is required." data-parsley-errors-container="#type_accom_b_error_${AvailableCount}">
-                                            <option> </option>
-                                            @if($BuildingData->isNotEmpty())
-                                                    @foreach ($BuildingData as $a)
-                                                        <option value="{{ $a->id }}">{{ $a->BuildingName }}</option>
-                                                    @endforeach
-                                            @endif
-                                        </select>
-                                        <div class="dd" data-target="#building_${AvailableCount}">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Building</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Building">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a building…"></div>
-                                                <div class="dd-scroll">
-                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Building</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                    @if($BuildingData->isNotEmpty())
-                                                        @foreach ($BuildingData as $a)
-                                                        <div class="dd-item" role="option" data-value="{{ $a->id }}"><span class="dd-nm">{{ $a->BuildingName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                        @endforeach
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div id="type_accom_b_error_${AvailableCount}"></div>
-                                    </div>
-
-
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="floor" class="form-label">FLOOR</label>
-                                        <select class="form-select dd-native-select AvailableFloor"
-                                         data-flag="A" id="AvailableFloor_${AvailableCount}"data-id= "${AvailableCount}"
-                                         name="Floor[${AvailableCount}]" placeholder=" Select Building" required   required
-                                          data-parsley-errors-container="#type_accom_f_error_${AvailableCount}"
-                                            data-parsley-trigger="keyup" data-parsley-required-message="Please select floor.">
-
-                                        </select>
-                                        <div class="dd" data-target="#AvailableFloor_${AvailableCount}">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Floor</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Floor">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a floor…"></div>
-                                                <div class="dd-scroll"></div>
-                                            </div>
-                                        </div>
-                                        <div id="type_accom_f_error_${AvailableCount}"></div>
-
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="roomNo" class=" form-label">ROOM NO.</label>
-                                        <select class="form-select dd-native-select RoomNo"data-id= "${AvailableCount}" id="RoomNo_${AvailableCount}"
-                                         name="RoomNo[${AvailableCount}]"  required
-                                          data-parsley-type="digits" data-parsley-trigger="keyup"
-                                        data-parsley-errors-container="#type_accom_r_error_${AvailableCount}"
-                                        data-parsley-required-message="Please select floor.">
-
-                                        </select>
-                                        <div class="dd" data-target="#RoomNo_${AvailableCount}">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Room</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Room">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a room…"></div>
-                                                <div class="dd-scroll"></div>
-                                            </div>
-                                        </div>
-                                        <div id="type_accom_r_error_${AvailableCount}"></div>
-
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="typeAccom" class=" form-label">TYPE OF ACCOMMODATION</label>
-                                        <select class="form-select dd-native-select" id="TypeAccommodation_${AvailableCount}"
-                                         name="Accommodation_type_id[${AvailableCount}]" required data-parsley-trigger="change"
-                                         data-parsley-required-message="Please select accommodation type."
-                                        data-parsley-errors-container="#type_accom_type_accom_r_error_${AvailableCount}">
-                                        <option value=""></option>
-                                        @if($AccommodationType->isNotEmpty())
-                                                @foreach ($AccommodationType as $a)
-                                                    <option value="{{ $a->id }}">{{ $a->AccommodationName }}</option>
-                                                @endforeach
-                                        @endif
-                                        </select>
-                                        <div class="dd" data-target="#TypeAccommodation_${AvailableCount}">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Type</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Accommodation Type">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a type…"></div>
-                                                <div class="dd-scroll">
-                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                    @if($AccommodationType->isNotEmpty())
-                                                        @foreach ($AccommodationType as $a)
-                                                        <div class="dd-item" role="option" data-value="{{ $a->id }}"><span class="dd-nm">{{ $a->AccommodationName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                        @endforeach
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div id="type_accom_type_accom_r_error_${AvailableCount}"></div>
-
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="capacity" class="form-label">CAPACITY</label>
-                                        <input type="number" min="1" class="form-control" id="Capacity_${AvailableCount}" name="Capacity[${AvailableCount}]" placeholder="4 people"requireddata-parsley-trigger="keyup" data-parsley-required-message="Capacity is required.">
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="roomType" class="form-label">ROOM TYPE</label>
-                                        <select class="form-select dd-native-select" id="RoomType_${AvailableCount}" name="RoomType[${AvailableCount}]" required data-parsley-trigger="change" data-parsley-errors-container="#type_accom_type_accom_r_type_error_${AvailableCount}" data-parsley-required-message="Room type is required.">
-                                            <?php
-                                                $ROOM = config('settings.eligibilty');
-                                            ?>
-                                                @if($ROOM)
-                                                    @foreach ($ROOM as $k=>$a)
-                                                        <option value="{{ $k }}">{{ $a }}</option>
-                                                    @endforeach
-                                                @endif
-                                        </select>
-                                        @php $firstRoomTypeClone = $ROOM ? reset($ROOM) : null; @endphp
-                                        <div class="dd" data-target="#RoomType_${AvailableCount}">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">{{ $firstRoomTypeClone ?? 'Select Room Type' }}</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Room Type">
-                                                <div class="dd-scroll">
-                                                    @if($ROOM)
-                                                        @foreach ($ROOM as $k=>$a)
-                                                        <div class="dd-item{{ $loop->first ? ' active' : '' }}" role="option" data-value="{{ $k }}"><span class="dd-nm">{{ $a }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                        @endforeach
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div id="type_accom_type_accom_r_type_error_${AvailableCount}"></div>
-
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="bedNo" class="form-label">BED NO.</label>
-                                    </div>
-                                    <div class="col-lg-12" id="bedNoContainer_${AvailableCount}">
-                                        <label class="form-label">BED NAMES</label>
-                                        <div class="row g-2" id="bedNoFields_${AvailableCount}">
-                                            <div class="col-auto"><small class="text-muted">Enter capacity first</small></div>
-                                        </div>
-                                        <input type="hidden" name="BedNo[${AvailableCount}]" id="BedNo_${AvailableCount}" value="0">
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for=" " class="form-label d-block">BLOCK FOR?</label>
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input" type="radio" name="blockFor[${AvailableCount}]" value="Male" id="male_${AvailableCount}"
-                                               required data-parsley-required-message="Please select an option.">
-                                            <label class="form-check-label" for="male_1">Male</label>
-                                        </div>
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input" type="radio" name="blockFor[${AvailableCount}]"  value="Female" id="female_${AvailableCount}"
-                                                 checked required data-parsley-required-message="Please select an option.">
-                                            <label class="form-check-label" for="female_1">Female</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-
-                                        <label for="roomStatus" class="form-label">CLEANING SCHEDULE</label>
-                                            <select class="form-select dd-native-select" id="CleaningSchedule_${AvailableCount}" data-parsley-errors-container="#type_accom_type_accom_cleaningschedule_error_${AvailableCount}" name="CleaningSchedule[${AvailableCount}]" aria-label="Default select example" required data-parsley-required-message="Please select an option.">
-                                                <?php
-                                                    $CleaningSchedule = config('settings.CleaningSchedule');
-                                                ?>
-                                                    @if($CleaningSchedule)
-                                                        @foreach ($CleaningSchedule as $a)
-                                                            <option value="{{ $a }}">{{ $a }}</option>
-                                                        @endforeach
-                                                    @endif
-                                        </select>
-                                        <div class="dd" data-target="#CleaningSchedule_${AvailableCount}">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">{{ $CleaningSchedule[0] ?? 'Select' }}</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Cleaning Schedule">
-                                                <div class="dd-scroll">
-                                                    @if($CleaningSchedule)
-                                                        @foreach ($CleaningSchedule as $a)
-                                                        <div class="dd-item{{ $loop->first ? ' active' : '' }}" role="option" data-value="{{ $a }}"><span class="dd-nm">{{ $a }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                        @endforeach
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div id="type_accom_type_accom_cleaningschedule_error_${AvailableCount}"></div>
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="occupThres" class="form-label">OCCUPANCY THRESHOLDS</label>
-                                        <input type="number" min="0" max="100" class="form-control" id="Occupancytheresold_${AvailableCount}" name="Occupancytheresold[${AvailableCount}]" placeholder="90%" required data-parsley-type="digits" data-parsley-trigger="keyup" data-parsley-required-message="Occupancy threshold is required.">
-                                    </div>
-                        </div>
-                    </div>`;
-                                    $("#AvailableCount").val(AvailableCount);
-        $(".appendAvailableAccommodation").append(row);
-        AvailableAccommodationJsClass(AvailableCount);
-
-    });
-
-    // Remove dynamically added accommodation row
-    $(document).on('click', '.remove-accommodation-row', function() {
-        $(this).closest('.added-accommodation-row').remove();
-    });
-
-    $(document).on('click','.addMore-Occupancy_threshod',function(){
-
-        var AvailablethreshodCount = $("#AvailablethreshodCount").val();
-        AvailablethreshodCount++;
-        var row='';
-
-        row=`<div   id='OccupancyThresold_${AvailablethreshodCount}' >
-                    <hr>   <div class="row g-xl-4 g-3 ">
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="BuildingName" class="form-label">Building Name</label>
-
-                                        <select class="form-select dd-native-select OccupancybuildingAvailable" data-flag="Occupancy" id="building_occupancy_${AvailablethreshodCount}" data-id="${AvailablethreshodCount}"
-                                        name="building_id[${AvailablethreshodCount}]" placeholder="Select Building"
-                                        required data-parsley-type="digits"
-                                        data-parsley-required-message="Please select building."
-                                        data-parsley-errors-container="#type_occupancy_error_${AvailablethreshodCount}_${AvailablethreshodCount}">
-                                        <option value=""></option>
-                                            @if($BuildingData->isNotEmpty())
-                                                @foreach ($BuildingData as $a)
-                                                    <option value="{{ $a->id }}">{{ $a->BuildingName }}</option>
-                                                @endforeach
-                                            @endif
-                                        </select>
-                                        <div class="dd" data-target="#building_occupancy_${AvailablethreshodCount}">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Building</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Building">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a building…"></div>
-                                                <div class="dd-scroll">
-                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Building</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                    @if($BuildingData->isNotEmpty())
-                                                        @foreach ($BuildingData as $a)
-                                                        <div class="dd-item" role="option" data-value="{{ $a->id }}"><span class="dd-nm">{{ $a->BuildingName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                        @endforeach
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div id="type_occupancy_error_${AvailablethreshodCount}_${AvailablethreshodCount}"></div>
-                                    </div>
-                                    
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="Floor" class="form-label">Floor</label>
-
-                                        <select class="form-select dd-native-select AvailableFloor_Occupancy" id="AvailableFloor_Occupancy_${AvailablethreshodCount}" data-flag="Occupancy"
-                                        data-id="${AvailablethreshodCount}" name="Floor[${AvailablethreshodCount}]" placeholder="Select Floor" required
-                                        data-parsley-trigger="change" data-parsley-required-message="Please select a floor."
-                                        data-parsley-errors-container="#type_occupancy_f_error_${AvailablethreshodCount}_${AvailablethreshodCount}">
-                                        </select>
-                                        <div class="dd" data-target="#AvailableFloor_Occupancy_${AvailablethreshodCount}">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Floor</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Floor">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a floor…"></div>
-                                                <div class="dd-scroll"></div>
-                                            </div>
-                                        </div>
-                                        <div id="type_occupancy_f_error_${AvailablethreshodCount}_${AvailablethreshodCount}"></div>
-                                    </div>
-                                    
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="roomNo" class="form-label">Room No.</label>
-                                        <select class="form-select dd-native-select RoomNo" data-id="${AvailablethreshodCount}" id="RoomNo_Occupancy_${AvailablethreshodCount}"
-                                        name="RoomNo[${AvailablethreshodCount}]" required data-parsley-trigger="change"
-                                        data-parsley-required-message="Please select a room number."
-                                        data-parsley-errors-container="#type_occupancy_room_error_${AvailablethreshodCount}_${AvailablethreshodCount}">
-                                        </select>
-                                        <div class="dd" data-target="#RoomNo_Occupancy_${AvailablethreshodCount}">
-                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                                <span class="dd-lbl">Select Room</span>
-                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                            </button>
-                                            <div class="dd-panel" role="listbox" aria-label="Room">
-                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a room…"></div>
-                                                <div class="dd-scroll"></div>
-                                            </div>
-                                        </div>
-                                        <div id="type_occupancy_room_error_${AvailablethreshodCount}_${AvailablethreshodCount}"></div>
-                                    </div>
-                                    
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="ThresSoldLevel_${AvailablethreshodCount}" class="form-label">Set Occupancy Level</label>
-                                        <input type="number" min="0" max="100" class="form-control" 
-                                        name="ThresSoldLevel[${AvailablethreshodCount}]" id="ThresSoldLevel_${AvailablethreshodCount}" placeholder="Set Occupancy level" 
-                                        required data-parsley-type="number" data-parsley-min="0" data-parsley-max="100"
-                                        data-parsley-required-message="Occupancy level is required."
-                                        data-parsley-type-message="Please enter a valid number."
-                                        data-parsley-min-message="Minimum value is 0."
-                                        data-parsley-max-message="Maximum value is 100."
-                                        data-parsley-errors-container="#type_occupancy_level_error_${AvailablethreshodCount}_${AvailablethreshodCount}">
-                                        <div id="type_occupancy_level_error_${AvailablethreshodCount}_${AvailablethreshodCount}"></div>
-                                    </div>
-                                </div>`;
-        $(".AppendOccupancyThreshold").append(row);
-        $("#AvailablethreshodCount").val(AvailablethreshodCount);
-        AvailableOccupancyThreshold(AvailablethreshodCount);
-    });
-
-    $(document).on("click",".RemoveOccupancyThreshold",function(){
-        var id = $(this).attr('value');
-
-        $("#OccupancyThresold_"+id).remove();
-        id--;
-        $("#AvailablethreshodCount").val(id);
-    });
-    function AvailableOccupancyThreshold(AvailableCount){
-    }
-    // Generate bed name fields when capacity changes
-    $(document).on('input change', '[id^="Capacity_"]', function() {
-        var id = $(this).attr('id').replace('Capacity_', '');
-        var capacity = parseInt($(this).val()) || 0;
-        var $container = $('#bedNoFields_' + id);
-        $container.empty();
-
-        if (capacity > 0 && capacity <= 50) {
-            for (var b = 1; b <= capacity; b++) {
-                $container.append(
-                    '<div class="col-lg-2 col-md-3 col-sm-4 col-6 mb-1">' +
-                        '<input type="text" class="form-control form-control-sm" name="BedNames[' + id + '][]" value="BedNo-' + b + '" placeholder="Bed ' + b + '">' +
-                    '</div>'
-                );
-            }
-            $('#BedNo_' + id).val(capacity);
-        } else if (capacity > 50) {
-            $container.html('<div class="col-auto"><small class="text-danger">Maximum 50 beds per room</small></div>');
-        } else {
-            $container.html('<div class="col-auto"><small class="text-muted">Enter capacity first to generate bed fields</small></div>');
-        }
-    });
-
-    function AvailableAccommodationJsClass(AvailableCount){
-
-    $("#Inv_Cat_id_"+AvailableCount).select2({
-       placeholder:'Select inventories',
-       allowClear: true,
-       width: '100%'
-    });
-
-
-}
-</script>
-@include('resorts._dropdown_script')
+<script>window.ACFG = @json($acfg);</script>
+<script src="{{ URL::asset('resorts_assets/js/accommodation-config.js') }}?v={{ @filemtime(public_path('resorts_assets/js/accommodation-config.js')) }}"></script>
 @endsection
