@@ -1925,7 +1925,7 @@ class Common
             return $defaultPicture;
         }
 
-        $admin = ResortAdmin::with('resort')->find($userId);
+        $admin = ResortAdmin::find($userId);
         if (!$admin) {
             return $defaultPicture;
         }
