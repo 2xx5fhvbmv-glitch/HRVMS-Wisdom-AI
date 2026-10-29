@@ -42,16 +42,15 @@ class ImportAvailableAccommodation implements  ToModel, WithHeadingRow
 
         // Split values safely to avoid undefined indexes
         $item = explode("/", $itemname);
-        $floorParts = explode('-', $floor);
         $roomParts = explode('/', $room);
 
-        $roomSubParts = isset($roomParts[2]) ? explode('-', $roomParts[2]) : [];
+        $roomSubParts = isset($roomParts[2]) ? explode('-', $roomParts[2], 2) : []; // "Room - F1-2": keep the dash inside the number
 
         // Assign values safely with default empty string if not found
         $itemname = $item[0] ?? '';
         $ItemCode = $item[1] ?? '';
-        $floor = isset($floorParts[1]) ? str_replace(' ', '', $floorParts[1]) : '';
-        $room = isset($roomSubParts[1]) ? str_replace(' ', '', $roomSubParts[1]) : '';
+        $floor = str_contains((string) $floor, '-') ? trim(substr($floor, strrpos($floor, '-') + 1)) : ''; // "Block-A - 2": the floor is after the last dash
+        $room = isset($roomSubParts[1]) ? trim($roomSubParts[1]) : ''; // room numbers can contain spaces now (e.g. "F2 1")
 
         // Get Room Type from config
         $roomtypeConfig = config('settings.eligibilty');
@@ -122,6 +121,8 @@ class ImportAvailableAccommodation implements  ToModel, WithHeadingRow
             // Store existing record messages for later response
             $this->existingRows[] = "The RoomNo {$room} already exists in Building {$buildingname}, Floor {$floor} for this resort.";
         }
+
+        return null; // rows are saved above; nothing for the import library to save (the declared return type requires a value)
     }
 
 }

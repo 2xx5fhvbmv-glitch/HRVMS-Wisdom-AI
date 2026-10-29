@@ -91,6 +91,47 @@ class AccommodationConfigTest extends TestCase
         $this->assertSame(1, $rooms(), 'the refused room was rolled back');
     }
 
+    public function test_buildings_keep_gender_and_numbering_and_rooms_take_text_numbers()   // §1 rows 1/3, §1b, §2.1
+    {
+        $store = route('resort.accommodation.StoreBuilding');
+        $b = $this->postJson($store, ['BuildingName' => 'Num ' . substr(uniqid(), -5), 'gender' => 'F', 'room_numbering' => 'custom', 'room_number_pattern' => 'F{F}-{N}'])->assertOk()->json('id');
+        $this->assertEquals(['F', 'custom', 'F{F}-{N}'], array_values((array) DB::table('building_models')->where('id', $b)->first(['gender', 'room_numbering', 'room_number_pattern'])));
+        $this->postJson($store, ['BuildingName' => 'Bad ' . uniqid(), 'room_numbering' => 'custom', 'room_number_pattern' => 'F{F}-'])->assertStatus(422);   // no counter
+        $this->postJson($store, ['BuildingName' => 'Bad ' . uniqid(), 'room_numbering' => 'custom'])->assertStatus(422);                                   // pattern missing
+        $this->postJson($store, ['BuildingName' => 'Bad ' . uniqid(), 'gender' => 'Q'])->assertStatus(422);
+
+        $room = route('resort.accommodation.StoreFloorandroom');
+        foreach (['G01', 'F1-2', 'A 101'] as $no) {
+            $id = $this->postJson($room, ['building_id' => $b, 'Floor' => 1, 'Room' => $no])->assertOk()->json('id');
+            $this->assertSame($no, DB::table('bulidng_and_floor_and_rooms')->where('id', $id)->value('Room'));
+        }
+        $this->postJson($room, ['building_id' => $b, 'Floor' => 1, 'Room' => '<b>1</b>'])->assertStatus(422);
+        $this->postJson($room, ['building_id' => $b, 'Floor' => 1, 'Room' => str_repeat('9', 16)])->assertStatus(422);
+
+        // Room update: validated now, and only inside the caller's resort
+        $rid = DB::table('bulidng_and_floor_and_rooms')->where('building_id', $b)->where('Room', 'G01')->value('id');
+        $upd = route('resort.accommodation.FloorAndRoomUpdate');
+        $this->putJson($upd, ['Main_id' => base64_encode($rid), 'building_id' => $b, 'Floor' => 1, 'Room' => 'G02'])->assertOk();
+        $this->assertSame('G02', DB::table('bulidng_and_floor_and_rooms')->where('id', $rid)->value('Room'));
+        $this->putJson($upd, ['Main_id' => base64_encode($rid), 'building_id' => $b, 'Floor' => 1, 'Room' => 'F1-2'])->assertStatus(422);   // taken
+        $foreign = DB::table('building_models')->where('resort_id', '!=', $this->master->resort_id)->value('id');
+        $this->putJson($upd, ['Main_id' => base64_encode($rid), 'building_id' => $foreign, 'Floor' => 1, 'Room' => 'G03'])->assertStatus(422);
+    }
+
+    public function test_import_reads_dashes_in_building_names_and_room_numbers()   // §1b round trip through the Excel template text
+    {
+        $name = 'Blk-' . substr(uniqid(), -4);
+        $b = $this->postJson(route('resort.accommodation.StoreBuilding'), ['BuildingName' => $name])->json('id');
+        $type = $this->postJson(route('resort.accommodation.AccommodationTypeStore'), ['AccommodationName' => 'Imp ' . substr(uniqid(), -5)])->json('id');
+        (new \App\Imports\ImportAvailableAccommodation)->model([
+            'buildingname' => $name, 'floor' => "$name - 1", 'room' => "$name / Floor - 1 / Room - F1-2",
+            'typeofaccommodation' => DB::table('accommodation_types')->where('id', $type)->value('AccommodationName'), 'capacity' => 1,
+            'roomtype' => array_values(config('settings.eligibilty'))[0], 'bedno' => 1, 'blockfor' => 'Male', 'itemname' => null,
+            'cleaningshedule' => 'Daily', 'roomstatus' => 'Available', 'occupancytheresold' => 90,
+        ]);
+        $this->assertSame(['1', 'F1-2'], array_map('strval', array_values((array) DB::table('available_accommodation_models')->where('BuildingName', $b)->first(['Floor', 'RoomNo']))));
+    }
+
     public function test_hr_is_told_once_when_a_room_reaches_its_occupancy_level()   // §2.3
     {
         DB::table('employees')->update(['device_token' => null]);   // notifications also push to phones

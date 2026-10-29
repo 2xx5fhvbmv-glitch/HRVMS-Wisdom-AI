@@ -9,7 +9,7 @@ class BuildingModel extends Model
 {
     use HasFactory;
     public  $table = 'building_models';
-    public $fillable = ['resort_id','BuildingName'];
+    public $fillable = ['resort_id','BuildingName','gender','room_numbering','room_number_pattern'];
 
     public function floorsAndRooms()
     {

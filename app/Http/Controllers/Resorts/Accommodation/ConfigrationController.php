@@ -33,6 +33,21 @@ class ConfigrationController extends Controller
    protected $resort; 
    protected $globalUser;
     protected $underEmp_id=[];
+    /** Room numbers are text (plan §2.1): G01, F1-2, A101 ... */
+    private const ROOM_NO_RULES = ['required', 'max:15', 'regex:/^[A-Za-z0-9 .\/-]+$/'];
+
+    /** Optional building fields (plan §1 rows 1 and 3, §1b): who it's for and how its rooms are numbered. */
+    private function buildingFieldRules(): array
+    {
+        return [
+            'gender' => ['nullable', 'in:M,F,X'],
+            'room_numbering' => ['nullable', 'in:by_floor,continuous,custom'],
+            // Custom pattern: {F} floor, {N} / {NN} counter on the floor, {C} building-wide counter; must contain a counter.
+            'room_number_pattern' => ['nullable', 'required_if:room_numbering,custom', 'max:40',
+                'regex:/^([A-Za-z0-9 .\/-]|\{(F|N|NN|C)\})+$/', 'regex:/\{(N|NN|C)\}/'],
+        ];
+    }
+
     public function __construct()
     {
         // AC-03: Accommodation settings (buildings/floors/rooms/beds/
@@ -771,7 +786,8 @@ class ConfigrationController extends Controller
                         return $query->where('resort_id', $resort_id);
                     }),
                 ],
-            ], [
+            ] + $this->buildingFieldRules(), [
+                'room_number_pattern.regex' => 'Use letters, digits, space, - / . and {F} {N} {NN} {C}, with at least one of {N}, {NN} or {C}.',
                 'BuildingName.required' => 'The Building Name field is required. Please write something.',
                 'BuildingName.unique' => 'The Building Name already exists for this resort.',
                 'BuildingName.max' => 'The maximum allowed length for the Building Name is 50 characters.',
@@ -788,7 +804,8 @@ class ConfigrationController extends Controller
 
         try
         {
-            $created = BuildingModel::create(["resort_id"=>$resort_id,"BuildingName"=>$request->BuildingName]);
+            $created = BuildingModel::create(["resort_id"=>$resort_id,"BuildingName"=>$request->BuildingName]
+                + array_filter($request->only(['gender', 'room_numbering', 'room_number_pattern']), fn ($v) => $v !== null));
             DB::commit();
             return response()->json(['success' =>true,'message'=>'Building added successfully', 'id' => $created->id], 200);
 
@@ -850,7 +867,8 @@ class ConfigrationController extends Controller
                     return $query->where('resort_id', $resort_id);
                 })->ignore($b_id),
             ],
-        ], [
+        ] + $this->buildingFieldRules(), [
+            'room_number_pattern.regex' => 'Use letters, digits, space, - / . and {F} {N} {NN} {C}, with at least one of {N}, {NN} or {C}.',
             'BuildingName.required' => 'The Building Name field is required. Please write something.',
             'BuildingName.unique' => 'The Building Name already exists for this resort.',
             'BuildingName.max' => 'The maximum allowed length for the Building Name is 50 characters.',
@@ -871,7 +889,8 @@ class ConfigrationController extends Controller
             // Was unscoped — the update payload reassigns resort_id to the
             // caller's own, so without a where() filter this let one resort
             // "adopt" another resort's building record by id.
-            BuildingModel::where("id",$b_id)->where('resort_id', $resort_id)->update(["resort_id"=>$resort_id,"BuildingName"=>$request->BuildingName]);
+            BuildingModel::where("id",$b_id)->where('resort_id', $resort_id)->update(["resort_id"=>$resort_id,"BuildingName"=>$request->BuildingName]
+                + array_filter($request->only(['gender', 'room_numbering', 'room_number_pattern']), fn ($v) => $v !== null));
 
             DB::commit();
             return response()->json([
@@ -927,7 +946,7 @@ class ConfigrationController extends Controller
                 'present', 'numeric', 'min:0',
             ],
             'Room' => [
-                'required',
+                ...self::ROOM_NO_RULES,
                 Rule::unique('bulidng_and_floor_and_rooms')->where(function ($query) use ($request, $resort_id, $building_id) {
                     return $query->where('Floor', $request->Floor)
                                  ->where('building_id', $building_id)
@@ -1008,6 +1027,17 @@ class ConfigrationController extends Controller
     }
     public function FloorAndRoomUpdate(Request $request)
     {
+        $resort_id = $this->resort->resort_id;
+        $Main_id = base64_decode($request->Main_id);
+        $validator = Validator::make($request->all(), [
+            'building_id' => ['required', Rule::exists('building_models', 'id')->where('resort_id', $resort_id)],
+            'Floor' => ['present', 'numeric', 'min:0'],
+            'Room' => [...self::ROOM_NO_RULES, Rule::unique('bulidng_and_floor_and_rooms')->where(fn ($q) => $q
+                ->where('Floor', $request->Floor)->where('building_id', $request->building_id)->where('resort_id', $resort_id))->ignore($Main_id)],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
 
         DB::beginTransaction();
 
