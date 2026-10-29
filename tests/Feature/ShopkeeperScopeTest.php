@@ -59,6 +59,14 @@ class ShopkeeperScopeTest extends TestCase
             'qr_code' => 'data:image/png;base64,AA'])->assertStatus(422)->assertJsonValidationErrors(['emp_id', 'product_id']);
     }
 
+    public function test_payment_price_comes_from_the_catalogue()   // W1-19: a posted price is ignored
+    {
+        $product = Product::where('shopkeeper_id', $this->shop->id)->first() ?? $this->markTestSkipped('Shop has no products.');
+        $this->postJson(route('shopkeeper.payment.store'), ['emp_id' => Employee::where('resort_id', $this->shop->resort_id)->value('id'), 'product_id' => $product->id,
+            'quantity' => 3, 'price' => 0.01, 'qr_code' => 'data:image/png;base64,AA']);
+        $this->assertEquals(round($product->price * 3, 2), Payment::where('product_id', $product->id)->latest('id')->value('price'));
+    }
+
     public function test_uploads_must_be_real_images()   // NV08: names come from content, a script can't land under public/
     {
         $this->assertSame('png', \App\Helpers\Common::imageExtension(\Illuminate\Http\UploadedFile::fake()->image('photo.png')));

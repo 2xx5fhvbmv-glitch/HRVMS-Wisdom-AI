@@ -164,6 +164,12 @@ class ResortInternalPermission extends Controller
                 return response()->json($response);
             }
             $resort_id = $this->resortdata->resort_id;
+            // Department and position must be this resort's own.
+            if (!\App\Models\ResortDepartment::where('id', $department)->where('resort_id', $resort_id)->exists()
+                || !\App\Models\ResortPosition::where('id', $position)->where('resort_id', $resort_id)->exists()) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'msg' => 'Invalid department or position.'], 422);
+            }
             $existingPermissions = ResortInteralPagesPermission::where('resort_id', $resort_id)
                 ->where('Dept_id', $department)
                 ->where('position_id', $position)

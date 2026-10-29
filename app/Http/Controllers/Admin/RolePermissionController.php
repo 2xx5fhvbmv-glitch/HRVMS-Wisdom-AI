@@ -237,6 +237,15 @@ class RolePermissionController extends Controller
 
   public function updateRolePermissions(Request $request, $id)
   {
+    // A non-super admin can't change their own role, and can only grant permissions they hold themselves.
+    $caller = Auth::guard('admin')->user();
+    if ($caller->type !== 'super') {
+      abort_if((int) $id === (int) $caller->role_id, 403, 'You cannot change the permissions of your own role.');
+      $granted = \App\Models\AdminModulePermission::whereIn('id', (array) $request->module_permissions)->get();
+      abort_if($granted->count() !== count(array_unique((array) $request->module_permissions))
+        || $granted->contains(fn ($mp) => !Common::hasPermission($mp->module_id, $mp->permission_id)), 403, 'You can only grant permissions you hold yourself.');
+    }
+
     AdminRoleModulePermission::where('role_id', $id)->delete();
 
     if(isset($request->module_permissions))

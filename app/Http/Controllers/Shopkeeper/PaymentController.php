@@ -246,7 +246,8 @@ class PaymentController extends Controller
                 'purchased_date' => now(),
                 'product_id' => $request->product_id,
                 'quantity' => $request->quantity, // Fixed typo from qunatity
-                'price' => $request->price,
+                // Catalogue price x quantity, like the (read-only) form field shows; never the posted number.
+                'price' => round((float) Product::where('id', $request->product_id)->where('shopkeeper_id', $shopkeeper->id)->value('price') * $request->quantity, 2),
                 'status' => 'Pending Consent',
                 'qr_code' => $request->qr_code,  // Store QR code base64 string
             ]);

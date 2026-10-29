@@ -76,6 +76,23 @@ class AdminAccessControlTest extends TestCase
         $this->assertSame(['Self', 'sub'], [$me->fresh()->first_name, $me->fresh()->type]);
     }
 
+    public function test_editors_cannot_hand_out_permissions_they_do_not_hold()   // W1-03 follow-up
+    {
+        $me = $this->sub([['admin_users', 'view'], ['admin_users', 'edit'], ['roles_permissions', 'view'], ['roles_permissions', 'edit']]);
+        $strong = $this->sub([['admin_users', 'edit'], ['resorts', 'edit']])->role_id;   // has Resorts edit, which $me lacks
+        $weak = $this->sub([['admin_users', 'edit']])->role_id;
+        $resortsEdit = AdminModulePermission::where('module_id', config('settings.admin_modules.resorts'))->where('permission_id', config('settings.permissions.edit'))->value('id');
+
+        $this->as($me)->post(route('admin.update', $me->id), ['first_name' => 'Self', 'email' => $me->email, 'role_id' => $strong])->assertForbidden();
+        $this->assertNotEquals($strong, $me->fresh()->role_id);
+        $this->as($me)->post(route('admin.role.update_role_permissions', $me->role_id), ['module_permissions' => [$resortsEdit]])->assertForbidden();
+        $this->as($me)->post(route('admin.role.update_role_permissions', $weak), ['module_permissions' => [$resortsEdit]])->assertForbidden();
+        $this->assertFalse(AdminRoleModulePermission::whereIn('role_id', [$me->role_id, $weak])->where('module_permission_id', $resortsEdit)->exists());
+
+        $this->as($me)->post(route('admin.update', $me->id), ['first_name' => 'Self', 'email' => $me->email, 'role_id' => $weak])->assertOk();   // a role within its own permissions is fine
+        $this->assertEquals($weak, $me->fresh()->role_id);
+    }
+
     public function test_check_password_only_tests_the_callers_own_password()
     {
         $me = $this->sub();

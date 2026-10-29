@@ -212,6 +212,7 @@ class AdminController extends Controller
 
   public function store(Request $request)
   {
+    $this->assertAssignableRole($request->input('role_id'));
     try {
       $input = $request->except(['_token']);
       if (Auth::guard('admin')->user()->type !== 'super') {
@@ -303,6 +304,17 @@ class AdminController extends Controller
    * hides it); a non-super admin can't change a super admin, nor their own status. Called outside each method's
    * try/catch, which would otherwise swallow the 403.
    */
+  /** A non-super admin may only give a role whose every permission they hold themselves: they can delegate, not hand out (or take) more. */
+  private function assertAssignableRole($roleId): void
+  {
+    if (!$roleId || Auth::guard('admin')->user()->type === 'super') {
+      return;
+    }
+    $exceeds = \App\Models\AdminRoleModulePermission::where('role_id', $roleId)->with('module_permission')->get()
+      ->contains(fn ($p) => !$p->module_permission || !Common::hasPermission($p->module_permission->module_id, $p->module_permission->permission_id));
+    abort_if($exceeds, 403, 'You can only assign a role with permissions you hold yourself.');
+  }
+
   private function editableAdmin($id, bool $statusChange = false): Admin
   {
     $caller = Auth::guard('admin')->user();
@@ -314,6 +326,7 @@ class AdminController extends Controller
   public function update(Request $request, $id)
   {
     $admin = $this->editableAdmin($id);
+    $this->assertAssignableRole($request->input('role_id'));
     try {
       $input = $request->only(['first_name', 'middle_name', 'last_name', 'email', 'role_id']);
       if (Auth::guard('admin')->user()->type === 'super') {
