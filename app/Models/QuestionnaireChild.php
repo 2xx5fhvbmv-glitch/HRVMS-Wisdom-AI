@@ -53,15 +53,7 @@ class QuestionnaireChild extends Model
     }
 
     public function getCreatedByAttribute($value): ?string {
-        $admin = ResortAdmin::select('first_name', 'last_name')->where('id', $this->attributes['created_by'])->first();
-
-        $createdby = '';
-
-        if($admin) {
-            $createdby = ucwords($admin->first_name.' '.$admin->last_name);
-        }
-
-        return $createdby;
+        return \App\Helpers\Common::personName(ResortAdmin::class, $this->attributes['created_by'] ?? null);
     }
 
 

@@ -3532,6 +3532,20 @@ class Common
         return $template;
     }
 
+    /**
+     * "First Last" of an Admin/ResortAdmin id, looked up once per id: models' created_by accessors run for every
+     * serialized row (DataTables lists), which was one query per row.
+     * ponytail: static per-process memo; a queue worker can show a renamed creator's old name until restart.
+     */
+    public static function personName(string $model, $id): string
+    {
+        static $names = [];
+        if (!$id) {
+            return '';
+        }
+        return $names[$model][$id] ??= (($a = $model::select('first_name', 'last_name')->find($id)) ? ucwords($a->first_name . ' ' . $a->last_name) : '');
+    }
+
     /** Approved leaves overlapping $from..$to for these employees, grouped by emp_id: one query for a roster grid instead of one per employee per day. */
     public static function approvedLeavesByEmployee($empIds, $from, $to)
     {
