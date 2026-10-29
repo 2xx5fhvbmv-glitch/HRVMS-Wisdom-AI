@@ -67,9 +67,10 @@ class LeaderDashboardTest extends TestCase
         mkdir("$dir/resorts/master-dashboard", 0777, true);
         file_put_contents("$dir/resorts/master-dashboard/leaderdashboard.blade.php",
             '{{ json_encode(["leader" => array_keys($leader), "resign" => $pendingResignationsForHod instanceof \Illuminate\Support\Collection, "ot" => $totalOverallWorkingHours, "checkins" => is_iterable($monthlyCheckinPerformance), "kept" => $total_employees]) }}');
-        app('view')->getFinder()->addLocation($dir);
+        app('view')->getFinder()->prependLocation($dir); app('view')->getFinder()->flush(); // before the real view, which also exists
 
         $this->as('gm');
+        view()->share('errors', new \Illuminate\Support\ViewErrorBag); // a web request always has it (ShareErrorsFromSession)
         $html = view('resorts.master-dashboard.leaderdashboard', ['total_employees' => 77, 'totalOverallWorkingHours' => 5])->render();
         $data = json_decode(html_entity_decode($html), true);
         $this->assertSame(['absent_delta', 'health', 'requests', 'events'], $data['leader']);

@@ -85,18 +85,18 @@
         $to   = \Carbon\Carbon::parse($l->to_date)->startOfDay();
         return $leaveRow($l) + [
             'from' => $from->format('d M'), 'to' => $to->format('d M'),
-            'day'  => (int) $from->diffInDays($today) + 1, 'of' => (int) $from->diffInDays($to) + 1,
+            'day'  => (int) $from->diffInDays($today, true) + 1, 'of' => (int) $from->diffInDays($to, true) + 1,
             'back' => $to->copy()->addDay()->format('D, d M'),
         ];
     })->values();
     $lvUp = $upcomingLeaveC
         ->filter(fn ($l) => \Carbon\Carbon::parse($l->from_date)->lte($horizon))
         ->sortBy('from_date')
-        ->map(function ($l) use ($leaveRow, $today, $span) {
+        ->map(function ($l) use ($leaveRow, $today, $span, $plural) {
             $from = \Carbon\Carbon::parse($l->from_date)->startOfDay();
             $to   = \Carbon\Carbon::parse($l->to_date)->startOfDay();
-            $days = (int) ($l->total_days ?: $from->diffInDays($to) + 1);
-            $in   = (int) $today->diffInDays($from);
+            $days = (int) ($l->total_days ?: $from->diffInDays($to, true) + 1);
+            $in   = (int) $today->diffInDays($from, true);
             return $leaveRow($l) + [
                 'dates' => $span($from, $to), 'len' => $plural($days, 'day'),
                 'in'    => $in === 1 ? 'Starts tomorrow' : 'Starts in ' . $plural($in, 'day'),
