@@ -151,6 +151,48 @@ class AccommodationConfigTest extends TestCase
         $this->assertSame(['1', 'F1-2'], array_map('strval', array_values((array) DB::table('available_accommodation_models')->where('BuildingName', $b)->first(['Floor', 'RoomNo']))));
     }
 
+    public function test_bulk_building_and_bulk_room_setup_are_all_or_nothing()   // §2.6
+    {
+        $rid = $this->master->resort_id;
+        $url = route('resort.accommodation.StoreBuildingWithFloors');
+        $name = 'Bulk ' . substr(uniqid(), -5);
+        $bad = ['BuildingName' => "$name x", 'floors' => [['floor' => 0, 'rooms' => ['G01', 'G02']], ['floor' => 1, 'rooms' => ['101', 'G02']]]];
+        $this->postJson($url, $bad)->assertStatus(422);                                                  // G02 twice in the building
+        $this->assertSame(0, DB::table('building_models')->where('BuildingName', "$name x")->count(), 'nothing half-built');
+
+        $res = $this->postJson($url, ['BuildingName' => $name, 'gender' => 'M', 'floors' => [['floor' => 0, 'rooms' => ['G01', 'G02']], ['floor' => 1, 'rooms' => ['101']]]])
+            ->assertOk()->json();
+        $this->assertCount(3, $res['rooms']);
+        $this->assertSame(3, DB::table('bulidng_and_floor_and_rooms')->where('building_id', $res['id'])->count());
+
+        $type = $this->postJson(route('resort.accommodation.AccommodationTypeStore'), ['AccommodationName' => 'Bulk ' . substr(uniqid(), -5)])->json('id');
+        $cat = DB::table('inventory_category_models')->insertGetId(['resort_id' => $rid, 'CategoryName' => 'T', 'created_at' => now(), 'updated_at' => now()]);
+        $item = DB::table('inventory_modules')->insertGetId(['resort_id' => $rid, 'Inv_Cat_id' => $cat, 'ItemName' => 'Lamp', 'ItemCode' => 'L' . uniqid(),
+            'Quantity' => 10, 'Occupied' => 0, 'created_at' => now(), 'updated_at' => now()]);
+        $setup = ['Accommodation_type_id' => $type, 'Capacity' => 2, 'RoomType' => 6, 'blockFor' => 'Male', 'CleaningSchedule' => 'Daily',
+            'Occupancytheresold' => 90, 'items' => [$item => 2]];
+        $rooms = [['building_id' => $res['id'], 'floor' => 0, 'room' => 'G01'], ['building_id' => $res['id'], 'floor' => 0, 'room' => 'G02']];
+        $batch = route('resort.accommodation.SetupRoomsBatch');
+
+        $this->postJson($batch, ['rooms' => array_merge($rooms, [['building_id' => $res['id'], 'floor' => 0, 'room' => 'G99']]), 'setup' => $setup])
+            ->assertStatus(422)->assertJsonPath('failed.0.index', 2);                                      // one bad room: nothing saved
+        $this->assertSame(0, DB::table('available_accommodation_models')->where('BuildingName', $res['id'])->count());
+        $this->assertEquals(0, DB::table('inventory_modules')->where('id', $item)->value('Occupied'));
+
+        $this->postJson($batch, ['rooms' => $rooms, 'setup' => $setup])->assertOk()->assertJsonCount(2, 'rooms');
+        $this->assertSame(4, DB::table('assing_accommodations')->join('available_accommodation_models as a', 'a.id', '=', 'assing_accommodations.available_a_id')
+            ->where('a.BuildingName', $res['id'])->count(), '2 rooms x 2 beds');
+        $this->assertEquals(4, DB::table('inventory_modules')->where('id', $item)->value('Occupied'), '2 rooms x 2 lamps');
+
+        // Same batch again as an edit: 3 beds, 1 lamp each; a bed can't be cut below the staff assigned
+        $this->postJson($batch, ['rooms' => $rooms, 'setup' => ['Capacity' => 3, 'items' => [$item => 1]] + $setup])->assertOk();
+        $this->assertEquals(2, DB::table('inventory_modules')->where('id', $item)->value('Occupied'));
+        $g01 = DB::table('available_accommodation_models')->where('BuildingName', $res['id'])->where('RoomNo', 'G01')->value('id');
+        \App\Models\AssingAccommodation::where('available_a_id', $g01)->take(2)->get()->each->update(['emp_id' => DB::table('employees')->where('resort_id', $rid)->value('id')]);
+        $this->postJson($batch, ['rooms' => [$rooms[0]], 'setup' => ['Capacity' => 1] + $setup])->assertStatus(422)
+            ->assertJsonPath('failed.0.message', 'Room G01 has 2 staff assigned, so it needs at least 2 beds.');
+    }
+
     public function test_hr_is_told_once_when_a_room_reaches_its_occupancy_level()   // §2.3
     {
         DB::table('employees')->update(['device_token' => null]);   // notifications also push to phones

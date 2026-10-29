@@ -814,6 +814,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::post('accommodation/available-accommodation-store', 'Accommodation\ConfigrationController@AvailableAccommodationStore')->name('resort.accommodation.AvailableAccommodationStore');
     Route::get('accommodation/available-accommodation-list', 'Accommodation\ConfigrationController@AvailableAccommodationIndex')->name('resort.accommodation.AvailableAccommodationIndex');
     Route::delete('accommodation/available-accommodation-destroy/{id?}', 'Accommodation\ConfigrationController@AvailableAccommodationDestroy')->name('resort.accommodation.AvailableAccommodationDestroy');
+    Route::post('accommodation/buildings/with-floors', 'Accommodation\\ConfigrationController@StoreBuildingWithFloors')->name('resort.accommodation.StoreBuildingWithFloors');
+    Route::post('accommodation/rooms/setup-batch', 'Accommodation\\ConfigrationController@SetupRoomsBatch')->name('resort.accommodation.SetupRoomsBatch');
     Route::get('accommodation/available-accommodation/{id}/items', 'Accommodation\\ConfigrationController@AvailableAccommodationItems')->name('resort.accommodation.AvailableAccommodationItems');
     Route::put('accommodation/available-accommodation-update/{id?}', 'Accommodation\ConfigrationController@AvailableAccommodationUpdate')->name('resort.accommodation.AvailableAccommodationUpdate');
     Route::get('accommodation/get-beds/{id?}', 'Accommodation\ConfigrationController@getBeds')->name('resort.accommodation.getBeds');

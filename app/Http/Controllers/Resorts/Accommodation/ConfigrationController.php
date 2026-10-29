@@ -538,6 +538,122 @@ class ConfigrationController extends Controller
         return response()->json(['success' => true, 'beds' => $beds]);
     }
 
+    /**
+     * A building with all its floors and rooms in one request and one transaction (plan §2.6): nothing is saved if any
+     * room is invalid, so a half-built building can't happen. Returns the building id and each room's id.
+     */
+    public function StoreBuildingWithFloors(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+        $v = Validator::make($request->all(), [
+            'BuildingName' => ['required', 'max:50', Rule::unique('building_models')->where(fn ($q) => $q->where('resort_id', $resort_id))],
+            'floors' => ['required', 'array', 'min:1', 'max:60'],
+            'floors.*.floor' => ['required', 'integer', 'min:0', 'max:200', 'distinct'],
+            'floors.*.rooms' => ['required', 'array', 'min:1', 'max:60'],
+            'floors.*.rooms.*' => [...self::ROOM_NO_RULES, 'distinct'],   // one number once per building
+        ] + $this->buildingFieldRules(), [
+            'BuildingName.unique' => 'The Building Name already exists for this resort.',
+            'floors.*.rooms.*.distinct' => 'Room :input appears twice in this building.',
+        ]);
+        if ($v->fails()) {
+            return response()->json(['success' => false, 'errors' => $v->errors()], 422);
+        }
+
+        return DB::transaction(function () use ($request, $resort_id) {
+            $building = BuildingModel::create(['resort_id' => $resort_id, 'BuildingName' => $request->BuildingName]
+                + array_filter($request->only(['gender', 'room_numbering', 'room_number_pattern']), fn ($x) => $x !== null));
+            $rooms = [];
+            foreach ($request->floors as $f) {
+                foreach ($f['rooms'] as $no) {
+                    $rooms[] = ['floor' => (int) $f['floor'], 'room' => (string) $no, 'id' => BulidngAndFloorAndRoom::create(
+                        ['resort_id' => $resort_id, 'building_id' => $building->id, 'Floor' => (int) $f['floor'], 'Room' => (string) $no])->id];
+                }
+            }
+            return response()->json(['success' => true, 'message' => 'Building added successfully', 'id' => $building->id, 'rooms' => $rooms]);
+        });
+    }
+
+    /**
+     * One setup applied to a list of rooms in one transaction (plan §2.6): creates the setup where a room has none and
+     * updates it (beds, items) where it has one. All or nothing: rooms that fail come back in `failed` with the reason
+     * and nothing is saved, so the screen can fix them and resend.
+     */
+    public function SetupRoomsBatch(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+        $v = Validator::make($request->all(), [
+            'rooms' => ['required', 'array', 'min:1', 'max:200'],
+            'rooms.*.building_id' => ['required', Rule::exists('building_models', 'id')->where('resort_id', $resort_id)],
+            'rooms.*.floor' => ['required', 'integer', 'min:0'],
+            'rooms.*.room' => self::ROOM_NO_RULES,
+            'setup.Accommodation_type_id' => ['required', Rule::exists('accommodation_types', 'id')->where('resort_id', $resort_id)],
+            'setup.Capacity' => ['required', 'integer', 'min:1', 'max:50'],
+            'setup.RoomType' => ['required', Rule::in(array_keys(config('settings.eligibilty')))],
+            'setup.blockFor' => ['required', Rule::in(['Male', 'Female'])],
+            'setup.CleaningSchedule' => ['required', Rule::in(config('settings.CleaningSchedule'))],
+            'setup.RoomStatus' => ['nullable', Rule::in(config('settings.RoomStatus'))],
+            'setup.Occupancytheresold' => ['required', 'integer', 'min:50', 'max:100'],
+            'setup.items' => ['sometimes', 'array'],
+            'setup.items.*' => ['integer', 'min:1', 'max:999'],
+        ]);
+        if ($v->fails()) {
+            return response()->json(['success' => false, 'errors' => $v->errors()], 422);
+        }
+
+        DB::beginTransaction();
+        $done = $failed = [];
+        foreach ($request->rooms as $i => $r) {
+            $result = $this->saveRoomSetup($resort_id, $r, $request->setup);
+            is_string($result) ? $failed[] = ['index' => $i, 'room' => $r['room'], 'message' => $result] : $done[] = ['index' => $i, 'id' => $result];
+        }
+        if ($failed) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => count($failed) . ' of ' . count($request->rooms) . ' rooms could not be set up; nothing was saved.', 'failed' => $failed], 422);
+        }
+        DB::commit();
+        return response()->json(['success' => true, 'message' => 'Rooms set up successfully', 'rooms' => $done]);
+    }
+
+    /** Create or update one room's setup; returns its id, or the reason it can't be saved. */
+    private function saveRoomSetup($resortId, array $r, array $setup)
+    {
+        $where = ['resort_id' => $resortId, 'building_id' => $r['building_id'], 'Floor' => $r['floor'], 'Room' => $r['room']];
+        if (!BulidngAndFloorAndRoom::where($where)->exists()) {
+            return "Room {$r['room']} is not on floor {$r['floor']} of this building.";
+        }
+        $fields = ['Accommodation_type_id' => $setup['Accommodation_type_id'], 'Capacity' => (int) $setup['Capacity'], 'RoomType' => $setup['RoomType'],
+            'blockFor' => $setup['blockFor'], 'CleaningSchedule' => $setup['CleaningSchedule'], 'RoomStatus' => $setup['RoomStatus'] ?? 'Available',
+            'Occupancytheresold' => (int) $setup['Occupancytheresold'], 'BedNo' => (int) $setup['Capacity']];
+        $room = AvailableAccommodationModel::where('resort_id', $resortId)->where('BuildingName', $r['building_id'])
+            ->where('Floor', $r['floor'])->where('RoomNo', $r['room'])->first();
+
+        if (!$room) {
+            $room = AvailableAccommodationModel::create($fields + ['resort_id' => $resortId, 'BuildingName' => $r['building_id'], 'Floor' => $r['floor'], 'RoomNo' => $r['room']]);
+            for ($b = 1; $b <= $fields['Capacity']; $b++) {
+                AssingAccommodation::create(['resort_id' => $resortId, 'available_a_id' => $room->id, 'BedNo' => 'BedNo-' . $b]);
+            }
+        } else {
+            $beds = AssingAccommodation::where('available_a_id', $room->id)->where('resort_id', $resortId)->orderBy('id')->get();
+            $occupied = $beds->filter(fn ($b) => !empty($b->emp_id))->count();
+            if ($fields['Capacity'] < $occupied) {
+                return "Room {$r['room']} has {$occupied} staff assigned, so it needs at least {$occupied} beds.";
+            }
+            $room->update($fields);
+            for ($b = $beds->count() + 1; $b <= $fields['Capacity']; $b++) {
+                AssingAccommodation::create(['resort_id' => $resortId, 'available_a_id' => $room->id, 'BedNo' => 'BedNo-' . $b]);
+            }
+            $beds->filter(fn ($b) => empty($b->emp_id))->sortByDesc('id')->take(max(0, $beds->count() - $fields['Capacity']))->each->delete();
+        }
+
+        if (array_key_exists('items', $setup)) {
+            $this->releaseRoomItems($room->id, $resortId);
+            if ($short = $this->reserveRoomItems($room->id, (array) $setup['items'], $resortId)) {
+                return "Room {$r['room']}: insufficient inventory: " . implode(', ', $short);
+            }
+        }
+        return $room->id;
+    }
+
     /** Give a room's linked items back to stock and unlink them (room deleted or its items replaced). */
     private function releaseRoomItems($roomId, $resortId): void
     {
