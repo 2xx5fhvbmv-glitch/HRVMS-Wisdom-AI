@@ -10,7 +10,7 @@ use Auth;
 use App\Events\ResortNotificationEvent;
 use App\Models\Compliance;
 use App\Helpers\Common;
-use App\Models\incidents;
+use App\Models\Incidents;
 class CheckIncidentCompliance extends Command
 {
     /**

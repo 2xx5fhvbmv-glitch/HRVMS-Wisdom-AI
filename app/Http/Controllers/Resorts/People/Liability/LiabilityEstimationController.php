@@ -8,7 +8,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Validator;
 use App\Models\Resort;
 use App\Models\Employee;
-use App\Models\resortAdmin;
+use App\Models\ResortAdmin;
 use App\Models\ResortDepartment;
 use App\Models\ResortSiteSettings;
 use App\Models\StoreManningResponseParent;

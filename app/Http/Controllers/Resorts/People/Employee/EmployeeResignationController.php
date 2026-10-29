@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Models\ExitClearanceFormResponse;
 use App\Models\Resort;
 use App\Models\Employee;
-use App\Models\resortAdmin;
+use App\Models\ResortAdmin;
 use App\Models\ResortDepartment;
 use App\Models\ResortPosition;
 use App\Models\ExitClearanceForm;
