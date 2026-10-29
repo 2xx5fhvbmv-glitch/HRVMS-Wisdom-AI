@@ -254,7 +254,7 @@
    $(document).on('click', '#update-info-btn', function () {
         var url = $(this).data('url');
         $.ajax({
-            type: "GET",
+            type: "POST", // changes data: never a GET (no CSRF check),
             url: url,
             success: function (response) {
                 $('#reqApproval-modal').modal('hide');

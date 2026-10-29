@@ -1826,7 +1826,7 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
       Route::post('people/advance-salary-repayment-tracker/update-status','People\Employee\AdvanceSalaryRepaymentTrackerController@updateStatus')->name('people.advance-salary-repayment-tracker.update-status');
       Route::post('people/advance-salary-repayment-tracker/update','People\Employee\AdvanceSalaryRepaymentTrackerController@update')->name('people.advance-salary-repayment-tracker.update');
       Route::post('people/advance-salary-repayment-tracker/addNote','People\Employee\AdvanceSalaryRepaymentTrackerController@addNote')->name('people.advance-salary-repayment-tracker.addNotes');
-      Route::get('people/advance-salary-repayment-tracker/mark-as-complete/{id}','People\Employee\AdvanceSalaryRepaymentTrackerController@markAsComplete')->name('people.advance-salary-repayment-tracker.markAsComplete');
+      Route::post('people/advance-salary-repayment-tracker/mark-as-complete/{id}','People\Employee\AdvanceSalaryRepaymentTrackerController@markAsComplete')->name('people.advance-salary-repayment-tracker.markAsComplete');
 
 
       Route::get('advance-salary-repayment-tracker/{id}/download-pdf', 'People\Employee\AdvanceSalaryRepaymentTrackerController@downloadPdf')
@@ -1938,7 +1938,7 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
           Route::get('people/info-update/index','People\Employee\InfoUpdateController@index')->name('people.info-update.index');
           Route::get('people/info-update/list','People\Employee\InfoUpdateController@list')->name('people.info-update.list');
           Route::get('people/info-update/show/{id}','People\Employee\InfoUpdateController@show')->name('people.info-update.show');
-          Route::get('people/info-update/status','People\Employee\InfoUpdateController@statusChange')->name('people.info-update.status-change');
+          Route::post('people/info-update/status','People\Employee\InfoUpdateController@statusChange')->name('people.info-update.status-change');
           Route::post('people/info-update/rejected','People\Employee\InfoUpdateController@rejectRequest')->name('people.info-update.request-rejected');
 
         //  Info Update Module  End

@@ -35,7 +35,7 @@
                         </div>
                         @if($payrollAdvance->recovery_status == 'Scheduled')
                             <div class="col-auto ms-auto">
-                                <a href="{{route('people.advance-salary-repayment-tracker.markAsComplete',base64_encode($payrollAdvance->id))}}" class="btn btn-themeBlueBr btn-xs">Mark As Completed</a>
+                                <form method="POST" action="{{route('people.advance-salary-repayment-tracker.markAsComplete',base64_encode($payrollAdvance->id))}}" class="d-inline">@csrf<button type="submit" class="btn btn-themeBlueBr btn-xs">Mark As Completed</button></form>
                             </div>
                         @elseif($payrollAdvance->recovery_status == 'Completed')
                             <div class="col-auto ms-auto">

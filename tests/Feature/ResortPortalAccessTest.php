@@ -75,6 +75,13 @@ class ResortPortalAccessTest extends TestCase
         $auth($other)->assertForbidden();
     }
 
+    public function test_data_changing_actions_no_longer_accept_get()   // NV05: a GET carries no CSRF check
+    {
+        $this->actingAs(ResortAdmin::where('type', 'super')->where('status', 'Active')->firstOrFail(), 'resort-admin');
+        $this->get(route('people.info-update.status-change', ['id' => 1, 'status' => 'approve']))->assertStatus(405);
+        $this->get(route('people.advance-salary-repayment-tracker.markAsComplete', base64_encode(1)))->assertStatus(405);
+    }
+
     public function test_master_admin_still_passes_the_gates()
     {
         $master = ResortAdmin::where('type', 'super')->where('status', 'Active')->firstOrFail();
