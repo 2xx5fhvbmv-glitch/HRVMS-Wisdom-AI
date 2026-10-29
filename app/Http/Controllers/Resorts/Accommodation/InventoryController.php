@@ -574,7 +574,7 @@ class InventoryController extends Controller
                 'Unassigned'
             );
             AssingAccommodation::where('id', $assignedBeds->first()->assign_id)
-                ->update(['emp_id' => 0, 'effected_date' => null]);
+                ->first()?->update(['emp_id' => 0, 'effected_date' => null]);
 
             try {
                 Common::notifyEmployees(

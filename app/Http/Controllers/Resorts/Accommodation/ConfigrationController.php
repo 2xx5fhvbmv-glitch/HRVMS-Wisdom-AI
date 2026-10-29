@@ -105,12 +105,13 @@ class ConfigrationController extends Controller
         DB::beginTransaction();
         try
         {
-        InventoryCategoryModel::create(["resort_id"=>$this->resort->resort_id,"CategoryName"=>ucfirst($CategoryName)]);
+        $created = InventoryCategoryModel::create(["resort_id"=>$this->resort->resort_id,"CategoryName"=>ucfirst($CategoryName)]);
 
             DB::commit();
             return response()->json([
                 'success' => true,
                 'message' => 'Category Added Successfully',
+                'id' => $created->id,
             ], 200);
         }
         catch (\Exception $e)
@@ -271,11 +272,12 @@ class ConfigrationController extends Controller
         DB::beginTransaction();
         try
         {
-            AccommodationType::create(["resort_id"=>$this->resort->resort_id,"AccommodationName"=>ucfirst($AccommodationName),'Color'=>$request->Color ?? '#014653']);
+            $created = AccommodationType::create(["resort_id"=>$this->resort->resort_id,"AccommodationName"=>ucfirst($AccommodationName),'Color'=>$request->Color ?? '#014653']);
             DB::commit();
             return response()->json([
                 'success' => true,
                 'message' => 'Accommodation Added Successfully',
+                'id' => $created->id,
             ], 200);
         }
         catch (\Exception $e)
@@ -792,9 +794,9 @@ class ConfigrationController extends Controller
 
         try
         {
-            BuildingModel::create(["resort_id"=>$resort_id,"BuildingName"=>$request->BuildingName]);
+            $created = BuildingModel::create(["resort_id"=>$resort_id,"BuildingName"=>$request->BuildingName]);
             DB::commit();
-            return response()->json(['success' =>true,'message'=>'Building added successfully' ], 200);
+            return response()->json(['success' =>true,'message'=>'Building added successfully', 'id' => $created->id], 200);
 
         }
         catch (\Exception $e)
@@ -958,9 +960,9 @@ class ConfigrationController extends Controller
         try
         {
             $resort_id = $this->resort->resort_id;
-            BulidngAndFloorAndRoom::create(["resort_id"=>$resort_id,"Floor"=>$request->Floor,"Room"=>$request->Room,"building_id"=>$request->building_id]);
+            $created = BulidngAndFloorAndRoom::create(["resort_id"=>$resort_id,"Floor"=>$request->Floor,"Room"=>$request->Room,"building_id"=>$request->building_id]);
             DB::commit();
-            return response()->json([ 'success' => true,'message' => 'Floor And Room Updated Successfully',], 200);
+            return response()->json([ 'success' => true,'message' => 'Floor And Room Updated Successfully', 'id' => $created->id], 200);
         }
         catch (\Exception $e)
         {
@@ -1170,18 +1172,16 @@ class ConfigrationController extends Controller
     {
         $EscalationDay = $request->EscalationDay;
         $resort_id = $this->resort->resort_id;
+            // One row per resort (updateOrCreate below), read as a number of days by the maintenance
+            // escalation check. The old unique rule ignored the row whose *id* equalled the resort id,
+            // so re-saving the current value failed with "already taken".
             $validator = Validator::make($request->all(), [
-                'EscalationDay' => [
-                    'required',
-                    'max:15',
-                    Rule::unique('escalation_days')->where(function ($query) use ($resort_id)
-                    {
-                        return $query->where('resort_id', $resort_id);
-                    })->ignore($resort_id),
-                ],
+                'EscalationDay' => ['required', 'integer', 'min:1', 'max:30'],
             ], [
-                'EscalationDay.required' => 'The Escalation Day field is required. Please write something.',
-                'EscalationDay.max' => 'The maximum allowed length for the Building Name is 50 characters.',
+                'EscalationDay.required' => 'Enter the number of days.',
+                'EscalationDay.integer' => 'Escalation day must be a whole number of days from 1 to 30.',
+                'EscalationDay.min' => 'Escalation day must be a whole number of days from 1 to 30.',
+                'EscalationDay.max' => 'Escalation day must be a whole number of days from 1 to 30.',
             ]);
 
             if($validator->fails())

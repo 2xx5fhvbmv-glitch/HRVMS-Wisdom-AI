@@ -5,10 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Models\MaintanaceRequest;
 use App\Models\EscalationDay;
-use App\Models\BuildingModel;
 use App\Models\AvailableAccommodationModel;
-use App\Models\AssingAccommodation;
-use App\Models\OccupancyLevelsHitACriticalThreshold;
 use App\Helpers\Common;
 use Carbon\Carbon;
 
@@ -80,46 +77,13 @@ class AccommodationEscalationReminder extends Command
     // ponytail: re-notifies every day a building stays at/below threshold
     // (no dedup state, unlike the maintenance path above) — upgrade to a
     // last-notified-date column if daily repeats prove too noisy.
+    /**
+     * Safety net for the per-bed check (App\Services\RoomOccupancyAlert): HR is told once when a room reaches its
+     * occupancy alert level (percent full). The old version compared FREE beds with the level, so a 90% level fired
+     * as soon as 10% of beds were taken, every day, from occupancy_levels_hit_a_critical_thresholds.
+     */
     private function notifyCriticalOccupancy()
     {
-        OccupancyLevelsHitACriticalThreshold::chunk(100, function ($thresholds) {
-            foreach ($thresholds as $config) {
-                $building = BuildingModel::where('id', $config->building_id)
-                    ->where('resort_id', $config->resort_id)
-                    ->first();
-                if (!$building) continue;
-
-                $bedCapacity = AssingAccommodation::join('available_accommodation_models as a', 'a.id', '=', 'assing_accommodations.available_a_id')
-                    ->where('a.BuildingName', $building->id)
-                    ->where('assing_accommodations.resort_id', $config->resort_id)
-                    ->count();
-                if ($bedCapacity <= 0) continue;
-
-                $availableBed = AssingAccommodation::join('available_accommodation_models as a', 'a.id', '=', 'assing_accommodations.available_a_id')
-                    ->where('a.BuildingName', $building->id)
-                    ->where('assing_accommodations.resort_id', $config->resort_id)
-                    ->where('assing_accommodations.emp_id', 0)
-                    ->count();
-
-                $bedPerc = ($availableBed / $bedCapacity) * 100;
-                if ($config->ThresSoldLevel < $bedPerc) continue;
-
-                $hrIds = Common::getResortHrEmployeeIds($config->resort_id);
-                if (empty($hrIds)) continue;
-
-                try {
-                    Common::notifyEmployees(
-                        $config->resort_id,
-                        $hrIds,
-                        'Building Occupancy Critical',
-                        "{$building->BuildingName} has only {$availableBed} of {$bedCapacity} beds available (" . round($bedPerc, 1) . "%), at or below its critical threshold.",
-                        'Accommodation',
-                        $building->id
-                    );
-                } catch (\Exception $e) {
-                    \Log::warning('Occupancy critical notification failed for building ' . $building->id . ': ' . $e->getMessage());
-                }
-            }
-        });
+        \App\Services\RoomOccupancyAlert::checkAll();
     }
 }

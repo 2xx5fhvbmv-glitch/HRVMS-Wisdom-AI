@@ -47,6 +47,14 @@ class AssingAccommodation extends Model
             }
         });
 
+        // A bed assigned, freed, added or removed can move its room across HR's occupancy alert level.
+        static::saved(function ($bed) {
+            if ($bed->wasRecentlyCreated || $bed->wasChanged('emp_id')) {
+                \App\Services\RoomOccupancyAlert::check($bed->available_a_id);
+            }
+        });
+        static::deleted(fn ($bed) => \App\Services\RoomOccupancyAlert::check($bed->available_a_id));
+
 
     }
 

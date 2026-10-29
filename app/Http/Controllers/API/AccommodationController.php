@@ -965,7 +965,7 @@ class AccommodationController extends Controller
 
             $anyAssigned                                    =   AssingAccommodation::where('emp_id', $emp_id)->where('resort_id', $this->resort_id)->first();
             if (!$anyAssigned) {
-                AssingAccommodation::where("id", $assignId)->where('resort_id', $this->resort_id)->update(['emp_id' => $emp_id, "effected_date" => date('Y-m-d')]);
+                AssingAccommodation::where("id", $assignId)->where('resort_id', $this->resort_id)->first()?->update(['emp_id' => $emp_id, "effected_date" => date('Y-m-d')]);
 
                 Common::recordAccommodationHistory(
                     $this->resort_id,
