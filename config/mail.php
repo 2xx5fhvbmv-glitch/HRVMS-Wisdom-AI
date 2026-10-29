@@ -92,8 +92,15 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', 'Example'),
+        'address' => env('MAIL_FROM_ADDRESS', 'hello@thewisdom.ai'),
+        'name' => env('MAIL_FROM_NAME', 'Wisdom AI'),
+    ],
+
+    // Replies go back to the sender. Read when the mailer is first built (lazily), so
+    // Common::applyResortSmtpConfig() can switch it to a resort's own address first.
+    'reply_to' => [
+        'address' => env('MAIL_FROM_ADDRESS', 'hello@thewisdom.ai'),
+        'name' => env('MAIL_FROM_NAME', 'Wisdom AI'),
     ],
 
     /*

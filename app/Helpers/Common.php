@@ -3438,6 +3438,8 @@ class Common
 			'mail.mailers.smtp.encryption' => $config->encryption,
 			'mail.from.address' => $config->from_address,
 			'mail.from.name' => $config->from_name,
+			'mail.reply_to.address' => $config->from_address, // replies go to the resort, not Wisdom
+			'mail.reply_to.name' => $config->from_name,
 		]);
 	}
 
