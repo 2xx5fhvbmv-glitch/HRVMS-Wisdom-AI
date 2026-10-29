@@ -53,8 +53,9 @@ class CheckUserRankForAPI
         }
 
         // Fallback: when this route group allows HR,GM,HOD,EXCOM, also allow if user is in HR department (for HR EXCOM / HR HOD access)
+        // Only HR-department staff of manager rank or above (1 EXCOM, 2 HOD, 3 HR, 4 MGR); HR supervisors and line workers don't pass (W1-28).
         $allowsHRGroup = count(array_intersect($allowedRanks, ['HR', 'GM', 'HOD', 'EXCOM'])) >= 1;
-        if ($allowsHRGroup) {
+        if ($allowsHRGroup && in_array((int) ($employee->rank ?: $employee->main_rank), [1, 2, 3, 4], true)) {
             $hrDeptId = ResortDepartment::where('resort_id', $user->resort_id)
                 ->where(function ($q) {
                     $q->where('name', 'Human Resources')->orWhere('name', 'like', '%Human Resources%');

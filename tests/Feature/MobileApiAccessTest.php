@@ -57,6 +57,32 @@ class MobileApiAccessTest extends TestCase
         $this->assertNotSame(403, $this->postJson('/api/accommodation/housekeeping-add-schedules', [])->status());
     }
 
+    /** An active employee moved into their resort's Human Resources department with the given rank (rolled back). */
+    private function hrDepartmentEmployee(int $rank): Employee
+    {
+        foreach (Employee::where('status', 'Active')->whereHas('resortAdmin', fn ($q) => $q->where('status', 'Active'))->get() as $e) {
+            $hrDept = \App\Models\ResortDepartment::where('resort_id', $e->resort_id)->where('name', 'like', '%Human Resources%')->value('id');
+            if ($hrDept) {
+                $e->forceFill(['Dept_id' => $hrDept, 'rank' => $rank])->save();
+                return $e->fresh();
+            }
+        }
+        $this->markTestSkipped('No resort with a Human Resources department.');
+    }
+
+    public function test_hr_department_line_worker_cannot_assign_or_move_accommodation()   // W1-28
+    {
+        Passport::actingAs($this->hrDepartmentEmployee(6)->resortAdmin, [], 'api');
+        $this->postJson('/api/accommodation/assign-accommodation-to-emp', [])->assertForbidden()->assertJson(['error' => 'Forbidden: Insufficient rank']);
+        $this->postJson('/api/accommodation/move-accommodation-for-emp', [])->assertForbidden()->assertJson(['error' => 'Forbidden: Insufficient rank']);
+    }
+
+    public function test_hr_department_manager_still_reaches_accommodation_assignment()   // W1-28
+    {
+        Passport::actingAs($this->hrDepartmentEmployee(4)->resortAdmin, [], 'api');
+        $this->assertNotSame(403, $this->postJson('/api/accommodation/assign-accommodation-to-emp', [])->status());
+    }
+
     public function test_mobile_user_with_a_temporary_password_can_only_change_it()   // W1-30
     {
         $user = $this->lineWorker()->resortAdmin;
