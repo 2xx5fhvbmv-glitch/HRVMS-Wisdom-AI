@@ -47,6 +47,7 @@ class StorageHelper
 
     public static function put(string $path, $contents, array $options = []): bool
     {
+        self::forgetUrl($path);
         return self::disk()->put($path, $contents, $options);
     }
 
@@ -62,17 +63,27 @@ class StorageHelper
 
     public static function delete($paths): bool
     {
+        array_map([self::class, 'forgetUrl'], (array) $paths);
         return self::disk()->delete($paths);
     }
 
     public static function move(string $from, string $to): bool
     {
+        self::forgetUrl($from);
+        self::forgetUrl($to);
         return self::disk()->move($from, $to);
     }
 
     public static function copy(string $from, string $to): bool
     {
+        self::forgetUrl($to);
         return self::disk()->copy($from, $to);
+    }
+
+    /** Drop Common::GetApplicantAWSFile()'s cached link for a path whose file changes. */
+    public static function forgetUrl(string $path): void
+    {
+        \Illuminate\Support\Facades\Cache::forget('storage_url:' . md5($path));
     }
 
     public static function allFiles(?string $directory = null): array

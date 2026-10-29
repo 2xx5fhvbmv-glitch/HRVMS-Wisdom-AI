@@ -10688,7 +10688,27 @@ class Common
         })->values()->all();
     }
 
+    /**
+     * Viewable URL for a stored file. On Wasabi/S3 every call cost a network round trip (exists() before signing the link),
+     * about 100 ms per file, 4+ seconds on a dashboard full of photos. The result is cached per path for 20 minutes; signed
+     * links last 30, so a cached link always has at least 10 minutes left. Local storage is not cached (no network).
+     */
     public static function GetApplicantAWSFile($path)
+    {
+        if (config('settings.storage_driver') === 'local' || empty($path)) {
+            return self::resolveApplicantAWSFile($path);
+        }
+        $key = 'storage_url:' . md5($path);   // StorageHelper forgets it when the file is written, moved or deleted
+        if (($cached = \Illuminate\Support\Facades\Cache::get($key)) !== null) {
+            return $cached;
+        }
+        $result = self::resolveApplicantAWSFile($path);
+        // A missing file is only remembered briefly, in case it is uploaded right after.
+        \Illuminate\Support\Facades\Cache::put($key, $result, $result['success'] ? now()->addMinutes(20) : now()->addMinutes(2));
+        return $result;
+    }
+
+    private static function resolveApplicantAWSFile($path)
     {
         // Read from config (env() returns null when prod runs
         // `php artisan config:cache`, which made every upload helper
