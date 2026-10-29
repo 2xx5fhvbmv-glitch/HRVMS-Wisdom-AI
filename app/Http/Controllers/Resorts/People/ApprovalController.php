@@ -586,10 +586,10 @@ class ApprovalController extends Controller
 
         if($request['action'] == 'info-update') {
 
-            // status-change is a GET route — POST here 405'd every Approve.
+            // status-change is POST (it changes data; audit NV05) — this must match the route.
             $approve_url = [
                 'route' => route('people.info-update.status-change'),
-                'method' => 'GET',
+                'method' => 'POST',
                 'action' => 'Approved',
                 'status'=> 'approve',
                 'id' => $request['id'],
