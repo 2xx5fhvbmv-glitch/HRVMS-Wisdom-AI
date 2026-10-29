@@ -184,7 +184,7 @@ class AccommodationController extends Controller
                                                                     ->whereNotIn('maintanace_requests.Status', ['Closed', 'On-Hold']);
 
             $MaintanaceRequest                              =   $MaintanaceRequest->leftjoin("resort_admins as t2", "t2.id", "maintanace_requests.Assigned_To")
-                                                                    ->get(['maintanace_requests.*','t1.id as Parentid', 't1.first_name', 't1.last_name', 't3.Emp_id', 't2.id as Assign_Parentid', 't2.first_name as Assign_first_name', 't2.last_name as Assign_last_name'])
+                                                                    ->with('BuilidngData')->get(['maintanace_requests.*','t1.id as Parentid', 't1.first_name', 't1.last_name', 't3.Emp_id', 't2.id as Assign_Parentid', 't2.first_name as Assign_first_name', 't2.last_name as Assign_last_name'])
                                                                     ->map(function ($row) {
                                                                         $row->RequestedBy = $row->first_name . ' ' . $row->last_name;
                                                                         $row->AssgingedStaff = $row->Assigned_To;

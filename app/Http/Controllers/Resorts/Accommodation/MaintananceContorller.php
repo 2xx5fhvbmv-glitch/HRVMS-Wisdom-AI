@@ -412,7 +412,7 @@ class MaintananceContorller extends Controller
                     });
                 }
                 $MaintanaceRequest = $MaintanaceRequest->orderBy('maintanace_requests.date', 'desc')
-                        ->get(['t1.id as Parentid', 't1.first_name', 't1.last_name', 'maintanace_requests.*'])
+                        ->with('BuilidngData')->get(['t1.id as Parentid', 't1.first_name', 't1.last_name', 'maintanace_requests.*'])
                         ->map(function ($row) use($EscalationDay)
                         {
                             $row->RequestedBy = $row->first_name . ' ' . $row->last_name;
@@ -549,7 +549,7 @@ class MaintananceContorller extends Controller
                 });
             }
             $MaintanaceRequest = $MaintanaceRequest->orderBy('maintanace_requests.date', 'desc')
-            ->get(['t1.id as Parentid','t1.first_name','t1.last_name','t4.id as Assign_Parentid','t4.first_name as Assign_first_name','t4.last_name as Assign_last_name','maintanace_requests.*'])
+            ->with('BuilidngData')->get(['t1.id as Parentid','t1.first_name','t1.last_name','t4.id as Assign_Parentid','t4.first_name as Assign_first_name','t4.last_name as Assign_last_name','maintanace_requests.*'])
             ->map(function ($row) use($EscalationDay)
                     {
                         $row->RequestedBy = $row->first_name . ' ' . $row->last_name;
@@ -1083,7 +1083,7 @@ class MaintananceContorller extends Controller
                 });
             }
             $MaintanaceRequest = $MaintanaceRequest->orderBy('maintanace_requests.id', 'desc')
-                    ->get(['t1.id as Parentid', 't1.first_name', 't1.last_name', 'maintanace_requests.*'])
+                    ->with('BuilidngData')->get(['t1.id as Parentid', 't1.first_name', 't1.last_name', 'maintanace_requests.*'])
                     ->map(function ($row)
                     {
                         $row->RequestedBy = $row->first_name . ' ' . $row->last_name;
@@ -1380,7 +1380,7 @@ class MaintananceContorller extends Controller
                 });
             }
             $MaintanaceRequest = $MaintanaceRequest->orderBy('maintanace_requests.id', 'desc')
-                    ->get(['t1.id as Parentid', 't1.first_name', 't1.last_name', 'maintanace_requests.*'])
+                    ->with('BuilidngData')->get(['t1.id as Parentid', 't1.first_name', 't1.last_name', 'maintanace_requests.*'])
                     ->map(function ($row)
                     {
                         $row->RequestedBy = $row->first_name . ' ' . $row->last_name;
@@ -1486,7 +1486,7 @@ class MaintananceContorller extends Controller
                                                             });
                                                         }
                                                         $MaintanaceRequest = $MaintanaceRequest->orderBy('maintanace_requests.id', 'desc')
-                                                                ->get(['t1.id as Parentid', 't1.first_name', 't1.last_name', 'maintanace_requests.*'])
+                                                                ->with('BuilidngData')->get(['t1.id as Parentid', 't1.first_name', 't1.last_name', 'maintanace_requests.*'])
                                                                 ->map(function ($row) use($EscalationDay)
                                                                 {
                                                                     $row->RequestedBy = $row->first_name . ' ' . $row->last_name;
@@ -1663,7 +1663,7 @@ class MaintananceContorller extends Controller
                                                             });
                                                         }
                                                         $MaintanaceRequest = $MaintanaceRequest->orderBy('maintanace_requests.id', 'desc')
-                                                                ->get(['t1.id as Parentid', 't1.first_name', 't1.last_name', 'maintanace_requests.*'])
+                                                                ->with('BuilidngData')->get(['t1.id as Parentid', 't1.first_name', 't1.last_name', 'maintanace_requests.*'])
                                                                 ->map(function ($row)
                                                                 {
                                                                     $row->RequestedBy = $row->first_name . ' ' . $row->last_name;

@@ -4583,14 +4583,6 @@ class Common
 
     public static function getSubordinates($employeeId, $subordinates = [], $visited = [], $resortId = null)
     {
-        // Prevent infinite loops from circular reporting structures
-        if (in_array($employeeId, $visited)) {
-            return $subordinates;
-        }
-
-        // Mark this employee as visited
-        $visited[] = $employeeId;
-
         // No resort_id filter on `reporting_to` — safe today only because
         // reporting_to values happen to be set within a resort's own org
         // chart. Resolve the root employee's own resort_id once and pin
@@ -4600,17 +4592,30 @@ class Common
             $resortId = Employee::where('id', $employeeId)->value('resort_id');
         }
 
-        $directSubordinates = Employee::where('reporting_to', $employeeId)
-                                    ->where('resort_id', $resortId)
-                                    ->pluck('id')->toArray();
+        // The resort's whole reporting map in one query (was one query per person in the tree), walked in memory.
+        $childrenOf = Employee::where('resort_id', $resortId)
+            ->whereNotNull('reporting_to')
+            ->orderBy('id')
+            ->get(['id', 'reporting_to'])
+            ->groupBy('reporting_to')
+            ->map(fn ($rows) => $rows->pluck('id')->all());
 
-        foreach ($directSubordinates as $subordinateId) {
-            // Only add if not already in subordinates list
+        return self::collectSubordinates($employeeId, $subordinates, $visited, $childrenOf);
+    }
+
+    /** Depth-first walk of getSubordinates(); $visited holds the current path, so circular reporting can't loop. */
+    private static function collectSubordinates($employeeId, array $subordinates, array $visited, $childrenOf): array
+    {
+        if (in_array($employeeId, $visited)) {
+            return $subordinates;
+        }
+        $visited[] = $employeeId;
+
+        foreach ($childrenOf->get($employeeId, []) as $subordinateId) {
             if (!in_array($subordinateId, $subordinates)) {
                 $subordinates[] = $subordinateId;
             }
-            // Pass visited array to prevent cycles
-            $subordinates = self::getSubordinates($subordinateId, $subordinates, $visited, $resortId);
+            $subordinates = self::collectSubordinates($subordinateId, $subordinates, $visited, $childrenOf);
         }
 
         return $subordinates;

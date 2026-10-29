@@ -79,7 +79,7 @@ class TaDocumentTemplateController extends Controller
                     $downloadUrl = null;
                     $disk = StorageHelper::disk();
                     try {
-                        if ($disk->exists($row->file_path)) {
+                        if (StorageHelper::existsCached($row->file_path)) {
                             $downloadUrl = StorageHelper::isCloud()
                                 ? $disk->temporaryUrl($row->file_path, now()->addMinutes(30))
                                 : $disk->url($row->file_path);

@@ -80,10 +80,26 @@ class StorageHelper
         return self::disk()->copy($from, $to);
     }
 
-    /** Drop Common::GetApplicantAWSFile()'s cached link for a path whose file changes. */
+    /**
+     * exists() remembered like Common::GetApplicantAWSFile()'s links (20 min, 2 min when missing). For list pages that
+     * check every row's file; put/delete/move/copy here clear it. Use plain exists() before reading or writing a file.
+     */
+    public static function existsCached(string $path): bool
+    {
+        $key = 'storage_exists:' . md5($path);
+        if (($cached = \Illuminate\Support\Facades\Cache::get($key)) !== null) {
+            return (bool) $cached;
+        }
+        $exists = self::disk()->exists($path);
+        \Illuminate\Support\Facades\Cache::put($key, $exists ? 1 : 0, $exists ? now()->addMinutes(20) : now()->addMinutes(2));
+        return $exists;
+    }
+
+    /** Drop the cached link and existence of a path whose file changes. */
     public static function forgetUrl(string $path): void
     {
         \Illuminate\Support\Facades\Cache::forget('storage_url:' . md5($path));
+        \Illuminate\Support\Facades\Cache::forget('storage_exists:' . md5($path));
     }
 
     public static function allFiles(?string $directory = null): array
