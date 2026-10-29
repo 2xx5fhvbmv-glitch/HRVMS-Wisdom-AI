@@ -57,7 +57,7 @@ class ResortRegistrationEmail extends ResetPasswordNotification
     // existing callers (ResortsController::store(), EmployeeImport) don't
     // need signature changes; it's no longer read here.
     $resetToken = Password::broker('resort-admin')->createToken($resort_admin);
-    $resetUrl = url('/') . route('resort.password.reset', ['token' => $resetToken, 'email' => $email], false);
+    $resetUrl = rtrim(config('app.url'), '/') . route('resort.password.reset', ['token' => $resetToken, 'email' => $email], false);
     $setPasswordButton = '<a style="padding:5px 10px;background-color:#DA2128;color:#ffffff" href="'.$resetUrl.'">Set your password</a>';
 
     $login_route = route('resort.loginindex');

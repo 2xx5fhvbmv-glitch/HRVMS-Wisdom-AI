@@ -54,7 +54,7 @@ class AdminRegistrationEmail extends ResetPasswordNotification
     // existing callers (AdminController::store()) don't need signature
     // changes; it's no longer read here.
     $resetToken = Password::broker('admins')->createToken($admin);
-    $resetUrl = url('/') . route('admin.password.reset', ['token' => $resetToken, 'email' => $email], false);
+    $resetUrl = rtrim(config('app.url'), '/') . route('admin.password.reset', ['token' => $resetToken, 'email' => $email], false);
     $setPasswordButton = '<a style="padding:5px 10px;background-color:#DA2128;color:#ffffff" href="'.$resetUrl.'">Set your password</a>';
 
     $login_route = route('admin.loginindex');
