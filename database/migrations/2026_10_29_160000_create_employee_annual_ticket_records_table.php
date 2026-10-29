@@ -12,21 +12,24 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('employee_annual_ticket_records')) {
-            return;
+        if (!Schema::hasTable('employee_annual_ticket_records')) {
+            Schema::create('employee_annual_ticket_records', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedInteger('resort_id')->index();
+                $table->unsignedBigInteger('employee_id');
+                $table->date('cycle_start_date');
+                $table->date('cycle_end_date');
+                $table->boolean('company_provided');
+                $table->unsignedBigInteger('decided_by')->nullable();   // resort_admins.id of the HR user
+                $table->timestamp('decided_at')->nullable();
+                $table->timestamps();
+            });
         }
-        Schema::create('employee_annual_ticket_records', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedInteger('resort_id')->index();
-            $table->unsignedBigInteger('employee_id');
-            $table->date('cycle_start_date');
-            $table->date('cycle_end_date');
-            $table->boolean('company_provided');
-            $table->unsignedBigInteger('decided_by')->nullable();   // resort_admins.id of the HR user
-            $table->timestamp('decided_at')->nullable();
-            $table->timestamps();
-            $table->unique(['employee_id', 'cycle_start_date']);
-        });
+        // Named explicitly: the generated name is 66 characters and MySQL allows 64. Added separately so a table left
+        // without it by the first (failed) run gets it too.
+        if (!collect(Schema::getIndexes('employee_annual_ticket_records'))->contains('name', 'emp_ticket_cycle_unique')) {
+            Schema::table('employee_annual_ticket_records', fn (Blueprint $table) => $table->unique(['employee_id', 'cycle_start_date'], 'emp_ticket_cycle_unique'));
+        }
     }
 
     public function down(): void
