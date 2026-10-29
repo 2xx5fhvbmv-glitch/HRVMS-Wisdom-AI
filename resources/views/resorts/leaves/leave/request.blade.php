@@ -24,6 +24,11 @@
                             <h1>{{ $page_title }}</h1>
                         </div>
                     </div>
+                    @if(App\Helpers\Common::isHR())
+                    <div class="col-auto">
+                        <a href="{{ route('leave.annualTickets') }}" class="btn leave-btn-secondary btn-sm">Annual leave tickets</a>
+                    </div>
+                    @endif
                 </div>
             </div>
             <div class="card">

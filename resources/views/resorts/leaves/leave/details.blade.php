@@ -338,6 +338,11 @@
                         </div>
                     </div>
                     @endif
+                    @if(!empty($annualTicket))
+                    <div class="card-footer bg-white border-top py-3">
+                        @include('resorts.leaves.partials.annual-ticket', ['ticket' => $annualTicket, 'ticketName' => trim($leaveDetail->employee_first_name . ' ' . $leaveDetail->employee_last_name)])
+                    </div>
+                    @endif
                 </div>
                 <!-- </div> old structure -->
                             <!-- <div class="col-lg-auto">

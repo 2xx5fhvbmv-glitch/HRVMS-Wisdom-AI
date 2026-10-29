@@ -721,6 +721,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::get('/get/combine-info', 'Leave\LeaveController@getCombineInfo')->name('leaves.combineInfo.get');
 
     Route::post('/leaves/handle-leave-action', 'Leave\LeaveController@handleLeaveAction')->name('leave.handleAction');
+    Route::get('/leaves/annual-tickets', 'Leave\AnnualTicketController@index')->name('leave.annualTickets');
+    Route::post('/leaves/annual-tickets', 'Leave\AnnualTicketController@store')->name('leave.annualTickets.store');
     Route::post('/leaves/recommend-alternative-dates','Leave\LeaveController@recommendAlternativeDate')->name('leave.recommendAlternativeDate');
     Route::post('/leaves/send-email-to-travel-partner', 'Leave\LeaveController@sendEmailToTravelPartner')
      ->name('send.email.to.travel.partner');

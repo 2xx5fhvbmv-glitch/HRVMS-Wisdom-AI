@@ -3481,6 +3481,24 @@ class LeaveController extends Controller
         }
     }
 
+    /** Flight-ticket tracking from the app: HR answers Yes/No for an employee's current Annual Leave cycle (editable within it). */
+    public function saveAnnualLeaveTicket(Request $request)
+    {
+        $employee = Auth::guard('api')->user()?->GetEmployee;
+        if (!$employee || !Common::isHR($employee)) {
+            return response()->json(['success' => false, 'message' => 'Only HR can answer this.'], 403);
+        }
+        $request->validate(['employee_id' => ['required', 'integer'], 'company_provided' => ['required', 'boolean']]);
+        $target = Employee::where('id', $request->employee_id)->where('resort_id', $employee->resort_id)->first();
+        if (!$target) {
+            return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
+        }
+        $state = Common::saveAnnualTicket($target, $request->boolean('company_provided'), Auth::guard('api')->id());
+        return $state
+            ? response()->json(['success' => true, 'message' => 'Ticket answer saved.', 'annual_ticket' => $state])
+            : response()->json(['success' => false, 'message' => 'This employee has no joining date, so there is no leave cycle yet.'], 422);
+    }
+
     public function leaveRequestViewHRHOD($leave_id)
     {
         if (!Auth::guard('api')->check()) {
@@ -3664,6 +3682,9 @@ class LeaveController extends Controller
                     // $leaveDetail->island_pass               = json_decode($leaveDetail->island_pass, true);
                     $baseUrl                                = url('/');
                     $leaveDetail->attachments               = Common::resolveLeaveAttachmentUrl($leaveDetail->attachments);
+                    // Flight-ticket tracking: HR answers for the employee's current cycle (POST resort/annual-leave-ticket); null otherwise.
+                    $leaveDetail->annual_ticket              = Common::isHR($employee) && Common::isAnnualLeaveCategory($leaveDetail->leave_category_id)
+                                                                    ? Common::annualTicketState(Employee::find($leaveDetail->emp_id)) : null;
 
                     // Give the approver context in one call instead of
                     // requiring a second lookup for the leave this one

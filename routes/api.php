@@ -105,6 +105,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('resort/view-leave-history/{leave_id}', [App\Http\Controllers\API\LeaveController::class, 'viewLeaveHistory']);
 		Route::post('resort/employee-leave-request-list', [App\Http\Controllers\API\LeaveController::class, 'employeeLeaveRequestListHRHOD']);
 		Route::post('resort/employee-leave-request-view/{leave_id}', [App\Http\Controllers\API\LeaveController::class, 'leaveRequestViewHRHOD']);
+		Route::post('resort/annual-leave-ticket', [App\Http\Controllers\API\LeaveController::class, 'saveAnnualLeaveTicket']);
 		Route::post('resort/handle-leave-action', [App\Http\Controllers\API\LeaveController::class, 'handleLeaveAction']);
 
 

@@ -7440,6 +7440,43 @@ class Common
         return ['start' => $start, 'end' => $start->copy()->addYearNoOverflow()->subDay()];
     }
 
+    /**
+     * Flight-ticket tracking: the employee's current Annual Leave cycle and HR's answer to "has the company provided
+     * this cycle's round-trip ticket?" (company_provided null = not answered yet). Null before the employee joins.
+     */
+    public static function annualTicketState($employee): ?array
+    {
+        $cycle = !empty($employee?->joining_date) ? self::annualLeaveCycle($employee->joining_date) : null;
+        if (!$cycle) {
+            return null;
+        }
+        $record = \App\Models\EmployeeAnnualTicketRecord::where('employee_id', $employee->id)->whereDate('cycle_start_date', $cycle['start'])->first();
+        $decider = $record?->decided_by ? \App\Models\ResortAdmin::find($record->decided_by) : null;
+        return [
+            'employee_id' => $employee->id,
+            'cycle_start' => $cycle['start']->toDateString(),
+            'cycle_end' => $cycle['end']->toDateString(),
+            'company_provided' => $record?->company_provided,
+            'decided_at' => $record?->decided_at?->toDateTimeString(),
+            'decided_by' => $decider ? trim($decider->first_name . ' ' . $decider->last_name) : null,
+        ];
+    }
+
+    /** Records HR's answer for the employee's current cycle; it can be changed any time within the cycle. */
+    public static function saveAnnualTicket($employee, bool $companyProvided, $deciderAdminId): ?array
+    {
+        $cycle = !empty($employee?->joining_date) ? self::annualLeaveCycle($employee->joining_date) : null;
+        if (!$cycle) {
+            return null;
+        }
+        \App\Models\EmployeeAnnualTicketRecord::updateOrCreate(
+            ['employee_id' => $employee->id, 'cycle_start_date' => $cycle['start']->toDateString()],
+            ['resort_id' => $employee->resort_id, 'cycle_end_date' => $cycle['end']->toDateString(), 'company_provided' => $companyProvided,
+                'decided_by' => $deciderAdminId, 'decided_at' => now()]
+        );
+        return self::annualTicketState($employee);
+    }
+
     /** Whether a leave category is the resort's Annual Leave (the only anniversary-accrued type). */
     public static function isAnnualLeaveCategory($leaveCategoryId): bool
     {

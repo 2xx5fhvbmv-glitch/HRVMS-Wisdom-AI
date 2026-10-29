@@ -1309,7 +1309,11 @@ class LeaveController extends Controller
             ->orderBy('elt.id')
             ->get();
 
-        return view('resorts.leaves.leave.details', compact('page_title', 'empID', 'available_rank', 'leaveDetail', 'leaveBalances', 'leaveUsage', 'leave_categories', 'employee', 'canApproveThisLeave', 'departurePass', 'localTransportation'));
+        // Flight-ticket tracking: HR answers for the employee's current cycle on any Annual Leave request.
+        $annualTicket = Common::isHR() && Common::isAnnualLeaveCategory($leaveDetail->leave_category_id)
+            ? Common::annualTicketState(Employee::find($leaveDetail->emp_id)) : null;
+
+        return view('resorts.leaves.leave.details', compact('page_title', 'empID', 'available_rank', 'leaveDetail', 'leaveBalances', 'leaveUsage', 'leave_categories', 'employee', 'canApproveThisLeave', 'departurePass', 'localTransportation', 'annualTicket'));
     }
 
     public function getLeaveHistory(Request $request)
