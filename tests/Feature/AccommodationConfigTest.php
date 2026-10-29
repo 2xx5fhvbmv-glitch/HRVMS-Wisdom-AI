@@ -89,6 +89,25 @@ class AccommodationConfigTest extends TestCase
         $this->postJson(route('resort.accommodation.AvailableAccommodationStore'), $setup('102'))->assertStatus(422)->assertJsonFragment(['success' => false]);
         $this->assertEquals(2, DB::table('inventory_modules')->where('id', $item)->value('Occupied'), 'nothing reserved by the refused save');
         $this->assertSame(1, $rooms(), 'the refused room was rolled back');
+
+        // §2.2: read and edit a set-up room's items; stock follows
+        $roomId = DB::table('available_accommodation_models')->where('BuildingName', $b)->value('id');
+        $occ = fn () => (int) DB::table('inventory_modules')->where('id', $item)->value('Occupied');
+        $this->getJson(route('resort.accommodation.AvailableAccommodationItems', $roomId))->assertOk()
+            ->assertJsonPath('items.0.id', $item)->assertJsonPath('items.0.qty', 2)->assertJsonPath('items.0.available', 1);
+        $upd = fn ($extra) => $this->putJson(route('resort.accommodation.AvailableAccommodationUpdate', $roomId), $extra + ['Accommodation_type_id' => $type,
+            'Capacity' => 1, 'RoomType' => 1, 'blockFor' => 'Male', 'CleaningSchedule' => 'Daily', 'Occupancytheresold' => 90]);
+        $upd(['items' => [$item => 1]])->assertOk();
+        $this->assertSame(1, $occ(), 'lowered to 1: one unit back in stock');
+        $upd(['items' => [$item => 3]])->assertOk();
+        $this->assertSame(3, $occ());
+        $upd(['items' => [$item => 4]])->assertStatus(422);
+        $this->assertSame(3, $occ(), 'refused: unchanged');
+        $this->assertEquals(3, DB::table('available_accommodation_inv_items')->where('Available_Acc_id', $roomId)->value('quantity'));
+        $upd([])->assertOk();
+        $this->assertSame(3, $occ(), 'no items section: items untouched');
+        $this->deleteJson(route('resort.accommodation.AvailableAccommodationDestroy', $roomId))->assertOk();
+        $this->assertSame(0, $occ(), 'deleting the room gives its items back');
     }
 
     public function test_buildings_keep_gender_and_numbering_and_rooms_take_text_numbers()   // §1 rows 1/3, §1b, §2.1

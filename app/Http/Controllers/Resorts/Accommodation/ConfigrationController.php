@@ -494,17 +494,7 @@ class ConfigrationController extends Controller
 
         DB::beginTransaction();
         try {
-            // Decrement Occupied count for each linked inventory item
-            $linkedItems = AvailableAccommodationInvItem::where('Available_Acc_id', $id)->get();
-            foreach ($linkedItems as $link) {
-                $inv = InventoryModule::find($link->Item_id);
-                if ($inv) {
-                    $inv->Occupied = max(0, ($inv->Occupied ?? 0) - ($link->quantity ?? 1));
-                    $inv->save();
-                }
-            }
-
-            AvailableAccommodationInvItem::where('Available_Acc_id', $id)->delete();
+            $this->releaseRoomItems($id, $resort_id);
             \App\Models\AssingAccommodation::where('available_a_id', $id)->where('resort_id', $resort_id)->delete();
             $accommodation->delete();
             DB::commit();
@@ -548,6 +538,52 @@ class ConfigrationController extends Controller
         return response()->json(['success' => true, 'beds' => $beds]);
     }
 
+    /** Give a room's linked items back to stock and unlink them (room deleted or its items replaced). */
+    private function releaseRoomItems($roomId, $resortId): void
+    {
+        foreach (AvailableAccommodationInvItem::where('Available_Acc_id', $roomId)->get() as $link) {
+            InventoryModule::where('id', $link->Item_id)->where('resort_id', $resortId)
+                ->update(['Occupied' => DB::raw('GREATEST(COALESCE(Occupied, 0) - ' . (int) ($link->quantity ?? 1) . ', 0)')]);
+        }
+        AvailableAccommodationInvItem::where('Available_Acc_id', $roomId)->delete();
+    }
+
+    /**
+     * Reserve [item id => quantity] for a room and link them. Check and reserve are one conditional UPDATE per item,
+     * so two saves at once can't both take the last units. Returns the items short of stock; the caller rolls back.
+     */
+    private function reserveRoomItems($roomId, array $qtyByItem, $resortId): array
+    {
+        $outOfStock = [];
+        foreach ($qtyByItem as $item => $qty) {
+            $qty = max(1, (int) $qty);
+            $reserved = InventoryModule::where('id', $item)->where('resort_id', $resortId)
+                ->whereRaw('COALESCE(Quantity, 0) - COALESCE(Occupied, 0) >= ?', [$qty])
+                ->update(['Occupied' => DB::raw('COALESCE(Occupied, 0) + ' . $qty)]);
+            if (!$reserved && ($inv = InventoryModule::where('id', $item)->where('resort_id', $resortId)->first())) {
+                $outOfStock[] = $inv->ItemName . ' (Available: ' . (($inv->Quantity ?? 0) - ($inv->Occupied ?? 0)) . ', Requested: ' . $qty . ')';
+                continue;
+            }
+            AvailableAccommodationInvItem::create(['Available_Acc_id' => $roomId, 'Item_id' => $item, 'quantity' => $qty]);
+        }
+        return $outOfStock;
+    }
+
+    /** A set-up room's items (plan §2.2): the drawer shows and edits them, "Same as the floor below" copies them. */
+    public function AvailableAccommodationItems($id)
+    {
+        $resort_id = $this->resort->resort_id;
+        if (!AvailableAccommodationModel::where('id', $id)->where('resort_id', $resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Not found'], 404);
+        }
+        $items = AvailableAccommodationInvItem::join('inventory_modules as i', 'i.id', '=', 'available_accommodation_inv_items.Item_id')
+            ->leftJoin('inventory_category_models as c', 'c.id', '=', 'i.Inv_Cat_id')
+            ->where('available_accommodation_inv_items.Available_Acc_id', $id)->where('i.resort_id', $resort_id)
+            ->get(['i.id', 'i.ItemName as name', 'i.ItemCode as code', 'c.CategoryName as category', 'available_accommodation_inv_items.quantity as qty',
+                DB::raw('GREATEST(COALESCE(i.Quantity, 0) - COALESCE(i.Occupied, 0), 0) as available')]);
+        return response()->json(['success' => true, 'items' => $items]);
+    }
+
     public function AvailableAccommodationUpdate(Request $request, $id)
     {
         $resort_id = $this->resort->resort_id;
@@ -555,7 +591,21 @@ class ConfigrationController extends Controller
         if (!$accommodation) {
             return response()->json(['success' => false, 'message' => 'Not found'], 404);
         }
-
+        // Optional items section, {item id: quantity}; when sent it replaces the room's items (absent = items untouched).
+        if ($request->has('items')) {
+            $v = Validator::make($request->all(), ['items' => ['present', 'array'], 'items.*' => ['integer', 'min:1', 'max:999']]);
+            if ($v->fails()) {
+                return response()->json(['success' => false, 'errors' => $v->errors()], 422);
+            }
+        }
+        DB::beginTransaction();
+        if ($request->has('items')) {
+            $this->releaseRoomItems($id, $resort_id);
+            if ($short = $this->reserveRoomItems($id, $request->input('items', []), $resort_id)) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Insufficient inventory: ' . implode(', ', $short)], 422);
+            }
+        }
         $accommodation->update([
             'Accommodation_type_id' => $request->Accommodation_type_id,
             'Capacity' => $request->Capacity,
@@ -597,9 +647,9 @@ class ConfigrationController extends Controller
                 ->orderBy('id', 'desc')
                 ->limit($excessCount)
                 ->pluck('id');
-            \App\Models\AssingAccommodation::whereIn('id', $emptyBeds)->delete();
+            \App\Models\AssingAccommodation::whereIn('id', $emptyBeds)->get()->each->delete(); // as models: the occupancy alert re-checks the room
         }
-
+        DB::commit();
         return response()->json(['success' => true, 'message' => 'Accommodation updated successfully']);
     }
 
@@ -719,21 +769,11 @@ class ConfigrationController extends Controller
                 {
                     $invQtyMap = ($request->InvQty && array_key_exists($i, $request->InvQty)) ? $request->InvQty[$i] : [];
 
-                    // Check and reserve stock in one conditional UPDATE per item, so two saves at the same
-                    // moment can't both take the last units (was: check, then read + save Occupied).
-                    // A failure rolls the whole save back, including items already reserved.
-                    $outOfStock = [];
+                    $qtyByItem = [];
                     foreach ($request->Inv_Cat_id[$i] as $item) {
-                        $qty = isset($invQtyMap[$item]) ? intval($invQtyMap[$item]) : 1;
-                        $reserved = InventoryModule::where('id', $item)->where('resort_id', $resort_id)
-                            ->whereRaw('COALESCE(Quantity, 0) - COALESCE(Occupied, 0) >= ?', [$qty])
-                            ->update(['Occupied' => DB::raw('COALESCE(Occupied, 0) + ' . $qty)]);
-                        if (!$reserved && ($inv = InventoryModule::where('id', $item)->where('resort_id', $resort_id)->first())) {
-                            $outOfStock[] = $inv->ItemName . ' (Available: ' . (($inv->Quantity ?? 0) - ($inv->Occupied ?? 0)) . ', Requested: ' . $qty . ')';
-                            continue;
-                        }
-                        AvailableAccommodationInvItem::create([ 'Available_Acc_id'=>$parent_id->id,'Item_id'=>$item,'quantity'=>$qty]);
+                        $qtyByItem[$item] = isset($invQtyMap[$item]) ? intval($invQtyMap[$item]) : 1;
                     }
+                    $outOfStock = $this->reserveRoomItems($parent_id->id, $qtyByItem, $resort_id);
 
                     if (!empty($outOfStock)) {
                         DB::rollBack();
