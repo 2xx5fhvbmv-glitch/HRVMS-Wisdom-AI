@@ -100,6 +100,8 @@ class StorageHelper
     {
         \Illuminate\Support\Facades\Cache::forget('storage_url:' . md5($path));
         \Illuminate\Support\Facades\Cache::forget('storage_exists:' . md5($path));
+        \Illuminate\Support\Facades\Cache::forget('storage_file:' . md5($path) . ':0');
+        \Illuminate\Support\Facades\Cache::forget('storage_file:' . md5($path) . ':1');
     }
 
     public static function allFiles(?string $directory = null): array

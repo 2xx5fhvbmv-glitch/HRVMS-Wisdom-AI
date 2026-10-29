@@ -10607,7 +10607,27 @@ class Common
             ->where("resort_id", $resort_id)
             ->first();
 
-        if (!$ChildFiles || !StorageHelper::disk()->exists($ChildFiles->File_Path)) {
+        if (!$ChildFiles) {
+            return ['success' => false, 'NewURLshow' => null, 'mimeType' => null];
+        }
+        if (config('settings.storage_driver') === 'local') {
+            return self::resolveAWSFile($ChildFiles, $id, $resort_id, $is_secure);
+        }
+
+        // Same link cache as GetApplicantAWSFile(): skips the Wasabi exists() call and, for encrypted files, the
+        // download/decrypt/re-upload on every view. Keyed by path (StorageHelper::forgetUrl clears it).
+        $key = 'storage_file:' . md5($ChildFiles->File_Path) . ':' . (empty($is_secure) ? 0 : 1);
+        if (($cached = \Illuminate\Support\Facades\Cache::get($key)) !== null) {
+            return $cached;
+        }
+        $result = self::resolveAWSFile($ChildFiles, $id, $resort_id, $is_secure);
+        \Illuminate\Support\Facades\Cache::put($key, $result, $result['success'] ? now()->addMinutes(20) : now()->addMinutes(2));
+        return $result;
+    }
+
+    private static function resolveAWSFile($ChildFiles, $id, $resort_id, $is_secure)
+    {
+        if (!StorageHelper::disk()->exists($ChildFiles->File_Path)) {
             return ['success' => false, 'NewURLshow' => null, 'mimeType' => null];
         }
 
