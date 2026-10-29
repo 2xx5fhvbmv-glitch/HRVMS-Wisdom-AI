@@ -21,7 +21,7 @@ class ModulesPagesController extends Controller
 
         if ($request->ajax())
         {
-            $ModulePages = ModulePages::orderBy('created_at', 'DESC')
+            $ModulePages = ModulePages::with("Modules")->orderBy("created_at", "DESC")
             ->get();
             return datatables()->of($ModulePages)
                 ->addColumn('checkbox', function ($ModulePages) {
@@ -58,6 +58,7 @@ class ModulesPagesController extends Controller
                 return $action_links;
             })
 
+            ->removeColumn('modules')
             ->rawColumns(['checkbox','ModuleName','status', 'action']) // Include 'status' in rawColumns to process HTML
             ->make(true);
 

@@ -519,6 +519,11 @@ class PerformanceDashboardController extends Controller
         $activeCycleIds = PerformanceCycle::where('resort_id', $resort_id)
             ->whereIn('status', ['OnGoing', 'Pending'])
             ->pluck('id');
+        // Rating and status columns both need it; compute once per row.
+        $statusCache = [];
+        $statusFor = function ($empId) use ($activeCycleIds, &$statusCache) {
+            return $statusCache[$empId] ??= $this->computeAppraisalStatus($empId, $activeCycleIds);
+        };
 
         return datatables()->of($query)
             ->addColumn('applicant', function ($row) {
@@ -526,8 +531,8 @@ class PerformanceDashboardController extends Controller
             })
             ->addColumn('position', fn($row) => $row->position->position_title ?? '')
             ->addColumn('department', fn($row) => $row->department->name ?? '')
-            ->addColumn('rating', function ($row) use ($activeCycleIds) {
-                $st = $this->computeAppraisalStatus($row->id, $activeCycleIds);
+            ->addColumn('rating', function ($row) use ($statusFor) {
+                $st = $statusFor($row->id);
                 $r = (int) round($st['rating']);
                 $html = '';
                 for ($i = 1; $i <= 5; $i++) {
@@ -535,8 +540,8 @@ class PerformanceDashboardController extends Controller
                 }
                 return $html;
             })
-            ->addColumn('appraisal_status', function ($row) use ($activeCycleIds) {
-                $st = $this->computeAppraisalStatus($row->id, $activeCycleIds);
+            ->addColumn('appraisal_status', function ($row) use ($statusFor) {
+                $st = $statusFor($row->id);
                 $cls = match($st['label']) {
                     'Done'        => 'badge-themeSuccess',
                     'In Progress' => 'badge-themeWarning',
