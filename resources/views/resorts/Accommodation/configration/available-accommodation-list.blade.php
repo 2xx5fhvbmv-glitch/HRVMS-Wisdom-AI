@@ -337,7 +337,7 @@ $(document).ready(function() {
         if (capacity > beds.length) {
             for (var i = beds.length + 1; i <= capacity; i++) {
                 html += '<div class="col-lg-3 col-md-4 col-6 mb-1">' +
-                    '<input type="text" class="form-control form-control-sm edit-bed-name new-bed" data-bed-id="new_' + i + '" value="BedNo-' + i + '" style="border-color:#28a745;">' +
+                    '<input type="text" class="form-control form-control-sm edit-bed-name new-bed" data-bed-id="new_' + i + '" value="Bed No ' + i + '" style="border-color:#28a745;">' +
                     '<small class="text-success" style="font-size:10px;">New</small>' +
                 '</div>';
             }

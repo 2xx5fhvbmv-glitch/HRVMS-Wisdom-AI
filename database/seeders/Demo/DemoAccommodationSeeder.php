@@ -169,7 +169,7 @@ class DemoAccommodationSeeder
             $p = $occupants[$b - 1] ?? null;
             $since = $p ? Carbon::parse(max(self::OPENED, (string) $p->joining_date)) : Carbon::parse(self::OPENED);
             $bedId = $this->row('assing_accommodations', ['resort_id' => $this->resortId, 'available_a_id' => $roomId, 'emp_id' => $p->id ?? 0,
-                'effected_date' => $since->format('Y-m-d'), 'BedNo' => "BedNo-{$b}", 'created_at' => $since, 'updated_at' => $since]);
+                'effected_date' => $since->format('Y-m-d'), 'BedNo' => "Bed No {$b}", 'created_at' => $since, 'updated_at' => $since]);
             if ($p) {
                 if (isset($this->people()[$p->id])) { // leavers raise no requests and are not moved
                     $this->bedsByEmployee[$p->id] = [(object) ['id' => $roomId, 'building' => $buildingId, 'floor' => $floor, 'room' => $roomNo], $bedId];

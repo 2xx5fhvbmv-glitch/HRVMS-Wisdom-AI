@@ -28,12 +28,14 @@
             'buildingUpdate'  => route('resort.accommodation.BuildingUpdate'),
             'buildingDestroy' => route('resort.accommodation.BuildingDestory', ['id' => '__ID__']),
             'roomStore'       => route('resort.accommodation.StoreFloorandroom'),
+            'buildingAddFloors' => route('resort.accommodation.AddFloorsToBuilding', ['id' => '__ID__']),   // floors+rooms in one transaction
             'roomDestroy'     => route('resort.accommodation.FloorAndRoomDestroy', ['id' => '__ID__']),
             'setupStore'      => route('resort.accommodation.AvailableAccommodationStore'),
             'setupUpdate'     => route('resort.accommodation.AvailableAccommodationUpdate', ['id' => '__ID__']),
             'setupDestroy'    => route('resort.accommodation.AvailableAccommodationDestroy', ['id' => '__ID__']),
             'beds'            => route('resort.accommodation.getBeds', ['id' => '__ID__']),
             'escalation'      => route('resort.accommodation.config.EscalationDay'),
+            'defaultAlert'    => route('resort.accommodation.config.DefaultOccupancyAlert'),
             'typeStore'       => route('resort.accommodation.AccommodationTypeStore'),
             'typeDestroy'     => route('resort.accommodation.Accommodationdestory', ['id' => '__ID__']),
             'catStore'        => route('resort.accommodation.StoreInvCategory'),
@@ -57,6 +59,7 @@
             'dq'    => (int) ($i->default_qty_per_unit ?? 0),
         ])->values(),
         'escalation' => optional($EscalationDay)->EscalationDay,
+        'defaultAlert' => optional($EscalationDay)->default_occupancy_alert ?? 90,   // shared per resort; the Alerts tab saves it via urls.defaultAlert
         'cleaning'   => config('settings.CleaningSchedule'),
     ];
 @endphp

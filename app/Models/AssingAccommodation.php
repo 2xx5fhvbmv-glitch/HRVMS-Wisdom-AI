@@ -43,7 +43,7 @@ class AssingAccommodation extends Model
                     $nextNumber = (int) $lastNumber + 1;
                 }
 
-                $model->BedNo = 'BedNo-' . $nextNumber;
+                $model->BedNo = 'Bed No ' . $nextNumber;
             }
         });
 

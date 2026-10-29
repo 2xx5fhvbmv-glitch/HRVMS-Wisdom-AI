@@ -562,15 +562,60 @@ class ConfigrationController extends Controller
         return DB::transaction(function () use ($request, $resort_id) {
             $building = BuildingModel::create(['resort_id' => $resort_id, 'BuildingName' => $request->BuildingName]
                 + array_filter($request->only(['gender', 'room_numbering', 'room_number_pattern', 'occupancy_alert']), fn ($x) => $x !== null));
-            $rooms = [];
-            foreach ($request->floors as $f) {
-                foreach ($f['rooms'] as $no) {
-                    $rooms[] = ['floor' => (int) $f['floor'], 'room' => (string) $no, 'id' => BulidngAndFloorAndRoom::create(
-                        ['resort_id' => $resort_id, 'building_id' => $building->id, 'Floor' => (int) $f['floor'], 'Room' => (string) $no])->id];
-                }
-            }
+            $rooms = $this->createFloorRooms($building->id, $request->floors, $resort_id);
             return response()->json(['success' => true, 'message' => 'Building added successfully', 'id' => $building->id, 'rooms' => $rooms]);
         });
+    }
+
+    /**
+     * Floors/rooms added to an existing building in one transaction (same contract as StoreBuildingWithFloors, which
+     * covers a new building). A room number may be used once per floor, as on the single-room endpoint.
+     */
+    public function AddFloorsToBuilding(Request $request, $id)
+    {
+        $resort_id = $this->resort->resort_id;
+        $building = BuildingModel::where('id', $id)->where('resort_id', $resort_id)->first();
+        if (!$building) {
+            return response()->json(['success' => false, 'message' => 'Building not found'], 404);
+        }
+        $v = Validator::make($request->all(), [
+            'floors' => ['required', 'array', 'min:1', 'max:60'],
+            'floors.*.floor' => ['required', 'integer', 'min:0', 'max:200', 'distinct'],
+            'floors.*.rooms' => ['required', 'array', 'min:1', 'max:60'],
+            'floors.*.rooms.*' => self::ROOM_NO_RULES,
+        ]);
+        $v->after(function ($v) use ($request, $building) {
+            $taken = BulidngAndFloorAndRoom::where('building_id', $building->id)->get(['Floor', 'Room'])
+                ->map(fn ($r) => (int) $r->Floor . '|' . mb_strtolower(trim($r->Room)))->flip();
+            foreach ((array) $request->floors as $i => $f) {
+                $seen = [];
+                foreach ((array) ($f['rooms'] ?? []) as $j => $no) {
+                    $key = (int) ($f['floor'] ?? 0) . '|' . mb_strtolower(trim((string) $no));
+                    if (isset($taken[$key]) || isset($seen[$key])) {
+                        $v->errors()->add("floors.$i.rooms.$j", "Room $no already exists on floor " . (int) $f['floor'] . '.');
+                    }
+                    $seen[$key] = true;
+                }
+            }
+        });
+        if ($v->fails()) {
+            return response()->json(['success' => false, 'errors' => $v->errors()], 422);
+        }
+
+        return DB::transaction(fn () => response()->json(['success' => true, 'message' => 'Floors added successfully', 'id' => $building->id,
+            'rooms' => $this->createFloorRooms($building->id, $request->floors, $resort_id)]));
+    }
+
+    private function createFloorRooms($buildingId, array $floors, $resortId): array
+    {
+        $rooms = [];
+        foreach ($floors as $f) {
+            foreach ($f['rooms'] as $no) {
+                $rooms[] = ['floor' => (int) $f['floor'], 'room' => (string) $no, 'id' => BulidngAndFloorAndRoom::create(
+                    ['resort_id' => $resortId, 'building_id' => $buildingId, 'Floor' => (int) $f['floor'], 'Room' => (string) $no])->id];
+            }
+        }
+        return $rooms;
     }
 
     /**
@@ -630,7 +675,7 @@ class ConfigrationController extends Controller
         if (!$room) {
             $room = AvailableAccommodationModel::create($fields + ['resort_id' => $resortId, 'BuildingName' => $r['building_id'], 'Floor' => $r['floor'], 'RoomNo' => $r['room']]);
             for ($b = 1; $b <= $fields['Capacity']; $b++) {
-                AssingAccommodation::create(['resort_id' => $resortId, 'available_a_id' => $room->id, 'BedNo' => 'BedNo-' . $b]);
+                AssingAccommodation::create(['resort_id' => $resortId, 'available_a_id' => $room->id, 'BedNo' => 'Bed No ' . $b]);
             }
         } else {
             $beds = AssingAccommodation::where('available_a_id', $room->id)->where('resort_id', $resortId)->orderBy('id')->get();
@@ -640,7 +685,7 @@ class ConfigrationController extends Controller
             }
             $room->update($fields);
             for ($b = $beds->count() + 1; $b <= $fields['Capacity']; $b++) {
-                AssingAccommodation::create(['resort_id' => $resortId, 'available_a_id' => $room->id, 'BedNo' => 'BedNo-' . $b]);
+                AssingAccommodation::create(['resort_id' => $resortId, 'available_a_id' => $room->id, 'BedNo' => 'Bed No ' . $b]);
             }
             $beds->filter(fn ($b) => empty($b->emp_id))->sortByDesc('id')->take(max(0, $beds->count() - $fields['Capacity']))->each->delete();
         }
@@ -676,8 +721,10 @@ class ConfigrationController extends Controller
             $reserved = InventoryModule::where('id', $item)->where('resort_id', $resortId)
                 ->whereRaw('COALESCE(Quantity, 0) - COALESCE(Occupied, 0) >= ?', [$qty])
                 ->update(['Occupied' => DB::raw('COALESCE(Occupied, 0) + ' . $qty)]);
-            if (!$reserved && ($inv = InventoryModule::where('id', $item)->where('resort_id', $resortId)->first())) {
-                $outOfStock[] = $inv->ItemName . ' (Available: ' . (($inv->Quantity ?? 0) - ($inv->Occupied ?? 0)) . ', Requested: ' . $qty . ')';
+            if (!$reserved) {   // short on stock, or not this resort's item: never link it
+                $inv = InventoryModule::where('id', $item)->where('resort_id', $resortId)->first();
+                $outOfStock[] = $inv ? $inv->ItemName . ' (Available: ' . (($inv->Quantity ?? 0) - ($inv->Occupied ?? 0)) . ', Requested: ' . $qty . ')'
+                    : "Item #{$item} (not in this resort's inventory)";
                 continue;
             }
             AvailableAccommodationInvItem::create(['Available_Acc_id' => $roomId, 'Item_id' => $item, 'quantity' => $qty]);
@@ -907,7 +954,7 @@ class ConfigrationController extends Controller
                         AssingAccommodation::create([
                             "resort_id" => $resort_id,
                             'available_a_id' => $parent_id->id,
-                            'BedNo' => $bedNames[$b] ?? 'BedNo-' . ($b + 1),
+                            'BedNo' => $bedNames[$b] ?? 'Bed No ' . ($b + 1),
                         ]);
                     }
 
@@ -1045,8 +1092,10 @@ class ConfigrationController extends Controller
             // Was unscoped — the update payload reassigns resort_id to the
             // caller's own, so without a where() filter this let one resort
             // "adopt" another resort's building record by id.
+            // Missing fields are left as they are; clear_occupancy_alert turns the building's alert off.
             BuildingModel::where("id",$b_id)->where('resort_id', $resort_id)->update(["resort_id"=>$resort_id,"BuildingName"=>$request->BuildingName]
-                + array_filter($request->only(['gender', 'room_numbering', 'room_number_pattern', 'occupancy_alert']), fn ($v) => $v !== null));
+                + array_filter($request->only(['gender', 'room_numbering', 'room_number_pattern', 'occupancy_alert']), fn ($v) => $v !== null)
+                + ($request->boolean('clear_occupancy_alert') ? ['occupancy_alert' => null, 'occupancy_alert_notified_at' => null] : []));
 
             DB::commit();
             return response()->json([
@@ -1264,6 +1313,20 @@ class ConfigrationController extends Controller
                                                         ->pluck('Room');
          return response()->json(['success' =>true,'data'=>$BulidngAndFloorAndRoom ], 200);
     }
+    /** Default occupancy alert level (percent full) for new rooms, one value per resort. */
+    public function DefaultOccupancyAlert(Request $request)
+    {
+        $v = Validator::make($request->all(), ['default_occupancy_alert' => ['required', 'integer', 'min:50', 'max:100']]);
+        if ($v->fails()) {
+            return response()->json(['success' => false, 'errors' => $v->errors()], 422);
+        }
+        $row = EscalationDay::firstOrNew(['resort_id' => $this->resort->resort_id]);
+        $row->EscalationDay ??= config('settings.EscalationDay');   // the row also holds the escalation days; keep the default if new
+        $row->default_occupancy_alert = (int) $request->default_occupancy_alert;
+        $row->save();
+        return response()->json(['success' => true, 'message' => 'Default occupancy alert saved', 'default_occupancy_alert' => $row->default_occupancy_alert]);
+    }
+
     public function EscalationDay(Request $request)
     {
         $EscalationDay = $request->EscalationDay;

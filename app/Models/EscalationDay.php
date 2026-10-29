@@ -12,6 +12,7 @@ class EscalationDay extends Model
 
     protected $fillable = [
                             'resort_id',
-                            'EscalationDay'
+                            'EscalationDay',
+                            'default_occupancy_alert',
                         ];
 }

@@ -193,6 +193,67 @@ class AccommodationConfigTest extends TestCase
             ->assertJsonPath('failed.0.message', 'Room G01 has 2 staff assigned, so it needs at least 2 beds.');
     }
 
+    /** A set-up room of this resort with one bed (built through the bulk endpoints, rolled back with the test). */
+    private function setUpRoom(): int
+    {
+        $res = $this->postJson(route('resort.accommodation.StoreBuildingWithFloors'), ['BuildingName' => 'Fx ' . substr(uniqid(), -6), 'floors' => [['floor' => 1, 'rooms' => ['101']]]])->json();
+        $type = $this->postJson(route('resort.accommodation.AccommodationTypeStore'), ['AccommodationName' => 'Fx ' . substr(uniqid(), -6)])->json('id');
+        $this->postJson(route('resort.accommodation.SetupRoomsBatch'), ['rooms' => [['building_id' => $res['id'], 'floor' => 1, 'room' => '101']],
+            'setup' => ['Accommodation_type_id' => $type, 'Capacity' => 1, 'RoomType' => 6, 'blockFor' => 'Male', 'CleaningSchedule' => 'Daily', 'Occupancytheresold' => 90]])->assertOk();
+        return (int) DB::table('available_accommodation_models')->where('BuildingName', $res['id'])->value('id');
+    }
+
+    public function test_floors_added_to_an_existing_building_are_all_or_nothing()   // remaining-work item 6
+    {
+        $url = fn ($id) => route('resort.accommodation.AddFloorsToBuilding', $id);
+        $b = $this->postJson(route('resort.accommodation.StoreBuildingWithFloors'), ['BuildingName' => 'Add ' . substr(uniqid(), -5), 'floors' => [['floor' => 1, 'rooms' => ['101']]]])->json('id');
+        $count = fn () => DB::table('bulidng_and_floor_and_rooms')->where('building_id', $b)->count();
+
+        $this->postJson($url($b), ['floors' => [['floor' => 2, 'rooms' => ['201', '202']], ['floor' => 1, 'rooms' => ['101']]]])->assertStatus(422);   // 101 already on floor 1
+        $this->postJson($url($b), ['floors' => [['floor' => 2, 'rooms' => ['201', '201']]]])->assertStatus(422);                                       // twice on one floor
+        $this->assertSame(1, $count(), 'nothing half-added');
+
+        $this->postJson($url($b), ['floors' => [['floor' => 2, 'rooms' => ['201', '202']], ['floor' => 3, 'rooms' => ['101']]]])->assertOk()->assertJsonCount(3, 'rooms');
+        $this->assertSame(4, $count(), 'room 101 may repeat on another floor, as on the single-room endpoint');
+
+        $other = DB::table('building_models')->where('resort_id', '!=', $this->master->resort_id)->value('id');
+        if ($other) {
+            $this->postJson($url($other), ['floors' => [['floor' => 9, 'rooms' => ['901']]]])->assertNotFound();
+        }
+    }
+
+    public function test_beds_are_named_bed_no_n_and_alerts_can_be_cleared_or_defaulted()   // remaining-work items 1, 2, 3
+    {
+        $rid = $this->master->resort_id;
+        $room = $this->setUpRoom();
+        $bed = \App\Models\AssingAccommodation::create(['resort_id' => $rid, 'available_a_id' => $room]);
+        $this->assertMatchesRegularExpression('/^Bed No \d+$/', $bed->BedNo);
+
+        $b = $this->postJson(route('resort.accommodation.StoreBuilding'), ['BuildingName' => 'Alert ' . substr(uniqid(), -5), 'occupancy_alert' => 80])->json('id');
+        $name = DB::table('building_models')->where('id', $b)->value('BuildingName');
+        $this->putJson(route('resort.accommodation.BuildingUpdate'), ['CatId' => base64_encode($b), 'BuildingName' => $name])->assertOk();
+        $this->assertEquals(80, DB::table('building_models')->where('id', $b)->value('occupancy_alert'), 'a missing field leaves it as it was');
+        $this->putJson(route('resort.accommodation.BuildingUpdate'), ['CatId' => base64_encode($b), 'BuildingName' => $name, 'clear_occupancy_alert' => true])->assertOk();
+        $this->assertNull(DB::table('building_models')->where('id', $b)->value('occupancy_alert'));
+
+        $url = route('resort.accommodation.config.DefaultOccupancyAlert');
+        $this->postJson($url, ['default_occupancy_alert' => 75])->assertOk();
+        $this->assertEquals(75, DB::table('escalation_days')->where('resort_id', $rid)->value('default_occupancy_alert'));
+        $this->assertNotNull(DB::table('escalation_days')->where('resort_id', $rid)->value('EscalationDay'));
+        $this->postJson($url, ['default_occupancy_alert' => 40])->assertStatus(422);
+        $this->get(route('resort.accommodation.config.index'))->assertOk()->assertSee('"defaultAlert":75', false);
+    }
+
+    public function test_room_items_from_another_resort_are_refused()   // remaining-work item 5
+    {
+        $foreign = DB::table('inventory_modules')->where('resort_id', '!=', $this->master->resort_id)->value('id') ?? $this->markTestSkipped('No other resort inventory.');
+        $room = $this->setUpRoom();
+        $type = DB::table('available_accommodation_models')->where('id', $room)->value('Accommodation_type_id');
+        $this->putJson(route('resort.accommodation.AvailableAccommodationUpdate', $room), ['Accommodation_type_id' => $type, 'Capacity' => 1,
+            'RoomType' => 1, 'blockFor' => 'Male', 'CleaningSchedule' => 'Daily', 'Occupancytheresold' => 90, 'items' => [$foreign => 1]])->assertStatus(422);
+        $this->assertFalse(DB::table('available_accommodation_inv_items')->where('Available_Acc_id', $room)->where('Item_id', $foreign)->exists());
+    }
+
     public function test_hr_is_told_once_when_a_room_reaches_its_occupancy_level()   // §2.3
     {
         DB::table('employees')->update(['device_token' => null]);   // notifications also push to phones
