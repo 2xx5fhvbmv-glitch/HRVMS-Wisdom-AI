@@ -101,6 +101,8 @@ class VisaNationalityImport implements ToModel, WithHeadingRow
 
             return null; // Always return null for import
         }
+
+        return null; // rows are saved above; the declared return type needs a value on every path (was a TypeError)
     }
 
 }

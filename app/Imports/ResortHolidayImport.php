@@ -42,6 +42,6 @@ class ResortHolidayImport implements ToModel, WithHeadingRow
             $this->collection[]= ["PublicHolidaydate"=>$row['holidaydate'],"PublicHolidayName"=>$row['holidayname'],"resort_id"=>$this->resort];
         }
 
-
+        return null; // rows are saved above; the declared return type needs a value on every path (was a TypeError)
     }
 }
