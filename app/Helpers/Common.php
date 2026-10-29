@@ -1925,7 +1925,7 @@ class Common
             return $defaultPicture;
         }
 
-        $admin = ResortAdmin::find($userId);
+        $admin = self::resortAdminPictureRow($userId);
         if (!$admin) {
             return $defaultPicture;
         }
@@ -1978,6 +1978,26 @@ class Common
 
         return $defaultPicture;
 	}
+
+    /**
+     * The id/profile_picture/signature_img row getResortUserPicture() needs. Pages show one avatar per row, so the
+     * logged-in user's whole resort is loaded in one query and answered from memory (one query per page, not per avatar).
+     * ponytail: per-process memo refreshed every 60s, so a changed photo can take up to a minute to show in a worker.
+     */
+    private static function resortAdminPictureRow($userId)
+    {
+        static $byResort = [];
+        $resortId = Auth::guard('resort-admin')->user()?->resort_id ?? Auth::guard('api')->user()?->resort_id;
+        if ($resortId) {
+            if (!isset($byResort[$resortId]) || $byResort[$resortId]['at'] < time() - 60) {
+                $byResort[$resortId] = ['at' => time(), 'rows' => ResortAdmin::where('resort_id', $resortId)->get(['id', 'profile_picture', 'signature_img'])->keyBy('id')];
+            }
+            if ($row = $byResort[$resortId]['rows']->get($userId)) {
+                return $row;
+            }
+        }
+        return ResortAdmin::find($userId); // another resort's user, or no resort guard (shopkeeper, clinic doctor)
+    }
 
     /**
      * Batch version of getResortUserPicture() — resolves profile pictures
