@@ -3532,6 +3532,19 @@ class Common
         return $template;
     }
 
+    /** Approved leaves overlapping $from..$to for these employees, grouped by emp_id: one query for a roster grid instead of one per employee per day. */
+    public static function approvedLeavesByEmployee($empIds, $from, $to)
+    {
+        return EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
+            ->whereIn('employees_leaves.emp_id', collect($empIds)->filter()->unique()->values())
+            ->where('employees_leaves.status', 'Approved')
+            ->whereDate('employees_leaves.from_date', '<=', $to)
+            ->whereDate('employees_leaves.to_date', '>=', $from)
+            ->orderBy('employees_leaves.id')
+            ->get(['employees_leaves.emp_id', 't4.color', 't4.leave_type', 't4.leave_category', 'employees_leaves.from_date', 'employees_leaves.to_date'])
+            ->groupBy('emp_id');
+    }
+
     public static function GetRosterdata($resort_id,$duty_roster_id,$Employee,$WeekstartDate, $WeekendDate, $startOfMonth,$endOfMonth,$flag)
     {
 

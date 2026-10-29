@@ -118,6 +118,7 @@
                                 <div class="viewBudget-accordion" id="accordionDutyRoster">
                                     @if(!empty($groupedRosterData))
                                         @php $deptIteration = 1; @endphp
+                                        @php $leavesByEmp = Common::approvedLeavesByEmployee(collect($Rosterdata)->pluck('emp_id'), $monthwiseheaders[0]['date'] ?? now()->toDateString(), collect($monthwiseheaders)->last()['date'] ?? now()->toDateString()); @endphp
                                         @foreach ($groupedRosterData as $deptId => $deptData)
                                             {{-- Level 1: Department --}}
                                             <div class="accordion-item mb-2 department-accordion">
@@ -255,12 +256,7 @@
                                                                                                                 ?? $entriesForDate->first();
 
                                                                                                             // Check for leave on this date
-                                                                                                            $employeeLeave = \App\Models\EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
-                                                                                                                ->where('employees_leaves.emp_id', $r->emp_id)
-                                                                                                                ->where('employees_leaves.status', 'Approved')
-                                                                                                                ->whereDate('employees_leaves.from_date', '<=', $formattedDate)
-                                                                                                                ->whereDate('employees_leaves.to_date', '>=', $formattedDate)
-                                                                                                                ->first(['t4.color', 't4.leave_type', 't4.leave_category', 'employees_leaves.from_date', 'employees_leaves.to_date']);
+                                                                                                            $employeeLeave = ($leavesByEmp[$r->emp_id] ?? collect())->first(fn ($l) => substr((string) $l->from_date, 0, 10) <= $formattedDate && substr((string) $l->to_date, 0, 10) >= $formattedDate);
 
                                                                                                             $toatalHoursForDay = 0;
                                                                                                             $startTime = null;
@@ -653,12 +649,7 @@
                                                                                         ?? $entriesForDate->first();
 
                                                                                     // Check for leave on this date
-                                                                                    $employeeLeave = \App\Models\EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
-                                                                                        ->where('employees_leaves.emp_id', $r->emp_id)
-                                                                                        ->where('employees_leaves.status', 'Approved')
-                                                                                        ->whereDate('employees_leaves.from_date', '<=', $formattedDate)
-                                                                                        ->whereDate('employees_leaves.to_date', '>=', $formattedDate)
-                                                                                        ->first(['t4.color', 't4.leave_type', 't4.leave_category', 'employees_leaves.from_date', 'employees_leaves.to_date']);
+                                                                                    $employeeLeave = ($leavesByEmp[$r->emp_id] ?? collect())->first(fn ($l) => substr((string) $l->from_date, 0, 10) <= $formattedDate && substr((string) $l->to_date, 0, 10) >= $formattedDate);
 
                                                                                     $toatalHoursForDay = 0;
                                                                                     $startTime = null;
