@@ -4012,6 +4012,7 @@ class LeaveController extends Controller
                     // instead of the per-stage status.
                     'etps.status as stage_status',
                 )
+                ->where('etp.resort_id', $resort_id) // was missing: HR saw every resort's passes
                 ->orderBy('etp.id', 'desc') // Order by ID descending
                 ->get();
 

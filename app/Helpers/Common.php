@@ -7098,6 +7098,24 @@ class Common
     }
 
     /**
+     * Approver employees (with name and position) keyed by id. Approval-flow builders run once per row on lists
+     * and the same few approvers repeat, so each one is loaded once.
+     * ponytail: static per-process memo; a long-running worker can show an approver's old name/position.
+     */
+    private static function approversById($ids)
+    {
+        static $cache = [];
+        $missing = collect($ids)->filter()->unique()->reject(fn ($id) => array_key_exists($id, $cache));
+        if ($missing->isNotEmpty()) {
+            $found = \App\Models\Employee::with(['resortAdmin', 'position'])->whereIn('id', $missing)->get()->keyBy('id');
+            foreach ($missing as $id) {
+                $cache[$id] = $found->get($id);
+            }
+        }
+        return collect($cache)->filter();
+    }
+
+    /**
      * Builds the standardized multi-step approval payload for a single
      * Leave request, for mobile's timeline UI. Pure read-side — does not
      * change how approve/reject is enforced (that stays in
@@ -7127,10 +7145,7 @@ class Common
             ->orderBy('id')
             ->get(['id', 'approver_id', 'approver_rank', 'status', 'comments', 'approved_at']);
 
-        $approvers = \App\Models\Employee::with(['resortAdmin', 'position'])
-            ->whereIn('id', $stages->pluck('approver_id')->filter()->unique())
-            ->get()
-            ->keyBy('id');
+        $approvers = self::approversById($stages->pluck('approver_id'));
 
         $rankConfig = config('settings.Position_Rank', []);
 
@@ -7201,10 +7216,7 @@ class Common
             ->orderBy('id', 'desc')
             ->get(['id', 'approver_id', 'approver_rank', 'approver_role', 'status', 'comments', 'approved_at']);
 
-        $approvers = \App\Models\Employee::with(['resortAdmin', 'position'])
-            ->whereIn('id', $stages->pluck('approver_id')->filter()->unique())
-            ->get()
-            ->keyBy('id');
+        $approvers = self::approversById($stages->pluck('approver_id'));
 
         $rankConfig = config('settings.Position_Rank', []);
 
