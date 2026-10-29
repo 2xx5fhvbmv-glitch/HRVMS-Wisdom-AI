@@ -13,6 +13,8 @@ class SuperAdminAndSettingsSeeder extends Seeder
     public function run(): void
     {
         $now = Carbon::now();
+        // No fixed password in the repo (audit W1-NV06): random, shown once, and changed at first login.
+        $password = Str::random(20);
 
         // === SUPER ADMIN CREATION ===
         $adminId = DB::table('admins')->insertGetId([
@@ -20,7 +22,8 @@ class SuperAdminAndSettingsSeeder extends Seeder
             'middle_name'     => null,
             'last_name'       => 'Admin',
             'email'           => 'superadmin@wisdom.ai',
-            'password'        => Hash::make('Admin@123'), 
+            'password'        => Hash::make($password),
+            'must_change_password' => 1,
             'role_id'         => 1, 
             'profile_picture' => null,
             'home_phone'      => null,
@@ -39,6 +42,7 @@ class SuperAdminAndSettingsSeeder extends Seeder
             'created_at'      => $now,
             'updated_at'      => $now,
         ]);
+        $this->command?->warn("Super admin superadmin@wisdom.ai created with password: {$password} (change it at first login).");
 
         // === SITE SETTINGS ===
         DB::table('settings')->insert([
