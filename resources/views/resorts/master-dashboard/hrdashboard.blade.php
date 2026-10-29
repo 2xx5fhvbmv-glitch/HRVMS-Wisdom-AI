@@ -84,8 +84,8 @@
     $today = \Carbon\Carbon::today();
     $hrNameOf = fn ($emp) => optional(optional($emp)->resortAdmin)->full_name ?: '—';
     $hrPosOf  = fn ($emp) => optional(optional($emp)->position)->position_title ?: '';
-    $hrPicIds = $hrResignC->map(fn ($r) => optional($r->employee)->Admin_Parent_id)
-        ->merge($hrExitC->map(fn ($f) => optional(optional($f->employeeResignation)->employee)->Admin_Parent_id))
+    $hrPicIds = $hrResignC->map(fn ($r) => optional($r->employee)->Admin_Parent_id)->toBase()
+        ->concat($hrExitC->map(fn ($f) => optional(optional($f->employeeResignation)->employee)->Admin_Parent_id)->toBase())
         ->filter()->unique()->values()->all();
     $hrPics   = \App\Helpers\Common::getResortUserPicturesBatch($hrPicIds);
     $hrPhotoOf = fn ($adminId) => (($u = $hrPics[$adminId] ?? '') && $u !== $defaultPic) ? $u : '';

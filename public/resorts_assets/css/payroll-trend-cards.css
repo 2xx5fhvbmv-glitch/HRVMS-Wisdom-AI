@@ -1,0 +1,104 @@
+/* Payroll dashboard — OT trend, Pension, Tax and Budget comparison cards (scoped under .ptc).
+   Built from the approved prototype; HTML/SVG only (no Chart.js). Soft fill = --fill-done-1/2/3.
+   The portal is light-only (theme engine removed), so there are no Dark/Teal overrides to add. */
+.ptc{--fill-done-1:#7FBEC6;--fill-done-2:#b9dcdf;--fill-done-3:#dcecee;--lime-1:#E0FF02;--lime-2:#eaf7a3;--lime-3:#e8f0d6;--hatch-bg:#fafcfc;
+  --ok:var(--positive,#1F9D6B);--ok-bg:var(--positive-bg,#E7F4EC);--warn:#B7791F;--warn-bg:var(--warning-bg,#FBF0DC);--err:var(--error,#E5573F);--err-bg:var(--error-bg,#FDEEEB);
+  --g1:#3A4145;--g2:#6B7378;--g4:#C7CDCF;--d-hover:160ms;--d-state:240ms;--e-ui:cubic-bezier(.2,.8,.2,1);--e-tide:cubic-bezier(.16,1,.3,1);--e-swell:cubic-bezier(.34,1.56,.64,1)}
+.card.ptc{padding:18px 20px 18px;display:flex;flex-direction:column;min-width:0}
+.ptc .pc-h{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:32px}
+.ptc .pc-h .t{font-size:18px;font-weight:600;line-height:1.2}
+.ptc .rs-sel{appearance:none;-webkit-appearance:none;flex:none;font:inherit;font-size:14px;font-weight:500;color:var(--g1);height:32px;line-height:30px;padding:0 32px 0 12px;border:1px solid var(--line);border-radius:10px;outline:none;cursor:pointer; background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235D6F75' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 11px center/12px; transition:border-color var(--d-hover) var(--e-ui),box-shadow var(--d-hover) var(--e-ui)}
+.ptc .rs-sel:hover{border-color:#cfdcde}
+.ptc .rs-sel:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(1,70,83,.08)}
+.ptc .hero{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-top:14px;min-height:64px}
+.ptc .hm{min-width:0}
+.ptc .cap,.ptc .side .k{font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--faint);line-height:1.4;white-space:nowrap}
+.ptc .hrow{display:flex;align-items:center;gap:10px;margin-top:2px}
+.ptc .big{font-size:32px;font-weight:600;letter-spacing:-.8px;line-height:1.1;font-variant-numeric:tabular-nums;display:inline-flex;align-items:baseline;white-space:nowrap}
+.ptc .big .cur{font-size:18px;font-weight:500;color:var(--faint);margin-right:2px}
+.ptc .big .u{font-size:14px;font-weight:400;color:var(--faint);margin-left:6px;letter-spacing:0}
+.ptc .chip{display:inline-flex;align-items:center;font-size:11px;font-weight:600;letter-spacing:.3px;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.ptc .chip[hidden]{display:none}
+.ptc .chip.ok{color:var(--ok);background:var(--ok-bg)}
+.ptc .chip.warn{color:var(--warn);background:var(--warn-bg)}
+.ptc .chip.err{color:var(--err);background:var(--err-bg)}
+.ptc .chip.mute{color:var(--g2);background:var(--line-2)}
+.ptc .side{flex:none;text-align:right;padding-bottom:5px}
+.ptc .side .v{font-size:14px;font-weight:500;color:var(--g1);font-variant-numeric:tabular-nums;margin-top:2px;white-space:nowrap}
+.ptc .viz{position:relative;margin-top:18px;min-width:0}
+.ptc .f-done{background:linear-gradient(180deg,var(--fill-done-1) 0%,var(--fill-done-2) 55%,var(--fill-done-3) 100%)}
+.ptc .f-lime{background:linear-gradient(180deg,#E0FF02 0%,#eaf7a3 62%,#e8f0d6 100%);box-shadow:0 10px 22px -8px rgba(178,206,0,.85)}
+.ptc .f-np{background-color:#fafcfc;background-image:repeating-linear-gradient(45deg,var(--line) 0 2px,transparent 2px 6px)}
+.ptc .f-err{background:var(--err)}
+.ptc .mx{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;margin-top:8px}
+.ptc .mx span{text-align:center;font-size:10.5px;font-weight:500;color:var(--faint);transition:color var(--d-hover) var(--e-ui)}
+.ptc .mx span.on{color:var(--teal);font-weight:600}
+.ptc .focus .it{transition:opacity var(--d-state) var(--e-ui),transform var(--d-state) var(--e-tide)}
+.ptc .focus.hot .it{opacity:.4}
+.ptc .focus.hot .it.on{opacity:1}
+.ptc .ot svg{display:block;width:100%;height:190px;overflow:visible;font-family:inherit}
+.ptc .ot .gl{stroke:var(--line-2);stroke-width:1}
+.ptc .ot .gt{font-size:10.5px;fill:var(--faint)}
+.ptc .ot .mt{font-size:10.5px;font-weight:500;fill:var(--faint)}
+.ptc .ot .mt.on{fill:var(--teal);font-weight:600}
+.ptc .ot .np-t{font-size:10.5px;font-weight:500;fill:var(--faint)}
+.ptc .ot .ln{fill:none;stroke:var(--teal);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.ptc .ot .ly{fill:none;stroke:var(--g4);stroke-width:1.5;stroke-dasharray:4 4}
+.ptc .ot .cap-g rect{fill:var(--teal)}
+.ptc .ot .cap-g text{font-size:10.5px;font-weight:600;fill:#fff}
+.ptc .ot .guide{stroke:var(--teal);stroke-width:1;stroke-dasharray:3 3;opacity:0;transition:opacity var(--d-hover)}
+.ptc .ot .dot{fill:#fff;stroke:var(--teal);stroke-width:2.2;opacity:0;transition:opacity var(--d-hover)}
+.ptc .ot.hot .guide,.ptc .ot.hot .dot{opacity:1}
+.ptc .ot .hit{fill:transparent;cursor:crosshair}
+.ptc .leg{display:flex;gap:16px;margin-top:6px}
+.ptc .leg span{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:500;color:var(--g2)}
+.ptc .leg i{display:inline-block;width:14px;height:2px;border-radius:2px;background:var(--teal)}
+.ptc .leg i.d{height:0;background:none;border-top:2px dashed var(--g4);border-radius:0}
+.ptc .pills{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;height:168px;align-items:end}
+.ptc .pill{appearance:none;border:none;padding:0;height:100%;width:100%;max-width:30px;justify-self:center;border-radius:999px;cursor:pointer;position:relative;outline:none}
+.ptc .pill:focus-visible{box-shadow:0 0 0 2px var(--teal)}
+.ptc .pill.f-np{cursor:default}
+.ptc .focus .pill.it.on{transform:translateY(-4px)}
+.ptc .stairs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;align-items:end;height:168px}
+.ptc .st{display:flex;flex-direction:column;justify-content:flex-end;height:100%;cursor:default;min-width:0}
+.ptc .st .amt{font-size:12.5px;font-weight:500;color:var(--g1);text-align:center;font-variant-numeric:tabular-nums;margin-bottom:6px;white-space:nowrap}
+.ptc .st .amt.z{color:var(--faint);font-weight:400}
+.ptc .st .blk{height:var(--h);border-radius:10px 10px 4px 4px;transform-origin:bottom}
+.ptc .st .blk.free{background:var(--line-2)}
+.ptc .st-x{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:9px}
+.ptc .st-x div{text-align:center;min-width:0}
+.ptc .st-x .r{font-size:14px;font-weight:500;color:var(--ink);line-height:1.2}
+.ptc .st-x .b{font-size:10.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptc .pace{position:relative;height:12px;border-radius:6px;background:var(--line-2);margin-top:26px;cursor:default}
+.ptc .pace .fill{position:absolute;left:0;top:0;bottom:0;width:var(--w);border-radius:6px;transform-origin:left}
+.ptc .pace .gap{position:absolute;top:0;bottom:0;left:var(--a);width:var(--g);border-radius:0 6px 6px 0}
+.ptc .pace .mk{position:absolute;left:var(--m);top:-24px;bottom:-4px;width:0;border-left:1.5px solid var(--teal)}
+.ptc .pace .mk b{position:absolute;bottom:100%;left:0;transform:translate(-50%,-2px);font-size:10.5px;font-weight:600;color:#fff;background:var(--teal);border-radius:999px;padding:2px 9px;white-space:nowrap}
+.ptc .var{position:relative;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;height:118px;margin-top:22px}
+.ptc .var::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px solid var(--g4)}
+.ptc .var .zl{position:absolute;right:0;top:50%;transform:translateY(-120%);font-size:10.5px;color:var(--faint)}
+.ptc .vc{position:relative;height:100%;cursor:default}
+.ptc .vc .vb{position:absolute;left:50%;width:min(100%,22px);transform:translateX(-50%);border-radius:6px}
+.ptc .vc .vb.up{bottom:50%;border-radius:6px 6px 2px 2px;transform-origin:bottom}
+.ptc .vc .vb.dn{top:50%;border-radius:2px 2px 6px 6px;transform-origin:top}
+.ptc .vc.np .vb{top:8%;bottom:8%;border-radius:6px}
+/* OT hatch (SVG pattern) uses tokens, not hex */
+.ptc .ot .hb{fill:var(--hatch-bg)}
+.ptc .ot .hs{fill:var(--line)}
+.ptc .ot .ar{stroke:none}
+
+/* fixes for sitting inside the existing 4-across grid (narrower than the prototype's 2x2) */
+.card.ptc{min-width:0;overflow:hidden}
+.ptc .hero{flex-wrap:wrap;row-gap:6px}
+.ptc .hm{max-width:100%}
+.ptc .cap{white-space:normal}
+.ptc .hrow{flex-wrap:wrap}
+.ptc .empty-hero{font-size:14px;color:var(--muted);padding:6px 0}
+.ptc .pc-h .t{margin:0}
+.ptc .pc-h select.rs-sel{width:auto;display:inline-block}
+.ptc .viz{min-height:60px}
+.ptc .mx,.ptc .pills,.ptc .var{gap:3px}
+.ptc .mx span{white-space:nowrap;letter-spacing:-.3px;overflow:visible}
+.ptc .st-x .b{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;margin-top:2px}
+@media (prefers-reduced-motion:reduce){.ptc *{transition-duration:1ms!important}}
+

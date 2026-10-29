@@ -224,6 +224,11 @@
        empty gap in the shorter one. align-items:flex-start keeps each card
        at its own natural height instead. */
     .dept-comparison-row { align-items: flex-start; }
+    /* This row is a direct child of the page's outer .row, so Bootstrap's ".row > *" rule gives it
+       side padding and ".row" gives it negative side margins — together they pulled its right edge
+       one gutter short of Payrolls / Budget Comparison. Zeroing both lets its own columns' padding
+       set the edges, so Payroll Distributions ends on the same line as the cards around it. */
+    .row.dept-comparison-row { margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; }
     .dept-card-header,
     .dept-modal-header {
         display: flex;
@@ -1098,155 +1103,7 @@
                 </div>
             </div>
 
-            <div class="col-xl-3 col-md-6">
-                <div class="card">
-                    <div class=" card-title">
-                        <div class="row justify-content-between align-items-center g-md-2 g-1">
-                            <div class="col">
-                                <h3 class="text-nowrap">OT Trend</h3>
-                            </div>
-                            <div class="col-auto">
-                                <div class="form-group">
-                                   <select id="yearSelect" class="form-select dd-native-select" style="width: auto; display: inline-block;">
-                                        @for ($y = now()->year; $y >= now()->year - 5; $y--)
-                                            <option value="{{ $y }}">{{ $y }}</option>
-                                        @endfor
-                                    </select>
-                                    <div class="dd" data-target="#yearSelect">
-                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                            <span class="dd-lbl">{{ now()->year }}</span>
-                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                        </button>
-                                        <div class="dd-panel" role="listbox" aria-label="Year">
-                                            <div class="dd-scroll">
-                                                @for ($y = now()->year; $y >= now()->year - 5; $y--)
-                                                <div class="dd-item{{ $y == now()->year ? ' active' : '' }}" role="option" data-value="{{ $y }}"><span class="dd-nm">{{ $y }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                                @endfor
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <canvas id="myLineChart" width="365" height="326"></canvas>
-                </div>
-            </div>
-
-            <div class="col-xl-3 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('payroll.pension.index', config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card">
-                    <div class="card-title ">
-                        <div class="row justify-content-between align-items-center g-md-3 g-1">
-                            <div class="col">
-                                <h3 class="text-nowrap">Pension</h3>
-                            </div>
-                            <div class="col-auto">
-                                <div class="form-group">
-                                    <select class="form-select dd-native-select YearWisePensionData" id="yearWisePensionDataFilter" aria-label="Default select example">
-                                        <?php
-                                        $currentYear = date('Y');
-                                        for ($i = 0; $i < 3; $i++) {
-                                            $startYear = $currentYear - $i;
-                                            echo "<option value=\"$startYear\"";
-                                            if ($i == 0)
-                                            {
-                                                echo " selected";
-                                            }
-                                            echo ">$startYear</option>";
-                                        }
-                                        ?>
-                                    </select>
-                                    <div class="dd" data-target="#yearWisePensionDataFilter">
-                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                            <span class="dd-lbl">{{ date('Y') }}</span>
-                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                        </button>
-                                        <div class="dd-panel" role="listbox" aria-label="Year">
-                                            <div class="dd-scroll">
-                                                <?php
-                                                for ($i = 0; $i < 3; $i++) {
-                                                    $startYear = $currentYear - $i;
-                                                    $activeCls = $i == 0 ? ' active' : '';
-                                                    echo '<div class="dd-item' . $activeCls . '" role="option" data-value="' . $startYear . '"><span class="dd-nm">' . $startYear . '</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>';
-                                                }
-                                                ?>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <canvas id="pension" width="365" height="293" class="mb-2"></canvas>
-                    <div class="row g-2 justify-content-center">
-                        <div class="col-auto">
-                            <div class="doughnut-label">
-                                <span class="bg-theme"></span>Employee
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="doughnut-label">
-                                <span class="bg-themeLightBlue"></span>Employer
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-xl-3 col-md-6">
-                <div class="card">
-                    <div class="card-title">
-                        <h3>Tax</h3>
-                    </div>
-                    <div class="taxChart-block">
-                        <canvas id="taxChart" width="328" height="328"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-md-6">
-                <div class="card">
-                    <div class="card-title">
-                        <div class="row justify-content-between align-items-center g-md-3 g-1">
-                            <div class="col">
-                                <h3 class="text-nowrap">Budget Comparison</h3>
-                            </div>
-                            <div class="col-auto">
-                                <select class="form-select dd-native-select YearWiseBudgetComparison" id="yearWiseBudgetComparisonFilter" aria-label="Default select example" style="width: auto; display: inline-block;">
-                                    @for ($i = date('Y'); $i >= date('Y') - 5; $i--)
-                                        <option value="{{ $i }}" {{ $i == date('Y') ? 'selected' : '' }}>{{ $i }}</option>
-                                    @endfor
-                                </select>
-                                <div class="dd" data-target="#yearWiseBudgetComparisonFilter">
-                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                        <span class="dd-lbl">{{ date('Y') }}</span>
-                                        <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                                    </button>
-                                    <div class="dd-panel" role="listbox" aria-label="Year">
-                                        <div class="dd-scroll">
-                                            @for ($i = date('Y'); $i >= date('Y') - 5; $i--)
-                                            <div class="dd-item{{ $i == date('Y') ? ' active' : '' }}" role="option" data-value="{{ $i }}"><span class="dd-nm">{{ $i }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                            @endfor
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <canvas id="budgetComp" width="365" height="293" class="mb-2"></canvas>
-                    <div class="row g-2 justify-content-center">
-                        <div class="col-auto">
-                            <div class="doughnut-label">
-                                <span class="bg-theme"></span>Budgeted Amount
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="doughnut-label">
-                                <span class="bg-themeLightBlue"></span>Actual Amount
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            @include('resorts.payroll.dashboard._trend_cards')
         </div>
     </div>
 </div>
@@ -1257,6 +1114,7 @@
 @endsection
 
 @section('import-css')
+<link href="{{ URL::asset('resorts_assets/css/payroll-trend-cards.css') }}?v={{ @filemtime(public_path('resorts_assets/css/payroll-trend-cards.css')) }}" rel="stylesheet">
 @include('resorts.payroll._payroll_buttons_v2_styles')
 @include('resorts._dropdown_styles')
 @include('resorts.payroll.dashboard._estimate_breakdown_styles')
@@ -1776,11 +1634,6 @@
         GetServiceChargeChart();
     });
 
-    // Trigger data load on dropdown change
-    $(document).on("change", ".YearWisePensionData", function () {
-        fetchPensionChartData();
-    });
-
     // Initial chart load
     GetServiceChargeChart();
 
@@ -1788,22 +1641,11 @@
 
     fetchDepartmentDistribution();
 
-    fetchPensionChartData();
-
-    renderEwtTaxChart();
-
         // Initialize progress bars for the initial server-rendered comparison card
         window.initializePayrollComparisonDonuts();
 
 
-    const defaultYear = $('#yearSelect').val();
-    fetchOtTrendChart(defaultYear);
-
-    // On year change
-    $('#yearSelect').on('change', function () {
-        const selectedYear = $(this).val();
-        fetchOtTrendChart(selectedYear);
-    });    // Rendering the chart
+    // Rendering the chart
 
     function fetchPayrollData() {
         $.ajax({
@@ -2391,373 +2233,6 @@
 
 
   
-    function fetchOtTrendChart(selectedYear) {
-        $.ajax({
-            url: "{{ route('payroll.otTrendData') }}",
-            type: "GET",
-            data: { year: selectedYear },
-            success: function (response) {
-                const labels = response.labels;
-                const data = response.data;
-
-                const ctx = document.getElementById('myLineChart').getContext('2d');
-
-                if (window.myLineChart && typeof window.myLineChart.destroy === 'function') {
-                    window.myLineChart.destroy();
-                }
-
-                var _pOt = window.WaiChart ? window.WaiChart.palette().aqua : '#2EACB3';
-                window.myLineChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'OT Hours',
-                            data: data,
-                            borderColor: _pOt,
-                            backgroundColor: _pOt + '1A', // ~0.1 alpha
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.4,
-                            pointRadius: 5,
-                            pointBackgroundColor: _pOt
-                        }]
-                    },
-                    options: {
-                        plugins: {
-                            legend: { display: false }
-                        },
-                        layout: { padding: 0 },
-                        scales: {
-                            x: { grid: { display: false } },
-                            y: {
-                                beginAtZero: true,
-                                grid: { display: false },
-                                ticks: { callback: function(v) { return v + ' hrs'; } }
-                            }
-                        }
-                    }
-                });
-                if (window.WaiChart) window.WaiChart.registerForTheme(window.myLineChart, function (c, p) {
-                    c.data.datasets[0].borderColor = p.aqua;
-                    c.data.datasets[0].backgroundColor = p.aqua + '1A';
-                    c.data.datasets[0].pointBackgroundColor = p.aqua;
-                });
-            },
-            error: function (xhr) {
-                console.error("Failed to load OT trend data", xhr);
-            }
-        });
-    }
-
-    function renderLineChart(labels, dataPoints) {
-        const ctx = document.getElementById('myLineChart').getContext('2d');
-
-        if (window.myLineChart) {
-            window.myLineChart.destroy(); // Destroy previous instance if needed
-        }
-
-        var _pOt2 = window.WaiChart ? window.WaiChart.palette().aqua : '#2EACB3';
-        window.myLineChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Total OT Hours',
-                    data: dataPoints,
-                    borderColor: _pOt2,
-                    backgroundColor: _pOt2,
-                    borderWidth: 1,
-                    fill: false,
-                    tension: 0.4,
-                    pointRadius: 0
-                }]
-            },
-            options: {
-                plugins: {
-                    legend: { display: false }
-                },
-                layout: {
-                    padding: { top: 0, bottom: 0, left: 0, right: 0 }
-                },
-                scales: {
-                    x: {
-                        grid: { display: false },
-                        border: { display: true }
-                    },
-                    y: {
-                        grid: { display: false },
-                        beginAtZero: true,
-                        ticks: { callback: function(v) { return formatAmount(v, 'USD'); } }
-                    }
-                }
-            }
-        });
-        if (window.WaiChart) window.WaiChart.registerForTheme(window.myLineChart, function (c, p) {
-            c.data.datasets[0].borderColor = p.aqua;
-            c.data.datasets[0].backgroundColor = p.aqua;
-        });
-    }
-
-    function fetchPensionChartData() {
-        $.ajax({
-            url: "{{route('payroll.getMonthlyPensionData')}}", // API endpoint
-            method: 'GET',
-            data: {
-                "_token": "{{ csrf_token() }}",
-                "YearWisePensionData": $(".YearWisePensionData").val()
-            },
-            success: function (response) {
-                // console.log(response);
-
-                const labels = response.map(item => item.month);
-                const employeeData = response.map(item => item.employee);
-                const employerData = response.map(item => item.employer);
-
-                updatePensionChart(labels, employeeData, employerData);
-            }
-        });
-    }
-
-    function updatePensionChart(labels, employeeData, employerData) {
-        const ctx = document.getElementById('pension').getContext('2d');
-
-        if (window.pensionChart) {
-            window.pensionChart.destroy(); // Destroy previous chart instance
-        }
-
-        var _pPen = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
-        window.pensionChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Employee',
-                        data: employeeData,
-                        backgroundColor: _pPen.teal,
-                        borderColor: _pPen.teal,
-                        borderWidth: 1,
-                        borderRadius: 3,
-                        barThickness: 14
-                    },
-                    {
-                        label: 'Employer',
-                        data: employerData,
-                        backgroundColor: _pPen.aqua,
-                        borderColor: _pPen.aqua,
-                        borderWidth: 1,
-                        borderRadius: 3,
-                        barThickness: 14
-                    }
-                ]
-            },
-            options: {
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        enabled: true,
-                        callbacks: {
-                            label: function (tooltipItem) {
-                                return formatAmount(tooltipItem.raw, 'USD');
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { display: false },
-                        border: { display: true }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) { return formatAmount(value, 'USD'); }
-                        },
-                        grid: { display: false },
-                        border: { display: true }
-                    }
-                }
-            }
-        });
-        if (window.WaiChart) window.WaiChart.registerForTheme(window.pensionChart, function (c, p) {
-            c.data.datasets[0].backgroundColor = c.data.datasets[0].borderColor = p.teal;
-            c.data.datasets[1].backgroundColor = c.data.datasets[1].borderColor = p.aqua;
-        });
-    }
-
-    var budgetCompChart = null;
-
-    function fetchBudgetComparison(year) {
-        $.ajax({
-            url: "{{ route('payroll.budgetComparison') }}",
-            type: 'GET',
-            data: { year: year },
-            success: function (response) {
-                var ctd = document.getElementById('budgetComp').getContext('2d');
-
-                if (budgetCompChart) {
-                    budgetCompChart.destroy();
-                }
-
-                // The year filter already shows which year is selected, so
-                // the trailing year on each month label ("Jan 26") is
-                // redundant on the axis itself — strip it, keep just the
-                // month. Presentation only; response.labels is untouched.
-                var monthOnlyLabels = response.labels.map(function (label) {
-                    return label.replace(/\s+\d{2,4}$/, '');
-                });
-
-                var _pBudget = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
-                budgetCompChart = new Chart(ctd, {
-                    type: 'line',
-                    data: {
-                        labels: monthOnlyLabels,
-                        datasets: [
-                            {
-                                label: 'Budgeted Amount',
-                                data: response.budgeted,
-                                borderColor: _pBudget.teal,
-                                backgroundColor: _pBudget.teal,
-                                borderWidth: 1,
-                                fill: false,
-                                tension: 0.4,
-                                pointRadius: 0
-                            },
-                            {
-                                label: 'Actual Amount',
-                                data: response.actual,
-                                borderColor: _pBudget.aqua,
-                                backgroundColor: _pBudget.aqua,
-                                borderWidth: 1,
-                                fill: false,
-                                tension: 0.4,
-                                pointRadius: 0
-                            },
-                        ]
-                    },
-                    options: {
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        },
-                        layout: {
-                            padding: { top: 0, bottom: 0, left: 0, right: 0 }
-                        },
-                        scales: {
-                            x: {
-                                // No explicit tick rotation — same as OT
-                                // Trend's x-axis, letting Chart.js pick its
-                                // own natural angle so both charts share the
-                                // same label style.
-                                beginAtZero: true,
-                                grid: { display: false },
-                                border: { display: true }
-                            },
-                            y: {
-                                grid: { display: false },
-                                beginAtZero: true,
-                                ticks: {
-                                    callback: function (value) { return formatAmount(value, 'USD'); }
-                                }
-                            }
-                        }
-                    }
-                });
-                if (window.WaiChart) window.WaiChart.registerForTheme(budgetCompChart, function (c, p) {
-                    c.data.datasets[0].borderColor = c.data.datasets[0].backgroundColor = p.teal;
-                    c.data.datasets[1].borderColor = c.data.datasets[1].backgroundColor = p.aqua;
-                });
-            },
-            error: function (xhr) {
-                console.error("Failed to fetch budget comparison data", xhr);
-            }
-        });
-    }
-
-    fetchBudgetComparison($('.YearWiseBudgetComparison').val());
-
-    $(document).on("change", ".YearWiseBudgetComparison", function () {
-        fetchBudgetComparison($(this).val());
-    });
-
-    function renderEwtTaxChart(year = new Date().getFullYear()) {
-        $.ajax({
-            url: "{{ route('payroll.ewtBracketChart') }}",
-            type: 'GET',
-            data: { year: year },
-            success: function (res) {
-                const ctx = document.getElementById('taxChart').getContext('2d');
-
-                if (window.taxChartInstance) window.taxChartInstance.destroy();
-
-                // Convert data to display currency
-                var chartData = res.data.map(function(v) { return convertAmount(v, 'USD'); });
-
-                // Build labels with amounts for legend
-                var legendLabels = res.labels.map(function(label, i) {
-                    return label + ' (' + currencySymbol + chartData[i].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ')';
-                });
-
-                window.taxChartInstance = new Chart(ctx, {
-                    type: 'pie',
-                    data: {
-                        labels: legendLabels,
-                        datasets: [{
-                            data: chartData,
-                            backgroundColor: ['#014653', '#2EACB3', '#EFB408', '#50B9BF', '#333333'],
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                display: true,
-                                position: 'bottom'
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(tooltipItem) {
-                                        return tooltipItem.label;
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    plugins: [{
-                        id: 'taxLabelsInside',
-                        // afterDatasetsDraw runs one phase before the core
-                        // Tooltip plugin's own afterDraw — drawing here
-                        // (instead of afterDraw) keeps the tooltip on top on
-                        // hover instead of hidden behind this label. Same fix
-                        // as doughnutLabelsInside/doughnutLabelsInsideN
-                        // elsewhere on this page.
-                        afterDatasetsDraw(chart) {
-                            var ctx2 = chart.ctx;
-                            var dataset = chart.data.datasets[0];
-                            var meta = chart.getDatasetMeta(0);
-                            meta.data.forEach(function(element, i) {
-                                var value = dataset.data[i];
-                                var pos = element.tooltipPosition();
-                                ctx2.fillStyle = '#fff';
-                                ctx2.font = 'bold 12px Arial';
-                                ctx2.textAlign = 'center';
-                                ctx2.textBaseline = 'middle';
-                                ctx2.fillText(currencySymbol + value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}), pos.x, pos.y);
-                            });
-                        }
-                    }]
-                });
-                // backgroundColor array (#014653/#2EACB3/#EFB408/#50B9BF/#333333)
-                // only partially matches SSOT tokens — left literal to avoid a
-                // half-themed slice set; legend/tooltip still retheme.
-                if (window.WaiChart) window.WaiChart.registerForTheme(window.taxChartInstance);
-            }
-        });
-    }
-
     function getRandomColor() {
         const hue = Math.floor(Math.random() * 360);
         return `hsl(${hue}, 70%, 60%)`;
@@ -2849,5 +2324,23 @@
     // });
 
 </script>
+@php
+    // "Last processed" month for the four trend cards = the same committed payroll the Last Payroll KPI shows
+    // (approved / locked). Months after it are hatched, never plotted as zero.
+    $ptcLastStart = ($lastPayroll && in_array($lastPayroll->status, ['approved', 'locked'], true))
+        ? \Carbon\Carbon::parse($lastPayroll->getRawOriginal('start_date')) : null;
+    $ptcCfg = [
+        'lastY' => $ptcLastStart ? $ptcLastStart->year : null,
+        'lastM' => $ptcLastStart ? $ptcLastStart->month : null,
+        'urls'  => [
+            'ot'      => route('payroll.otTrendData'),
+            'pension' => route('payroll.getMonthlyPensionData'),
+            'tax'     => route('payroll.ewtBracketChart'),
+            'budget'  => route('payroll.budgetComparison'),
+        ],
+    ];
+@endphp
+<script>window.PTC = @json($ptcCfg);</script>
+<script src="{{ URL::asset('resorts_assets/js/payroll-trend-cards.js') }}?v={{ @filemtime(public_path('resorts_assets/js/payroll-trend-cards.js')) }}"></script>
 @include('resorts._dropdown_script')
 @endsection

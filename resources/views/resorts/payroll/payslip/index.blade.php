@@ -20,7 +20,7 @@
        later task across every listing screen. */
     #employee-table .tableUser-block .img-circle { width: 32px; height: 32px; min-width: 32px; }
     .pyslip-avatar { position: relative; background: var(--neutral-bg, #DEDEDE); }
-    .pyslip-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .pyslip-avatar img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; } /* above the initials block; a broken image removes itself and the initials show */
     .pyslip-avatar-fallback {
         position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
         background: var(--teal-soft, #F5F8F8); color: var(--teal, #014653); font-size: 12px; font-weight: 600;
@@ -423,6 +423,7 @@
         {
             $('#employee-table').DataTable().destroy();
         }
+        const defaultPic = @json(url(config('settings.default_picture'))); // returned for employees with no photo
         let table = $('#employee-table').DataTable({
             "searching": false,
             "bLengthChange": false,
@@ -448,7 +449,7 @@
                     data: 'employee', 
                     render: function(data, type, row) {
                         var initials = ((data.first_name || '').charAt(0) + (data.last_name || '').charAt(0)).toUpperCase() || '?';
-                        var photoTag = data.profile_picture ? `<img src="${data.profile_picture}" alt="" onerror="this.remove()">` : '';
+                        var photoTag = (data.profile_picture && data.profile_picture !== defaultPic) ? `<img src="${data.profile_picture}" alt="" onerror="this.remove()">` : '';
                         return `<div class="tableUser-block"><div class="img-circle pyslip-avatar">${photoTag}<span class="pyslip-avatar-fallback">${initials}</span></div><span> ${data.first_name} ${data.last_name}</span></div>`;
                     }
                 },
