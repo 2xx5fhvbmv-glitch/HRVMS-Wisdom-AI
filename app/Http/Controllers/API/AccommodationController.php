@@ -115,11 +115,18 @@ class AccommodationController extends Controller
                 'female_beds_occupied'                      => $totalOccupiedFemaleBeds,
             ];
 
+            // Free beds per room for every occupied room in one query (was one query per occupant row).
+            // Free = emp_id 0 or NULL, matching the old collection where('emp_id', 0) loose compare.
+            $freeBedsByRoom                                 =   AssingAccommodation::whereIn('available_a_id', AvailableAccommodationModel::where('resort_id', $this->resort_id)->select('id'))
+                                                                    ->where(fn ($q) => $q->where('emp_id', 0)->orWhereNull('emp_id'))
+                                                                    ->groupBy('available_a_id')
+                                                                    ->toBase()->selectRaw('available_a_id, count(*) as c')->pluck('c', 'available_a_id');
+
             $BuildingModel                                  =   BuildingModel::join('bulidng_and_floor_and_rooms as t1', 't1.building_id', '=', 'building_models.id')
                                                                     ->where("building_models.resort_id", $this->resort_id)
                                                                     ->groupBy('building_models.id', 'building_models.id')
                                                                     ->get(['building_models.*', DB::RAW('Count(t1.building_id) as TotalRoom')])
-                                                                    ->map(function ($building) {
+                                                                    ->map(function ($building) use ($freeBedsByRoom) {
 
                     $accommodations                         =   AvailableAccommodationModel::join('assing_accommodations as t1', 't1.available_a_id', '=', 'available_accommodation_models.id')
                                                                     ->join('employees as t2', 't2.id', '=', 't1.emp_id')
@@ -128,11 +135,10 @@ class AccommodationController extends Controller
                                                                     ->where("BuildingName", $building->id)
                                                                     ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType')
                                                                     ->get(['t1.emp_id', 't3.id as Parentid', 't3.first_name', 't3.last_name', 'available_accommodation_models.*'])
-                                                                    ->map(function ($accommodation) {
-                                                                        $assignedAccommodations                         =   AssingAccommodation::where("available_a_id", $accommodation->id)->get();
+                                                                    ->map(function ($accommodation) use ($freeBedsByRoom) {
                                                                         $accommodation->EmployeeName                    =   ucfirst($accommodation->first_name . ' ' . $accommodation->last_name);
                                                                         $accommodation->profileImg                      =   Common::getResortUserPicture($accommodation->Parentid);
-                                                                        $accommodation->AssingAccommodationCount        =   $assignedAccommodations->where("emp_id", 0)->count();
+                                                                        $accommodation->AssingAccommodationCount        =   (int) ($freeBedsByRoom[$accommodation->id] ?? 0);
                                                                         $accommodation->bedAvailable                    =   ($accommodation->Capacity == $accommodation->AssingAccommodationCount) ? $accommodation->Capacity : $accommodation->AssingAccommodationCount;
 
                                                                         return $accommodation;

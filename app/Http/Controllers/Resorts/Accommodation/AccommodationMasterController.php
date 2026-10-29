@@ -659,23 +659,6 @@ class AccommodationMasterController extends Controller
 
 
 
-                $accommodations = AvailableAccommodationModel::join('assing_accommodations as t1', 't1.available_a_id', '=', 'available_accommodation_models.id')
-                                        ->join('employees as t2', 't2.id', '=', 't1.emp_id')
-                                        ->join('resort_admins as t3', 't3.id', '=', 't2.Admin_Parent_id')
-                                        ->where('available_accommodation_models.resort_id', $this->resort->resort_id)
-                                        ->where("BuildingName", $building->id)
-                                        ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType')
-                                        ->get(['t1.emp_id','t3.id as Parentid', 't3.first_name', 't3.last_name', 'available_accommodation_models.*'])
-                                        ->map(function ($accommodation)
-                                        {
-                                            $assignedAccommodations = AssingAccommodation::where("available_a_id", $accommodation->id)->get();
-                                            $accommodation->EmployeeName = ucfirst($accommodation->first_name . ' ' . $accommodation->last_name);
-                                            $accommodation->profileImg =  Common::getResortUserPicture($accommodation->Parentid);
-                                            $accommodation->AssingAccommodationCount = $assignedAccommodations->where("emp_id", 0)->count();
-                                            $accommodation->bedAvailable = ($accommodation->Capacity == $accommodation->AssingAccommodationCount) ? $accommodation->Capacity : $accommodation->AssingAccommodationCount;
-
-                                            return $accommodation;
-                                        });
                                         // Rooms Available = distinct rooms in the building with at
                                         // least one free (emp_id = 0) bed. The old ->first()/=1
                                         // logic could only ever report 0 or 1 room.
