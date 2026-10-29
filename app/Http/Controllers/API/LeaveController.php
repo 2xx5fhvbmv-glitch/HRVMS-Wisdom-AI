@@ -2644,7 +2644,7 @@ class LeaveController extends Controller
             $leaveRequest                   =   $this->getUpcomingLeaveRequest($resort_id, $emp_id, $available_rank,$employee->rank);
             $upcomingHolidays               =   $this->getUpcomingHolidays($resort_id);
             $employeesOnLeaveToday          =   $this->getEmployeesOnLeaveToday($resort_id, $isHOD, $employee->Dept_id);
-            $islandPassHR                   =   $this->islandPassHR();
+            $islandPassHR                   =   $this->islandPassHR($resort_id);
             $upcomingBirthdays              =   $this->upcomingBirthdays($resort_id);
 
             $leaveData = [
@@ -2973,7 +2973,7 @@ class LeaveController extends Controller
         return $upcomingBirthdays;
     }
 
-    private function islandPassHR()
+    private function islandPassHR($resort_id)
     {
         $islandPassQuery    = DB::table('employee_travel_passes as etp')
             ->join('employees as e', 'e.id', '=', 'etp.employee_id') // Main employee
@@ -2988,6 +2988,7 @@ class LeaveController extends Controller
                 'ra.profile_picture',
                 'rp.position_title as position',
             )
+            ->where('etp.resort_id', $resort_id) // was missing: showed another resort's latest pass
             ->orderBy('etp.id', 'desc') // Order by ID descending
             ->first();
 
