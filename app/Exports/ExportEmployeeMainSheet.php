@@ -82,58 +82,24 @@ class ExportEmployeeMainSheet implements FromArray, WithHeadings, WithTitle, Wit
                 $sheet->getColumnDimension($colDivName)->setVisible(false);
                 $sheet->getColumnDimension($colDeptName)->setVisible(false);
 
-                for ($row = $startRow; $row <= $dataRows + $startRow - 1; $row++) {
-                    // A: Division dropdown (shows name and code)
-                    $this->setDropdown($sheet, "A{$row}", "=Divisions");
+                $lastRow = $dataRows + $startRow - 1;
+                for ($row = $startRow; $row <= $lastRow; $row++) {
+                    // Hidden helpers: division/department name and id for the dependent dropdowns
+                    $sheet->setCellValue("{$colDivName}{$row}", "=IF(A{$row}=\"\",\"\",A{$row})");
+                    $sheet->setCellValue("{$colDivId}{$row}", "=IF({$colDivName}{$row}=\"\",\"\",VLOOKUP({$colDivName}{$row},DivisionMap_Name:DivisionMap_ID,2,FALSE))");
+                    $sheet->setCellValue("{$colDeptName}{$row}", "=IF(B{$row}=\"\",\"\",B{$row})");
+                    $sheet->setCellValue("{$colDeptId}{$row}", "=IF({$colDeptName}{$row}=\"\",\"\",VLOOKUP({$colDeptName}{$row},DepartmentMap_Name:DepartmentMap_ID,2,FALSE))");
+                }
 
-                    // Extract Division Name from display (helper column)
-                    $divNameFormula = "=IF(A{$row}=\"\",\"\",A{$row})";
-                    $sheet->setCellValue("{$colDivName}{$row}", $divNameFormula);
-
-                    // Division ID lookup (hidden column)
-                    $divLookup = "=IF({$colDivName}{$row}=\"\",\"\",VLOOKUP({$colDivName}{$row},DivisionMap_Name:DivisionMap_ID,2,FALSE))";
-                    $sheet->setCellValue("{$colDivId}{$row}", $divLookup);
-
-                    // B: Department dropdown based on Division ID (shows name and code)
-                    $deptFormula = "=IF({$colDivId}{$row}=\"\",\"\",INDIRECT({$colDivId}{$row}&\"_depts\"))";
-                    $this->setDropdown($sheet, "B{$row}", $deptFormula);
-
-                    // Extract Department Name from display (helper column)
-                    $deptNameFormula = "=IF(B{$row}=\"\",\"\",B{$row})";
-                    $sheet->setCellValue("{$colDeptName}{$row}", $deptNameFormula);
-
-                    // Department ID lookup (hidden column)
-                    $deptLookup = "=IF({$colDeptName}{$row}=\"\",\"\",VLOOKUP({$colDeptName}{$row},DepartmentMap_Name:DepartmentMap_ID,2,FALSE))";
-                    $sheet->setCellValue("{$colDeptId}{$row}", $deptLookup);
-
-                    // C: Section dropdown based on Department ID (shows name and code)
-                    $sectionFormula = "=IF({$colDeptId}{$row}=\"\",\"\",IF(ISERROR(INDIRECT({$colDeptId}{$row}&\"_sections\")),\"\",INDIRECT({$colDeptId}{$row}&\"_sections\")))";
-                    $this->setDropdown($sheet, "C{$row}", $sectionFormula);
-
-                    // D: Position dropdown based on Department ID (shows name and code)
-                    $positionFormula = "=IF({$colDeptId}{$row}=\"\",\"\",IF(ISERROR(INDIRECT({$colDeptId}{$row}&\"_positions\")),\"\",INDIRECT({$colDeptId}{$row}&\"_positions\")))";
-                    $this->setDropdown($sheet, "D{$row}", $positionFormula);
-
-                    // I: Gender dropdown
-                    $this->setDropdown($sheet, "I{$row}", "=Genders");
-
-                    // Q: Nationality dropdown
-                    $this->setDropdown($sheet, "Q{$row}", "=Nationalities");
-
-                    // T: EmploymentType dropdown
-                    $this->setDropdown($sheet, "T{$row}", "=EmploymentTypes");
-
-                    // U: MaritalStatus dropdown
-                    $this->setDropdown($sheet, "U{$row}", "=MaritalStatuses");
-
-                    // V: BloodGroup dropdown
-                    $this->setDropdown($sheet, "V{$row}", "=BloodGroups");
-
-                    // W: Religion dropdown (maps to employees.religion enum('0','1'))
-                    $this->setDropdown($sheet, "W{$row}", "=Religions");
-
-                    // AB: PaymentMode dropdown
-                    $this->setDropdown($sheet, "AB{$row}", "=PaymentModes");
+                // One validation per column range (formulas are relative to the first row, Excel shifts them per row);
+                // per-cell validations made this download take seconds.
+                $s = $startRow;
+                $this->setDropdown($sheet, "A{$s}:A{$lastRow}", "=Divisions", 'Division', 'Select a division from the dropdown');
+                $this->setDropdown($sheet, "B{$s}:B{$lastRow}", "=IF({$colDivId}{$s}=\"\",\"\",INDIRECT({$colDivId}{$s}&\"_depts\"))", 'Department', 'Select a department (filtered by division)');
+                $this->setDropdown($sheet, "C{$s}:C{$lastRow}", "=IF({$colDeptId}{$s}=\"\",\"\",IF(ISERROR(INDIRECT({$colDeptId}{$s}&\"_sections\")),\"\",INDIRECT({$colDeptId}{$s}&\"_sections\")))", 'Section', 'Select a section (filtered by department)');
+                $this->setDropdown($sheet, "D{$s}:D{$lastRow}", "=IF({$colDeptId}{$s}=\"\",\"\",IF(ISERROR(INDIRECT({$colDeptId}{$s}&\"_positions\")),\"\",INDIRECT({$colDeptId}{$s}&\"_positions\")))", 'Position', 'Select a position (filtered by department)');
+                foreach (['I' => 'Genders', 'Q' => 'Nationalities', 'T' => 'EmploymentTypes', 'U' => 'MaritalStatuses', 'V' => 'BloodGroups', 'W' => 'Religions', 'AB' => 'PaymentModes'] as $col => $list) {
+                    $this->setDropdown($sheet, "{$col}{$s}:{$col}{$lastRow}", "={$list}");
                 }
 
                 // Set fixed width for Division, Department, Position, Section columns to accommodate codes
@@ -157,57 +123,24 @@ class ExportEmployeeMainSheet implements FromArray, WithHeadings, WithTitle, Wit
                 $sheet->getProtection()->setDeleteRows(false);
 
                 // Unlock data entry cells (including hidden helper columns)
-                $lastHelperColIndex = Coordinate::columnIndexFromString($lastHelperCol);
-                for ($row = $startRow; $row <= $dataRows + $startRow - 1; $row++) {
-                    for ($i = Coordinate::columnIndexFromString('A'); $i <= $lastHelperColIndex; $i++) {
-                        $col = Coordinate::stringFromColumnIndex($i);
-                        $sheet->getStyle("{$col}{$row}")->getProtection()->setLocked(false);
-                    }
-                }
-
-                // Add data validation messages for better user experience
-                $this->addValidationMessage($sheet, 'A', 'Division', 'Select a division from the dropdown');
-                $this->addValidationMessage($sheet, 'B', 'Department', 'Select a department (filtered by division)');
-                $this->addValidationMessage($sheet, 'C', 'Section', 'Select a section (filtered by department)');
-                $this->addValidationMessage($sheet, 'D', 'Position', 'Select a position (filtered by department)');
+                $sheet->getStyle("A{$startRow}:{$lastHelperCol}{$lastRow}")->getProtection()->setLocked(false);
             },
         ];
     }
 
-    private function setDropdown(Worksheet $sheet, string $cell, string $formula): void
+    private function setDropdown(Worksheet $sheet, string $range, string $formula, string $title = 'Select Value', string $prompt = 'Choose from the available options.'): void
     {
-        try {
-            $validation = $sheet->getCell($cell)->getDataValidation();
-            $validation->setType(DataValidation::TYPE_LIST)
-                ->setErrorStyle(DataValidation::STYLE_INFORMATION)
-                ->setAllowBlank(true)
-                ->setShowInputMessage(true)
-                ->setShowErrorMessage(true)
-                ->setShowDropDown(true)
-                ->setErrorTitle('Invalid Selection')
-                ->setError('Please select a value from the dropdown list.')
-                ->setPromptTitle('Select Value')
-                ->setPrompt('Choose from the available options.')
-                ->setFormula1($formula);
-        } catch (\Exception $e) {
-            \Log::warning("Could not set dropdown for cell '{$cell}': " . $e->getMessage());
-        }
-    }
-
-    private function addValidationMessage(Worksheet $sheet, string $column, string $fieldName, string $message): void
-    {
-        $dataRows = 250;
-        $startRow = 2;
-        
-        for ($row = $startRow; $row <= $dataRows + $startRow - 1; $row++) {
-            $cell = $column . $row;
-            try {
-                $validation = $sheet->getCell($cell)->getDataValidation();
-                $validation->setPromptTitle($fieldName . ' Selection')
-                    ->setPrompt($message);
-            } catch (\Exception $e) {
-                \Log::warning("Could not set validation message for cell '{$cell}': " . $e->getMessage());
-            }
-        }
+        $sheet->setDataValidation($range, (new DataValidation)
+            ->setType(DataValidation::TYPE_LIST)
+            ->setErrorStyle(DataValidation::STYLE_INFORMATION)
+            ->setAllowBlank(true)
+            ->setShowInputMessage(true)
+            ->setShowErrorMessage(true)
+            ->setShowDropDown(true)
+            ->setErrorTitle('Invalid Selection')
+            ->setError('Please select a value from the dropdown list.')
+            ->setPromptTitle($title === 'Select Value' ? $title : $title . ' Selection')
+            ->setPrompt($prompt)
+            ->setFormula1($formula));
     }
 }
