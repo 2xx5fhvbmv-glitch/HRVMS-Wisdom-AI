@@ -24,7 +24,6 @@ use App\Models\AvailableAccommodationModel;
 use App\Models\AvailableAccommodationInvItem;
 use App\Exports\AvailableAccommodationExport;
 use App\Exports\QuickAssignmentTempleteExport;
-use App\Models\OccupancyLevelsHitACriticalThreshold;
 use App\Imports\ImportAvailableAccommodation;
 use App\Imports\ImportQuickAssignment;
 class ConfigrationController extends Controller
@@ -41,6 +40,7 @@ class ConfigrationController extends Controller
     {
         return [
             'gender' => ['nullable', 'in:M,F,X'],
+            'occupancy_alert' => ['nullable', 'integer', 'min:50', 'max:100'],   // building alert, percent full
             'room_numbering' => ['nullable', 'in:by_floor,continuous,custom'],
             // Custom pattern: {F} floor, {N} / {NN} counter on the floor, {C} building-wide counter; must contain a counter.
             'room_number_pattern' => ['nullable', 'required_if:room_numbering,custom', 'max:40',
@@ -561,7 +561,7 @@ class ConfigrationController extends Controller
 
         return DB::transaction(function () use ($request, $resort_id) {
             $building = BuildingModel::create(['resort_id' => $resort_id, 'BuildingName' => $request->BuildingName]
-                + array_filter($request->only(['gender', 'room_numbering', 'room_number_pattern']), fn ($x) => $x !== null));
+                + array_filter($request->only(['gender', 'room_numbering', 'room_number_pattern', 'occupancy_alert']), fn ($x) => $x !== null));
             $rooms = [];
             foreach ($request->floors as $f) {
                 foreach ($f['rooms'] as $no) {
@@ -961,7 +961,7 @@ class ConfigrationController extends Controller
         try
         {
             $created = BuildingModel::create(["resort_id"=>$resort_id,"BuildingName"=>$request->BuildingName]
-                + array_filter($request->only(['gender', 'room_numbering', 'room_number_pattern']), fn ($v) => $v !== null));
+                + array_filter($request->only(['gender', 'room_numbering', 'room_number_pattern', 'occupancy_alert']), fn ($v) => $v !== null));
             DB::commit();
             return response()->json(['success' =>true,'message'=>'Building added successfully', 'id' => $created->id], 200);
 
@@ -1046,7 +1046,7 @@ class ConfigrationController extends Controller
             // caller's own, so without a where() filter this let one resort
             // "adopt" another resort's building record by id.
             BuildingModel::where("id",$b_id)->where('resort_id', $resort_id)->update(["resort_id"=>$resort_id,"BuildingName"=>$request->BuildingName]
-                + array_filter($request->only(['gender', 'room_numbering', 'room_number_pattern']), fn ($v) => $v !== null));
+                + array_filter($request->only(['gender', 'room_numbering', 'room_number_pattern', 'occupancy_alert']), fn ($v) => $v !== null));
 
             DB::commit();
             return response()->json([
@@ -1264,90 +1264,6 @@ class ConfigrationController extends Controller
                                                         ->pluck('Room');
          return response()->json(['success' =>true,'data'=>$BulidngAndFloorAndRoom ], 200);
     }
-    public function OccupancyThreshold(Request $request)
-    {
-
-        $building_id = $request->building_id;
-        $Floor = $request->Floor;
-        $RoomNo = $request->RoomNo;
-        $ThresSoldLevel = $request->ThresSoldLevel;
-        $resort_id = $this->resort->resort_id;
-        $validator = Validator::make($request->all(), [
-            'building_id.*' => [
-                'required',
-            ],
-            'Floor.*' => [
-                'required',
-            ],
-            'RoomNo.*' => [
-                'required',
-                function ($attribute, $value, $fail) use ($request, $resort_id) {
-                    $index = str_replace('RoomNo.', '', $attribute);
-                    $building_id = $request->building_id[$index] ?? null;
-                    $floor = $request->Floor[$index] ?? null;
-
-                    // Validate RoomNo uniqueness for the same Building, Floor, and Resort
-                    $exists = DB::table('occupancy_levels_hit_a_critical_thresholds')
-                        ->where('building_id', $building_id)
-                        ->where('Floor', $floor)
-                        ->where('RoomNo', $value)
-                        ->where('resort_id', $resort_id)
-                        ->exists();
-
-                    if ($exists) {
-                        $fail("The RoomNo {$value} already exists in Building {$building_id}, Floor {$floor} for this resort.");
-                    }
-                },
-            ],
-
-        ], [
-            'building_id.*.required' => 'The Building field is required. Please select a building.',
-            'Floor.*.required' => 'The Floor field is required. Please specify the floor number.',
-            'RoomNo.*.required' => 'The RoomNo field is required. Please specify the room number.',
-        ]);
-
-        if($validator->fails())
-        {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        DB::beginTransaction();
-        try
-        {
-            $i=0;
-            $AvailablethreshodCount = $request->AvailablethreshodCount;
-            for ($i = 1; $i <= $AvailablethreshodCount; $i++)
-            {
-
-
-                OccupancyLevelsHitACriticalThreshold::create([
-                    'resort_id'=> $resort_id,
-                    'building_id'=>$building_id[$i],
-                    'Floor'=>$Floor[$i],
-                    'RoomNo'=>$RoomNo[$i],
-                    'ThresSoldLevel'=>$ThresSoldLevel[$i],
-                ]);
-
-            }
-
-            DB::commit();
-            return response()->json([ 'success' => true,'message' => 'Occupancy levels Critical thresholds Create Successfully'], 200);
-        }
-        catch (\Exception $e)
-        {
-            DB::rollBack();
-            \Log::emergency("File: " . $e->getFile());
-            \Log::emergency("Line: " . $e->getLine());
-            \Log::emergency("Message: " . $e->getMessage());
-            return response()->json(['error' => 'Failed to Create Occupancy levels Critical thresholds'], 500);
-        }
-
-
-    }
-
     public function EscalationDay(Request $request)
     {
         $EscalationDay = $request->EscalationDay;

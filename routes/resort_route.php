@@ -777,7 +777,6 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::delete('/accommodation/floor-and-room/destroy/{id}', 'Accommodation\ConfigrationController@FloorAndRoomDestroy')->name('resort.accommodation.FloorAndRoomDestroy');
     Route::get('accommodation/get-floor', 'Accommodation\ConfigrationController@GetBuildingWiseFloor')->name('resort.accommodation.config.getFloor');
     Route::get('accommodation/get-floor-wise-rooms', 'Accommodation\ConfigrationController@GetFloorWiseRooms')->name('resort.accommodation.config.GetFloorWiseRooms');
-    Route::post('accommodation/occupancy/threshold-form', 'Accommodation\ConfigrationController@OccupancyThreshold')->name('resort.accommodation.config.OccupancyThresholdForm');
     Route::post('accommodation/escalation-day', 'Accommodation\ConfigrationController@EscalationDay')->name('resort.accommodation.config.EscalationDay');
     Route::get('accommodation/accommodation-template', 'Accommodation\ConfigrationController@AccommodationTemplete')->name('resort.accommodation.config.AccommodationTemplete');
     Route::get('accommodation/quick-assignment-template', 'Accommodation\ConfigrationController@QuickAssignmentTemplete')->name('resort.accommodation.config.QuickAssignmentTemplete');

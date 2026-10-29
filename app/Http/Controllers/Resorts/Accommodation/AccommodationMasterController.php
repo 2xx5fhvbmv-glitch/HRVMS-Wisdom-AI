@@ -17,7 +17,6 @@ use App\Models\InventoryCategoryModel;
 use App\Http\Controllers\Controller;
 use App\Models\AvailableAccommodationModel;
 use App\Models\AvailableAccommodationInvItem;
-use App\Models\OccupancyLevelsHitACriticalThreshold;
 use App\Models\TransferAccommodation;
 
 class AccommodationMasterController extends Controller
@@ -97,21 +96,10 @@ class AccommodationMasterController extends Controller
                                 $building->BedCapacity = $BedCapacity;
                                 $building->AvailableBed = $AvailableBedCount;
 
-                                $OccupancyLevel = OccupancyLevelsHitACriticalThreshold::where("resort_id", $this->resort->resort_id)
-                                ->where('building_id', $building->id)
-                                ->first();
-                                        $AvailableBed = ((int)$building->AvailableBed>0) ?  (int)$building->AvailableBed : 1;
-                                $BedCapacity = ((int)$building->BedCapacity>0) ?  (int)$building->BedCapacity : 1;
-                               
-                                $BedPerc = ((int)$AvailableBed / (int)$BedCapacity) * 100;
-                                if(isset($OccupancyLevel) && $OccupancyLevel->ThresSoldLevel  >= $BedPerc)
-                                {
-                                    $building->OccupancyLevel = "Alert";
-                                }
-                                else
-                                {
-                                    $building->OccupancyLevel = "No";
-                                }
+                                // "Alert" once the building is at least its occupancy alert level full (building_models.occupancy_alert,
+                                // percent full), the same rule HR's notification uses. The old table compared FREE beds with the level.
+                                $full = $building->BedCapacity > 0 ? ($building->BedCapacity - $building->AvailableBed) / $building->BedCapacity * 100 : 0;
+                                $building->OccupancyLevel = ($building->occupancy_alert && $building->BedCapacity > 0 && $full >= $building->occupancy_alert) ? "Alert" : "No";
 
                            
 

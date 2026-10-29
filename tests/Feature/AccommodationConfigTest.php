@@ -223,4 +223,24 @@ class AccommodationConfigTest extends TestCase
         $beds->take($half)->each(fn ($b, $i) => $b->update(['emp_id' => $occupants[$i]]));  // crosses again: told again
         $this->assertGreaterThan($first, $alerts());
     }
+
+    public function test_hr_is_told_once_when_a_building_reaches_its_occupancy_level()   // §2.3 building alert
+    {
+        DB::table('employees')->update(['device_token' => null]);   // notifications also push to phones
+        $buildingId = DB::table('available_accommodation_models as a')->join('assing_accommodations as s', 's.available_a_id', '=', 'a.id')
+            ->select('a.BuildingName')->groupBy('a.BuildingName')->havingRaw('count(*) >= 2')->value('a.BuildingName') ?? $this->markTestSkipped('No building with 2+ beds.');
+        $beds = \App\Models\AssingAccommodation::whereIn('available_a_id', DB::table('available_accommodation_models')->where('BuildingName', $buildingId)->pluck('id'))->orderBy('id')->get();
+        $beds->each->update(['emp_id' => 0]);
+        DB::table('available_accommodation_models')->where('BuildingName', $buildingId)->update(['Occupancytheresold' => 100]);   // keep room alerts out of the way
+        DB::table('building_models')->where('id', $buildingId)->update(['occupancy_alert' => 50, 'occupancy_alert_notified_at' => null]);
+        $alerts = fn () => DB::table('resort_notifications')->where('page_id', 'accommodation-building-occupancy-alert')->where('request_id', $buildingId)->count();
+        $occupants = DB::table('employees')->where('status', 'Active')->limit($beds->count())->pluck('id');
+
+        $half = (int) ceil($beds->count() / 2);
+        $beds->take($half)->each(fn ($b, $i) => $b->update(['emp_id' => $occupants[$i]]));
+        $this->assertGreaterThan(0, $first = $alerts());   // one row per HR person
+        $beds->each(fn ($b, $i) => $b->update(['emp_id' => $occupants[$i]]));
+        $this->assertSame($first, $alerts(), 'still above: not again');
+        $this->assertNotNull(DB::table('building_models')->where('id', $buildingId)->value('occupancy_alert_notified_at'));
+    }
 }
