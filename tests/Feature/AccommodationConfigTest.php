@@ -254,6 +254,68 @@ class AccommodationConfigTest extends TestCase
         $this->assertFalse(DB::table('available_accommodation_inv_items')->where('Available_Acc_id', $room)->where('Item_id', $foreign)->exists());
     }
 
+    public function test_floors_can_have_their_own_gender()   // remaining-work item 4
+    {
+        $b = $this->postJson(route('resort.accommodation.StoreBuildingWithFloors'), ['BuildingName' => 'Fg ' . substr(uniqid(), -6), 'gender' => 'X', 'floors' => [['floor' => 1, 'rooms' => ['101']], ['floor' => 2, 'rooms' => ['201']]]])->json('id');
+        $set = fn ($floor, $g) => $this->putJson(route('resort.accommodation.FloorGenderUpdate', [$b, $floor]), ['gender' => $g]);
+        $set(1, 'F')->assertOk();
+        $set(2, 'M')->assertOk();
+        $set(2, 'Q')->assertStatus(422);
+        $this->getJson(route('resort.accommodation.FloorGenders', $b))->assertOk()->assertExactJson(['success' => true, 'floors' => ['1' => 'F', '2' => 'M']]);
+        $set(2, null)->assertOk();   // back to the building's setting
+        $this->getJson(route('resort.accommodation.FloorGenders', $b))->assertJsonPath('floors', ['1' => 'F']);
+    }
+
+    public function test_deleted_building_floor_and_room_setup_come_back_on_the_same_rows()   // remaining-work item 7
+    {
+        $rid = $this->master->resort_id;
+        // Building with a floor gender: delete, restore, same ids.
+        $res = $this->postJson(route('resort.accommodation.StoreBuildingWithFloors'), ['BuildingName' => 'Rs ' . substr(uniqid(), -6), 'floors' => [['floor' => 1, 'rooms' => ['101', '102']]]])->json();
+        $this->putJson(route('resort.accommodation.FloorGenderUpdate', [$res['id'], 1]), ['gender' => 'F'])->assertOk();
+        $trash = $this->deleteJson(route('resort.accommodation.BuildingDestory', base64_encode($res['id'])))->assertOk()->json('trash_id');
+        $this->assertNull(DB::table('building_models')->where('id', $res['id'])->first());
+        $this->postJson(route('resort.accommodation.RestoreDeleted', $trash))->assertOk();
+        $this->assertNotNull(DB::table('building_models')->where('id', $res['id'])->first());
+        $this->assertEqualsCanonicalizing(array_column($res['rooms'], 'id'), DB::table('bulidng_and_floor_and_rooms')->where('building_id', $res['id'])->pluck('id')->all());
+        $this->assertSame('F', DB::table('building_floors')->where('building_id', $res['id'])->value('gender'));
+        $this->postJson(route('resort.accommodation.RestoreDeleted', $trash))->assertStatus(409);   // only once
+
+        // One floor/room: refused while the same room exists again.
+        $roomRow = $res['rooms'][0]['id'];
+        $t2 = $this->deleteJson(route('resort.accommodation.FloorAndRoomDestroy', base64_encode($roomRow)))->assertOk()->json('trash_id');
+        $again = $this->postJson(route('resort.accommodation.StoreFloorandroom'), ['building_id' => $res['id'], 'Floor' => 1, 'Room' => '101'])->assertOk()->json('id');
+        $this->postJson(route('resort.accommodation.RestoreDeleted', $t2))->assertStatus(409);
+        DB::table('bulidng_and_floor_and_rooms')->where('id', $again)->delete();
+        $this->postJson(route('resort.accommodation.RestoreDeleted', $t2))->assertOk();
+        $this->assertNotNull(DB::table('bulidng_and_floor_and_rooms')->where('id', $roomRow)->first());
+
+        // Room setup with an item: beds come back empty, stock is reserved again; short stock refuses the restore.
+        $room = $this->setUpRoom();
+        $cat = DB::table('inventory_category_models')->insertGetId(['resort_id' => $rid, 'CategoryName' => 'T', 'created_at' => now(), 'updated_at' => now()]);
+        $item = DB::table('inventory_modules')->insertGetId(['resort_id' => $rid, 'Inv_Cat_id' => $cat, 'ItemName' => 'Fan', 'ItemCode' => 'F' . uniqid(), 'Quantity' => 2, 'Occupied' => 0, 'created_at' => now(), 'updated_at' => now()]);
+        $type = DB::table('available_accommodation_models')->where('id', $room)->value('Accommodation_type_id');
+        $this->putJson(route('resort.accommodation.AvailableAccommodationUpdate', $room), ['Accommodation_type_id' => $type, 'Capacity' => 1, 'RoomType' => 1, 'blockFor' => 'Male',
+            'CleaningSchedule' => 'Daily', 'Occupancytheresold' => 90, 'items' => [$item => 2]])->assertOk();
+        $bed = DB::table('assing_accommodations')->where('available_a_id', $room)->value('id');
+        DB::table('assing_accommodations')->where('id', $bed)->update(['emp_id' => DB::table('employees')->where('resort_id', $rid)->value('id')]);
+        $t3 = $this->deleteJson(route('resort.accommodation.AvailableAccommodationDestroy', $room))->assertOk()->json('trash_id');
+        $this->assertEquals(0, DB::table('inventory_modules')->where('id', $item)->value('Occupied'));
+
+        DB::table('inventory_modules')->where('id', $item)->update(['Occupied' => 1]);   // someone took one meanwhile
+        $this->postJson(route('resort.accommodation.RestoreDeleted', $t3))->assertStatus(422);
+        $this->assertNull(DB::table('available_accommodation_models')->where('id', $room)->first(), 'refused restore changed nothing');
+        DB::table('inventory_modules')->where('id', $item)->update(['Occupied' => 0]);
+        $this->postJson(route('resort.accommodation.RestoreDeleted', $t3))->assertOk();
+        $this->assertNotNull(DB::table('available_accommodation_models')->where('id', $room)->first());
+        $this->assertEquals(0, DB::table('assing_accommodations')->where('id', $bed)->value('emp_id'), 'bed back, empty');
+        $this->assertEquals(2, DB::table('inventory_modules')->where('id', $item)->value('Occupied'));
+
+        $other = DB::table('accommodation_trash')->where('resort_id', '!=', $rid)->value('id');
+        if ($other) {
+            $this->postJson(route('resort.accommodation.RestoreDeleted', $other))->assertNotFound();
+        }
+    }
+
     public function test_hr_is_told_once_when_a_room_reaches_its_occupancy_level()   // §2.3
     {
         DB::table('employees')->update(['device_token' => null]);   // notifications also push to phones

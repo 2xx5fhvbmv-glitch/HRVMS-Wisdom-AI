@@ -29,6 +29,9 @@
             'buildingDestroy' => route('resort.accommodation.BuildingDestory', ['id' => '__ID__']),
             'roomStore'       => route('resort.accommodation.StoreFloorandroom'),
             'buildingAddFloors' => route('resort.accommodation.AddFloorsToBuilding', ['id' => '__ID__']),   // floors+rooms in one transaction
+            'floorGenders'    => route('resort.accommodation.FloorGenders', ['id' => '__ID__']),                          // GET {floor: M|F|X}
+            'floorGender'     => route('resort.accommodation.FloorGenderUpdate', ['id' => '__ID__', 'floor' => '__FLOOR__']), // PUT {gender: M|F|X|null}
+            'restore'         => route('resort.accommodation.RestoreDeleted', ['id' => '__ID__']),   // POST with a delete's trash_id: same rows back
             'roomDestroy'     => route('resort.accommodation.FloorAndRoomDestroy', ['id' => '__ID__']),
             'setupStore'      => route('resort.accommodation.AvailableAccommodationStore'),
             'setupUpdate'     => route('resort.accommodation.AvailableAccommodationUpdate', ['id' => '__ID__']),

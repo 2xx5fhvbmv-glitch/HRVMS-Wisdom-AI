@@ -494,11 +494,16 @@ class ConfigrationController extends Controller
 
         DB::beginTransaction();
         try {
+            $trashId = $this->trash('room_setup', $id, [
+                'available_accommodation_models' => DB::table('available_accommodation_models')->where('id', $id)->get(),
+                'assing_accommodations' => DB::table('assing_accommodations')->where('available_a_id', $id)->where('resort_id', $resort_id)->get(),
+                'available_accommodation_inv_items' => DB::table('available_accommodation_inv_items')->where('Available_Acc_id', $id)->get(),
+            ]);
             $this->releaseRoomItems($id, $resort_id);
             \App\Models\AssingAccommodation::where('available_a_id', $id)->where('resort_id', $resort_id)->delete();
             $accommodation->delete();
             DB::commit();
-            return response()->json(['success' => true, 'message' => 'Accommodation deleted successfully']);
+            return response()->json(['success' => true, 'message' => 'Accommodation deleted successfully', 'trash_id' => $trashId]);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['success' => false, 'message' => 'Failed to delete'], 500);
@@ -606,6 +611,36 @@ class ConfigrationController extends Controller
             'rooms' => $this->createFloorRooms($building->id, $request->floors, $resort_id)]));
     }
 
+    /** Floor genders of a building, {floor: "M"|"F"|"X"}; a floor that isn't listed follows the building's gender. */
+    public function FloorGenders($id)
+    {
+        $resort_id = $this->resort->resort_id;
+        if (!BuildingModel::where('id', $id)->where('resort_id', $resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Building not found'], 404);
+        }
+        return response()->json(['success' => true, 'floors' => (object) DB::table('building_floors')->where('building_id', $id)->whereNotNull('gender')->pluck('gender', 'floor')->all()]);
+    }
+
+    /** Set or clear (gender: null) one floor's gender. */
+    public function FloorGenderUpdate(Request $request, $id, $floor)
+    {
+        $resort_id = $this->resort->resort_id;
+        if (!BuildingModel::where('id', $id)->where('resort_id', $resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Building not found'], 404);
+        }
+        $v = Validator::make($request->all() + ['floor' => $floor], ['floor' => ['required', 'integer', 'min:0', 'max:200'], 'gender' => ['present', 'nullable', 'in:M,F,X']]);
+        if ($v->fails()) {
+            return response()->json(['success' => false, 'errors' => $v->errors()], 422);
+        }
+        if ($request->gender === null) {
+            DB::table('building_floors')->where('building_id', $id)->where('floor', (int) $floor)->delete();
+        } else {
+            DB::table('building_floors')->updateOrInsert(['building_id' => $id, 'floor' => (int) $floor],
+                ['resort_id' => $resort_id, 'gender' => $request->gender, 'updated_at' => now(), 'created_at' => now()]);
+        }
+        return response()->json(['success' => true, 'message' => 'Floor gender saved', 'floor' => (int) $floor, 'gender' => $request->gender]);
+    }
+
     private function createFloorRooms($buildingId, array $floors, $resortId): array
     {
         $rooms = [];
@@ -700,6 +735,69 @@ class ConfigrationController extends Controller
     }
 
     /** Give a room's linked items back to stock and unlink them (room deleted or its items replaced). */
+    /** Keep a deleted record's rows (by table) so it can be restored on the same ids. Returns the trash id. */
+    private function trash(string $kind, $recordId, array $rowsByTable): int
+    {
+        return DB::table('accommodation_trash')->insertGetId(['resort_id' => $this->resort->resort_id, 'kind' => $kind, 'record_id' => $recordId,
+            'payload' => json_encode(array_map(fn ($rows) => collect($rows)->map(fn ($r) => (array) $r)->all(), $rowsByTable)),
+            'deleted_by' => $this->resort->id, 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    /**
+     * Put a deleted building, floor/room or room setup back on its old rows. Refused when its place has been taken
+     * since (same building name, same room on the floor). Beds come back empty (staff may have moved since) and the
+     * room's items are reserved from stock again; short stock refuses the restore and changes nothing.
+     */
+    public function RestoreDeleted($trashId)
+    {
+        $resort_id = $this->resort->resort_id;
+        $trash = DB::table('accommodation_trash')->where('id', $trashId)->where('resort_id', $resort_id)->first();
+        if (!$trash) {
+            return response()->json(['success' => false, 'message' => 'Not found'], 404);
+        }
+        if ($trash->restored_at) {
+            return response()->json(['success' => false, 'message' => 'Already restored.'], 409);
+        }
+        $rows = json_decode($trash->payload, true);
+
+        foreach ($rows['building_models'] ?? [] as $b) {
+            if (BuildingModel::where('resort_id', $resort_id)->whereRaw('LOWER(TRIM(BuildingName)) = ?', [mb_strtolower(trim($b['BuildingName']))])->exists()) {
+                return response()->json(['success' => false, 'message' => "A building called {$b['BuildingName']} exists again, so this one can't come back."], 409);
+            }
+        }
+        foreach ($rows['bulidng_and_floor_and_rooms'] ?? [] as $r) {
+            if (BulidngAndFloorAndRoom::where('building_id', $r['building_id'])->where('Floor', $r['Floor'])->where('Room', $r['Room'])->exists()) {
+                return response()->json(['success' => false, 'message' => "Room {$r['Room']} on floor {$r['Floor']} exists again, so it can't come back."], 409);
+            }
+            if (empty($rows['building_models']) && !BuildingModel::where('id', $r['building_id'])->where('resort_id', $resort_id)->exists()) {
+                return response()->json(['success' => false, 'message' => 'Its building was deleted; restore the building first.'], 409);
+            }
+        }
+        foreach ($rows['available_accommodation_models'] ?? [] as $r) {
+            if (AvailableAccommodationModel::where('resort_id', $resort_id)->where('BuildingName', $r['BuildingName'])->where('Floor', $r['Floor'])->where('RoomNo', $r['RoomNo'])->exists()) {
+                return response()->json(['success' => false, 'message' => "Room {$r['RoomNo']} has been set up again, so this setup can't come back."], 409);
+            }
+        }
+
+        return DB::transaction(function () use ($rows, $trash, $resort_id) {
+            foreach (['building_models', 'bulidng_and_floor_and_rooms', 'building_floors', 'available_accommodation_models'] as $table) {
+                foreach ($rows[$table] ?? [] as $r) {
+                    DB::table($table)->insert($r);   // same id
+                }
+            }
+            foreach ($rows['assing_accommodations'] ?? [] as $bed) {
+                DB::table('assing_accommodations')->insert(['emp_id' => 0] + $bed);   // the bed, without its old occupant
+            }
+            $items = collect($rows['available_accommodation_inv_items'] ?? [])->mapWithKeys(fn ($i) => [$i['Item_id'] => (int) ($i['quantity'] ?? 1)])->all();
+            if ($items && ($short = $this->reserveRoomItems($trash->record_id, $items, $resort_id))) {
+                // Thrown so the transaction rolls everything back; Laravel sends the response.
+                throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['success' => false, 'message' => 'Not enough stock to put its items back: ' . implode(', ', $short)], 422));
+            }
+            DB::table('accommodation_trash')->where('id', $trash->id)->update(['restored_at' => now(), 'updated_at' => now()]);
+            return response()->json(['success' => true, 'message' => ucfirst(str_replace('_', ' ', $trash->kind)) . ' restored', 'kind' => $trash->kind, 'id' => $trash->record_id]);
+        });
+    }
+
     private function releaseRoomItems($roomId, $resortId): void
     {
         foreach (AvailableAccommodationInvItem::where('Available_Acc_id', $roomId)->get() as $link) {
@@ -1119,12 +1217,20 @@ class ConfigrationController extends Controller
         DB::beginTransaction();
         try
         {
-            BuildingModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
-            BulidngAndFloorAndRoom::where("building_id",$id)->where('resort_id', $this->resort->resort_id)->delete();
+            $rid = $this->resort->resort_id;
+            $trashId = $this->trash('building', $id, [
+                'building_models' => DB::table('building_models')->where('id', $id)->where('resort_id', $rid)->get(),
+                'bulidng_and_floor_and_rooms' => DB::table('bulidng_and_floor_and_rooms')->where('building_id', $id)->where('resort_id', $rid)->get(),
+                'building_floors' => DB::table('building_floors')->where('building_id', $id)->where('resort_id', $rid)->get(),
+            ]);
+            BuildingModel::where("id",$id)->where('resort_id', $rid)->delete();
+            BulidngAndFloorAndRoom::where("building_id",$id)->where('resort_id', $rid)->delete();
+            DB::table('building_floors')->where('building_id', $id)->where('resort_id', $rid)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
                 'message' => 'Building  and internal Floor and Room  Delete Successfully ',
+                'trash_id' => $trashId,   // POST accommodation/trash/{trash_id}/restore puts it back
             ], 200);
            
               
@@ -1277,11 +1383,13 @@ class ConfigrationController extends Controller
 
         DB::beginTransaction();
         try {
+            $trashId = $this->trash('floor_room', $id, ['bulidng_and_floor_and_rooms' => DB::table('bulidng_and_floor_and_rooms')->where('id', $id)->where('resort_id', $this->resort->resort_id)->get()]);
             BulidngAndFloorAndRoom::where("id", $id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
                 'message' => 'Floor and Room deleted successfully.',
+                'trash_id' => $trashId,
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
