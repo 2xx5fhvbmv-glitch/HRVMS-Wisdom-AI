@@ -426,3 +426,23 @@
   #acfg .drf .why:empty{display:none}
   #acfg .drf .ac-btn{flex:1}
 }
+/* building header: who it's for + HR alert level */
+#acfg .seg.sm button{font-size:12.5px;padding:4px 12px}
+#acfg .seg button.dis{opacity:.45;cursor:not-allowed}
+#acfg .bid .bgf{margin-top:0}
+#acfg .bid .bgf:last-of-type{margin-top:0}
+#acfg .bid .facts + .bgf{margin-top:auto}
+#acfg .bgv.muted{color:var(--faint);font-weight:400}
+#acfg .bgf .rng{flex:0 1 220px;gap:10px}
+#acfg .bgf .ac-btn.sm{padding:5px 10px}
+/* add building window: alert switch row + pattern errors */
+#acfg #mAlF .rng{gap:12px}
+#acfg #mAlF .rng .tg{flex:none;padding:0}
+#acfg #mPE:empty{display:none}
+#acfg #mPE{margin-top:8px}
+#acfg .ftab.bad{border-color:var(--err)}
+#acfg #mGdF,#acfg #mPatF,#acfg #mAlF{margin-top:16px}
+#acfg #mPatF .hint{display:block;margin-top:6px}
+#acfg #mP{margin-top:16px}
+#acfg .bgf{flex-wrap:wrap;row-gap:6px}
+#acfg .bgf .rng{flex:1 1 150px;max-width:260px}

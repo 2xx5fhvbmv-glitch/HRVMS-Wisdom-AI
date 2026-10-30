@@ -33,10 +33,11 @@
             'floorGender'     => route('resort.accommodation.FloorGenderUpdate', ['id' => '__ID__', 'floor' => '__FLOOR__']), // PUT {gender: M|F|X|null}
             'restore'         => route('resort.accommodation.RestoreDeleted', ['id' => '__ID__']),   // POST with a delete's trash_id: same rows back
             'roomDestroy'     => route('resort.accommodation.FloorAndRoomDestroy', ['id' => '__ID__']),
-            'setupStore'      => route('resort.accommodation.AvailableAccommodationStore'),
+            'buildingWithFloors' => route('resort.accommodation.StoreBuildingWithFloors'),
+            'setupBatch'      => route('resort.accommodation.SetupRoomsBatch'),
+            'items'           => route('resort.accommodation.AvailableAccommodationItems', ['id' => '__ID__']),
             'setupUpdate'     => route('resort.accommodation.AvailableAccommodationUpdate', ['id' => '__ID__']),
             'setupDestroy'    => route('resort.accommodation.AvailableAccommodationDestroy', ['id' => '__ID__']),
-            'beds'            => route('resort.accommodation.getBeds', ['id' => '__ID__']),
             'escalation'      => route('resort.accommodation.config.EscalationDay'),
             'defaultAlert'    => route('resort.accommodation.config.DefaultOccupancyAlert'),
             'typeStore'       => route('resort.accommodation.AccommodationTypeStore'),
@@ -50,7 +51,7 @@
             'inventory' => route('resort.accommodation.inventory'),
         ],
         'types'     => $AccommodationType->map(fn ($t) => ['id' => $t->id, 'n' => $t->AccommodationName])->values(),
-        'buildings' => $BuildingData->map(fn ($b) => ['id' => $b->id, 'n' => $b->BuildingName])->values(),
+        'buildings' => $BuildingData->map(fn ($b) => ['id' => $b->id, 'n' => $b->BuildingName, 'g' => $b->gender, 'ns' => $b->room_numbering, 'pat' => $b->room_number_pattern, 'al' => $b->occupancy_alert])->values(),
         // only items that still have stock; "per bed" = the inventory item's own per-person flag
         'items'     => $InventoryModule->map(fn ($i) => [
             'id'    => $i->id,
@@ -146,7 +147,7 @@
     <div class="cols">
       <section class="ac-card">
         <div class="ch"><span class="t">Occupancy alert</span></div>
-        <div class="sub">The occupancy alert level new rooms start with. You can change it for each room.</div>
+        <div class="sub">HR is notified when a room or a building is at least this full. New rooms start with this level, and you can change it for each room.</div>
         <div class="rng"><input type="range" min="50" max="100" step="5" value="90" id="aR" aria-label="Default occupancy alert"><b id="aV">90%</b></div>
         <div class="ac-row" style="margin-top:16px"><button class="ac-btn btn-main" type="button" id="aSave">Save</button></div>
       </section>
@@ -202,13 +203,17 @@
     <div class="mdb">
       <div class="mt" id="mT"></div><div class="ms" id="mS"></div>
       <div class="fs" id="mNameF"><label for="mName">Building name</label><input class="inp" id="mName" placeholder="e.g. Building C, GM Villa, Sup Block" maxlength="50" autocomplete="off"><div class="err" id="mE"></div></div>
+      <div class="fs" id="mGdF"><span class="lb">Who is this building for</span><div class="seg" id="mGd" role="radiogroup"><button type="button" role="radio" data-gd="M" aria-checked="false">Male</button><button type="button" role="radio" data-gd="F" aria-checked="false">Female</button><button type="button" role="radio" data-gd="X" class="on" aria-checked="true">Mixed</button></div></div>
       <div class="mdiv" id="mDiv"></div>
       <div class="grid2" style="align-items:end">
         <div class="fs"><span class="lb">How many floors</span><div class="step" id="mF"><button type="button" data-d="-1" aria-label="Fewer floors">−</button><input type="number" value="3" min="1" max="40" aria-label="Floors"><button type="button" data-d="1" aria-label="More floors">+</button></div></div>
         <label class="tg" id="mGF" style="padding-bottom:7px"><input type="checkbox" id="mG" checked><span class="sw"></span>Starts with a ground floor</label>
       </div>
-      <div class="fs" id="mNS" style="margin-top:16px"><span class="lb">Room numbers</span><div class="seg" id="mNSs" role="radiogroup"><button type="button" role="radio" data-ns="F" class="on" aria-checked="true">By floor · 101, 102…</button><button type="button" role="radio" data-ns="C" aria-checked="false">Continuous · 1, 2, 3…</button></div></div>
+      <div class="fs" id="mNS" style="margin-top:16px"><span class="lb">Room numbers</span><div class="seg" id="mNSs" role="radiogroup"><button type="button" role="radio" data-ns="F" class="on" aria-checked="true">By floor · 101, 102…</button><button type="button" role="radio" data-ns="C" aria-checked="false">Continuous · 1, 2, 3…</button><button type="button" role="radio" data-ns="U" aria-checked="false">Custom</button></div></div>
+      <div class="fs" id="mPatF" hidden><label for="mPat">Room number pattern</label><input class="inp" id="mPat" value="F{F}-{N}" maxlength="40" autocomplete="off" spellcheck="false"><span class="hint">{F} floor · {N} room on the floor · {NN} the same with two digits · {C} counting on through the building. For example F{F}-{N} gives F1-1, F1-2, F2-1…</span></div>
+      <div class="fs" id="mAlF"><span class="lb">Alert HR when the building is this full</span><div class="rng"><label class="tg"><input type="checkbox" id="mAl"><span class="sw"></span></label><input type="range" min="50" max="100" step="5" value="90" id="mAlR" aria-label="Building occupancy alert" disabled><b id="mAlV">Off</b></div></div>
       <div class="ftab" id="mP" aria-live="polite"></div>
+      <div class="err" id="mPE"></div>
       <div class="mres" id="mR" hidden></div>
       <div class="mf"><span class="msum" id="mSum"></span><button class="ac-btn btn-gh" type="button" id="mC">Cancel</button><button class="ac-btn btn-main btn-lg" type="button" id="mOk"></button></div>
     </div>
