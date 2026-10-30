@@ -62,7 +62,7 @@
   function forByRank(r) { var f = FOR.filter(function (x) { return x[3] === String(r); })[0]; return f ? f[0] : null; }
   function cleanUi(v) { return v === 'By Weekly' ? 'Bi-weekly' : v; }
   function cleanDb(v) { return v === 'Bi-weekly' ? 'By Weekly' : v; }
-  var DEF_ALERT = (function () { try { return Math.min(100, Math.max(50, +localStorage.getItem('acfg.alert') || 90)); } catch (e) { return 90; } })();
+  var DEF_ALERT = Math.min(100, Math.max(50, +CFG.defaultAlert || 90));   // the resort's default for new rooms (shared by HR users)
   var CATS = [], INV = (CFG.items || []).map(function (i) { return { id: String(i.id), n: i.n || '', code: i.code || '', cat: String(i.cat), catName: 'Other', per: !!i.per, dq: +i.dq || 0, avail: +i.avail || 0 }; });
 
   /* ---------- state ---------- */
@@ -72,6 +72,17 @@
   var B = [], FR = [], SU = [], BLD = (CFG.buildings || []).map(bmap);
   var cur = null, sel = {}, loaded = false;
   function bldg() { return B.filter(function (b) { return b.id === cur; })[0]; }
+  /* floor genders by building id: { floor: 'M' | 'F' }, read once per building; no entry = the building's setting */
+  var FG = {};
+  function floorG(b) {
+    if (!(b.id in FG)) { FG[b.id] = {}; http('GET', tpl(U.floorGenders, b.id)).then(function (r) { if (r.ok) { FG[b.id] = (r.json && r.json.floors) || {}; if (bldg() && bldg().id === b.id) drawMain(); } }); }
+    return FG[b.id];
+  }
+  function fgSelect(b, f) {
+    if (b.g !== 'X') return '';
+    var v = floorG(b)[f] || '';
+    return '<select class="fgs" data-fg="' + f + '" aria-label="Who ' + fname(f) + ' is for">' + [['', 'Male & female'], ['M', 'Male only'], ['F', 'Female only']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === v ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>';
+  }
   function fname(f) { return f === 0 ? 'Ground floor' : 'Floor ' + f; }
   function key(f, no) { return f + '|' + no; }
   function selKeys() { return Object.keys(sel); }
@@ -209,9 +220,9 @@
       '<div class="stack">' + floors.map(function (fl) {
         var s = fl.rooms.filter(function (r) { return r.s; }).length, below = b.floors.filter(function (x) { return x.f === fl.f - 1; })[0], hasSel = fl.rooms.some(function (r) { return sel[key(fl.f, r.no)]; });
         var canCopy = below && below.rooms.some(function (r) { return r.s; }) && fl.rooms.some(function (r) { return !r.s; });
-        return '<div class="flr' + (hasSel ? ' has-sel' : '') + '" data-f="' + fl.f + '"><div class="fcol"><button type="button" class="fn" data-fsel="' + fl.f + '" aria-label="Pick every room on ' + fname(fl.f) + '"><b>' + fname(fl.f) + '</b><span>' + fl.rooms.length + ' ' + (fl.rooms.length === 1 ? 'room' : 'rooms') + ' · ' + (s === fl.rooms.length ? 'all set up' : s + ' set up') + '</span><em>Pick whole floor</em></button></div>' +
+        return '<div class="flr' + (hasSel ? ' has-sel' : '') + '" data-f="' + fl.f + '"><div class="fcol"><button type="button" class="fn" data-fsel="' + fl.f + '" aria-label="Pick every room on ' + fname(fl.f) + '"><b>' + fname(fl.f) + '</b><span>' + fl.rooms.length + ' ' + (fl.rooms.length === 1 ? 'room' : 'rooms') + ' · ' + (s === fl.rooms.length ? 'all set up' : s + ' set up') + '</span><em>Pick whole floor</em></button>' + fgSelect(b, fl.f) + '</div>' +
           '<div class="rooms">' + fl.rooms.map(function (r) { return tile(fl, r); }).join('') + '<button type="button" class="addr" data-addr="' + fl.f + '" aria-label="Add a room to ' + fname(fl.f) + '" data-tip="Add room ' + nextNo(fl) + '">' + ICON.plus + '</button></div>' +
-          '<div class="fa">' + (canCopy ? '<button class="ac-btn btn-ctx cpy" type="button" data-copy="' + fl.f + '" data-tip="Give these rooms the same setup as ' + fname(fl.f - 1) + ', room by room (items aren’t copied)">Same as ' + fname(fl.f - 1) + '</button>' : '') +
+          '<div class="fa">' + (canCopy ? '<button class="ac-btn btn-ctx cpy" type="button" data-copy="' + fl.f + '" data-tip="Give these rooms the same setup as ' + fname(fl.f - 1) + ', room by room, items included">Same as ' + fname(fl.f - 1) + '</button>' : '') +
           '<button class="ib" type="button" data-delf="' + fl.f + '" aria-label="Remove ' + fname(fl.f) + '" data-tip="Remove floor">' + ICON.bin + '</button></div></div>';
       }).join('') + '</div><button class="ac-btn btn-gh addf" type="button" id="addF">' + ICON.plus + 'Add floors</button>';
     if (enter) { tide(el.querySelectorAll('.flr'), 20); tide(el.querySelectorAll('.rm'), 80); }
@@ -239,6 +250,14 @@
     if (t.closest('#balE')) editAlert();
   });
 
+  /* floor gender: PUT, with undo */
+  $('main').addEventListener('change', function (e) {
+    var sg = e.target.closest('select[data-fg]'); if (!sg) return;
+    var b = bldg(), f = +sg.dataset.fg, map = floorG(b), old = map[f] || '', v = sg.value;
+    var put = function (g) { return http('PUT', tpl(U.floorGender, b.id).replace('__FLOOR__', f), { gender: g || null }).then(function (r) { if (!r.ok) { toastErr(msgOf(r)); return false; } if (g) map[f] = g; else delete map[f]; drawMain(); return true; }); };
+    put(v).then(function (ok) { if (ok) toast(fname(f) + ' is ' + (v === 'M' ? 'for male staff only' : v === 'F' ? 'for female staff only' : 'for male and female staff'), function () { put(old).then(function (ok2) { if (ok2) toast('Change undone'); }); }); });
+  });
+
   /* who the building is for (stored on the building) */
   function setGender(g) {
     var b = bldg(); if (g === b.g) return;
@@ -249,13 +268,20 @@
       reload({ b: true, t: false }).then(function () { toast(b.name + ' is now ' + (g === 'X' ? 'for male and female staff' : 'for ' + GL[g].toLowerCase() + ' staff only'), function () { http('PUT', U.buildingUpdate, { CatId: b64(b.id), BuildingName: b.name, gender: old }).then(function (u) { if (u.ok) { reload({ b: true, t: false }); toast('Building is back to ' + GL[old]); } else toastErr(msgOf(u)); }); }); });
     });
   }
-  /* building alert: HR is told when the building is at least this % full (50–100; once set it can be changed, not removed) */
+  /* building alert: HR is told when the building is at least this % full (50–100), or off */
   function editAlert() {
     var b = bldg(), row = $('bal'), v = b.al == null ? DEF_ALERT : b.al;
-    row.innerHTML = '<span class="lb2">Alert HR at</span><div class="rng"><input type="range" min="50" max="100" step="5" value="' + v + '" aria-label="Building occupancy alert"><b>' + v + '%</b></div><button class="ac-btn btn-main sm" type="button" id="balS">Save</button><button class="ac-btn btn-gh sm" type="button" id="balC">Cancel</button>';
+    row.innerHTML = '<span class="lb2">Alert HR at</span><div class="rng"><input type="range" min="50" max="100" step="5" value="' + v + '" aria-label="Building occupancy alert"><b>' + v + '%</b></div><button class="ac-btn btn-main sm" type="button" id="balS">Save</button>' + (b.al == null ? '' : '<button class="ac-btn btn-gh sm" type="button" id="balO">Turn off</button>') + '<button class="ac-btn btn-gh sm" type="button" id="balC">Cancel</button>';
     var rg = row.querySelector('input'); rg.focus();
     rg.addEventListener('input', function () { row.querySelector('b').textContent = rg.value + '%'; });
     $('balC').onclick = function () { drawMain(); };
+    if ($('balO')) $('balO').onclick = function () {
+      var old = b.al;
+      http('PUT', U.buildingUpdate, { CatId: b64(b.id), BuildingName: b.name, clear_occupancy_alert: true }).then(function (r) {
+        if (!r.ok) return toastErr(msgOf(r));
+        reload({ b: true, t: false }).then(function () { toast('Building alert turned off for ' + b.name, function () { http('PUT', U.buildingUpdate, { CatId: b64(b.id), BuildingName: b.name, occupancy_alert: old }).then(function (u) { if (u.ok) { reload({ b: true, t: false }); toast('Alert back to ' + old + '%'); } else toastErr(msgOf(u)); }); }); });
+      });
+    };
     $('balS').onclick = function () {
       var nv = +rg.value, old = b.al; if (nv === old) return drawMain();
       http('PUT', U.buildingUpdate, { CatId: b64(b.id), BuildingName: b.name, occupancy_alert: nv }).then(function (r) {
@@ -295,20 +321,24 @@
       });
     });
   }
-  /* delete floor/room rows by (floor, number) in the building; resolves true when all went */
+  /* delete floor/room rows by (floor, number) in the building; resolves { ok: all went, trash: ids to restore them } */
   function delRooms(bid, list) {
     var b = B.filter(function (x) { return x.id === bid; })[0], ids = [];
     list.forEach(function (x) { var fl = b.floors.filter(function (y) { return y.f === x.f; })[0], r = fl && fl.rooms.filter(function (z) { return z.no === String(x.no); })[0]; if (r && r.rid) ids.push(r.rid); });
-    return batches(ids, 10, function (id) { return http('DELETE', tpl(U.roomDestroy, b64(id))); }).then(function (rs) { var bad = rs.filter(function (r) { return !r.ok; }); if (bad.length) toastErr(msgOf(bad[0])); return !bad.length; });
+    return batches(ids, 10, function (id) { return http('DELETE', tpl(U.roomDestroy, b64(id))); }).then(function (rs) {
+      var bad = rs.filter(function (r) { return !r.ok; }); if (bad.length) toastErr(msgOf(bad[0]));
+      return { ok: !bad.length, trash: rs.map(function (r) { return r.json && r.json.trash_id; }).filter(Boolean) };
+    });
   }
-  function restoreRooms(bid, list) { return batches(list, 10, function (x) { return http('POST', U.roomStore, { building_id: bid, Floor: x.f, Room: String(x.no) }); }).then(function (rs) { return rs.every(function (r) { return r.ok; }); }); }
+  /* put deleted rows back on their old ids (rooms keep their place, links to them still work) */
+  function restoreTrash(trash) { return batches(trash, 10, function (id) { return http('POST', tpl(U.restore, id)); }).then(function (rs) { var bad = rs.filter(function (r) { return !r.ok; }); if (bad.length) toastErr(msgOf(bad[0])); return !bad.length; }); }
   function removeFloor(f) {
     var b = bldg(), fl = b.floors.filter(function (x) { return x.f === f; })[0];
     if (fl.rooms.some(function (r) { return r.s; })) { toast(fname(f) + ' has rooms that are set up, so it can’t be removed here. Remove their setup from the Room setup list first.', null, 'warn'); return; }
     var list = fl.rooms.map(function (r) { return { f: f, no: r.no }; });
-    delRooms(b.id, list).then(function (ok) {
+    delRooms(b.id, list).then(function (res) {
       Object.keys(sel).forEach(function (k) { if (k.indexOf(f + '|') === 0) delete sel[k]; });
-      reload().then(function () { drawBar(); if (ok) toast(fname(f) + ' removed', function () { restoreRooms(b.id, list).then(function (ok2) { reload(); toast(ok2 ? fname(f) + ' is back' : 'Some rooms couldn’t be restored', null, ok2 ? 'ok' : 'warn'); }); }); });
+      reload().then(function () { drawBar(); if (res.ok) toast(fname(f) + ' removed', function () { restoreTrash(res.trash).then(function (ok2) { reload(); toast(ok2 ? fname(f) + ' is back' : 'Some rooms couldn’t be restored', null, ok2 ? 'ok' : 'warn'); }); }); });
     });
   }
 
@@ -328,7 +358,7 @@
   $('sDel').onclick = function () {
     var rs = picked(), b = bldg(); if ($('sDel').classList.contains('dis')) { toast('Rooms that are set up can’t be removed here. Remove their setup from the Room setup list first.', null, 'warn'); return; }
     var list = rs.map(function (r) { return { f: r.f, no: r.no }; });
-    delRooms(b.id, list).then(function (ok) { selClear(); reload().then(function () { drawBar(); if (ok) toast(list.length + (list.length === 1 ? ' room' : ' rooms') + ' removed', function () { restoreRooms(b.id, list).then(function (ok2) { reload(); toast(ok2 ? 'Rooms are back' : 'Some rooms couldn’t be restored', null, ok2 ? 'ok' : 'warn'); }); }); }); });
+    delRooms(b.id, list).then(function (res) { selClear(); reload().then(function () { drawBar(); if (res.ok) toast(list.length + (list.length === 1 ? ' room' : ' rooms') + ' removed', function () { restoreTrash(res.trash).then(function (ok2) { reload(); toast(ok2 ? 'Rooms are back' : 'Some rooms couldn’t be restored', null, ok2 ? 'ok' : 'warn'); }); }); }); });
   };
   $('sSet').onclick = openDrawer;
 
@@ -596,12 +626,12 @@
   }
 
   /* ---------- add building / floors modal ---------- */
-  var M = 'b', NS = 'F', PF = [], mBusy = false, mRetry = null;
+  var M = 'b', NS = 'F', PF = [], mBusy = false;
   function mv(id) { return +$(id).querySelector('input').value; }
   var GD = 'X';
   function pat() { return M === 'b' ? $('mPat').value.trim() : bldg().pat; }
   function openModal(kind) {
-    M = kind; var b = bldg(); mRetry = null; mBusy = false; $('mR').hidden = true;
+    M = kind; var b = bldg(); mBusy = false; $('mR').hidden = true;
     ['mNameF', 'mGF', 'mNS', 'mDiv', 'mGdF', 'mAlF'].forEach(function (id) { $(id).hidden = M !== 'b'; });
     $('mE').textContent = ''; $('mName').classList.remove('bad'); $('mPE').textContent = '';
     if (M === 'b') {
@@ -615,7 +645,7 @@
     $('mF').querySelector('input').value = nF; PF = Array.apply(null, { length: nF }).map(function () { return last; });
     drawPrev(); $('md').classList.add('on'); $('md').setAttribute('aria-hidden', 'false'); $('scrim').classList.add('on'); setTimeout(function () { (M === 'b' ? $('mName') : $('mOk')).focus(); }, 200);
   }
-  function closeModal() { if (mBusy) return; $('md').classList.remove('on'); $('md').setAttribute('aria-hidden', 'true'); if (!$('dr').classList.contains('on')) $('scrim').classList.remove('on'); if (mRetry) { mRetry = null; reload({ b: true }); } }
+  function closeModal() { if (mBusy) return; $('md').classList.remove('on'); $('md').setAttribute('aria-hidden', 'true'); if (!$('dr').classList.contains('on')) $('scrim').classList.remove('on'); }
   function plan() {
     var nF = mv('mF'), b = bldg(); while (PF.length < nF) PF.push(PF.length ? PF[PF.length - 1] : 8); PF.length = nF;
     var start = M === 'b' ? ($('mG').checked ? 0 : 1) : Math.max.apply(null, b.floors.map(function (f) { return f.f; }).concat([-1])) + 1, pt = pat();
@@ -643,8 +673,8 @@
     }).join('');
     var s = $('mF'), i2 = s.querySelector('input'), bs = s.querySelectorAll('button'); bs[0].disabled = +i2.value <= +i2.min; bs[1].disabled = +i2.value >= +i2.max;
     $('mSum').textContent = p.length + ' ' + (p.length === 1 ? 'floor' : 'floors') + ' · ' + tot + ' rooms';
-    var err = mRetry ? '' : planErr(p); $('mPE').textContent = err; $('mP').classList.toggle('bad', !!err);
-    if (!mRetry) { $('mOk').textContent = M === 'b' ? 'Create building' : 'Add ' + (p.length === 1 ? 'floor' : 'floors'); var ok = $('mOk'); ok.classList.toggle('dis', !!err); ok.setAttribute('aria-disabled', !!err); if (err) ok.setAttribute('data-tip', err); else ok.removeAttribute('data-tip'); }
+    var err = planErr(p); $('mPE').textContent = err; $('mP').classList.toggle('bad', !!err);
+    $('mOk').textContent = M === 'b' ? 'Create building' : 'Add ' + (p.length === 1 ? 'floor' : 'floors'); var ok = $('mOk'); ok.classList.toggle('dis', !!err); ok.setAttribute('aria-disabled', !!err); if (err) ok.setAttribute('data-tip', err); else ok.removeAttribute('data-tip');
   }
   (function () {
     var s = $('mF'), i = s.querySelector('input');
@@ -670,20 +700,9 @@
   $('mName').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('mOk').click(); });
   $('mC').onclick = closeModal;
   function mBusySet(on, txt) { mBusy = on; var ok = $('mOk'); ok.classList.toggle('dis', on); ok.setAttribute('aria-disabled', on); if (txt) ok.textContent = txt; }
-  /* create the rooms of a plan in the existing floor-and-room create, 10 at a time; resolves to the rooms that failed */
-  function createRooms(bid, list) {
-    var bad = [];
-    return batches(list, 10, function (x) { return http('POST', U.roomStore, { building_id: bid, Floor: x.f, Room: String(x.no) }).then(function (r) { if (!r.ok) bad.push({ f: x.f, no: x.no, msg: msgOf(r) }); }); }).then(function () { return bad; });
-  }
-  function showFail(bad, ctx) {
-    var el = $('mR'); el.hidden = false;
-    el.innerHTML = '<b>' + bad.length + ' ' + (bad.length === 1 ? 'room' : 'rooms') + ' couldn’t be created</b>: ' + bad.slice(0, 8).map(function (x) { return esc(x.no); }).join(', ') + (bad.length > 8 ? '…' : '') + '. ' + esc(bad[0].msg) + '<br>What was created is kept.';
-    ctx.bad = bad; mRetry = ctx; mBusySet(false, 'Retry ' + bad.length + ' failed');
-  }
   $('mOk').onclick = function () {
     if (mBusy) return;
-    if ($('mOk').classList.contains('dis') && !mRetry) { anim($('mPE'), [{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], { duration: 240 }); return; }
-    if (mRetry) { var ctx = mRetry; mBusySet(true, 'Creating ' + ctx.bad.length + ' rooms…'); createRooms(ctx.bid, ctx.bad).then(function (bad) { if (bad.length) showFail(bad, ctx); else finishModal(ctx.bid, ctx.nb, ctx.rooms, ctx.nFloors); }); return; }
+    if ($('mOk').classList.contains('dis')) { anim($('mPE'), [{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], { duration: 240 }); return; }
     var p = plan(), tot = p.reduce(function (a, x) { return a + x.n; }, 0), all = []; p.forEach(function (x) { x.nos.forEach(function (n) { all.push({ f: x.f, no: n }); }); });
     $('mR').hidden = true;
     if (M === 'b') {
@@ -700,16 +719,20 @@
       });
     } else {
       var b = bldg(); mBusySet(true, 'Creating ' + tot + ' rooms…');
-      createRooms(b.id, all).then(function (bad) { if (bad.length) return showFail(bad, { bid: b.id, rooms: all, nFloors: p.length }); finishModal(b.id, null, all, p.length); });
+      // one call, all or nothing: if it fails, no floor or room was added
+      http('POST', tpl(U.buildingAddFloors, b.id), { floors: p.map(function (x) { return { floor: x.f, rooms: x.nos.map(String) }; }) }).then(function (r) {
+        if (!r.ok) { mBusySet(false, 'Add ' + (p.length === 1 ? 'floor' : 'floors')); var el = $('mR'); el.hidden = false; el.innerHTML = '<b>No floors were added</b>, and nothing was saved. ' + esc(msgOf(r)); return; }
+        finishModal(b.id, null, all, p.length);
+      });
     }
   };
   function finishModal(bid, nb, rooms, nFloors) {
-    mBusySet(false); mRetry = null; $('md').classList.remove('on'); $('md').setAttribute('aria-hidden', 'true'); $('scrim').classList.remove('on');
+    mBusySet(false); $('md').classList.remove('on'); $('md').setAttribute('aria-hidden', 'true'); $('scrim').classList.remove('on');
     cur = bid; selClear();
     reload({ b: true }).then(function () {
       drawAll(!!nb);
       if (nb) toast(nb.name + ' added · ' + nb.floors + ' floors, ' + nb.rooms + ' rooms', function () { http('DELETE', tpl(U.buildingDestroy, b64(bid))).then(function (r) { if (r.ok) { cur = null; reload({ b: true }); toast(nb.name + ' removed'); } else toastErr(msgOf(r)); }); });
-      else toast(nFloors + ' ' + (nFloors === 1 ? 'floor' : 'floors') + ' added to ' + bldg().name, function () { delRooms(bid, rooms).then(function (ok) { if (ok) { reload(); toast('Floors removed'); } }); });
+      else toast(nFloors + ' ' + (nFloors === 1 ? 'floor' : 'floors') + ' added to ' + bldg().name, function () { delRooms(bid, rooms).then(function (res) { if (res.ok) { reload(); toast('Floors removed'); } }); });
     });
   }
   $('addB').onclick = function () { openModal('b'); };
@@ -754,7 +777,10 @@
   };
   $('aR').value = DEF_ALERT; $('aV').textContent = DEF_ALERT + '%';
   $('aR').addEventListener('input', function (e) { $('aV').textContent = e.target.value + '%'; });
-  $('aSave').onclick = function () { DEF_ALERT = +$('aR').value; try { localStorage.setItem('acfg.alert', String(DEF_ALERT)); } catch (e) { /* kept for this visit only */ } toast('Occupancy alert saved · new rooms start at ' + DEF_ALERT + '%'); };
+  $('aSave').onclick = function () {
+    var v = +$('aR').value;
+    http('POST', U.defaultAlert, { default_occupancy_alert: v }).then(function (r) { if (!r.ok) return toastErr(msgOf(r)); DEF_ALERT = v; toast('Occupancy alert saved · new rooms start at ' + v + '%'); });
+  };
   (function () { var i = $('eS').querySelector('input'); if (CFG.escalation != null && +CFG.escalation > 0) i.value = Math.max(1, Math.min(30, +CFG.escalation)); })();
   $('eS').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; var i = $('eS').querySelector('input'); i.value = Math.max(1, Math.min(30, +i.value + +b.dataset.d)); });
   $('eSave').onclick = function () {
