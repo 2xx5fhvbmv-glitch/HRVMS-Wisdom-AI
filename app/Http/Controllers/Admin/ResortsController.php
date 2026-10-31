@@ -437,7 +437,8 @@ class ResortsController extends Controller
       $isNew = 0;
       $data = Resort::with('businessHours')->where('id', $id)->first();
       $resort_admin = ResortAdmin::where('resort_id', $id)->where("is_master_admin",1)->where('type', 'super')->first();
-      $states = Common::getStates();
+      // An atoll saved before the list changed (e.g. the old duplicate "Gnaviyani Atoll") stays selectable.
+      $states = array_values(array_unique(array_merge(Common::getStates(), array_filter([$data->state ?? null, $data->billing_state ?? null, $resort_admin->state ?? null]))));
       $statuses = Config::get('settings.status');
       $paymentStatuses = Config::get('settings.payment_status');
       $invoiceStatuses = Config::get('settings.invoice_status');
