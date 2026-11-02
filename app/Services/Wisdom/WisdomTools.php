@@ -65,7 +65,8 @@ use Carbon\Carbon;
 class WisdomTools
 {
     /** Tools that expose salary / payroll / compensation data (HR / FULL tier only). */
-    const PAYROLL_TOOLS = ['get_payroll_summary', 'get_employee_salary', 'get_workforce_budget', 'get_employee_cost', 'get_payroll_by_department', 'get_payroll_trend'];
+    const PAYROLL_TOOLS = ['get_payroll_summary', 'get_employee_salary', 'get_workforce_budget', 'get_employee_cost', 'get_payroll_by_department', 'get_payroll_trend',
+        'get_salary_increments', 'get_employee_loans'];   // salary amounts and loan balances: compensation data too (founder, 2026-11-02)
 
     /**
      * OpenAI-compatible tool schema list, filtered by the caller's capabilities.
@@ -496,7 +497,8 @@ class WisdomTools
             $tools[] = self::fn('run_read_query',
                 "Run a custom READ-ONLY MySQL SELECT for questions the dedicated tools don't cover (budget, accommodation, overtime, etc.). WORKFLOW: if unsure of names, call `list_tables` then `describe_table` FIRST, then write the query. STRICT RULES:\n"
                 . "1) SELECT only — no INSERT/UPDATE/DELETE/DDL, single statement, no semicolons.\n"
-                . "2) You MUST scope to the resort by adding `resort_id = :resort_id` somewhere (never write a literal number — `:resort_id` is bound automatically). Use the resort_id column of the main table, or join through a table that has one.\n"
+                . "2) You MUST scope EVERY table to the resort with its own `alias.resort_id = :resort_id` (one per table/alias, including subqueries; never a literal number — `:resort_id` is bound automatically). Use :resort_id only in that form.\n"
+                . "2b) Join with JOIN ... ON (no `FROM a, b`), no database prefix on table names, and no OR / || / UNION — use IN (...) or run separate queries instead.\n"
                 . "3) System/auth tables and credential columns (passwords, tokens) are blocked.\n"
                 . "Schema notes: `resort_admins` is a restricted table and cannot be joined here — for employee NAMES use `list_employees` or `find_employee` instead (by `employees.id`/`employees.Admin_Parent_id`) and merge the names in afterward, rather than joining resort_admins in this query. Department: `employees.Dept_id = resort_departments.id`(name). Position: `employees.Position_id = resort_positions.id`(position_title). Attendance: `parent_attendaces.Emp_id = employees.id` (date, CheckingTime, CheckingOutTime, Status, OverTime, OTStatus). Employee date-of-birth column is `employees.dob`. Filter active staff with `employees.status = 'Active'`. Results are capped at 200 rows. If a query errors, use describe_table to check the real column names, then retry once.",
                 [
@@ -504,6 +506,10 @@ class WisdomTools
                 ], ['sql']);
         }
 
+        // A tier without payroll access isn't offered the compensation tools at all (execute() refuses them too).
+        if (empty($ctx['can_payroll'])) {
+            $tools = array_values(array_filter($tools, fn ($t) => !in_array($t['function']['name'] ?? '', self::PAYROLL_TOOLS, true)));
+        }
         return $tools;
     }
 
