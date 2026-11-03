@@ -138,7 +138,9 @@ class DemoTimeSeeder
             $ot = $otEntitled && $this->chance(0.1) ? mt_rand(2, 10) * 15 : 0;
             $out = $shiftEnd->copy()->addMinutes($ot ?: mt_rand(-3, 12));
             $onShift = $out->gt($this->now);
-            $forgotOut = !$onShift && $day->gte($this->today->copy()->subDays(10)) && $this->chance(0.015);
+            // Only this (still open) month: last month is the pending payroll run, which the wizard refuses
+            // while a Present day lacks a check-out — early in a month "the last 10 days" reached into it.
+            $forgotOut = !$onShift && $day->gte($this->today->copy()->subDays(10)->max($this->today->copy()->startOfMonth())) && $this->chance(0.015);
             $closed = !$onShift && !$forgotOut;
 
             $break = null;

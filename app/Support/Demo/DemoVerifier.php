@@ -80,7 +80,8 @@ class DemoVerifier
                 return 'oldest attendance is ' . ($oldest ?? 'missing');
             }
             // What PayrollController blocks a run on: no status, a Present day without both punches, undecided OT.
-            $bad = $att()->where('date', '<', now()->subDays(10)->format('Y-m-d'))->where(fn ($q) => $q->whereNull('Status')->orWhere('Status', '')
+            // ...on any day before the later of "10 days ago" and this month's 1st (last month is the pending run).
+            $bad = $att()->where('date', '<', now()->subDays(10)->max(now()->startOfMonth())->format('Y-m-d'))->where(fn ($q) => $q->whereNull('Status')->orWhere('Status', '')
                 ->orWhereNull('CheckingOutTime')->orWhere(fn ($q) => $q->whereNotNull('OverTime')->whereNull('OTStatus')))->count();
             return $bad === 0 ?: "{$bad} older attendance days would block payroll";
         });
