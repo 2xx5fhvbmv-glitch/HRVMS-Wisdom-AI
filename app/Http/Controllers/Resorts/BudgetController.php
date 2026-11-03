@@ -5,7 +5,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use App\Models\ManningandbudgetingConfigfiles;
-use App\Services\BudgetCalculationService;
 use App\Jobs\ConsolidateBudgetImportJob;
 use App\Imports\ConsolidateBudgetImport;
 use Maatwebsite\Excel\Facades\Excel;
@@ -42,10 +41,9 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class BudgetController extends Controller
 {
-    protected $budgetCalculationService;
     protected $resort;
 
-    public function __construct(BudgetCalculationService $budgetCalculationService)
+    public function __construct()
     {
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
         if(!$this->resort) return;

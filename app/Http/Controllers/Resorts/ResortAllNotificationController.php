@@ -50,8 +50,9 @@ class ResortAllNotificationController extends Controller
         $resort_id = $resort->resort_id;
         $user_type = $resort->is_employee;
 
-        // Starts a new cycle for every HOD — HR/GM only, whatever page the button is (or isn't) on.
-        if (!Common::hasFullDataAccess()) {
+        // Starts a new cycle for every HOD — HR/GM/master admin only (not L&D managers, unlike hasFullDataAccess),
+        // whatever page the button is (or isn't) on.
+        if (!Common::isHR() && (int) optional($resort->GetEmployee)->rank !== 8) {
             return response()->json(['success' => false, 'msg' => 'Only HR or the GM can request manning.'], 403);
         }
         $lock = Common::manningRequestLock($resort_id);

@@ -32,18 +32,10 @@ use App\Models\BudgetStatus;
 use Carbon\Carbon;
 use  DB;
 use App\Events\ResortNotificationEvent;
-use App\Services\BudgetCalculationService;
 use App\Models\StoreManningResponseParent;
 use App\Models\StoreManningResponseChild;
 class ManningResponseController extends Controller
 {
-    protected $budgetCalculationService;
-
-    public function __construct(BudgetCalculationService $budgetCalculationService)
-    {
-        $this->budgetCalculationService = $budgetCalculationService;
-    }
-
     public function fetchEmployees(Request $request)
     {
         // Get the position ID and count (number of employees to fetch)
@@ -814,12 +806,6 @@ class ManningResponseController extends Controller
 
                             // dd($positionMonthlyDataIds);
 
-                        // // Process each position_monthly_data_id if needed
-                        // foreach ($positionMonthlyDataIds as $positionMonthId)
-                        // {
-                        //     dd($positionMonthId);
-                        //     $budget = $this->budgetCalculationService->calculateBudgetForDepartment($dept_id, $positionMonthId);
-                        // }
 
 
                 }

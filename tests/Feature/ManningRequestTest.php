@@ -34,10 +34,18 @@ class ManningRequestTest extends TestCase
         foreach (['manager', 'hod.kitchen'] as $login) {
             $this->as($login)->postJson(route('resort.manning.notification'), ['manningRequest' => 'Please send'])->assertForbidden();
         }
+        // An L&D manager has resort-wide data access (hasFullDataAccess) but must not start a manning cycle.
+        $ld = $this->emp('manager');
+        $ldPosition = DB::table('resort_positions')->insertGetId(['resort_id' => $this->resortId, 'dept_id' => $ld->Dept_id,
+            'position_title' => 'L&D Manager', 'created_at' => now(), 'updated_at' => now()]);
+        $ld->forceFill(['Position_id' => $ldPosition])->save();
+        $this->assertTrue(\App\Helpers\Common::hasFullDataAccess($ld->fresh()));
+        $this->as('manager')->postJson(route('resort.manning.notification'), ['manningRequest' => 'Please send'])->assertForbidden();
         $this->assertSame(0, $this->cycles(), 'a refused request starts nothing');
 
+        $this->as('gm')->postJson(route('resort.manning.notification'), ['manningRequest' => 'Please send'])->assertJson(['success' => true]);
         $this->as('hr')->postJson(route('resort.manning.notification'), ['manningRequest' => 'Please send'])->assertJson(['success' => true]);
-        $this->assertSame(1, $this->cycles());
+        $this->assertSame(2, $this->cycles());
     }
 
     public function test_request_closes_once_next_years_budget_is_gm_approved_and_reopens_next_year()
