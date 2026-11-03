@@ -212,6 +212,8 @@ class ManningResponseController extends Controller
                 }
             }
 
+            [$monthRows, $totals] = $this->monthlyCounts($validated['monthly_data'], (array) $request->input('filled_positions', []));
+
             // Check if a ManningResponse already exists for the given resort, department, year AND category
             $manningResponse = ManningResponse::where('resort_id', $validated['resort_id'])
                 ->where('dept_id', $validated['dept_id'])
@@ -224,10 +226,7 @@ class ManningResponseController extends Controller
                 PositionMonthlyData::where('manning_response_id', $manningResponse->id)->delete();
 
                 // Update the existing ManningResponse
-                $manningResponse->update([
-                    'total_headcount' => $validated['total_headcount'],
-                    'total_filled_positions' => $validated['total_filled_headcount'] ?? 0,
-                    'total_vacant_positions' => $validated['total_vacant_headcount'] ?? 0,
+                $manningResponse->update($totals + [
                     // WP4 — was never set, so a real submission and a draft
                     // were indistinguishable (both '' — see the model's
                     // $fillable fix). This is the actual "submit" moment.
@@ -240,28 +239,12 @@ class ManningResponseController extends Controller
                     'dept_id' => $validated['dept_id'],
                     'year' => $validated['year'],
                     'employment_type' => $validated['employment_type'],
-                    'total_headcount' => $validated['total_headcount'],
-                    'total_filled_positions' => $validated['total_filled_headcount'] ?? 0,
-                    'total_vacant_positions' => $validated['total_vacant_headcount'] ?? 0,
                     'status' => 'submitted',
-                ]);
+                ] + $totals);
             }
 
-            // Loop through positions to create new monthly data
-            foreach ($validated['monthly_data'] as $positionId => $value) {
-                if (isset($validated['monthly_data'][$positionId])) {
-                    foreach ($validated['monthly_data'][$positionId] as $monthIndex => $headcount) {
-                        // Create a new PositionMonthlyData record for each month
-                        PositionMonthlyData::create([
-                            'manning_response_id' => $manningResponse->id,
-                            'position_id' => $positionId,
-                            'month' => $monthIndex + 1,
-                            'headcount' => $headcount,
-                            'vacantcount' => $request['vacant_positions'][$positionId][$monthIndex],
-                            'filledcount' => $request['filled_positions'][$positionId][$monthIndex],
-                        ]);
-                    }
-                }
+            foreach ($monthRows as $row) {
+                PositionMonthlyData::create(['manning_response_id' => $manningResponse->id] + $row);
             }
 
             // WP4 — a multi-category submit calls store() once per category
@@ -331,7 +314,7 @@ class ManningResponseController extends Controller
                 'success' => true,
                 'html' => $view,
                 'msg' => 'Data saved successfully.',
-                'nextYearHeadcount' => $validated['total_headcount'],
+                'nextYearHeadcount' => $totals['total_headcount'],
                 'currentYearHeadcount' => $request['total_headcount_current_year']
             ]);
 
@@ -342,6 +325,30 @@ class ManningResponseController extends Controller
                 'msg' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * One submission's position_monthly_data rows with each month's vacancies worked out here, never taken
+     * from the form (founder, 2026-11-03): filled is capped at the month's headcount, vacant = headcount − filled.
+     * Totals are rebuilt from those rows the way the form shows them: per position its busiest month, summed.
+     */
+    private function monthlyCounts(array $monthly, array $filled): array
+    {
+        $rows = [];
+        $totals = ['total_headcount' => 0, 'total_filled_positions' => 0, 'total_vacant_positions' => 0];
+        foreach ($monthly as $positionId => $months) {
+            $peak = [0, 0, 0];
+            foreach ((array) $months as $monthIndex => $headcount) {
+                $h = max(0, (int) $headcount);
+                $f = min(max(0, (int) ($filled[$positionId][$monthIndex] ?? 0)), $h);
+                $rows[] = ['position_id' => $positionId, 'month' => $monthIndex + 1, 'headcount' => $h, 'filledcount' => $f, 'vacantcount' => $h - $f];
+                $peak = [max($peak[0], $h), max($peak[1], $f), max($peak[2], $h - $f)];
+            }
+            $totals['total_headcount'] += $peak[0];
+            $totals['total_filled_positions'] += $peak[1];
+            $totals['total_vacant_positions'] += $peak[2];
+        }
+        return [$rows, $totals];
     }
 
     public function saveDraft(Request $request)
@@ -406,6 +413,8 @@ class ManningResponseController extends Controller
                 ]);
             }
 
+            [$monthRows, $totals] = $this->monthlyCounts($validated['monthly_data'], $validated['filled_positions']);
+
             // Save or update the ManningResponse
             $manningResponse = ManningResponse::updateOrCreate(
                 [
@@ -414,30 +423,14 @@ class ManningResponseController extends Controller
                     'year' => $validated['year'],
                     'employment_type' => $validated['employment_type'],
                 ],
-                [
-                    'total_headcount' => $validated['total_headcount'],
-                    'total_filled_positions' => $validated['total_filled_headcount'] ?? 0,
-                    'total_vacant_positions' => $validated['total_vacant_headcount'] ?? 0,
-                    'status' => 'draft' // Mark as draft
-                ]
+                $totals + ['status' => 'draft'] // Mark as draft
             );
 
             // Clear existing monthly data for the current response
             PositionMonthlyData::where('manning_response_id', $manningResponse->id)->delete();
 
-            // Loop through monthly data to create new records
-            foreach ($validated['monthly_data'] as $positionId => $value) {
-                foreach ($validated['monthly_data'][$positionId] as $monthIndex => $headcount) {
-                    // Create a new PositionMonthlyData record for each month
-                    PositionMonthlyData::create([
-                        'manning_response_id' => $manningResponse->id,
-                        'position_id' => $positionId,
-                        'month' => $monthIndex + 1, // Months are 1-12
-                        'headcount' => $headcount,
-                        'vacantcount' => $validated['vacant_positions'][$positionId][$monthIndex] ?? 0,
-                        'filledcount' => $validated['filled_positions'][$positionId][$monthIndex] ?? 0,
-                    ]);
-                }
+            foreach ($monthRows as $row) {
+                PositionMonthlyData::create(['manning_response_id' => $manningResponse->id] + $row);
             }
 
             DB::commit(); // Commit the transaction

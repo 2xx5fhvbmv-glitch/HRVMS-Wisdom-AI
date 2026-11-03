@@ -6669,6 +6669,24 @@ class Common
      * 8 => 'GM' label) — 'position' only matches when the department is
      * literally named "General Manager"/"GM", which real GM records aren't.
      */
+    /**
+     * Request Manning year lock (founder spec 2026-11-03): pressing it in year Y asks for year Y+1's
+     * manning/budget; once the GM has approved Y+1's budget it stays closed until 1 Jan, when it moves
+     * on to Y+2. "Approved" = the same test as BudgetController's Revise-Budget lock (any department).
+     */
+    public static function manningRequestLock($resortId): array
+    {
+        $year = now()->year + 1;
+        $locked = DB::table('manning_responses as mr')->where('mr.resort_id', $resortId)->where('mr.year', $year)
+            ->where(fn ($q) => $q->whereIn('mr.budget_process_status', ['Approved', 'Completed', 'GM_Approved'])
+                ->orWhereExists(fn ($s) => $s->from('budget_statuses as bs')->whereColumn('bs.Budget_id', 'mr.id')
+                    ->where('bs.resort_id', $resortId)->whereIn('bs.status', ['Approved', 'Completed'])))
+            ->exists();
+
+        return ['year' => $year, 'locked' => $locked,
+            'message' => $locked ? "The {$year} budget has already been approved. You cannot request again." : null];
+    }
+
     public static function budgetAccessLevel($employee = null): string
     {
         if ($employee === null) {

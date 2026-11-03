@@ -888,7 +888,7 @@
                         $.each(errors.errors, function(key, error) { // Adjust according to your response format
                             errs += error + '<br>';
                         });
-                        toastr.error(errs, { positionClass: 'toast-bottom-right' });
+                        toastr.error(errs || (errors && errors.msg) || 'Failed to send manning request.', { positionClass: 'toast-bottom-right' });
                     }
                 });
             }
