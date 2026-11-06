@@ -12500,6 +12500,77 @@ class Common
         }
     }
 
+    /**
+     * Which of these route names the signed-in portal user may VIEW — the answer checkRouteWisePermission() gives one
+     * route at a time, for any number of routes, without its UNMAPPED_ROUTE logging. Built for the WAI Guide, which
+     * offers help for ~160 screens on every page: it decides which guides are offered, it is not access control (the
+     * route middleware still is).
+     *
+     * Same rules: super admin → everything; the Page Permission bypass routes → allowed; a route with a module_pages
+     * row (its menu page preferred over an in-page one) → allowed only with this position's view tick; a route with
+     * no row → the route_permissions map's default (allowed unless enforce_unmapped is on).
+     *
+     * Cost: 2 queries on a cache miss (every page + this position's ticks), 0 on a hit. Cached 5 minutes per resort
+     * and position; ResortInternalPermission::UpdateInternalPermissions clears it (forgetAllowedRoutes).
+     */
+    public static function allowedRouteNames(array $routeNames): array
+    {
+        $user = Auth::guard('resort-admin')->user();
+        if (!$user) {
+            return [];
+        }
+        $routeNames = array_values(array_unique(array_filter($routeNames, 'is_string')));
+        if ($user->type === 'super') {
+            return $routeNames;
+        }
+        $employee = $user->GetEmployee;
+        if (!$employee) {
+            return [];
+        }
+
+        $byRoute = \Cache::remember(self::allowedRoutesCacheKey($employee->resort_id, $employee->Position_id), 300, function () use ($employee) {
+            $ticks = ResortPagewisePermission::where('resort_id', $employee->resort_id)
+                ->whereHas('Resort_internal_pages', fn ($q) => $q->where('Permission_id', config('settings.resort_permissions.view'))
+                    ->where('position_id', $employee->Position_id))
+                ->get(['Module_id', 'page_permission_id'])
+                ->mapWithKeys(fn ($t) => [$t->Module_id . '|' . $t->page_permission_id => true])->all();
+            $routes = [];
+            foreach (ModulePages::where('type', 'normal')->whereIn('TypeOfPage', ['InsideOfMenu', 'InsideOfPage'])->whereNotNull('internal_route')
+                ->orderByRaw("TypeOfPage = 'InsideOfMenu' DESC")->get(['id', 'Module_Id', 'internal_route']) as $page) {
+                $routes[$page->internal_route] ??= isset($ticks[$page->Module_Id . '|' . $page->id]);   // menu page wins, as in checkRouteWisePermission
+            }
+            return $routes;
+        });
+
+        $bypass = ['resort.Page.Permission', 'resort.getMenuData'];
+        $map = config('route_permissions.map', []);
+        $enforce = (bool) config('route_permissions.enforce_unmapped', false);
+        return array_values(array_filter($routeNames, function ($route) use ($byRoute, $bypass, $map, $enforce) {
+            if (in_array($route, $bypass, true)) {
+                return true;
+            }
+            if (array_key_exists($route, $byRoute)) {
+                return $byRoute[$route];
+            }
+            if (!$enforce) {
+                return true;   // unmapped routes are allowed today (report-only), just not logged from here
+            }
+            [$owner, $required] = $map[$route] ?? [null, null];
+            return $owner === '*' && $required === 'any_authenticated' ? true : (bool) ($byRoute[$owner] ?? false);
+        }));
+    }
+
+    public static function allowedRoutesCacheKey($resortId, $positionId): string
+    {
+        return "wai-guide-allowed-{$resortId}-{$positionId}";
+    }
+
+    /** Call after a position's Page Permission ticks change, so allowedRouteNames() reflects them at once. */
+    public static function forgetAllowedRoutes($resortId, $positionId): void
+    {
+        \Cache::forget(self::allowedRoutesCacheKey($resortId, $positionId));
+    }
+
     public static function checkRouteWisePermission($routeName,$permission_id){
 
 

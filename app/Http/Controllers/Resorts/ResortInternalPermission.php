@@ -205,6 +205,7 @@ class ResortInternalPermission extends Controller
 
 
             DB::commit();
+            \App\Helpers\Common::forgetAllowedRoutes($resort_id, $position);   // WAI Guide reflects the new ticks at once
             $response['success'] = true;
             $response['msg'] = __('Resort Internal Page Permission granted successfully', ['name' => 'Permission']);
             return response()->json($response);
