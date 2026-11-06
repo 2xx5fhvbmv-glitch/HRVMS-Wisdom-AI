@@ -11,6 +11,13 @@ class Payroll extends Model
 {
     use HasFactory;
     protected $table = 'payroll';
+
+    /**
+     * The only run statuses a payslip (or the employee payroll dashboard) may come from (founder, 2026-11-06):
+     * a draft/pending/approved run can still change, so it is never shown as a payslip. Every payslip query —
+     * API\PayrollController and Resorts\Payroll\PayslipController — filters on this one list.
+     */
+    const PAYSLIP_STATUSES = ['locked'];
     protected $fillable = ['resort_id','payroll_category','start_date', 'end_date', 'status' ,'total_payroll','total_employees','draft_date','payment_date','city_ledger_file','payroll_unit'];
 
     public static function boot(){

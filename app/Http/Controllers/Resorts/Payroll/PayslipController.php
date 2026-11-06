@@ -156,7 +156,7 @@ class PayslipController extends Controller
             return response()->json(['success' => false, 'message' => 'Payslip not found']);
         }
 
-        // Fetch payroll details — prioritize locked/completed payrolls over drafts
+        // Locked runs only (Payroll::PAYSLIP_STATUSES) — a draft/pending run is not a payslip yet.
         $payroll = Payroll::join('payroll_employees as pe', 'pe.payroll_id', '=', 'payroll.id')
             ->where('pe.employee_id', $employeeId)
             ->where('payroll.resort_id', $resort_id)
@@ -168,7 +168,8 @@ class PayslipController extends Controller
                     $q2->whereMonth('payroll.start_date', $month)->whereYear('payroll.start_date', $year);
                 });
             })
-            ->orderByRaw("FIELD(payroll.status, 'locked', 'completed', 'approved', 'pending_approval', 'draft')")
+            ->whereIn('payroll.status', Payroll::PAYSLIP_STATUSES)
+            ->orderByDesc('payroll.id')
             ->first();
 
         if (!$payroll) {
@@ -281,7 +282,8 @@ class PayslipController extends Controller
         ->whereHas('employees', function($query) use ($employeeId) {
             $query->where('employee_id', $employeeId);
         })
-        ->orderByRaw("FIELD(status, 'locked', 'completed', 'approved', 'pending_approval', 'draft')")
+        ->whereIn('status', Payroll::PAYSLIP_STATUSES)
+        ->orderByDesc('id')
         ->first();
         // dd($payroll);
         if (!$payroll) {
@@ -353,6 +355,8 @@ class PayslipController extends Controller
             ->whereMonth('start_date', $month)
             ->whereYear('end_date', $year)
             ->whereHas('employees', fn($q) => $q->where('employee_id', $employeeId))
+            ->whereIn('status', Payroll::PAYSLIP_STATUSES)
+            ->orderByDesc('id')
             ->first();
 
         if (!$payroll) {

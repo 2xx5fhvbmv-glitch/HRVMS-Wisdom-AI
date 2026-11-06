@@ -56,6 +56,22 @@ class PayrollController extends Controller
         return Common::manningCategory($employee?->employment_type ?? '') === 'Casual' ? 'Casual' : 'Permanent';
     }
 
+    /**
+     * The payslip screens only show locked runs (Payroll::PAYSLIP_STATUSES). When this employee is in a newer
+     * run that isn't locked yet, "this month" says so instead of going blank (founder, 2026-11-06).
+     */
+    private function processingMessage(int $employeeId, string $payrollCategory, ?string $latestShownStart): ?string
+    {
+        $pending = Payroll::join('payroll_employees as pe', 'pe.payroll_id', '=', 'payroll.id')
+            ->where('pe.employee_id', $employeeId)
+            ->where('payroll.payroll_category', $payrollCategory)
+            ->whereNotIn('payroll.status', Payroll::PAYSLIP_STATUSES)
+            ->when($latestShownStart, fn ($q) => $q->where('payroll.start_date', '>', $latestShownStart))
+            ->exists();
+
+        return $pending ? "This month's payroll is still being processed." : null;
+    }
+
     public function payrollDashboard(Request $request)
     {
 
@@ -83,7 +99,7 @@ class PayrollController extends Controller
             // below) — pull the whole year from there instead of
             // recomputing anything.
             $monthlyReviews                             =   DB::table('payroll_reviews as pr')
-                                                            ->join('payroll as p', 'p.id', '=', 'pr.payroll_id')
+                                                            ->join('payroll as p', 'p.id', '=', 'pr.payroll_id')->whereIn('p.status', Payroll::PAYSLIP_STATUSES)
                                                             ->where('pr.employee_id', $employee_id)
                                                             ->whereYear('p.start_date', $year)
                                                             ->selectRaw('MONTH(p.start_date) as month_num, SUM(pr.earnings_basic) as basic, SUM(pr.earnings_overtime) as overtime, SUM(pr.service_charge) as service_charge')
@@ -111,12 +127,12 @@ class PayrollController extends Controller
             // Trend badge ("Last 12 Months +12%") — this year's total net
             // salary vs the prior year's, same employee.
             $currentYearNet                             =   (float) DB::table('payroll_reviews as pr')
-                                                            ->join('payroll as p', 'p.id', '=', 'pr.payroll_id')
+                                                            ->join('payroll as p', 'p.id', '=', 'pr.payroll_id')->whereIn('p.status', Payroll::PAYSLIP_STATUSES)
                                                             ->where('pr.employee_id', $employee_id)
                                                             ->whereYear('p.start_date', $year)
                                                             ->sum('pr.net_salary');
             $priorYearNet                                =   (float) DB::table('payroll_reviews as pr')
-                                                            ->join('payroll as p', 'p.id', '=', 'pr.payroll_id')
+                                                            ->join('payroll as p', 'p.id', '=', 'pr.payroll_id')->whereIn('p.status', Payroll::PAYSLIP_STATUSES)
                                                             ->where('pr.employee_id', $employee_id)
                                                             ->whereYear('p.start_date', $year - 1)
                                                             ->sum('pr.net_salary');
@@ -159,7 +175,7 @@ class PayrollController extends Controller
                                                             ->where('pe.employee_id',$employee_id)
                                                             // WP9 — this employee's own payroll_category (Casual vs
                                                             // Permanent/Intern), see employeePayrollCategory().
-                                                            ->where('payroll.payroll_category',$payrollCategory)
+                                                            ->where('payroll.payroll_category',$payrollCategory)->whereIn('payroll.status', Payroll::PAYSLIP_STATUSES)
                                                             // Was hardcoded to exactly last calendar month — if payroll
                                                             // for that specific month hasn't been run yet (a common lag;
                                                             // e.g. today is in August but the latest processed payroll
@@ -256,6 +272,7 @@ class PayrollController extends Controller
                     'payslip_end_date'                  => $payroll->end_date ?? 0,
                     ],
                     'net_salary'                        =>  number_format($payrollNetSalary,2),
+                    'current_period_message'            =>  $this->processingMessage($employee_id, $payrollCategory, $payroll->start_date ?? null),
                 ];
             
         return response()->json(['success' => true, 'message' => 'Payroll Employee Dashboard', 'payroll_data' => $data], 200);
@@ -288,7 +305,7 @@ class PayrollController extends Controller
                 ->where('pe.employee_id', $employee_id)
                 // WP9 — this employee's own payroll_category, see employeePayrollCategory().
                 ->where('payroll.payroll_category', $payrollCategory)
-                ->where('payroll.status', 'locked')
+                ->whereIn('payroll.status', Payroll::PAYSLIP_STATUSES)
                 ->selectRaw('DISTINCT YEAR(payroll.start_date) as year')
                 ->orderByDesc('year')
                 ->pluck('year');
@@ -356,7 +373,7 @@ class PayrollController extends Controller
                                                             })
                                                             ->where('pe.employee_id',$employee_id)
                                                             // WP9 — this employee's own payroll_category, see employeePayrollCategory().
-                                                            ->where('payroll.payroll_category',$payrollCategory)
+                                                            ->where('payroll.payroll_category',$payrollCategory)->whereIn('payroll.status', Payroll::PAYSLIP_STATUSES)
                                                             // Same "exactly last calendar month" bug as payrollDashboard()
                                                             // — shows the most recently processed period instead of
                                                             // demanding an exact match, so this header snapshot doesn't
@@ -364,9 +381,10 @@ class PayrollController extends Controller
                                                             // only) has real rows for the same employee.
                                                             ->orderBy('payroll.start_date', 'desc')
                                                             ->select(
-                                                                'payroll.id', 'ptaa.total_ot', 'pr.earnings_allowance',
+                                                                'payroll.id', 'payroll.start_date', 'ptaa.total_ot', 'pr.earnings_allowance',
                                                                 'pr.earnings_basic', 'pd.total_deductions'
                                                             )->first();
+            $currentPeriodMessage                       =   $this->processingMessage($employee_id, $payrollCategory, $payrollNetSalAndOT->start_date ?? null);
              // Ensure payroll data is always present
             $payrollNetSalAndOT                         =   (object) [
                 'id'                                    =>   $payrollNetSalAndOT->id ?? null,
@@ -398,7 +416,7 @@ class PayrollController extends Controller
                                                             })
                                                             ->where('pe.employee_id',$employee_id)
                                                             // WP9 — this employee's own payroll_category, see employeePayrollCategory().
-                                                            ->where('payroll.payroll_category',$payrollCategory)
+                                                            ->where('payroll.payroll_category',$payrollCategory)->whereIn('payroll.status', Payroll::PAYSLIP_STATUSES)
                                                             ->whereYear('payroll.start_date', $year)
                                                             ->select(
                                                                 'payroll.id',  'payroll.resort_id', 'payroll.start_date',
@@ -416,6 +434,7 @@ class PayrollController extends Controller
                     'employee_data'                     =>  $employee,
                     'payroll_net_sal_ot'                =>  $payrollNetSalAndOT,
                     'payslip_list_data'                 =>  $payroll,
+                    'current_period_message'            =>  $currentPeriodMessage,
                 ];
 
         return response()->json(['success' => true, 'message' => 'Payroll Employee Dashboard', 'payslip_data' => $data], 200);
@@ -480,7 +499,7 @@ class PayrollController extends Controller
                                                                 })
                                                                 ->where('pe.employee_id',$employee_id)
                                                                 // WP9 — this employee's own payroll_category, see employeePayrollCategory().
-                                                                ->where('payroll.payroll_category',$payrollCategory);
+                                                                ->where('payroll.payroll_category',$payrollCategory)->whereIn('payroll.status', Payroll::PAYSLIP_STATUSES);
                                                                 if($month) {
                                                                     // A pay period is labelled by the month it ENDS in
                                                                     // (e.g. 26 Feb - 25 Mar is "March's" payslip — matches
@@ -648,7 +667,7 @@ class PayrollController extends Controller
                                                                 })
                                                                 ->where('pe.employee_id',$employee_id)
                                                                 // WP9 — this employee's own payroll_category, see employeePayrollCategory().
-                                                                ->where('payroll.payroll_category',$payrollCategory);
+                                                                ->where('payroll.payroll_category',$payrollCategory)->whereIn('payroll.status', Payroll::PAYSLIP_STATUSES);
                                                                 if($month) {
                                                                     // A pay period is labelled by the month it ENDS in
                                                                     // (e.g. 26 Feb - 25 Mar is "March's" payslip — matches
