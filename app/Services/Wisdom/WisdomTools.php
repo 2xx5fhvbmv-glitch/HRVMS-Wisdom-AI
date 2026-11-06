@@ -81,12 +81,21 @@ class WisdomTools
             [
                 'question' => ['type' => 'string', 'description' => 'The policy or law question, in plain words (e.g. "notice period for termination", "annual leave carry forward").'],
             ], ['question']);
+        // How-to guidance reads screens, not resort data, so every tier gets it too.
+        $moduleGuide = self::fn('get_module_guide',
+            'How to do something in Wisdom AI (e.g. "how do I add a bed", "where do I apply leave", "how to create a duty roster"). Returns the pages of ONE module that this user can see in their menu, each with its menu path and the labels shown on that screen (tabs, buttons, pop-up titles, form fields). Call it BEFORE answering any how-to / where-is question, then build the steps only from what it returns. If you cannot tell which module the task belongs to, do not guess: ask the user and end your reply with [[pick_module]].',
+            [
+                'module' => ['type' => 'string', 'description' => 'Module name as in the menu, e.g. "Accommodation", "Leave", "Time and Attendance", "People", "Payroll", "Visa".'],
+                'task'   => ['type' => 'string', 'description' => 'What the user wants to do, in a few words (e.g. "add a bed", "apply annual leave"). Used to pick the most relevant pages.'],
+                'page'   => ['type' => 'string', 'description' => 'Optional page name, to read one page listed under other_pages_in_menu, e.g. "Configuration".'],
+            ], ['module', 'task']);
         if (empty($ctx['can_db'])) {
-            return [$policySearch];
+            return [$policySearch, $moduleGuide];
         }
 
         $tools = [
             $policySearch,
+            $moduleGuide,
             self::fn('get_headcount',
                 'Get the number of active employees at the resort. Optionally filter by a department name.',
                 [
@@ -531,6 +540,9 @@ class WisdomTools
         }
         if ($name === 'search_policy_documents') {
             return self::searchPolicyDocuments((int) $ctx['resort_id'], $args);
+        }
+        if ($name === 'get_module_guide') {
+            return ModuleGuide::guide($args);
         }
         if (empty($ctx['can_db'])) {
             return ['error' => 'Access denied: your role does not have database access.'];

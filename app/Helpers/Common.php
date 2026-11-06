@@ -9635,6 +9635,70 @@ class Common
 
        return ["menu"=>$menu,"resort_id"=>$resort_id];
     }
+
+    /**
+     * The navbar exactly as this resort-admin user sees it: every module with the
+     * menu pages their position has View permission on (super resorts see all).
+     * Shared by the navbar (MasterDashboardController::getMenuData) and Wisdom AI's
+     * how-to guide, so WAI never points a user at a page their menu doesn't show.
+     *
+     * @return array [['ModuleId', 'ModuleName', 'submenu' => [['Page_id','PageName','route','Type','TypeOfPage'], ...]], ...]
+     */
+    public static function visibleResortMenu($resortAdmin): array
+    {
+        $resort_id = $resortAdmin->resort_id;
+        $modules = Modules::get(['id as ModuleId', 'module_name as ModuleName']);
+        $allPages = ModulePages::where('TypeOfPage', 'InsideOfMenu')
+            ->where('type', 'normal')
+            ->where('status', 'Active')
+            ->whereNull('deleted_at')
+            ->orderBy('place_order', 'asc')
+            ->get(['page_name', 'id as Page_id', 'Module_Id', 'internal_route', 'type', 'TypeOfPage'])
+            ->groupBy('Module_Id');
+
+        $Position_id = $resortAdmin->GetEmployee->Position_id ?? null;
+        $Permission_id = config('settings.resort_permissions.view');
+        $allowedPages = [];
+        if ($Position_id) {
+            $allowedPages = \App\Models\ResortPagewisePermission::where('resort_id', $resort_id)
+                ->whereHas('resort_internal_pages', function ($query) use ($Permission_id, $Position_id) {
+                    $query->where('permission_id', $Permission_id)
+                        ->where('position_id', $Position_id);
+                })
+                ->get(['Module_id', 'page_permission_id'])
+                ->map(fn ($p) => $p->Module_id . '_' . $p->page_permission_id)
+                ->toArray();
+        }
+
+        // §35 — Casual Payroll only makes sense once a resort has opted
+        // into paying Casuals directly (the page itself already redirects
+        // away otherwise, but the doc calls for it not to appear in the
+        // menu at all under the lump-sum model, not just redirect-on-click).
+        $casualPaymentModel = \App\Models\ResortSiteSettings::where('resort_id', $resort_id)->value('casual_payment_model') ?? 'lump_sum';
+        $isSuperAdmin = ($resortAdmin->type === 'super');
+
+        $menu = [];
+        foreach ($modules as $m) {
+            $submenu = [];
+            foreach ($allPages->get($m->ModuleId, collect()) as $page) {
+                if ($page->internal_route === 'resort.casualPayroll.index' && $casualPaymentModel !== 'direct_pay') {
+                    continue;
+                }
+                if ($isSuperAdmin || in_array($m->ModuleId . '_' . $page->Page_id, $allowedPages)) {
+                    $submenu[] = [
+                        'Page_id' => $page->Page_id,
+                        'PageName' => $page->page_name,
+                        'route' => $page->internal_route,
+                        'Type' => $page->type,
+                        'TypeOfPage' => $page->TypeOfPage,
+                    ];
+                }
+            }
+            $menu[] = ['ModuleId' => $m->ModuleId, 'ModuleName' => $m->ModuleName, 'submenu' => $submenu];
+        }
+        return $menu;
+    }
+
     public static function GetResortMenuPage($ModuleId)
     {
         $pagesList  = ModulePages::where("Module_Id",$ModuleId)

@@ -153,7 +153,7 @@
       w.appendChild(l);
       return w;
     }
-    function answer(a, j) {
+    function answer(a, j, q) {
       var text = j.success ? j.reply : (j.message || 'Something went wrong. Please try again.');
       a.textContent = '';
       // Optional labels from the endpoint, rendered only when it sends them (see backend notes): label = "Company policy · leave", source = citation.
@@ -161,6 +161,7 @@
       var md = el('div', 'a-md');
       if (window.WaiMd) window.WaiMd.render(md, text, { thread: body, reveal: true }); else md.textContent = text;
       a.appendChild(md);
+      if (j.success && j.modules && j.modules.length && window.WaiMd) md.appendChild(window.WaiMd.modulePicker(j.modules, function (m) { if (!busy && !usageOut) exchange('In the ' + m + ' module: ' + q); }));
       if (j.success && j.source) { var s = el('div', 'a-src', 'Source · '); s.appendChild(el('b', '', j.source)); a.appendChild(s); }
     }
     function exchange(q) {
@@ -168,7 +169,7 @@
       var qb = el('div', 'q', q); body.appendChild(qb); window.WaiMd.tideIn(qb);
       var a = el('div', 'a'); a.appendChild(thinking()); body.appendChild(a); window.WaiMd.tideIn(a, 120);
       body.scrollTop = body.scrollHeight;
-      postJson(U.wai, { message: q }).then(function (j) { if (j && j.usage) applyUsage(j.usage); answer(a, j); })
+      postJson(U.wai, { message: q }).then(function (j) { if (j && j.usage) applyUsage(j.usage); answer(a, j, q); })
         .catch(function () { answer(a, { success: false, message: 'Something went wrong. Please try again.' }); })
         .then(function () { busy = false; body.scrollTop = body.scrollHeight; });
     }

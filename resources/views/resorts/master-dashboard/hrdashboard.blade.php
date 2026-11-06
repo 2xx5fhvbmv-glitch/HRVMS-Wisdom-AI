@@ -1065,7 +1065,7 @@
       body.scrollTop = body.scrollHeight;
       fetch(URLS.wai, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', body: JSON.stringify({ message: q }) })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
-        .then(function (j) { if (j && j.usage) applyUsage(j.usage); var md = el('div', 'a-md'); WaiMd.render(md, j.success ? j.reply : (j.message || 'Something went wrong. Please try again.'), { thread: body, reveal: true }); a.replaceChild(md, p); body.scrollTop = body.scrollHeight; })
+        .then(function (j) { if (j && j.usage) applyUsage(j.usage); var md = el('div', 'a-md'); WaiMd.render(md, j.success ? j.reply : (j.message || 'Something went wrong. Please try again.'), { thread: body, reveal: true }); a.replaceChild(md, p); if (j.success && j.modules && j.modules.length) md.appendChild(WaiMd.modulePicker(j.modules, function (m) { ask('In the ' + m + ' module: ' + q); })); body.scrollTop = body.scrollHeight; })
         .catch(function () { if (p.parentNode) a.replaceChild(el('p', '', 'Something went wrong. Please try again.'), p); });
     }
     function submitAsk() { var v = askInput.value.trim(); if (!v) return; body.textContent = ''; body._waiSubj = null; ask(v); open(); }

@@ -710,12 +710,25 @@
             if (res.body && res.body.usage) applyUsage(res.body.usage);
             if (res.ok && res.body.success) {
                 addMessage('assistant', res.body.reply, true);
+                if (res.body.modules && res.body.modules.length) showModulePicker(res.body.modules, text);
             } else {
                 addMessage('assistant', '⚠️ ' + (res.body.message || 'Something went wrong. Please try again.'));
             }
         })
         .catch(function () { hideTyping(); addMessage('assistant', '⚠️ Network error. Please try again.'); })
         .finally(function () { busy = false; sendBtn.disabled = usageOut || !input.value.trim(); if (!usageOut) input.focus(); });
+    }
+
+    // Module chips go inside the last answer bubble; picking one re-asks the question scoped to it.
+    function showModulePicker(modules, question) {
+        var bubbles = msgs.querySelectorAll('.wai-bot .a-md');
+        if (!bubbles.length) return;
+        bubbles[bubbles.length - 1].appendChild(WaiMd.modulePicker(modules, function (m) {
+            if (busy || usageOut) return;
+            input.value = 'In the ' + m + ' module: ' + question;
+            sendMessage();
+        }));
+        scrollDown();
     }
 
     function clearChat() {

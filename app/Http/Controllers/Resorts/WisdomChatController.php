@@ -118,6 +118,12 @@ class WisdomChatController extends Controller
         }
 
         [$reply, $label, $source] = self::splitSourceTag($result['reply']);
+        // How-to question whose module WAI couldn't tell: the UI shows the user's own modules as chips.
+        $modules = null;
+        if (preg_match('/\[\[\s*pick_module\s*\]\]/i', $reply)) {
+            $reply = rtrim(preg_replace('/\n?\[\[\s*pick_module\s*\]\]/i', '', $reply));
+            $modules = \App\Services\Wisdom\ModuleGuide::modules() ?: null;
+        }
         $history[] = ['role' => 'assistant', 'content' => $reply];
         session([self::SESSION_KEY => $this->trim($history)]);
 
@@ -130,6 +136,7 @@ class WisdomChatController extends Controller
             // Policy / employment-law answers only (leader dashboard shows them when present).
             'label'      => $label,
             'source'     => $source,
+            'modules'    => $modules,
         ], fn ($v) => $v !== null));
     }
 

@@ -1893,77 +1893,13 @@ class MasterDashboardController extends Controller
         $auth_id = isset($resort->GetEmployee) ? $resort->GetEmployee->id : 26;
         $active_url = $page_route ?: Route::currentRouteName();
 
-        // ── Optimized: Load everything in 3 queries instead of 70+ ──
-
-        // 1. All modules (1 query)
-        $modules = \App\Models\Modules::get(['id as ModuleId', 'module_name as ModuleName']);
-
-        // 2. All menu pages (1 query)
-        $allPages = \App\Models\ModulePages::where('TypeOfPage', 'InsideOfMenu')
-            ->where('type', 'normal')
-            ->where('status', 'Active')
-            ->whereNull('deleted_at')
-            ->orderBy('place_order', 'asc')
-            ->get(['page_name', 'id as Page_id', 'Module_Id', 'internal_route', 'type', 'TypeOfPage'])
-            ->groupBy('Module_Id');
-
-        // 3. All permissions for this user's position (1 query)
-        $Position_id = $resort->GetEmployee->Position_id ?? null;
-        $Permission_id = config('settings.resort_permissions.view');
-        $allowedPages = collect();
-        if ($Position_id) {
-            $allowedPages = \App\Models\ResortPagewisePermission::where('resort_id', $resort_id)
-                ->whereHas('resort_internal_pages', function ($query) use ($Permission_id, $Position_id) {
-                    $query->where('permission_id', $Permission_id)
-                        ->where('position_id', $Position_id);
-                })
-                ->get(['Module_id', 'page_permission_id'])
-                ->map(function ($p) {
-                    return $p->Module_id . '_' . $p->page_permission_id;
-                })
-                ->toArray();
-        }
-
         // Check if active URL matches any page
         $activePageModuleId = \App\Models\ModulePages::where('internal_route', $active_url)->value('Module_Id');
 
-        // §35 — Casual Payroll only makes sense once a resort has opted
-        // into paying Casuals directly (the page itself already redirects
-        // away otherwise, but the doc calls for it not to appear in the
-        // menu at all under the lump-sum model, not just redirect-on-click).
-        $casualPaymentModel = \App\Models\ResortSiteSettings::where('resort_id', $resort_id)->value('casual_payment_model') ?? 'lump_sum';
-
-        // Build menu in-memory (0 additional queries)
         $menu = ['menu' => [], 'resort_id' => $resort_id];
-        $isSuperAdmin = ($resort->type === 'super');
-
-        foreach ($modules as $m) {
-            $PageIsActive = ($activePageModuleId == $m->ModuleId) ? 'active' : 'inactive';
-
-            $modulePages = $allPages->get($m->ModuleId, collect());
-            $submenu = [];
-            foreach ($modulePages as $page) {
-                if ($page->internal_route === 'resort.casualPayroll.index' && $casualPaymentModel !== 'direct_pay') {
-                    continue;
-                }
-                $permKey = $m->ModuleId . '_' . $page->Page_id;
-                if ($isSuperAdmin || in_array($permKey, $allowedPages)) {
-                    $submenu[] = [
-                        'Page_id' => $page->Page_id,
-                        'PageName' => $page->page_name,
-                        'route' => $page->internal_route,
-                        'Type' => $page->type,
-                        'TypeOfPage' => $page->TypeOfPage,
-                    ];
-                }
-            }
-
-            $menu['menu'][] = [
-                'ModuleId' => $m->ModuleId,
-                'ModuleName' => $m->ModuleName,
-                'PageIsActive' => $PageIsActive,
-                'submenu' => $submenu,
-            ];
+        foreach (Common::visibleResortMenu($resort) as $m) {
+            $m['PageIsActive'] = ($activePageModuleId == $m['ModuleId']) ? 'active' : 'inactive';
+            $menu['menu'][] = $m;
         }
 
         if ($device === 'mobile') {

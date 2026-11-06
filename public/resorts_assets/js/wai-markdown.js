@@ -337,5 +337,18 @@ window.WaiMd = (function () {
       node.textContent = value; node.animate([{ transform: 'translateY(70%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 340, easing: TIDE });
     };
   }
-  return { render: render, tideIn: tideIn, roll: roll };
+  // "Which module?" reply: one .go pill per module in the user's menu (server sends `modules`).
+  // Append it inside the answer's .a-md; picking one removes the row and calls onPick(name).
+  function modulePicker(modules, onPick) {
+    var w = document.createElement('div');
+    w.className = 'modpick';
+    modules.forEach(function (m) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'go'; b.textContent = m;
+      b.addEventListener('click', function () { w.remove(); onPick(m); });
+      w.appendChild(b);
+    });
+    return w;
+  }
+  return { render: render, tideIn: tideIn, roll: roll, modulePicker: modulePicker };
 })();
