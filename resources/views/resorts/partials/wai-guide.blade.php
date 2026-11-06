@@ -7,6 +7,9 @@
 --}}
 @php
     $wgUser = Auth::guard('resort-admin')->user();
+@endphp
+@if ($wgUser)
+@php
     // Route names the guides can open: the keys of PG in wai-guide-content.js (so the list can never drift from the content).
     // Paths only, built once per version of that file; a name that no longer exists is left out and the guide says the screen isn't available.
     $wgFile = public_path('resorts_assets/js/wai-guide-content.js');
@@ -22,7 +25,7 @@
     });
     // Which of those screens this person can open. HR-department heads (Common::isHR) own the platform, so they get every guide and nothing is computed.
     // Everyone else gets exactly what their sidebar menu shows (same rule as MasterDashboardController::getMenuData: a "view" tick for their position on the menu page).
-    // $wgMenu = guide screens that are menu pages (global, built once per version of the content file); $wgAllowed = the ones this position may view (cached 5 min per position).
+    // $wgMenu = guide screens that are menu pages (global, built once per version of the content file); $wgAllowed = the ones this position may view.
     $wgHr = \App\Helpers\Common::isHR($wgUser->GetEmployee);
     $wgMenu = $wgAllowed = null;
     $wgPos = $wgUser->GetEmployee->Position_id ?? null;
@@ -33,15 +36,11 @@
                 ->where('TypeOfPage', 'InsideOfMenu')->where('type', 'normal')->where('status', 'Active')->whereNull('deleted_at')
                 ->get(['id', 'Module_Id', 'internal_route'])->mapWithKeys(fn ($p) => [$p->internal_route => $p->Module_Id . '_' . $p->id])->all();
         });
-        $wgTicks = Cache::remember('wai-guide-ticks-' . $wgUser->GetEmployee->resort_id . '-' . $wgPos, 300, function () use ($wgUser, $wgPos) {
-            return \App\Models\ResortPagewisePermission::where('resort_id', $wgUser->GetEmployee->resort_id)
-                ->whereHas('resort_internal_pages', fn ($q) => $q->where('permission_id', config('settings.resort_permissions.view'))->where('position_id', $wgPos))
-                ->get(['Module_id', 'page_permission_id'])->map(fn ($p) => $p->Module_id . '_' . $p->page_permission_id)->all();
-        });
-        $wgAllowed = array_keys(array_filter($wgMenu, fn ($k) => in_array($k, $wgTicks, true)));
+        // The view ticks come from Common::allowedRouteNames(): the same rule as checkRouteWisePermission(), 2 queries cached
+        // per resort + position, and the cache is cleared when HR saves Page Permissions (no 5-minute wait).
+        $wgAllowed = array_values(array_intersect(array_keys($wgMenu), \App\Helpers\Common::allowedRouteNames(array_keys($wgMenu))));
     }
 @endphp
-@if ($wgUser)
 <link rel="stylesheet" href="{{ URL::asset('resorts_assets/css/wai-guide.css') }}?v={{ @filemtime(public_path('resorts_assets/css/wai-guide.css')) }}">
 <button type="button" class="wg-notch" id="wg-notch" data-wga="notch" aria-label="Open the Guide"
         data-route="{{ Route::currentRouteName() }}" data-uid="{{ $wgUser->id }}" data-rank="{{ $wgUser->GetEmployee->rank ?? '' }}" data-hr="{{ $wgHr ? 1 : '' }}" data-name="{{ $wgUser->first_name }}" data-routes='@json($wgRoutes)'@if ($wgMenu !== null) data-menu='@json(array_keys($wgMenu))' data-allowed='@json($wgAllowed)'@endif

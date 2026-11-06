@@ -20,9 +20,12 @@ class WisdomPolicySearchTest extends TestCase
 
     public function test_every_tier_gets_policy_search_and_the_policy_tier_gets_only_that()
     {
-        $this->assertSame(['search_policy_documents'], $this->toolNames(['can_db' => false, 'can_payroll' => false]));
-        $this->assertContains('search_policy_documents', $this->toolNames(['can_db' => true, 'can_payroll' => false]));
-        $this->assertContains('search_policy_documents', $this->toolNames(['can_db' => true, 'can_payroll' => true]));
+        // + the how-to guide (077cfe737): it reads screens, not resort data, so every tier gets it too.
+        $this->assertSame(['search_policy_documents', 'get_module_guide'], $this->toolNames(['can_db' => false, 'can_payroll' => false]));
+        foreach ([['can_db' => true, 'can_payroll' => false], ['can_db' => true, 'can_payroll' => true]] as $ctx) {
+            $this->assertContains('search_policy_documents', $this->toolNames($ctx));
+            $this->assertContains('get_module_guide', $this->toolNames($ctx));
+        }
     }
 
     public function test_search_asks_the_ai_service_for_this_resort_and_returns_cited_passages()

@@ -127,6 +127,26 @@ class AllowedRouteNamesTest extends TestCase
         $this->assertSame([], Common::allowedRouteNames(self::BUDGET), 'nobody signed in');
     }
 
+    public function test_the_wai_guide_gets_the_ticked_menu_screens_and_sees_a_change_on_the_next_page()
+    {
+        $guideData = function () {
+            $html = $this->get(route('resort.master.hod_dashboard'))->assertOk()->getContent();
+            preg_match("/data-menu='([^']*)' data-allowed='([^']*)'/", $html, $m);
+            $this->assertNotEmpty($m, 'a non-HR user gets data-menu / data-allowed on the guide notch');
+            return [json_decode(html_entity_decode($m[1]), true), json_decode(html_entity_decode($m[2]), true)];
+        };
+        $this->untick('hod.kitchen');
+        $this->as('hod.kitchen');
+        [$menu, $allowed] = $guideData();
+        $this->assertSame([], $allowed, 'no ticks, no menu screens');
+        $budget = array_values(array_intersect(self::BUDGET, $menu));
+        $this->assertNotEmpty($budget, 'the guide has budget screens');
+
+        $this->tick('hod.kitchen', [$budget[0]]);
+        $this->as('hod.kitchen');
+        $this->assertSame([$budget[0]], $guideData()[1]);
+    }
+
     public function test_it_agrees_with_check_route_wise_permission_on_every_page()
     {
         // Every page in the system, half of this resort's ticked: the batch answer must equal the one-by-one answer.
