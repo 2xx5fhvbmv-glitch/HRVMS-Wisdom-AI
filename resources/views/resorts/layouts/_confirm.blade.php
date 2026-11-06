@@ -31,32 +31,38 @@
         margin: 0 0 8px !important;
     }
     .wisdom-swal-actions {
-        justify-content: flex-end !important;
+        justify-content: center !important;
         gap: 10px !important;
         width: 100% !important;
         margin: 18px 0 0 !important;
         padding: 0 28px !important;
     }
-    /* wisdomAlert has a single OK button (no cancel) — flex-end from the
-       shared class above would strand it in the bottom-right corner, so
-       center it instead. wisdomConfirm keeps flex-end (its two buttons,
-       reversed, read correctly right-aligned). */
+    /* Buttons are centred under the centred icon / title / text, for both wisdomConfirm (two buttons)
+       and wisdomAlert (one OK). The modifier below is kept for wisdomAlert's markup; it is now the same as the base. */
     .wisdom-swal-actions.wisdom-swal-actions-center {
         justify-content: center !important;
     }
     .wisdom-swal-confirm,
+    /* Same size / weight / border / press as .wai-btn (buttons.css), so dialog buttons match the rest of the app.
+       Confirm stays teal (lime would be too faint on a white dialog); Cancel uses the .wai-btn-ctx light look. */
     .wisdom-swal-cancel {
         margin: 0 !important;
-        padding: 11px 20px !important;
-        border-radius: 12px !important;
-        font-size: 14px;
-        font-weight: 700;
+        padding: 13px 18px !important;
+        border-radius: 13px !important;
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1;
+        border: 1.5px solid transparent !important;
         box-shadow: none !important;
+        transition: background .15s, border-color .15s, transform .12s;
     }
+    .wisdom-swal-confirm:active,
+    .wisdom-swal-cancel:active { transform: scale(.97); }
+    .wisdom-swal-confirm:focus-visible,
+    .wisdom-swal-cancel:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
     .wisdom-swal-confirm {
         background: var(--teal) !important;
         color: #fff !important;
-        border: none !important;
     }
     .wisdom-swal-confirm.wisdom-swal-confirm-destructive {
         background: var(--critical) !important;
@@ -65,11 +71,11 @@
         background: var(--positive) !important;
     }
     .wisdom-swal-cancel {
-        background: var(--neutral-bg) !important;
-        color: var(--ink) !important;
-        border: none !important;
-        font-weight: 600;
+        background: #f1f7f7 !important;
+        color: var(--teal) !important;
+        border-color: #E2EBEC !important;
     }
+    .wisdom-swal-cancel:hover { background: #E6F0F1 !important; border-color: #cfdcde !important; }
     .wisdom-swal-icon.wisdom-swal-icon-positive {
         background: var(--positive-bg) !important;
         color: var(--positive) !important;

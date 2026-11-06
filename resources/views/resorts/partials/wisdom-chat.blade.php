@@ -182,7 +182,7 @@
                     <div class="wai-subtitle" id="uc-thread-subtitle">&nbsp;</div>
                 </div>
                 <div class="wai-header-actions">
-                    <button type="button" id="uc-thread-info" class="wai-gbtn" title="Group info"><i class="fa-solid fa-circle-info"></i></button>
+                    <button type="button" id="uc-thread-info" class="wai-gbtn" title="Group info"><i class="fa-solid fa-gear"></i></button>
                 </div>
             </div>
             <div class="wai-messages" id="uc-messages"></div>
@@ -496,6 +496,10 @@
 #uc-panel .wai-header-actions button { background: rgba(255,255,255,.14); }
 #uc-panel .uc-back:hover,
 #uc-panel .wai-header-actions button:hover { background: rgba(255,255,255,.26); }
+/* Dark ink / muted grey are for the light WAI header; on this teal band the title and icons need to be light */
+#uc-panel .wai-title { color: #fff; }
+#uc-panel .wai-header .wai-gbtn { color: rgba(255,255,255,.92); }
+#uc-panel .wai-header .wai-gbtn:hover { color: #fff; }
 
 /* Search */
 #uc-panel .uc-search-box { display: flex; align-items: center; gap: 8px; background: var(--line-2); border: 1px solid var(--line); border-radius: 11px; padding: 8px 12px; }
@@ -1311,7 +1315,7 @@
         avatarEl.innerHTML = type === 'group'
             ? '<i class="fa-solid fa-user-group"></i>'
             : ucAvatarInner(profile, name);
-        document.getElementById('uc-thread-info').style.display = type === 'group' ? 'flex' : 'none';
+        document.getElementById('uc-thread-info').style.display = type === 'group' ? 'grid' : 'none';
         hideTypingIndicator();
         showView(viewThread);
         loadThread();

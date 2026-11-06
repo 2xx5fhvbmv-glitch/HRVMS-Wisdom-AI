@@ -268,6 +268,11 @@
 #ldmd .ld-card,#ldmd .wai-hero{break-inside:avoid}
 #ldmd .focus{display:none!important}}
 #ldmd .ai-card{padding:16px 18px}
+/* the list keeps a fixed height and scrolls, so a long inbox doesn't stretch the page */
+#ldmd #aiList{max-height:380px;overflow-y:auto;overflow-x:hidden;margin-right:-6px;padding-right:6px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b9dcdf transparent}
+#ldmd #aiList::-webkit-scrollbar{width:6px}
+#ldmd #aiList::-webkit-scrollbar-thumb{background:#b9dcdf;border-radius:6px}
+#ldmd #aiList::-webkit-scrollbar-track{background:transparent}
 #ldmd .ai-card button{font-family:inherit}
 #ldmd .ai-card svg{display:block}
 #ldmd .ai-h{display:flex;align-items:center;gap:8px;margin-bottom:12px}

@@ -490,6 +490,14 @@
         });
     }
 
+    // list() leaves module_name / remediation_ai / severity_ai out of rawColumns, so the server sends them already
+    // HTML-escaped ("Time &amp; Attendance", "Manager&#039;s"). Undo that once here; escHtml below re-escapes for output.
+    function unesc(s) {
+        return String(s == null ? '' : s).replace(/&(lt|gt|quot|#0?39|amp);/g, function (m, e) {
+            return { lt: '<', gt: '>', quot: '"', '#39': "'", '#039': "'", amp: '&' }[e];
+        });
+    }
+
     function extractRuleName(html) {
         var m = /<div class="cc-rule-name">([\s\S]*?)<\/div>/.exec(html || '');
         return m ? m[1] : '';
@@ -497,9 +505,9 @@
 
     function ruleCellHtml(row) {
         var name = extractRuleName(row.compliance_breached_name);
-        var sev = (row.severity_ai || '').trim();
+        var sev = unesc(row.severity_ai).trim();
         var color = SEV_COLORS[sev.toLowerCase()] || 'var(--faint)';
-        var mod = row.module_name || '';
+        var mod = unesc(row.module_name);
         var sub = [];
         if (sev) { sub.push('<span class="sevword" style="color:' + color + '">' + escHtml(sev) + '</span>'); }
         if (mod) { sub.push(escHtml(mod)); }
@@ -525,14 +533,14 @@
         var m = /<div class="cc-desc-text">([\s\S]*?)<\/div>/.exec(raw);
         var innerHtml = m ? m[1] : escHtml(raw);
         var plain = innerHtml.replace(/<[^>]+>/g, '').trim();
-        var fixText = row.remediation_ai ? String(row.remediation_ai).trim() : '';
+        var fixText = unesc(row.remediation_ai).trim();
         var btn = '';
         if (fixText) {
-            var rule = extractRuleName(row.compliance_breached_name).replace(/<[^>]+>/g, '');
+            var rule = unesc(extractRuleName(row.compliance_breached_name).replace(/<[^>]+>/g, '')); // popup title is set via textContent
             btn = '<button type="button" class="fixhint" data-rule="' + escHtml(rule) + '" data-fix="' + escHtml(fixText) + '" onclick="openFixPopup(event,this)">'
                 + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0012 2z"/></svg>AI suggested fix<span class="fx">&rsaquo;</span></button>';
         }
-        return '<div class="desc-r" title="' + escHtml(plain) + '">' + innerHtml + '</div>' + btn;
+        return '<div class="desc-r" title="' + escHtml(unesc(plain)) + '">' + innerHtml + '</div>' + btn;
     }
 
     // Backend renders reported_on as "09 Jun 2026" (Carbon's 'd M Y') —

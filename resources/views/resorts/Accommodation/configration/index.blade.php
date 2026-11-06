@@ -63,6 +63,7 @@
             'dq'    => (int) ($i->default_qty_per_unit ?? 0),
         ])->values(),
         'escalation' => optional($EscalationDay)->EscalationDay,
+        'alertSaved' => optional($EscalationDay)->default_occupancy_alert !== null,   // read by the WAI Guide to tick "Set the occupancy alert"
         'defaultAlert' => optional($EscalationDay)->default_occupancy_alert ?? 90,   // shared per resort; the Alerts tab saves it via urls.defaultAlert
         'cleaning'   => config('settings.CleaningSchedule'),
     ];
@@ -101,7 +102,7 @@
     <div class="acc">
       <section class="ac-card rail" aria-labelledby="blT">
         <div class="ch"><span class="t" id="blT">Buildings</span><span class="cnt" id="bc"></span>
-          <button class="ac-btn btn-main sm addtop" type="button" id="addB"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add building</button></div>
+          <button class="ac-btn btn-main sm addtop" type="button" id="addB" data-guide="bld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add building</button></div>
         <label class="bsrch" id="bsW" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="bs" placeholder="Search buildings" aria-label="Search buildings" autocomplete="off"></label>
         <div class="bfl" id="bfl" hidden></div>
         <div class="bl" id="bl"><div class="skel"></div></div>
@@ -122,7 +123,7 @@
         <div class="ch"><span class="t">Accommodation types</span><span class="cnt" id="tc"></span><a class="va" href="{{ route('resort.accommodation.config.AccommodationIndex') }}">View all</a></div>
         <div class="sub">The names you use for room sharing, like Single share or Four share. You pick one when you set up rooms, and set the number of beds there.</div>
         <div class="lst" id="tl"></div>
-        <div class="addrow"><input class="inp" id="tN" placeholder="e.g. Private, Triple share" maxlength="50" autocomplete="off" aria-label="New accommodation type"><button class="ac-btn btn-main" type="button" id="tAdd">Add type</button></div>
+        <div class="addrow" data-guide="types"><input class="inp" id="tN" placeholder="e.g. Private, Triple share" maxlength="50" autocomplete="off" aria-label="New accommodation type"><button class="ac-btn btn-main" type="button" id="tAdd">Add type</button></div>
         <div class="err" id="tE"></div>
       </section>
     </div>
@@ -149,7 +150,7 @@
         <div class="ch"><span class="t">Occupancy alert</span></div>
         <div class="sub">HR is notified when a room or a building is at least this full. New rooms start with this level, and you can change it for each room.</div>
         <div class="rng"><input type="range" min="50" max="100" step="5" value="90" id="aR" aria-label="Default occupancy alert"><b id="aV">90%</b></div>
-        <div class="ac-row" style="margin-top:16px"><button class="ac-btn btn-main" type="button" id="aSave">Save</button></div>
+        <div class="ac-row" style="margin-top:16px"><button class="ac-btn btn-main" type="button" id="aSave" data-guide="alerts">Save</button></div>
       </section>
       <section class="ac-card">
         <div class="ch"><span class="t">Escalation day</span></div>

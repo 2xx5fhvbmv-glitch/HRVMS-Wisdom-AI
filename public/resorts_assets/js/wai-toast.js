@@ -1,7 +1,8 @@
 /* WAI toast — one helper for every portal, paired with wai-toast.css.
  *
  *   wisdomToast(type, title, message, {list, sticky, undo, duration})
- *     type: 'ok'|'err'|'warn'|'info' (also accepts success/error/warning)
+ *     type: 'ok'|'err'|'warn'|'info'|'rej' (also accepts success/error/warning)
+ *           'rej' = a rejection / decline the user just made: red dot and bar, but no shake (nothing went wrong)
  *
  * It also defines a small `window.toastr` stand-in (success/error/warning/info
  * with toastr's (message, title, options) signature) so the existing calls
@@ -14,7 +15,7 @@
 (function (w, d) {
     var MAX = 3, DEFAULT_MS = 5000;
     var X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>';
-    var TYPE = { ok: 'ok', success: 'ok', err: 'err', error: 'err', warn: 'warn', warning: 'warn', info: 'info' };
+    var TYPE = { ok: 'ok', success: 'ok', err: 'err', error: 'err', warn: 'warn', warning: 'warn', info: 'info', rej: 'rej' };
     var EMPTY_TITLE = { ok: 'Done', err: 'Something went wrong', warn: 'Heads up', info: 'Notice' };
     var stack = null, shown = 0, queue = [];
 

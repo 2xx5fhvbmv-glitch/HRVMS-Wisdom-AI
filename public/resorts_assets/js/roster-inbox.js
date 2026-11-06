@@ -159,7 +159,7 @@ window.mountRosterInbox = function (o) {
               ITEMS.splice(Math.min(k, ITEMS.length), 0, x); counts(); render(); toast('info', 'Action undone', x.n + '’s request is back in your inbox.');
             });
           } } : {};
-          toast(ok ? 'ok' : 'info', ok ? 'Request approved' : 'Request rejected', x.n + '’s request ' + (x.r || '').replace('Request ', '') + ' has been ' + (ok ? 'approved.' : 'rejected.'), opts);
+          toast(ok ? 'ok' : 'rej', ok ? 'Request approved' : 'Request rejected', x.n + '’s request ' + (x.r || '').replace('Request ', '') + ' has been ' + (ok ? 'approved.' : 'rejected.'), opts);
         }, 280);
       }).catch(function () { b.disabled = false; toast('err', 'Couldn’t ' + (ok ? 'approve' : 'reject') + ' request', 'Nothing was changed. Please try again.'); });
     });

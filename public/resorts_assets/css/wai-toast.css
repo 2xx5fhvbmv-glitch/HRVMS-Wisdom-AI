@@ -15,7 +15,7 @@
 
 /* status dot — lines up with the first text line */
 .wt-dot{flex:none;width:8px;height:8px;border-radius:50%;margin-top:5px}
-.t-ok .wt-dot{background:#E0FF02}.t-err .wt-dot{background:#ff8f78}.t-warn .wt-dot{background:#D99A2B}.t-info .wt-dot{background:#7FBEC6}
+.t-ok .wt-dot{background:#E0FF02}.t-err .wt-dot{background:#ff8f78}.t-warn .wt-dot{background:#D99A2B}.t-info .wt-dot{background:#7FBEC6}.t-rej .wt-dot{background:#FF4B3E}
 
 /* text: title + message on one line; stacks when there's a list */
 .wt-b{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;font-size:12.5px;line-height:18px;overflow-wrap:anywhere}
@@ -39,7 +39,7 @@
 
 /* countdown bar — pauses while hovered or focused */
 .wt-p{position:absolute;left:0;bottom:0;height:2px;width:100%;transform-origin:left center;animation:wt-shrink var(--wt-dur,5s) linear forwards;will-change:transform}
-.t-ok .wt-p{background:#E0FF02}.t-err .wt-p{background:#ff8f78}.t-warn .wt-p{background:#D99A2B}.t-info .wt-p{background:#7FBEC6}
+.t-ok .wt-p{background:#E0FF02}.t-err .wt-p{background:#ff8f78}.t-warn .wt-p{background:#D99A2B}.t-info .wt-p{background:#7FBEC6}.t-rej .wt-p{background:#FF4B3E}
 .wt-stack .wt:hover .wt-p,.wt-stack .wt:focus-within .wt-p{animation-play-state:paused}
 
 /* motion: transform + opacity only (smooth in Safari) */
