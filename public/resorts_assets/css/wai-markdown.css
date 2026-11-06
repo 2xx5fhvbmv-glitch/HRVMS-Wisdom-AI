@@ -95,3 +95,25 @@
 .wai-quota.is-low{color:#B7791F}
 .wai-quota.is-out{color:#E5573F}
 @media (prefers-reduced-transparency:reduce){.a-md [data-tip]::after,.wai-quota[data-tip]::after{background:#14232A;backdrop-filter:none;-webkit-backdrop-filter:none}}
+
+/* ===== Roster: status chips + searchable name list (rosterTable in wai-markdown.js) ===== */
+.a-md .roster{border:1px solid var(--line,#E2EBEC);border-radius:12px;background:#fff;overflow:hidden;margin-top:10px}
+.a-md .rs-chips{display:flex;flex-wrap:wrap;gap:8px;padding:12px;border-bottom:1px solid var(--line-2,#EEF4F4);background:var(--teal-soft,#f1f7f7)}
+.a-md .rs-chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:20px;border:1px solid var(--line,#E2EBEC);background:#fff;font:inherit;font-size:12.5px;color:var(--g1,#3A4145);cursor:pointer;transition:background .15s,border-color .15s}
+.a-md .rs-chip:hover{border-color:var(--teal,#014653)}
+.a-md .rs-chip i{width:7px;height:7px;border-radius:50%;background:var(--g2,#6B7378)}
+.a-md .rs-chip.ok i{background:var(--ok,#1F9D6B)}
+.a-md .rs-chip.err i{background:var(--err,#E5573F)}
+.a-md .rs-chip.warn i{background:var(--warn,#B7791F)}
+.a-md .rs-chip .n{font-weight:600;color:var(--ink,#14232A);font-variant-numeric:tabular-nums}
+.a-md .rs-chip[aria-pressed="true"]{background:var(--teal,#014653);border-color:var(--teal,#014653);color:#fff}
+.a-md .rs-chip[aria-pressed="true"] .n{color:#fff}
+.a-md .rs-q{display:block;width:calc(100% - 24px);margin:12px 12px 4px;padding:8px 12px;border:1px solid var(--line,#E2EBEC);border-radius:10px;font:inherit;font-size:12.5px;color:var(--ink,#14232A);background:#fff;outline:none}
+.a-md .rs-q:focus{border-color:var(--teal,#014653)}
+.a-md .rs-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.a-md .rs-list.open{max-height:300px;overflow-y:auto}
+.a-md .rs-n{display:flex;align-items:center;gap:9px;padding:8px 14px;font-size:12.5px;color:var(--ink,#14232A);border-top:1px solid var(--line-2,#EEF4F4)}
+.a-md .rs-empty{grid-column:1/-1;padding:14px;font-size:12.5px;color:var(--muted,#5D6F75)}
+.a-md .rs-more{display:block;width:100%;padding:10px;border:0;border-top:1px solid var(--line-2,#EEF4F4);background:#fff;font:inherit;font-size:12.5px;font-weight:500;color:var(--teal-2,#035b6c);cursor:pointer}
+.a-md .rs-more:hover{background:var(--teal-soft,#f1f7f7)}
+.a-md .rs-more[hidden]{display:none}

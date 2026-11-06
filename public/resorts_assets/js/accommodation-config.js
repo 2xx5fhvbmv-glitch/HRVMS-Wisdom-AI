@@ -159,6 +159,13 @@
   /* ---------- buildings rail ---------- */
   var q = '', bf = 'all';
   function bstat(b) { var c = cnt(b); return c.rooms && c.set === c.rooms ? 'ready' : c.set ? 'part' : 'none'; }
+  /* tell the WAI Guide which setup steps the data already shows as done (no request: it reads what the page holds) */
+  function guideSync() {
+    var g = window.WAIGuide; if (!g) return;
+    if (TYPES.length) g.done('types'); if (B.length) g.done('bld');
+    if (B.some(function (b) { return bstat(b) === 'ready'; })) g.done('rooms');
+    if (CFG.alertSaved) g.done('alerts');
+  }
   function drawRail() {
     $('bc').textContent = B.length;
     var many = B.length >= 8; $('bsW').hidden = !many; $('bfl').hidden = !many; if (!many) { q = ''; bf = 'all'; }
@@ -209,8 +216,8 @@
     }
     var c = cnt(b), pct = c.rooms ? Math.round(c.set / c.rooms * 100) : 0, unset = c.rooms - c.set, floors = b.floors.slice().sort(function (x, y) { return y.f - x.f; });
     var prog = !c.rooms ? '<div class="prg"><div class="pgh"><span class="lb2">Room setup</span></div><div class="pgv"><b>0</b> rooms yet</div><button class="ac-btn btn-main" type="button" id="addF2">Add floors</button></div>' :
-      unset ? '<div class="prg"><div class="pgh"><span class="lb2">Room setup</span><span class="pgp">' + pct + '%</span></div><div class="pgv"><b>' + c.set + '</b> of ' + c.rooms + ' rooms set up' + (c.beds ? ' <span>· ' + c.beds + ' beds so far</span>' : '') + '</div><div class="pgb" aria-hidden="true"><i style="width:' + pct + '%"></i></div><button class="ac-btn btn-main" type="button" id="doUnset">Set up the other ' + unset + ' ' + (unset === 1 ? 'room' : 'rooms') + '</button></div>' :
-      '<div class="prg ok"><div class="pgh"><span class="lb2">Room setup</span><span class="pgp">✓ Ready</span></div><div class="pgv"><b>All ' + c.rooms + '</b> rooms set up <span>· ' + c.beds + ' beds</span></div><div class="pgb" aria-hidden="true"><i style="width:100%"></i></div><a class="ac-btn btn-ctx" href="' + esc(U.assign) + '">Assign staff →</a></div>';
+      unset ? '<div class="prg"><div class="pgh"><span class="lb2">Room setup</span><span class="pgp">' + pct + '%</span></div><div class="pgv"><b>' + c.set + '</b> of ' + c.rooms + ' rooms set up' + (c.beds ? ' <span>· ' + c.beds + ' beds so far</span>' : '') + '</div><div class="pgb" aria-hidden="true"><i style="width:' + pct + '%"></i></div><button class="ac-btn btn-main" type="button" id="doUnset" data-guide="rooms">Set up the other ' + unset + ' ' + (unset === 1 ? 'room' : 'rooms') + '</button></div>' :
+      '<div class="prg ok"><div class="pgh"><span class="lb2">Room setup</span><span class="pgp">✓ Ready</span></div><div class="pgv"><b>All ' + c.rooms + '</b> rooms set up <span>· ' + c.beds + ' beds</span></div><div class="pgb" aria-hidden="true"><i style="width:100%"></i></div><a class="ac-btn btn-ctx" data-guide="assign" href="' + esc(U.assign) + '">Assign staff →</a></div>';
     el.innerHTML = '<div class="bh"><div class="bid"><div class="bt" id="bt"><h2>' + esc(b.name) + '</h2><button class="ib" type="button" id="ren" aria-label="Rename building" data-tip="Rename">' + ICON.pen + '</button></div>' +
       '<div class="facts"><span>' + c.fl + ' ' + (c.fl === 1 ? 'floor' : 'floors') + '</span><span>' + c.rooms + ' ' + (c.rooms === 1 ? 'room' : 'rooms') + '</span><span>' + numLabel(b) + '</span></div>' +
       '<div class="bgf"><span class="lb2">For</span><div class="seg sm" role="radiogroup" aria-label="Who this building is for">' + ['M', 'F', 'X'].map(function (g) { var why = gBlock(b, g);
@@ -567,7 +574,7 @@
         res.done.forEach(function (g) { if (g.fresh) stock(items, g.rooms.length, 1); else if (itemsT) g.rooms.forEach(function (r) { stock(oldItems[r.s.aid] || {}, 1, -1); stock(items, 1, 1); }); });
         busy = false;
         return reload({ s: true }).then(function () {
-          selClear(); res.fail.forEach(function (f) { sel[key(f.room.f, f.room.no)] = 1; }); drawMain();
+          guideSync(); selClear(); res.fail.forEach(function (f) { sel[key(f.room.f, f.room.no)] = 1; }); drawMain();
           var saved = rs.length - res.fail.length;
           if (res.fail.length) {
             failed = res.fail.map(function (f) { var rr = picked().filter(function (x) { return x.f === f.room.f && x.no === f.room.no; })[0] || f.room; return { no: f.no, msg: f.msg, room: rr }; });
@@ -613,7 +620,7 @@
     }).then(function (res) {
       var made = []; res.done.forEach(function (g) { stock(g.items, g.rooms.length, 1); g.rooms.forEach(function (r) { made.push({ f: r.f, no: r.no, items: g.items }); }); });
       reload({ s: true }).then(function () {
-        var n = made.length; if (!n) return toastErr(res.fail[0] ? res.fail[0].msg : 'Nothing could be copied');
+        guideSync(); var n = made.length; if (!n) return toastErr(res.fail[0] ? res.fail[0].msg : 'Nothing could be copied');
         if (res.fail.length) toast(res.fail.length + ' rooms couldn’t be copied: ' + res.fail[0].msg, null, 'warn');
         toast(n + ' ' + (n === 1 ? 'room' : 'rooms') + ' on ' + fname(f) + ' set up like ' + fname(f - 1), function () {
           var nb = B.filter(function (x) { return x.id === b.id; })[0], ids = [];
@@ -730,7 +737,7 @@
     mBusySet(false); $('md').classList.remove('on'); $('md').setAttribute('aria-hidden', 'true'); $('scrim').classList.remove('on');
     cur = bid; selClear();
     reload({ b: true }).then(function () {
-      drawAll(!!nb);
+      drawAll(!!nb); guideSync();
       if (nb) toast(nb.name + ' added · ' + nb.floors + ' floors, ' + nb.rooms + ' rooms', function () { http('DELETE', tpl(U.buildingDestroy, b64(bid))).then(function (r) { if (r.ok) { cur = null; reload({ b: true }); toast(nb.name + ' removed'); } else toastErr(msgOf(r)); }); });
       else toast(nFloors + ' ' + (nFloors === 1 ? 'floor' : 'floors') + ' added to ' + bldg().name, function () { delRooms(bid, rooms).then(function (res) { if (res.ok) { reload(); toast('Floors removed'); } }); });
     });
@@ -760,7 +767,7 @@
   $('tN').addEventListener('input', function () { var v = $('tN').value.trim(); errIn('tE', v && TYPES.some(function (t) { return t.n.toLowerCase() === v.toLowerCase(); }) ? v + ' already exists' : ''); });
   $('tAdd').onclick = function () {
     var v = $('tN').value.trim(); if (!v) { errIn('tE', 'Give the type a name'); return; } if (TYPES.some(function (t) { return t.n.toLowerCase() === v.toLowerCase(); })) { errIn('tE', v + ' already exists'); return; }
-    http('POST', U.typeStore, { AccommodationName: v, Color: '#014653' }).then(function (r) { if (!r.ok) return errIn('tE', msgOf(r)); errIn('tE', ''); $('tN').value = ''; loadTypes().then(function () { drawTypes(); toast(v + ' added'); }); });
+    http('POST', U.typeStore, { AccommodationName: v, Color: '#014653' }).then(function (r) { if (!r.ok) return errIn('tE', msgOf(r)); errIn('tE', ''); $('tN').value = ''; loadTypes().then(function () { drawTypes(); toast(v + ' added'); guideSync(); }); });
   };
   function drawCats() { $('cc').textContent = CATS.length; $('cl').innerHTML = CATS.length ? CATS.map(function (c) { return '<span>' + esc(c.n) + '<button type="button" data-dc="' + c.id + '" aria-label="Remove ' + esc(c.n) + '">' + ICON.x + '</button></span>'; }).join('') : '<div class="side-empty">No categories yet.</div>'; }
   $('cl').addEventListener('click', function (e) {
@@ -779,7 +786,7 @@
   $('aR').addEventListener('input', function (e) { $('aV').textContent = e.target.value + '%'; });
   $('aSave').onclick = function () {
     var v = +$('aR').value;
-    http('POST', U.defaultAlert, { default_occupancy_alert: v }).then(function (r) { if (!r.ok) return toastErr(msgOf(r)); DEF_ALERT = v; toast('Occupancy alert saved · new rooms start at ' + v + '%'); });
+    http('POST', U.defaultAlert, { default_occupancy_alert: v }).then(function (r) { if (!r.ok) return toastErr(msgOf(r)); DEF_ALERT = v; CFG.alertSaved = true; guideSync(); toast('Occupancy alert saved · new rooms start at ' + v + '%'); });
   };
   (function () { var i = $('eS').querySelector('input'); if (CFG.escalation != null && +CFG.escalation > 0) i.value = Math.max(1, Math.min(30, +CFG.escalation)); })();
   $('eS').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; var i = $('eS').querySelector('input'); i.value = Math.max(1, Math.min(30, +i.value + +b.dataset.d)); });
@@ -803,7 +810,7 @@
           var j = r.json || {}, errs = j.errors ? (Array.isArray(j.errors) ? j.errors : Object.keys(j.errors).map(function (k) { return j.errors[k]; })) : [];
           var lines = errs.map(function (x) { return typeof x === 'string' ? x : JSON.stringify(x); });
           res.innerHTML = (r.ok ? '<div class="uok">' + esc(j.message || 'Uploaded') + '</div>' : '<div class="uerr"><b>' + esc(j.message || 'The upload didn’t go through') + '</b></div>') + (lines.length ? '<div class="uerr">' + lines.slice(0, 8).map(esc).join('<br>') + (lines.length > 8 ? '<br>…and ' + (lines.length - 8) + ' more' : '') + '</div>' : '');
-          if (r.ok) { toast(j.message || 'Upload finished'); if (kind === 'rooms') reload({ b: true, s: true }); }
+          if (r.ok) { toast(j.message || 'Upload finished'); if (kind === 'rooms') reload({ b: true, s: true }).then(guideSync); }
         });
     }
     box.querySelector('[data-pick]').addEventListener('click', function () { file.click(); });
@@ -830,7 +837,7 @@
   var t0 = (location.hash || '').slice(1); if (t0 && tabs.querySelector('[data-t="' + t0 + '"]')) switchTab(t0, true); else moveInd(tabs.querySelector('.on'), true);
   drawTypes(); drawCats();
   Promise.all([loadTree(), loadSetups(), loadCats().catch(function () { })]).then(function () {
-    loaded = true; build(); cur = B[0] ? B[0].id : null; drawAll(true); drawCats(); tide(root.querySelectorAll('#p-rooms .ac-card'));
+    loaded = true; build(); cur = B[0] ? B[0].id : null; drawAll(true); drawCats(); tide(root.querySelectorAll('#p-rooms .ac-card')); guideSync();
   }).catch(function (e) {
     loaded = true; $('main').innerHTML = '<div class="onb"><div class="et">Couldn’t load your buildings</div><div class="es">' + esc(e && e.message ? e.message : 'Please check your connection.') + '</div><div class="ac-row"><button class="ac-btn btn-main" type="button" onclick="location.reload()">Try again</button></div></div>';
     $('bl').innerHTML = '';

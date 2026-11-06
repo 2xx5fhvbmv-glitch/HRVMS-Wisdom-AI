@@ -811,6 +811,11 @@
 #hrmd .tl-who .rs-ps{display:none}}
 
 #hrmd .ai-card{padding:16px 18px}
+/* the list keeps a fixed height and scrolls, so a long inbox doesn't stretch the page */
+#hrmd #aiList{max-height:380px;overflow-y:auto;overflow-x:hidden;margin-right:-6px;padding-right:6px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b9dcdf transparent}
+#hrmd #aiList::-webkit-scrollbar{width:6px}
+#hrmd #aiList::-webkit-scrollbar-thumb{background:#b9dcdf;border-radius:6px}
+#hrmd #aiList::-webkit-scrollbar-track{background:transparent}
 #hrmd .ai-card button{font-family:inherit}
 #hrmd .ai-card svg{display:block}
 #hrmd .ai-h{display:flex;align-items:center;gap:8px;margin-bottom:12px}

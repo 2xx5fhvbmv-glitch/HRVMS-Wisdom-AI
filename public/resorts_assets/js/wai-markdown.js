@@ -50,10 +50,58 @@ window.WaiMd = (function () {
   // Any 2-column table is a key/value table (.acc). Its header row is dropped when it only says "Field / Value" (or is
   // blank); a header with real content ("Building | Building B") is treated as the first fact. Wider tables -> .tbl.
   function mdTable(box, head, rows, cls) {
+    if (rosterTable(box, head, rows)) return;
     var ncol = head ? head.length : (rows[0] ? rows[0].length : 0);
     if (ncol !== 2) return listTable(box, head, rows);
     if (head && !(GENERIC_K.test(plain(head[0])) && GENERIC_V.test(plain(head[1])))) rows = [head].concat(rows);
     return accTable(box, rows);
+  }
+  // "Status | Count | Employees" where the Employees cell is one long comma-separated list (attendance register): a chip per
+  // status, and the picked status's names below as a searchable list. Cells with no names (—) get no chip. Returns false
+  // for every other table. Once the tool returns one row per person (Name | ID | Position), the normal list table takes over.
+  var ROSTER_COL = /^(employees?|staff|names?|people)$/i, ROSTER_TONE = { present: 'ok', absent: 'err', 'on leave': 'warn', unverified: 'warn' };
+  function rosterTable(box, head, rows) {
+    var ni = -1, live, cur, wrap, chips, panel;
+    if (!head) return false;
+    head.forEach(function (h, i) { if (ni < 0 && ROSTER_COL.test(plain(h))) ni = i; });
+    if (ni < 1) return false;
+    live = rows.map(function (r) {
+      var cell = plain(r[ni]);
+      return { label: plain(r[0]), names: /^[—–-]?$/.test(cell) ? [] : cell.split(/\s*,\s*/).filter(Boolean) };
+    }).filter(function (g) { return g.names.length; });
+    if (!live.some(function (g) { return g.names.length >= 8; })) return false;
+    cur = live.reduce(function (a, g) { return g.names.length > a.names.length ? g : a; }, live[0]);
+    wrap = el('div', 'roster'); chips = el('div', 'rs-chips'); panel = el('div', 'rs-panel');
+    function show(g) {
+      var q = '', open = false, list = el('div', 'rs-list'), more = el('button', 'rs-more'), inp;
+      panel.textContent = '';
+      if (g.names.length > 12) {
+        inp = el('input', 'rs-q'); inp.type = 'search'; inp.placeholder = 'Search ' + g.names.length + ' names'; inp.setAttribute('aria-label', 'Search names');
+        inp.addEventListener('input', function () { q = inp.value.trim().toLowerCase(); draw(); });
+        panel.appendChild(inp);
+      }
+      more.type = 'button'; more.addEventListener('click', function () { open = true; list.classList.add('open'); draw(); });
+      function draw() {
+        var hit = g.names.filter(function (n) { return !q || n.toLowerCase().indexOf(q) >= 0; }), cut = open || q || hit.length <= 12 ? hit : hit.slice(0, 12);
+        list.textContent = '';
+        cut.forEach(function (n) { var c = el('div', 'rs-n'); c.appendChild(el('span', 'av sm', initials(n))); c.appendChild(el('span', '', n)); list.appendChild(c); });
+        if (!hit.length) list.appendChild(el('div', 'rs-empty', 'No name matches'));
+        more.textContent = 'Show all ' + hit.length; more.hidden = cut.length === hit.length;
+      }
+      panel.appendChild(list); panel.appendChild(more); draw();
+    }
+    live.forEach(function (g) {
+      var b = el('button', 'rs-chip ' + (ROSTER_TONE[g.label.toLowerCase()] || 'muted')), on = g === cur;
+      b.type = 'button'; b.setAttribute('aria-pressed', on);
+      b.appendChild(el('i')); b.appendChild(el('span', 'l', g.label)); b.appendChild(el('span', 'n', String(g.names.length)));
+      b.addEventListener('click', function () {
+        Array.prototype.forEach.call(chips.children, function (c) { c.setAttribute('aria-pressed', c === b); });
+        show(g);
+      });
+      chips.appendChild(b);
+    });
+    wrap.appendChild(chips); wrap.appendChild(panel); box.appendChild(wrap); show(cur);
+    return true;
   }
   function accTable(box, rows) {
     var acc = el('div', 'acc');

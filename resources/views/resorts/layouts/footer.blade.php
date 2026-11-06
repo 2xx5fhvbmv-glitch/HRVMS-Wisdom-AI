@@ -81,3 +81,5 @@
 <script src="{{ URL::asset('resorts_assets/js/wai-markdown.js') }}?v={{ @filemtime(public_path('resorts_assets/js/wai-markdown.js')) }}"></script>
 {{-- Wisdom AI — floating HR assistant (self-gates by access tier) --}}
 @include('resorts.partials.wisdom-chat')
+{{-- WAI Guide — edge notch + in-app guides (loads its own CSS/JS) --}}
+@include('resorts.partials.wai-guide')
