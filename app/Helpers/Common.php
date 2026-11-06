@@ -9270,6 +9270,29 @@ class Common
         return round($tax, 2);
     }
 
+    /**
+     * employees.id of those due a share of the month's service-charge pool: Permanent (never Intern/Casual), not
+     * already paid out in a finalized F&F settlement, on an active benefit grid with service charge. Used by the
+     * payroll calculation (PayrollController::computePayroll) and the demo payroll seeder.
+     */
+    public static function serviceChargeEligibleIds($resortId, array $employeeIds): array
+    {
+        $employees = \App\Models\Employee::where('resort_id', $resortId)->whereIn('id', $employeeIds)->get(['id', 'rank', 'benefit_grid_level', 'Position_id', 'employment_type']);
+        $settled = DB::table('final_settlements')->whereIn('employee_id', $employees->pluck('id')->all())
+            ->where('status', 'finalized')->pluck('employee_id')->flip()->all();
+        $ids = [];
+        foreach ($employees as $employee) {
+            if (isset($settled[$employee->id]) || self::manningCategory($employee->employment_type ?? '') !== 'Permanent') {
+                continue;
+            }
+            $grade = self::resolveEmpGrade($resortId, $employee->rank, $employee->benefit_grid_level, $employee->Position_id);
+            if (\App\Models\ResortBenifitGrid::where('resort_id', $resortId)->where('emp_grade', $grade)->where('service_charge', 1)->where('status', 'Active')->exists()) {
+                $ids[] = (int) $employee->id;
+            }
+        }
+        return $ids;
+    }
+
     public static function getServiceCharge($employee_id, $resortId, $payrollId, $employee = null){
         // $resortId was accepted but never used — payroll_service_charges
         // has no resort_id column of its own, so ownership is verified via

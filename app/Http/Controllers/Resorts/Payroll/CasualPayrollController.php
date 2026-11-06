@@ -152,6 +152,16 @@ class CasualPayrollController extends Controller
             return abort(403, 'Unauthorized access');
         }
 
+        return $this->casualRows($request);
+    }
+
+    /**
+     * The calculation behind fetchTimeAttendance(), without the page-permission check — also run by the payroll
+     * save steps and every approval step's re-check (PayrollController::computePayroll, G1), where the approver
+     * (e.g. the GM) needn't have access to the Casual run page.
+     */
+    public function casualRows(Request $request)
+    {
         $resort_id = $this->resort->resort_id;
 
         $request->validate([

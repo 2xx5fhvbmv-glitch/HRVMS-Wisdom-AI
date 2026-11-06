@@ -143,11 +143,16 @@ class DemoPayrollSeeder
             ];
         }
 
-        // Service charge: the month's pool shared by days worked, floored to cents, the last person takes the remainder.
+        // Service charge: the month's pool shared by days worked among those eligible (Common::serviceChargeEligibleIds,
+        // as the payroll calculation does), floored to cents, the last person takes the remainder.
         $pool = round(self::SC_POOL[$start->month] * mt_rand(90, 110) / 100, -2);
-        $workdays = array_sum(array_column($lines, 'workdays')) ?: 1;
+        $ids = Common::serviceChargeEligibleIds($this->resortId, array_keys($lines));
+        sort($ids);
+        $workdays = array_sum(array_map(fn ($id) => $lines[$id]['workdays'], $ids)) ?: 1;
         $shared = 0.0;
-        $ids = array_keys($lines);
+        foreach (array_keys($lines) as $id) {
+            $lines[$id]['sc'] = 0.0;
+        }
         foreach ($ids as $n => $id) {
             $lines[$id]['sc'] = $n === count($ids) - 1 ? round($pool - $shared, 2) : floor($pool * $lines[$id]['workdays'] / $workdays * 100) / 100;
             $shared += $lines[$id]['sc'];

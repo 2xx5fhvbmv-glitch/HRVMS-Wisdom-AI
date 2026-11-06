@@ -83,8 +83,10 @@
 
   {{-- Step 4 — deductions --}}
   <section class="panel cpx-card" data-step="4" id="cp-step-deductions">
-    <div class="ch"><div class="idx">4</div><div><div class="ht">Deductions</div><div class="hs">Amounts withheld per casual, in {{ $currency }}</div></div></div>
+    <div class="ch"><div class="idx">4</div><div><div class="ht">Deductions</div><div class="hs">Amounts withheld per casual, in {{ $currency }} — attendance, advance, pension and EWT are worked out when you save; city ledger and "Other" are yours to enter</div></div></div>
     <div class="cbody">
+      <div class="mb-2"><input type="text" class="form-control form-control-sm" id="cp-ded-reason" maxlength="500"
+          placeholder="Reason for the city ledger / Other amounts (required when they change)" aria-label="Reason for the city ledger and Other amounts"></div>
       <div class="scrollwrap">
         <table class="etbl mid" id="cp-deductions-table">
           <thead><tr class="single"><th class="emp" style="text-align:left">Employee</th><th>Attendance</th><th>City ledger</th><th>Advance / loan</th><th>Pension</th><th>EWT</th><th>Other</th><th class="gsep">Total</th></tr></thead>
@@ -372,7 +374,7 @@
                 toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
                 cpGo(3);
             },
-            error: function () { toastr.error('Could not save employees.', 'Error', { positionClass: 'toast-bottom-right' }); }
+            error: function (xhr) { toastr.error((xhr.responseJSON && xhr.responseJSON.message) || 'Could not save employees.', 'Error', { positionClass: 'toast-bottom-right' }); }
         });
     });
 
@@ -421,7 +423,7 @@
                 cpRenderDeductions();
                 cpGo(3);
             },
-            error: function () { toastr.error('Could not load earnings.', 'Error', { positionClass: 'toast-bottom-right' }); }
+            error: function (xhr) { toastr.error((xhr.responseJSON && xhr.responseJSON.message) || 'Could not load earnings.', 'Error', { positionClass: 'toast-bottom-right' }); }
         });
     });
 
@@ -452,12 +454,15 @@
                 toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
                 cpGo(4);
             },
-            error: function () { toastr.error('Could not save attendance.', 'Error', { positionClass: 'toast-bottom-right' }); }
+            error: function (xhr) { toastr.error((xhr.responseJSON && xhr.responseJSON.message) || 'Could not save attendance.', 'Error', { positionClass: 'toast-bottom-right' }); }
         });
     });
 
-    // ---- Step 4 — deductions (live totals are display-only; the server recomputes on save) ----
+    // ---- Step 4 — deductions (G1: only city ledger and "Other" are entered here, with a reason; the rest are
+    // worked out on the server and shown once saved) ----
     const CP_DED_FIELDS = ['attendanceDeduction', 'cityLedger', 'advanceLoan', 'pension', 'ewt', 'other'];
+    const CP_DED_INPUTS = ['cityLedger', 'other'];
+    const CP_DED_SERVER = { attendanceDeduction: 'attendance_deduction', cityLedger: 'city_ledger', advanceLoan: 'advance_loan', pension: 'pension', ewt: 'ewt', other: 'other' };
 
     function cpDeductionTotal(d) {
         return (parseFloat(d.attendanceDeduction) || 0) + (parseFloat(d.cityLedger) || 0) + (parseFloat(d.advanceLoan) || 0)
@@ -482,7 +487,9 @@
             cpDeductionsData[e.id] = cpDeductionsData[e.id] || { attendanceDeduction: e.absent_deduction, cityLedger: 0, advanceLoan: 0, pension: 0, ewt: 0, other: 0 };
             const d = cpDeductionsData[e.id];
             return `<tr data-emp-code="${cpEsc(e.id)}">${cpEmpCell(e.name)}
-                ${CP_DED_FIELDS.map(f => `<td><input type="number" step="0.01" class="dinput cp-ded" data-field="${f}" value="${cpEsc(d[f])}"></td>`).join('')}
+                ${CP_DED_FIELDS.map(f => CP_DED_INPUTS.includes(f)
+                    ? `<td><input type="number" step="0.01" min="0" class="dinput cp-ded" data-field="${f}" value="${cpEsc(d[f])}"></td>`
+                    : `<td class="cpx-num">${cpMoney(d[f])}</td>`).join('')}
                 <td class="cp-ded-total gsep rowtot">${cpMoney(cpDeductionTotal(d))}</td>
             </tr>`;
         }).join('') || '<tr><td colspan="8" class="empty">Load earnings to enter deductions.</td></tr>');
@@ -514,14 +521,23 @@
         $.ajax({
             url: '{{ route('payroll.saveDeductions') }}',
             type: 'POST',
-            data: { payroll_id: cpPayrollId, DeductionData: deductionData, _token: '{{ csrf_token() }}' },
+            data: { payroll_id: cpPayrollId, DeductionData: deductionData, reason: $('#cp-ded-reason').val(), _token: '{{ csrf_token() }}' },
             success: function (res) {
                 if (!res.success) { toastr.error(res.message, 'Error', { positionClass: 'toast-bottom-right' }); return; }
+                // The server's figures (pension, EWT, advance, totals) replace what was on screen.
+                Object.keys(res.rows || {}).forEach(function (code) {
+                    if (!cpDeductionsData[code]) return;
+                    Object.keys(CP_DED_SERVER).forEach(function (f) { cpDeductionsData[code][f] = res.rows[code].deductions[CP_DED_SERVER[f]]; });
+                });
+                cpRenderDeductions();
                 toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
                 cpRenderReview();
                 cpGo(5);
             },
-            error: function () { toastr.error('Could not save deductions.', 'Error', { positionClass: 'toast-bottom-right' }); }
+            error: function (xhr) {
+                toastr.error((xhr.responseJSON && xhr.responseJSON.message) || 'Could not save deductions.', 'Error', { positionClass: 'toast-bottom-right' });
+                if (xhr.responseJSON && xhr.responseJSON.reason_required) $('#cp-ded-reason').focus();
+            }
         });
     });
 
@@ -574,7 +590,7 @@
                 if (!res.success) { toastr.error(res.message, 'Error', { positionClass: 'toast-bottom-right' }); return; }
                 toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
             },
-            error: function () { toastr.error('Could not save review.', 'Error', { positionClass: 'toast-bottom-right' }); }
+            error: function (xhr) { toastr.error((xhr.responseJSON && xhr.responseJSON.message) || 'Could not save review.', 'Error', { positionClass: 'toast-bottom-right' }); }
         });
     });
 
@@ -587,7 +603,7 @@
                 if (!res.success) { toastr.error(res.message || 'Failed.', 'Error', { positionClass: 'toast-bottom-right' }); return; }
                 toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
             },
-            error: function () { toastr.error('Could not send for approval.', 'Error', { positionClass: 'toast-bottom-right' }); }
+            error: function (xhr) { toastr.error((xhr.responseJSON && xhr.responseJSON.message) || 'Could not send for approval.', 'Error', { positionClass: 'toast-bottom-right' }); }
         });
     });
 </script>

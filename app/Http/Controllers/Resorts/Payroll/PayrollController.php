@@ -31,6 +31,8 @@ use App\Models\PayrollReview;
 use App\Models\PayrollReviewAllowances;
 use App\Models\PayrollServiceCharge;
 use App\Models\PayrollTimeAndAttendance;
+use App\Models\PayrollManualEntry;
+use App\Http\Controllers\Resorts\Payroll\CasualPayrollController;
 use App\Models\PayrollRecoverySchedule;
 use App\Models\ResortBudgetCost;
 use App\Models\ResortBenifitGrid;
@@ -442,6 +444,467 @@ class PayrollController extends Controller
         return [$payroll, null];
     }
 
+    /**
+     * Payroll G1 (founder, 2026-11-06): every figure of a Permanent run, worked out on the server from attendance,
+     * the roster, salary/benefit data and the audited HR inputs (PayrollManualEntry) — never from what the browser
+     * posted. The save steps store it, sendForApproval stores all of it, and every approval step recomputes and
+     * refuses a run whose saved figures differ (payrollMismatches). Built on the same calculators the wizard
+     * screens show (fetchTimeAttendance, fetchStaffShop, fetchAdvanceRecovery, pensionAndEwt).
+     *
+     * @return array{ok: bool, message?: string, rows?: array<int, array>}
+     */
+    private function computePayroll(Payroll $payroll): array
+    {
+        $settings = ResortSiteSettings::where('resort_id', $payroll->resort_id)->first();
+        $currency = ($settings->currency ?? 'Dollar') === 'MVR' ? 'MVR' : 'Dollar';
+        $rate = (float) ($settings->DollertoMVR ?? 0) ?: 15.42;
+        $toDisplay = fn ($amount, $unit) => $currency === 'MVR'
+            ? ($unit === 'MVR' ? $amount : $amount * $rate)
+            : ($unit === 'MVR' ? $amount / $rate : $amount);
+
+        $employeeIds = PayrollEmployees::where('payroll_id', $payroll->id)->pluck('employee_id')->map(fn ($id) => (int) $id)->all();
+        if (!$employeeIds) {
+            return ['ok' => true, 'rows' => [], 'unit' => $currency === 'MVR' ? 'MVR' : 'USD'];
+        }
+        if ($payroll->payroll_category === 'Casual') {
+            return $this->computeCasualPayroll($payroll, $employeeIds, $currency, $rate, $toDisplay);
+        }
+
+        $ta = $this->fetchTimeAttendance(new Request(['employees' => $employeeIds, 'startDate' => $payroll->start_date,
+            'endDate' => $payroll->end_date, 'payrollId' => $payroll->id, 'currency' => $currency]))->getData(true);
+        if (empty($ta['success'])) {
+            return ['ok' => false, 'message' => $ta['message'] ?? 'Attendance could not be worked out for this period.'];
+        }
+        $rows = collect($ta['data'])->keyBy('empid');
+        $employees = Employee::with('allowance')->whereIn('id', $rows->keys())->get()->keyBy('id');
+        $entries = PayrollManualEntry::live()->where('payroll_id', $payroll->id)->get();
+
+        // Service charge: this month's pool (HR input), shared by workdays among the eligible — the formula the
+        // screen used: floor to the cent, the last eligible employee takes the rounding remainder. Stored in USD.
+        $start = Carbon::parse($payroll->start_date);
+        $pool = (float) ServiceCharges::where('resort_id', $payroll->resort_id)->where('month', $start->month)->where('year', $start->year)->value('service_charge');
+        $poolUsd = $currency === 'MVR' ? $pool / $rate : $pool;
+        $shares = array_fill_keys($rows->keys()->all(), 0.0);
+        $eligible = array_values(array_intersect(Common::serviceChargeEligibleIds($payroll->resort_id, $rows->keys()->all()), $rows->keys()->all()));
+        sort($eligible);
+        $totalDays = array_sum(array_map(fn ($id) => (float) $rows[$id]['workdays'], $eligible));
+        if ($poolUsd > 0 && $totalDays > 0) {
+            $given = 0.0;
+            foreach ($eligible as $id) {
+                $shares[$id] = floor($poolUsd / $totalDays * (float) $rows[$id]['workdays'] * 100) / 100;
+                $given += $shares[$id];
+            }
+            $last = end($eligible);
+            $shares[$last] = round($shares[$last] + round($poolUsd - $given, 2), 2);
+        }
+
+        $shop = collect($this->fetchStaffShop(new Request(['employees' => $rows->keys()->all(), 'currency' => $currency]))->getData(true)['data'] ?? [])->keyBy('Emp_id');
+        $advance = (array) ($this->fetchAdvanceRecovery(new Request(['employee_ids' => $rows->keys()->all(),
+            'start_date' => $payroll->start_date, 'end_date' => $payroll->end_date]))->getData(true)['data'] ?? []);
+
+        $out = [];
+        foreach ($rows as $id => $r) {
+            $emp = $employees[$id];
+            $mine = $entries->where('employee_id', $id);
+            $entered = fn ($kind) => round($mine->where('kind', $kind)->sum(fn ($e) => $toDisplay($e->amount, $e->currency)), 2);
+
+            $serviceCharge = round($toDisplay($shares[$id], 'USD'), 2);
+            // Profile allowances plus this run's extra payments — fetchTimeAttendance already lists both.
+            $allowances = collect($r['allowances'])->map(fn ($a) => ['type' => $a['name'], 'amount' => round((float) $a['amount'], 2)])->values()->all();
+            $allowanceTotal = round(array_sum(array_column($allowances, 'amount')), 2);
+
+            [$pension, $ewt, $taxableMvr, $ewtMvr] = $this->pensionAndEwt($emp, (float) $r['earned_salary'], (float) $r['totalOTPay'],
+                $shares[$id], $entered('extra_payment'), $currency, $rate);
+            $deductions = [
+                'attendance_deduction' => round((float) $r['absent_deduction'], 2),
+                'city_ledger' => $entered('city_ledger'),
+                'staff_shop' => round((float) ($shop[$emp->Emp_id]['total'] ?? 0), 2),
+                'advance_loan' => round($toDisplay((float) ($advance[$id] ?? 0), 'USD'), 2),
+                'pension' => $pension,
+                'ewt' => $ewt,
+                'other' => $entered('other_deduction'),
+            ];
+            $deductions['total_deductions'] = round(array_sum($deductions), 2);
+            $totalEarnings = round((float) $r['earned_salary'] + (float) $r['totalOTPay'] + $allowanceTotal + $serviceCharge + (float) $r['ramadan_bonus'], 2);
+
+            $out[$id] = [
+                'Emp_id' => $emp->Emp_id,
+                'attendance' => [
+                    'present_days' => $r['present'], 'absent_days' => $r['absent'], 'leave_types' => trim(strip_tags((string) $r['leave_types'])),
+                    'regular_ot_hours' => round((float) $r['regular_ot'], 2), 'holiday_ot_hours' => round((float) $r['holiday_ot'], 2),
+                    'total_ot' => round((float) $r['regular_ot'] + (float) $r['holiday_ot'], 2),
+                ],
+                'service_charge' => ['total_working_days' => (int) $r['workdays'], 'service_charge_amount' => $shares[$id]],
+                'deductions' => $deductions,
+                'review' => [
+                    'service_charge' => $serviceCharge,
+                    'regularOTPay' => round((float) $r['regularOTPay'], 2), 'fridayOTPay' => round((float) $r['fridayOTPay'], 2),
+                    'holidayOTPay' => round((float) $r['holidayOTPay'], 2), 'earnings_overtime' => round((float) $r['totalOTPay'], 2),
+                    'earnings_basic' => round((float) $r['basic_salary'], 2), 'earned_salary' => round((float) $r['earned_salary'], 2),
+                    'earnings_allowance' => $allowanceTotal, 'total_earnings' => $totalEarnings,
+                    'total_deductions' => $deductions['total_deductions'],
+                    'net_salary' => round($totalEarnings - $deductions['total_deductions'], 2),
+                ],
+                'allowances' => $allowances,
+                'tax' => ['taxable_mvr' => $taxableMvr, 'ewt_mvr' => $ewtMvr],
+            ];
+        }
+
+        return ['ok' => true, 'rows' => $out, 'unit' => $currency === 'MVR' ? 'MVR' : 'USD'];
+    }
+
+    /**
+     * The Casual run (G1): earnings from CasualPayrollController's own calculator (position rate, no service charge,
+     * agency commission recorded but never paid to the employee); pension, EWT and advance recovery worked out with
+     * the Permanent rules (were typed by HR); city ledger and "Other" are HR inputs; staff shop stays 0 as before.
+     */
+    private function computeCasualPayroll(Payroll $payroll, array $employeeIds, string $currency, float $rate, \Closure $toDisplay): array
+    {
+        $casual = app(CasualPayrollController::class)->casualRows(new Request(['employees' => $employeeIds, 'startDate' => $payroll->start_date,
+            'endDate' => $payroll->end_date, 'currency' => $currency === 'MVR' ? 'MVR' : 'USD']))->getData(true);
+        if (empty($casual['success'])) {
+            return ['ok' => false, 'message' => $casual['message'] ?? 'Casual earnings could not be worked out for this period.'];
+        }
+        $rows = collect($casual['data'])->keyBy('employee_id');
+        $employees = Employee::whereIn('id', $rows->keys())->get()->keyBy('id');
+        $entries = PayrollManualEntry::live()->where('payroll_id', $payroll->id)->get();
+        $advance = (array) ($this->fetchAdvanceRecovery(new Request(['employee_ids' => $rows->keys()->all(),
+            'start_date' => $payroll->start_date, 'end_date' => $payroll->end_date]))->getData(true)['data'] ?? []);
+
+        $out = [];
+        foreach ($rows as $id => $r) {
+            $emp = $employees[$id]->setRelation('allowance', collect());   // no allowances on a Casual run
+            $mine = $entries->where('employee_id', $id);
+            $entered = fn ($kind) => round($mine->where('kind', $kind)->sum(fn ($e) => $toDisplay($e->amount, $e->currency)), 2);
+            [$pension, $ewt, $taxableMvr, $ewtMvr] = $this->pensionAndEwt($emp, (float) $r['earned_salary'], (float) $r['total_ot_pay'], 0.0, 0.0, $currency, $rate);
+            $deductions = [
+                'attendance_deduction' => round((float) $r['absent_deduction'], 2),
+                'city_ledger' => $entered('city_ledger'),
+                'staff_shop' => 0.0,
+                'advance_loan' => round($toDisplay((float) ($advance[$id] ?? 0), 'USD'), 2),
+                'pension' => $pension,
+                'ewt' => $ewt,
+                'other' => $entered('other_deduction'),
+            ];
+            $deductions['total_deductions'] = round(array_sum($deductions), 2);
+            $totalEarnings = round((float) $r['normal_pay'], 2);
+
+            $out[$id] = [
+                'Emp_id' => $emp->Emp_id,
+                'attendance' => [
+                    'present_days' => $r['present'], 'absent_days' => $r['unpaid_days'], 'leave_types' => '',
+                    'regular_ot_hours' => round((float) $r['regular_ot'], 2),
+                    'holiday_ot_hours' => round((float) $r['friday_ot'] + (float) $r['holiday_ot'], 2),
+                    'total_ot' => round((float) $r['regular_ot'] + (float) $r['friday_ot'] + (float) $r['holiday_ot'], 2),
+                ],
+                'service_charge' => ['total_working_days' => (int) $r['present'] + (int) $r['day_offs'], 'service_charge_amount' => 0.0],
+                'deductions' => $deductions,
+                'review' => [
+                    'service_charge' => 0.0, 'service_provider_commission' => round((float) $r['service_provider_commission'], 2),
+                    'regularOTPay' => round((float) $r['regular_ot_pay'], 2), 'fridayOTPay' => round((float) $r['friday_ot_pay'], 2),
+                    'holidayOTPay' => round((float) $r['holiday_ot_pay'], 2), 'earnings_overtime' => round((float) $r['total_ot_pay'], 2),
+                    'earnings_basic' => round((float) $r['basic_salary'], 2), 'earned_salary' => round((float) $r['earned_salary'], 2),
+                    'earnings_allowance' => 0.0, 'total_earnings' => $totalEarnings,
+                    'total_deductions' => $deductions['total_deductions'],
+                    'net_salary' => round($totalEarnings - $deductions['total_deductions'], 2),
+                ],
+                'allowances' => [],
+                'tax' => ['taxable_mvr' => $taxableMvr, 'ewt_mvr' => $ewtMvr],
+            ];
+        }
+
+        return ['ok' => true, 'rows' => $out, 'unit' => $currency === 'MVR' ? 'MVR' : 'USD'];
+    }
+
+    /** Recalculate a run and save every part — for callers outside the wizard (the demo seeder). */
+    public function recalculateRun(Payroll $payroll): array
+    {
+        $computed = $this->computePayroll($payroll);
+        if ($computed['ok']) {
+            DB::transaction(fn () => $this->persistComputed($payroll, $computed['rows'], ['attendance', 'service_charge', 'deductions', 'review'], $computed['unit']));
+        }
+        return $computed;
+    }
+
+    /**
+     * Pension (7% of earned salary, Maldivians only) and EWT (brackets on MVR taxable income: earned + profile
+     * allowances + service charge + OT + extra payments − pension), in display currency. Service charge is stored
+     * in USD and always converted (was treated as display currency, so an MVR resort taxed it unconverted), and
+     * MVR→USD divides by DollertoMVR instead of multiplying the stored inverse rate.
+     */
+    private function pensionAndEwt(Employee $employee, float $earned, float $otPay, float $serviceChargeUsd, float $extra, string $currency, float $rate): array
+    {
+        $toMvr = fn ($display) => $currency === 'Dollar' ? $display * $rate : $display;
+        $allowanceMvr = 0.0;
+        foreach ($employee->allowance as $allowance) {
+            $allowanceMvr += $allowance->amount_unit === 'USD' ? (float) $allowance->amount * $rate : (float) $allowance->amount;
+        }
+        $pension = $employee->nationality === 'Maldivian' ? round($earned * 0.07, 2) : 0.0;
+        $taxableMvr = max($toMvr($earned) + $allowanceMvr + $serviceChargeUsd * $rate + $toMvr($otPay) + $toMvr($extra) - $toMvr($pension), 0);
+        $ewtMvr = (float) Common::calculateEWT($taxableMvr);
+
+        return [$pension, round($currency === 'Dollar' ? $ewtMvr / $rate : $ewtMvr, 2), $taxableMvr, $ewtMvr];
+    }
+
+    /** Store the computed figures of the given parts: attendance, service_charge, deductions, review (review includes its allowance lines). */
+    private function persistComputed(Payroll $payroll, array $rows, array $parts, string $unit): void
+    {
+        $tables = ['attendance' => PayrollTimeAndAttendance::class, 'service_charge' => PayrollServiceCharge::class,
+            'deductions' => PayrollDeduction::class, 'review' => PayrollReview::class];
+        foreach ($rows as $employeeId => $row) {
+            $key = ['payroll_id' => $payroll->id, 'employee_id' => $employeeId];
+            foreach ($parts as $part) {
+                $saved = $tables[$part]::updateOrCreate($key, ['Emp_id' => $row['Emp_id']] + $row[$part]);
+                if ($part === 'review') {
+                    PayrollReviewAllowances::where('payroll_review_id', $saved->id)->delete();
+                    foreach ($row['allowances'] as $allowance) {
+                        PayrollReviewAllowances::create(['payroll_review_id' => $saved->id, 'allowance_type' => $allowance['type'],
+                            'amount' => $allowance['amount'], 'amount_unit' => $unit]);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Recompute and compare with what is saved: null when every saved figure matches to the cent, otherwise the
+     * message to show. Re-run before every approval step, so a run already in the chain when this shipped is
+     * checked too (founder, 2026-11-06: no grandfathering).
+     */
+    private function payrollMismatches(Payroll $payroll): ?string
+    {
+        $computed = $this->computePayroll($payroll);
+        if (!$computed['ok']) {
+            return $computed['message'];
+        }
+        $reviews = PayrollReview::where('payroll_id', $payroll->id)->get()->keyBy('employee_id');
+        $deductions = PayrollDeduction::where('payroll_id', $payroll->id)->get()->keyBy('employee_id');
+        $charges = PayrollServiceCharge::where('payroll_id', $payroll->id)->get()->keyBy('employee_id');
+        $off = [];
+        foreach ($computed['rows'] as $id => $row) {
+            $saved = ['review' => $reviews[$id] ?? null, 'deductions' => $deductions[$id] ?? null, 'service_charge' => $charges[$id] ?? null];
+            foreach ($saved as $part => $model) {
+                $fields = $part === 'review' ? ['service_charge', 'earnings_overtime', 'earned_salary', 'earnings_allowance', 'total_earnings', 'total_deductions', 'net_salary']
+                    : array_keys($row[$part]);
+                foreach ($fields as $field) {
+                    if (!is_numeric($row[$part][$field])) {
+                        continue;
+                    }
+                    if (!$model || abs((float) $model->$field - (float) $row[$part][$field]) > 0.01) {
+                        $off[$row['Emp_id']] = true;
+                        continue 3;
+                    }
+                }
+            }
+        }
+        $extra = $reviews->keys()->diff(array_keys($computed['rows']));
+        foreach ($extra as $id) {
+            $off[$reviews[$id]->Emp_id] = true;
+        }
+
+        return $off ? 'The saved payroll figures no longer match a fresh calculation for: ' . implode(', ', array_keys($off))
+            . '. Attendance, leave or salary data may have changed, or the figures were altered. Reject the run back to draft and save it again.' : null;
+    }
+
+    /**
+     * Keep an HR-entered amount (G1) in line with what HR entered: unchanged → nothing; changed → the old entries are
+     * kept but marked removed (who/when) and the new amount recorded with its reason; 0 just removes. Amounts are
+     * compared in the run's display currency. $dryRun only answers "would this change anything?".
+     */
+    private function recordEntry(Payroll $payroll, ?int $employeeId, string $kind, float $amount, string $reason, ?string $currency = null, bool $dryRun = false): bool
+    {
+        $settings = ResortSiteSettings::where('resort_id', $payroll->resort_id)->first();
+        $display = ($settings->currency ?? 'Dollar') === 'MVR' ? 'MVR' : 'USD';
+        $rate = (float) ($settings->DollertoMVR ?? 0) ?: 15.42;
+        $currency = $currency ?: $display;
+        $toDisplay = fn ($value, $unit) => $unit === $display ? $value : ($unit === 'USD' ? $value * $rate : $value / $rate);
+        $amount = round(max(0, $amount), 2);
+        $live = PayrollManualEntry::live()->where('payroll_id', $payroll->id)->where('employee_id', $employeeId)->where('kind', $kind)->get();
+        if (abs($live->sum(fn ($e) => $toDisplay($e->amount, $e->currency)) - $toDisplay($amount, $currency)) < 0.005) {
+            return false;
+        }
+        if ($dryRun) {
+            return true;
+        }
+        $adminId = Auth::guard('resort-admin')->id();
+        PayrollManualEntry::whereIn('id', $live->pluck('id'))->update(['deleted_by' => $adminId, 'deleted_at' => now()]);
+        if ($amount > 0) {
+            PayrollManualEntry::create(['payroll_id' => $payroll->id, 'employee_id' => $employeeId, 'kind' => $kind,
+                'amount' => $amount, 'currency' => $currency, 'reason' => $reason, 'created_by' => $adminId]);
+        }
+        return true;
+    }
+
+    /** Recompute the run, store the given parts, and answer with every employee's figures for the screen (keyed by Emp_id). */
+    private function recomputeAndRespond(Payroll $payroll, array $parts, string $message, array $extra = [])
+    {
+        $computed = $this->computePayroll($payroll);
+        if (!$computed['ok']) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $computed['message']], 422);
+        }
+        if (in_array('deductions', $parts, true) && !in_array('review', $parts, true) && PayrollReview::where('payroll_id', $payroll->id)->exists()) {
+            $parts[] = 'review';   // a later step was already saved — keep it in line
+        }
+        $this->persistComputed($payroll, $computed['rows'], $parts, $computed['unit']);
+        DB::commit();
+        $rows = collect($computed['rows'])->mapWithKeys(fn ($r) => [$r['Emp_id'] => [
+            'deductions' => $r['deductions'], 'review' => $r['review'], 'allowances' => $r['allowances'],
+            'service_charge' => $r['review']['service_charge'], 'workdays' => $r['service_charge']['total_working_days'],
+        ]]);
+        return response()->json(['success' => true, 'message' => $message, 'rows' => $rows] + $extra);
+    }
+
+    /** Add one HR entry to a draft run: an "Other" deduction or a one-off extra payment, with a required reason. */
+    public function addPayrollEntry(Request $request)
+    {
+        $request->validate([
+            'payroll_id' => 'required|integer',
+            'kind' => 'required|in:other_deduction,extra_payment',
+            'employee' => 'required|string',
+            'amount' => 'required|numeric|min:0.01|max:9999999',
+            'currency' => 'required|in:USD,MVR',
+            'label' => 'nullable|string|max:100',
+            'reason' => 'required|string|min:3|max:500',
+        ]);
+        DB::beginTransaction();
+        [$payroll, $error] = $this->editablePayrollOrError($request->payroll_id, $this->resort->resort_id);
+        if ($error) {
+            DB::rollBack();
+            return $error;
+        }
+        $employeeId = PayrollEmployees::where('payroll_id', $payroll->id)->where('Emp_id', $request->employee)->value('employee_id');
+        if (!$employeeId) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'This employee is not in the payroll.'], 404);
+        }
+        PayrollManualEntry::create(['payroll_id' => $payroll->id, 'employee_id' => $employeeId, 'kind' => $request->kind,
+            'label' => $request->label, 'amount' => round((float) $request->amount, 2), 'currency' => $request->currency,
+            'reason' => trim($request->reason), 'created_by' => Auth::guard('resort-admin')->id()]);
+        return $this->recomputeAndRespond($payroll, $request->kind === 'extra_payment' ? ['deductions', 'review'] : ['deductions'], 'Saved.');
+    }
+
+    /** Remove an HR entry from a draft run — the row is kept, marked removed with who/when. */
+    public function removePayrollEntry(Request $request)
+    {
+        $request->validate(['payroll_id' => 'required|integer', 'entry_id' => 'required|integer']);
+        DB::beginTransaction();
+        [$payroll, $error] = $this->editablePayrollOrError($request->payroll_id, $this->resort->resort_id);
+        if ($error) {
+            DB::rollBack();
+            return $error;
+        }
+        $entry = PayrollManualEntry::live()->where('payroll_id', $payroll->id)->whereIn('kind', ['other_deduction', 'extra_payment'])->find($request->entry_id);
+        if (!$entry) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'Entry not found.'], 404);
+        }
+        $entry->update(['deleted_by' => Auth::guard('resort-admin')->id(), 'deleted_at' => now()]);
+        return $this->recomputeAndRespond($payroll, $entry->kind === 'extra_payment' ? ['deductions', 'review'] : ['deductions'], 'Removed.');
+    }
+
+    /** The run's live HR entries (who / when / why), optionally of one kind. */
+    public function listPayrollEntries(Request $request)
+    {
+        $payroll = Payroll::where('id', $request->payroll_id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$payroll) {
+            return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
+        }
+        $entries = PayrollManualEntry::live()->where('payroll_id', $payroll->id)
+            ->when($request->kind, fn ($q) => $q->where('kind', $request->kind))->orderBy('id')->get();
+        $codes = PayrollEmployees::where('payroll_id', $payroll->id)->pluck('Emp_id', 'employee_id');
+        $names = \App\Models\ResortAdmin::whereIn('id', $entries->pluck('created_by')->filter())->get()->mapWithKeys(fn ($a) => [$a->id => trim($a->first_name . ' ' . $a->last_name)]);
+        return response()->json(['success' => true, 'entries' => $entries->map(fn ($e) => [
+            'id' => $e->id, 'kind' => $e->kind, 'employee' => $codes[$e->employee_id] ?? null, 'label' => $e->label,
+            'amount' => $e->amount, 'currency' => $e->currency, 'reason' => $e->reason,
+            'by' => $names[$e->created_by] ?? '', 'at' => Carbon::parse($e->getRawOriginal('created_at'))->format('d M Y H:i'),
+        ])->values()]);
+    }
+
+    /**
+     * City ledger upload (G1): the Excel file is read here, not in the browser — first sheet, a header row, then
+     * column A = Employee ID and column C = amount in USD (the layout the page always read). Each listed employee's
+     * city ledger is replaced, with the reason; employees not in the run are reported back.
+     */
+    public function uploadCityLedger(Request $request)
+    {
+        $request->validate([
+            'payroll_id' => 'required|integer',
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
+            'reason' => 'required|string|min:3|max:500',
+        ]);
+        DB::beginTransaction();
+        [$payroll, $error] = $this->editablePayrollOrError($request->payroll_id, $this->resort->resort_id);
+        if ($error) {
+            DB::rollBack();
+            return $error;
+        }
+        try {
+            $sheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($request->file('file')->getRealPath())->getSheet(0)->toArray(null, true, false, false);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'The file could not be read. Please upload the city ledger Excel file.'], 422);
+        }
+        $inPayroll = PayrollEmployees::where('payroll_id', $payroll->id)->pluck('employee_id', 'Emp_id');
+        $notFound = [];
+        $updated = 0;
+        foreach (array_slice($sheet, 1) as $row) {
+            $code = trim((string) ($row[0] ?? ''));
+            if ($code === '') {
+                continue;
+            }
+            $amount = (float) preg_replace('/[^0-9.\-]/', '', (string) ($row[2] ?? '0'));
+            if (!isset($inPayroll[$code])) {
+                $notFound[] = $code;
+                continue;
+            }
+            $this->recordEntry($payroll, (int) $inPayroll[$code], 'city_ledger', $amount, trim($request->reason), 'USD');
+            $updated++;
+        }
+        return $this->recomputeAndRespond($payroll, ['deductions'], "{$updated} employee(s) city ledger updated.", ['not_found' => $notFound]);
+    }
+
+    /** Minimum-wage compliance on the review step (unchanged rule; ran once per posted employee before, now once). */
+    private function flagMinimumWage(): void
+    {
+        $below = Employee::with('resortAdmin')->where('resort_id', $this->resort->resort_id)
+            ->where(fn ($q) => $q->where(fn ($m) => $m->where('basic_salary_currency', 'MVR')->where('basic_salary', '<', 8021))
+                ->orWhere(fn ($u) => $u->where('basic_salary_currency', 'USD')->where('basic_salary', '<', 520)))
+            ->get();
+        foreach ($below as $employee) {
+            Compliance::firstOrCreate([
+                'resort_id' => $this->resort->resort_id,
+                'employee_id' => $employee->id,
+                'module_name' => 'Workforce Planning',
+                'compliance_breached_name' => 'Minimum Wage',
+                'description' => "Employee {$employee->resortAdmin->full_name} has a basic salary below the minimum wage.",
+                'reported_on' => Carbon::now(),
+                'status' => 'Breached',
+            ]);
+        }
+    }
+
+    /** Maldivians must pay 7% pension — flag any whose computed pension is 0 (was checked against the posted figure). */
+    private function flagMissingPension(Payroll $payroll): void
+    {
+        $pension = PayrollDeduction::where('payroll_id', $payroll->id)->pluck('pension', 'employee_id');
+        $notify = Employee::whereIn('id', Common::getResortHrEmployeeIds($this->resort->resort_id))->first();
+        $maldivians = Employee::with(['resortAdmin', 'position'])->whereIn('id', $pension->keys())->where('nationality', 'Maldivian')->get();
+        foreach ($maldivians as $employee) {
+            if ((float) $pension[$employee->id] > 0) {
+                continue;
+            }
+            $text = "Employee {$employee->resortAdmin->full_name} ({$employee->position->position_title}) is Maldivian but has no pension deduction applied. Maldivian regulations require a mandatory 7% pension contribution for all Maldivian employees.";
+            try {
+                event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10, 'Payroll Pension Compliance', $text, 0, $notify->id ?? 0, 'Payroll')));
+            } catch (\Exception $notifyErr) {
+                Log::warning('Pension compliance notification broadcast failed: ' . $notifyErr->getMessage());
+            }
+            Compliance::create(['resort_id' => $this->resort->resort_id, 'employee_id' => $employee->id, 'module_name' => 'Payroll',
+                'compliance_breached_name' => 'Payroll Pension Compliance', 'description' => $text, 'reported_on' => Carbon::now(), 'status' => 'Breached']);
+        }
+    }
+
     public function saveDraftPayroll(Request $request)
     {
         $request->validate([
@@ -582,88 +1045,22 @@ class PayrollController extends Controller
         try {
             // payroll_id is the write key below — verify it belongs to this
             // resort and is still editable (P-02) before writing.
-            [, $error] = $this->editablePayrollOrError($request->payroll_id, $this->resort->resort_id);
+            [$payroll, $error] = $this->editablePayrollOrError($request->payroll_id, $this->resort->resort_id);
             if ($error) {
                 DB::rollBack();
                 return $error;
             }
 
-            $activityLog = []; // ✅ Array to track changes
-
-            foreach ($request->attendance as $attendance) {
-                // ✅ Fetch Employee details — resort_id scoped to prevent
-                // cross-resort leakage when Emp_id codes collide.
-                $emp_detail = Employee::with(['position', 'department'])
-                    ->where('Emp_id', $attendance['id'])
-                    ->where('resort_id', $this->resort->resort_id)
-                    ->first();
-
-                if (!$emp_detail) {
-                    DB::rollBack(); // Rollback transaction if employee not found
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Employee not found for ID: ' . $attendance['id']
-                    ], 404);
-                }
-
-                // ✅ Compute total OT dynamically
-                $regularOT = $attendance['regularOT'] ?? 0;
-                $holidayOT = $attendance['holidayOT'] ?? 0;
-                $totalOT = $regularOT + $holidayOT; // ✅ Auto-update total OT
-
-                // ✅ Prepare Updated Data
-                $updatedData = [
-                    'Emp_id' => $attendance['id'],
-                    'present_days' => $attendance['present'] ?? 0,
-                    'absent_days' => $attendance['absent'] ?? 0,
-                    'leave_types' => $attendance['leaveTypes'] ?? '',
-                    'regular_ot_hours' => $regularOT,
-                    'holiday_ot_hours' => $holidayOT,
-                    'total_ot' => $totalOT, // ✅ Auto-updated
-                    'notes' => $attendance['notes'] ?? null,
-                ];
-
-                // ✅ Fetch Existing Payroll Data for Comparison
-                $existingRecord = PayrollTimeAndAttendance::where([
-                    'payroll_id' => $request->payroll_id,
-                    'employee_id' => $emp_detail->id
-                ])->first();
-
-                if ($existingRecord) {
-                    foreach ($updatedData as $key => $value) {
-                        if ($existingRecord->$key != $value) { // Only log changes
-                            $activityLog[] = [
-                                'resort_id'=>$this->resort->resort_id,
-                                'payroll_id'=>$request->payroll_id,
-                                'user_id' => $this->resort->GetEmployee->id, // Track who made changes
-                                'employee_id' => $emp_detail->id,
-                                'field' => $key,
-                                'old_value' => $existingRecord->$key,
-                                'new_value' => $value,
-                                'updated_at' => now(),
-                            ];
-                        }
-                    }
-                }  // ✅ Insert or Update Payroll Attendance Data
-                PayrollTimeAndAttendance::updateOrCreate(
-                    [
-                        'payroll_id' => $request->payroll_id,
-                        'employee_id' => $emp_detail->id,
-                    ],
-                    $updatedData
-                );
+            // G1: days and OT always come from Time & Attendance — the posted figures are ignored, and are no
+            // longer replayed as overrides. Wrong attendance is fixed in T&A, then the run is recalculated.
+            $computed = $this->computePayroll($payroll);
+            if (!$computed['ok']) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => $computed['message']], 422);
             }
-            
-             // ✅ Save Activity Log if Changes Were Made
-        if (!empty($activityLog)) {
-            DB::table('payroll_attendance_activity_log')->insert($activityLog);
-        }
-            DB::commit(); // ✅ Commit transaction
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Employees Attendance successfully added to payroll.'
-            ]);
+            $this->persistComputed($payroll, $computed['rows'], ['attendance'], $computed['unit']);
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Employees Attendance successfully added to payroll.']);
 
         } catch (\Exception $e) {
             DB::rollBack(); // ✅ Rollback in case of error
@@ -697,17 +1094,16 @@ class PayrollController extends Controller
                 $attendance->notes = $request->note;
                 $attendance->save();
             } else {
-                // ✅ Create new record WITH frontend-passed values
+                // Only the note — the figures are filled in from Time & Attendance when the step is saved (G1).
+                if (!PayrollEmployees::where('payroll_id', $request->payroll_id)->where('employee_id', $request->empid)->exists()) {
+                    return response()->json(['success' => false, 'message' => 'This employee is not in the payroll.'], 404);
+                }
                 $attendance = PayrollTimeAndAttendance::create([
                     'payroll_id' => $request->payroll_id,
-                    'employee_id' => $request->employee_id,
-                    'present_days' => $request->present ?? 0,
-                    'absent_days' => $request->absent ?? 0,
-                    'leave_types' => $request->leave_type ?? '',
-                    'regular_ot_hours' => $request->regular_ot ?? 0,
-                    'holiday_ot_hours' => $request->holiday_ot ?? 0,
-                    'total_ot' => $request->total_ot ?? 0,
-                    'notes' => $request->note
+                    'employee_id' => $request->empid,
+                    'present_days' => 0, 'absent_days' => 0, 'leave_types' => '',
+                    'regular_ot_hours' => 0, 'holiday_ot_hours' => 0, 'total_ot' => 0,
+                    'notes' => $request->note,
                 ]);
             }
 
@@ -723,13 +1119,15 @@ class PayrollController extends Controller
         }
     }
 
+    /**
+     * Employee IDs (codes) due a service-charge share, for the "Distribute Amount" preview — the same rule the saved
+     * figures use (Common::serviceChargeEligibleIds). The page posts employees.id; Emp_id codes are accepted too.
+     * Was matched on Emp_id only, so the page's ids never matched and the preview shared the pool among everyone.
+     */
     public function getEligibleEmployees(Request $request)
     {
-        $employeeIds = $request->input('employee_ids', []);
-        // dd($employeeIds);
         $resortId = $this->resort->resort_id;
-
-        $ids = collect($employeeIds)->map(function ($item) {
+        $ids = collect($request->input('employee_ids', []))->map(function ($item) {
             if (is_array($item)) {
                 return $item['id'] ?? null;
             }
@@ -738,66 +1136,14 @@ class PayrollController extends Controller
                 return is_array($decoded) ? ($decoded['id'] ?? null) : $item;
             }
             return $item;
-        })->filter()->values()->toArray();
+        })->filter()->map(fn ($id) => (string) $id)->values()->all();
 
+        $employees = Employee::where('resort_id', $resortId)
+            ->where(fn ($q) => $q->whereIn('id', array_filter($ids, 'ctype_digit'))->orWhereIn('Emp_id', $ids))
+            ->pluck('Emp_id', 'id');
+        $eligible = Common::serviceChargeEligibleIds($resortId, $employees->keys()->all());
 
-        $eligibleEmployeeIds = [];
-        // dd($ids);
-        // resort_id MUST be filtered here — Emp_id (the human "DR-24"
-        // code) is unique per-resort, not globally. Without the scope,
-        // a Resort A request that includes "DR-24" would pull Resort B's
-        // DR-24 into the eligible pool. Reported as cross-resort
-        // leakage during a live payroll run.
-        $employees = Employee::whereIn('Emp_id', $ids)
-            ->where('resort_id', $resortId)
-            ->get();
-
-        // F&F-settled employees are NEVER eligible for further SC
-        // distribution from payroll — their SC was already paid out
-        // in the F&F settlement. Pre-pull the set of employees with a
-        // finalized FS row so the loop below drops them regardless of
-        // their benefit-grid eligibility.
-        $settledIds = \DB::table('final_settlements')
-            ->whereIn('employee_id', $employees->pluck('id')->all())
-            ->where('status', 'finalized')
-            ->pluck('employee_id')
-            ->flip()
-            ->all();
-
-        foreach ($employees as $employee) {
-            if (isset($settledIds[$employee->id])) {
-                // Already settled via F&F — exclude from SC pool.
-                continue;
-            }
-            // §34/WP1 — Interns AND Casual never get service charge.
-            // This endpoint builds its employee set purely from whatever
-            // Emp_ids the request posts (no employment_type filter of its
-            // own), so "Casual isn't part of this payroll run" was an
-            // assumption about the caller, not something enforced here —
-            // a forged/future request could still pass a Casual Emp_id
-            // through. resolveEmpGrade() now short-circuits on rank 0
-            // too (WP1), but this stays as an explicit, category-based
-            // belt-and-braces check rather than relying on that alone.
-            if (Common::manningCategory($employee->employment_type ?? '') !== 'Permanent') {
-                continue;
-            }
-            // Employee's own benefit_grid_level wins when it's still a real,
-            // active grade for this resort (resolveEmpGrade() guards against
-            // stale/poisoned values); otherwise falls back to the rank-based
-            // default grade mapping.
-            $empGrade = Common::resolveEmpGrade($resortId, $employee->rank, $employee->benefit_grid_level, $employee->Position_id);
-            $grid = ResortBenifitGrid::where('resort_id', $resortId)
-                ->where('emp_grade', $empGrade)
-                ->where('service_charge', 1)
-                ->where('status', 'Active') // Ensure the grid is active
-                ->first();
-
-            if ($grid) {
-                $eligibleEmployeeIds[] = (string)$employee->Emp_id; // Cast to string for front-end consistency
-            }
-        }
-
-        return response()->json($eligibleEmployeeIds);
+        return response()->json(array_values(array_map(fn ($id) => (string) $employees[$id], $eligible)));
     }
 
     public function saveServiceChargesToPayroll(Request $request)
@@ -823,110 +1169,19 @@ class PayrollController extends Controller
         $month = $payrollDate->month;
         $year = $payrollDate->year;
 
-        // dd($month, $year);
-
-        // Import the ServiceCharges model if not already available
-        // dd($request->all());
+        // G1: the month's pool is the one HR input here (kept with who/when); every share is worked out on the
+        // server. Deductions are recomputed too — EWT includes service charge, which wasn't known at that step.
         try {
-            foreach ($request->ServiceChargesData as $serviceCharge) {
-                // dd($serviceCharge);
-                ServiceCharges::updateOrCreate(
-                    [
-                        'resort_id' => $this->resort->resort_id,
-                        'month' => $month,
-                        'year' => $year,
-                    ],
-                    [
-                        'service_charge' => $serviceCharge['totalServiceCharge'],
-                    ]
-                );
-                // ✅ Fetch Employee details — resort_id scoped.
-                $emp_detail = Employee::with(['position', 'department'])
-                    ->where('Emp_id', $serviceCharge['id'])
-                    ->where('resort_id', $this->resort->resort_id)
-                    ->first();
-
-                if (!$emp_detail) {
-                    DB::rollBack(); // Rollback transaction if employee not found
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Employee not found for ID: ' . $serviceCharge['id']
-                    ], 404);
-                }
-
-                // §34 — force 0 regardless of what the client posted. This
-                // is the actual write path (getEligibleEmployees() above is
-                // only the UI gate, not trusted) — a forged/stale payload
-                // can't sneak an Intern into service charge here.
-                $isIntern = Common::manningCategory($emp_detail->employment_type ?? '') === 'Intern';
-
-                PayrollServiceCharge::updateOrCreate(
-                    [
-                        'payroll_id' => $request->payroll_id,
-                        'employee_id' => $emp_detail->id,
-                    ],
-                    [
-                        'Emp_id' => $serviceCharge['id'],
-                        'total_working_days' => $serviceCharge['totalWorkingDays'],
-                        'service_charge_amount' => $isIntern ? 0 : $serviceCharge['serviceCharge'],
-                    ]
-                );
-
-               
+            $pool = round(max(0, (float) ($request->input('total_service_charge', $request->ServiceChargesData[0]['totalServiceCharge'] ?? 0))), 2);
+            $reason = trim((string) $request->input('reason', ''));
+            if ($this->recordEntry($payroll, null, 'service_charge_pool', $pool, '', null, true) && mb_strlen($reason) < 3) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'reason_required' => true,
+                    'message' => 'Please give a reason for the service charge amount.'], 422);
             }
-        
-            DB::commit(); // ✅ Commit transaction
-            // Pick an HR recipient. Raw rank=3 (with a resort-wide,
-            // department-blind rank=2 fallback) excluded this resort's real
-            // HR employee. Status='Active' guard kept so we don't notify a
-            // terminated manager whose account no longer logs in.
-            $notify_person = Employee::whereIn('id', Common::getResortHrEmployeeIds($this->resort->resort_id))->where('status','Active')->first();
-                $payroll_service_charges = PayrollServiceCharge::where("employee_id",$emp_detail->id)->where('payroll_id',$request->payroll_id)->get();
-                foreach ($payroll_service_charges as $payroll) 
-                {
-                    $employee           =  Employee::where('id', $payroll->employee_id)->where('resort_id', $this->resort->resort_id)->first();
-                    if (Common::manningCategory($employee->employment_type ?? '') === 'Intern') {
-                        // §34 — an Intern correctly getting SC=0 is not a
-                        // compliance breach; skip so this never fires a
-                        // false "eligible but underpaid" alert for them.
-                        continue;
-                    }
-                    $grade              =  Common::resolveEmpGrade($this->resort->resort_id, $employee->rank, $employee->benefit_grid_level);
-                    $resortBenifitsGrid =  ResortBenifitGrid::where('resort_id', $this->resort->resort_id)->where('emp_grade', $grade)->where('service_charge', '1')->where('status','Active')->first();
-
-                    if($resortBenifitsGrid && $payroll->service_charge_amount > 0)
-                    {
-                            Compliance::create([
-                                'resort_id' => $this->resort->resort_id,
-                                'employee_id' => $employee->id,
-                                'module_name' => 'Payroll',
-                                'compliance_breached_name' => 'Service Charge Compliance',
-                                'description' => "Employee " . $employee->resortAdmin->full_name . " is eligible for service charge but receiving less than the required amount. Expected: " . $resortBenifitsGrid->service_charge_amount . ", Received: " . $payroll->service_charge_amount,
-                                'reported_on' => Carbon::now(),
-                                'status' => 'Breached'
-                            ]);
-                            try {
-                                event(new ResortNotificationEvent(Common::nofitication(
-                                    $this->resort->resort_id,
-                                    10,
-                                    'Service Charge Compliance',
-                                    "Employee " . $employee->resortAdmin->full_name . " is eligible for service charge but receiving less than the required amount. Expected: " . $resortBenifitsGrid->service_charge_amount . ", Received: " . $payroll->service_charge_amount,
-                                    0,
-                                    $notify_person->id ?? 0,
-                                    'Payroll'
-                                )));
-                            } catch (\Exception $notifyErr) {
-                                Log::warning('Service charge notification broadcast failed: ' . $notifyErr->getMessage());
-                            }
-
-                    }
-                }
-               
-            return response()->json([
-                'success' => true,
-                'message' => 'Employees Service charges successfully added to payroll.'
-            ]);
-
+            ServiceCharges::updateOrCreate(['resort_id' => $this->resort->resort_id, 'month' => $month, 'year' => $year], ['service_charge' => $pool]);
+            $this->recordEntry($payroll, null, 'service_charge_pool', $pool, $reason);
+            return $this->recomputeAndRespond($payroll, ['service_charge', 'deductions'], 'Employees Service charges successfully added to payroll.');
         } catch (\Exception $e) {
             DB::rollBack(); // ✅ Rollback in case of error
             Log::error('Error saving Service charges: ' . $e->getMessage()); // ✅ Log error for debugging
@@ -945,90 +1200,39 @@ class PayrollController extends Controller
         try {
             // payroll_id is the write key below — verify it belongs to
             // this resort and is still editable (P-02) before writing.
-            [, $error] = $this->editablePayrollOrError($request->payroll_id, $this->resort->resort_id);
+            [$payroll, $error] = $this->editablePayrollOrError($request->payroll_id, $this->resort->resort_id);
             if ($error) {
                 DB::rollBack();
                 return $error;
             }
 
-            foreach ($request->DeductionData as $deduction) {
-                // ✅ Fetch Employee details — resort_id scoped.
-                $emp_detail = Employee::with(['position', 'department'])
-                    ->where('Emp_id', $deduction['id'])
-                    ->where('resort_id', $this->resort->resort_id)
-                    ->first();
-
-                if (!$emp_detail) {
-                    DB::rollBack(); // Rollback transaction if employee not found
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Employee not found for ID: ' . $deduction['id']
-                    ], 404);
+            // G1: city ledger and "Other" are HR inputs (kept with who/when); every other deduction, and the total,
+            // is worked out on the server — the posted figures are ignored.
+            // A changed amount needs a reason; amounts already entered through the city-ledger upload or the
+            // "Add deduction" window come back unchanged and need none.
+            $inPayroll = PayrollEmployees::where('payroll_id', $payroll->id)->pluck('employee_id', 'Emp_id');
+            $posted = [];
+            foreach ($request->DeductionData ?? [] as $deduction) {
+                if ($employeeId = $inPayroll[$deduction['id'] ?? ''] ?? null) {
+                    $posted[] = [(int) $employeeId, 'city_ledger', (float) ($deduction['cityLedger'] ?? 0)];
+                    $posted[] = [(int) $employeeId, 'other_deduction', (float) ($deduction['other'] ?? 0)];
                 }
-
-           
-                PayrollDeduction::updateOrCreate(
-                    [
-                        'payroll_id' => $request->payroll_id,
-                        'employee_id' => $emp_detail->id,
-                    ],
-                    [
-                        'Emp_id' => $deduction['id'],
-                        'attendance_deduction' => $deduction['attendanceDeduction'],
-                        'city_ledger' => $deduction['cityLedger'],
-                        'staff_shop' => $deduction['staffShop'],
-                        'advance_loan' => $deduction['advanceLoan'],
-                        'pension' => $deduction['pension'],
-                        'ewt' => $deduction['ewt'],
-                        'other' => $deduction['other'],
-                        'total_deductions' => $deduction['total'],
-                    ]
-                );
-                if($emp_detail->nationality == 'Maldivian' &&  in_array($deduction['pension'] , ["MVR 0.00" , "0.00"]))
-                {
-                    // Raw rank=3 (with a resort-wide, department-blind
-                    // rank=2 fallback) excluded this resort's real HR employee.
-                    $notify_person = Employee::whereIn('id', Common::getResortHrEmployeeIds($this->resort->resort_id))->first();
-
-                    $newemployee = Employee::with(['resortAdmin','position','department'])->where('resort_id', $this->resort->resort_id)->where('id',$emp_detail->id)->first();
-                      try {
-                          event(new ResortNotificationEvent(Common::nofitication(
-                              $this->resort->resort_id,
-                              10,
-                              'Payroll Pension Compliance',
-                              "Employee {$newemployee->resortAdmin->full_name} ({$newemployee->position->position_title}) is Maldivian but has no pension deduction applied. Maldivian regulations require a mandatory 7% pension contribution for all Maldivian employees.",
-                              0,
-                              $notify_person->id ?? 0,
-                              'Payroll'
-                          )));
-                      } catch (\Exception $notifyErr) {
-                          Log::warning('Pension compliance notification broadcast failed: ' . $notifyErr->getMessage());
-                      }
-
-                    $compliance = Compliance::Create([
-                            'resort_id' => $this->resort->resort_id,
-                            'employee_id' => $newemployee->id,
-                            'module_name' => 'Payroll',
-                            'compliance_breached_name' => 'Payroll Pension Compliance',
-                            'description' => "Employee {$newemployee->resortAdmin->full_name} ({$newemployee->position->position_title}) is Maldivian but has no pension deduction applied. Maldivian regulations require a mandatory 7% pension contribution for all Maldivian employees.",
-                            'reported_on' => Carbon::now(),
-                            'status' => 'Breached'
-                    ]);
-                }
-
-
-
-              
             }
-        
-            DB::commit(); // ✅ Commit transaction
-
-
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Employees Deductions successfully added to payroll.'
-            ]);
+            $reason = trim((string) $request->input('reason', ''));
+            $changes = array_filter($posted, fn ($p) => $this->recordEntry($payroll, $p[0], $p[1], $p[2], '', null, true));
+            if ($changes && mb_strlen($reason) < 3) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'reason_required' => true,
+                    'message' => 'City ledger or "Other" amounts changed — please give a reason for the change.'], 422);
+            }
+            foreach ($changes as [$employeeId, $kind, $amount]) {
+                $this->recordEntry($payroll, $employeeId, $kind, $amount, $reason);
+            }
+            $response = $this->recomputeAndRespond($payroll, ['deductions'], 'Employees Deductions successfully added to payroll.');
+            if ($response->getData(true)['success'] ?? false) {
+                $this->flagMissingPension($payroll);
+            }
+            return $response;
 
         } catch (\Exception $e) {
             DB::rollBack(); // ✅ Rollback in case of error
@@ -1048,111 +1252,23 @@ class PayrollController extends Controller
         try {
             // payroll_id is the write key below — verify it belongs to
             // this resort and is still editable (P-02) before writing.
-            [, $error] = $this->editablePayrollOrError($request->payroll_id, $this->resort->resort_id);
+            [$payroll, $error] = $this->editablePayrollOrError($request->payroll_id, $this->resort->resort_id);
             if ($error) {
                 DB::rollBack();
                 return $error;
             }
 
-            foreach ($request->reviewData as $review) {
-                // Use earningsNormal (Total Earnings from DOM) directly — it already includes all components
-                $total_earnings = (float)($review['earningsNormal'] ?? 0);
-                // Fallback: if earningsNormal is 0, calculate from components
-                if ($total_earnings <= 0) {
-                    $total_earnings = (float)($review['earnedSalary'] ?? 0) + (float)($review['overtimeTotal'] ?? 0) + (float)($review['serviceCharge'] ?? 0) + (float)($review['earningsAllowance'] ?? 0);
-                }
-                $total_deductions = (float)($review['totalDeductions'] ?? 0);
-                // dd($review);
-                // ✅ Fetch Employee details
-                $emp_detail = Employee::with(['position', 'department'])
-                    ->where('Emp_id', $review['id'])
-                    ->where('resort_id', $this->resort->resort_id)
-                    ->first();
-
-                if (!$emp_detail) {
-                    DB::rollBack(); // Rollback transaction if newemployee not found
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Employee not found for ID: ' . $review['id']
-                    ], 404);
-                }
-
-              $reviewRecord = PayrollReview::updateOrCreate(
-                    [
-                        'payroll_id' => $request->payroll_id,
-                        'employee_id' => $emp_detail->id,
-                    ],
-                    [
-                        'Emp_id' => $review['id'],
-                        'service_charge' => $review['serviceCharge'] ?? 0,
-                        // §35 — only ever sent by the Casual run; null for
-                        // every Permanent/Intern review, same as before.
-                        'service_provider_commission' => $review['serviceProviderCommission'] ?? null,
-                        'regularOTPay' => $review['overtimeNormal'] ?? 0,
-                        'fridayOTPay' => $review['overtimeFriday'] ?? 0,
-                        'holidayOTPay' => $review['overtimeHoliday'] ?? 0,
-                        'earnings_basic' => $review['earningsBasic'] ?? 0,
-                        'earned_salary' => $review['earnedSalary'] ?? 0,
-                        'earnings_allowance' => $review['earningsAllowance'] ?? 0,
-                        'earnings_overtime' => $review['overtimeTotal'] ?? 0,
-                        'total_earnings' => $total_earnings,
-                        'total_deductions' => $total_deductions,
-                        'net_salary' => $total_earnings - $total_deductions,
-                    ]
-                );
-
-            //    here minimum wage check
-            $minWageMVR = 8021; // Minimum wage in MVR
-               $minWageUSD = 520; // Minimum wage in MVR
-
-               $employeesBelowMinWageInMVR = Employee::where('resort_id', $this->resort->resort_id)
-                    ->where('basic_salary', '<', $minWageMVR)
-                    ->where('basic_salary_currency', 'MVR')
-                    ->get();
-
-               $employeesBelowMinWageInUSD = Employee::where('resort_id', $this->resort->resort_id)
-                    ->where('basic_salary', '<', $minWageUSD) // Assuming you have a conversion rate set in your config
-                    ->where('basic_salary_currency', 'USD')
-                    ->get();
-               $employeesBelowMinWage = $employeesBelowMinWageInMVR->merge($employeesBelowMinWageInUSD);
-               if ($employeesBelowMinWage->isNotEmpty()) {
-                    foreach ($employeesBelowMinWage as $employee) 
-                    {
-                         $compliance = Compliance::firstOrCreate([
-                              'resort_id' => $this->resort->resort_id,
-                              'employee_id' => $employee->id,
-                              'module_name' => 'Workforce Planning',
-                              'compliance_breached_name' => 'Minimum Wage',
-                              'description' => "Employee {$employee->resortAdmin->full_name} has a basic salary below the minimum wage.",
-                              'reported_on' => Carbon::now(),
-                              'status' => 'Breached'
-                         ]);
-                    }
-               }
-
-                // Delete previous allowances to avoid duplicates
-                PayrollReviewAllowances::where('payroll_review_id', $reviewRecord->id)->delete();
-
-                // Save new dynamic allowances
-                if (!empty($review['allowances'])) {
-                    foreach ($review['allowances'] as $allowance) {
-                        // dd($allowance);
-                        PayrollReviewAllowances::create([
-                            'payroll_review_id' => $reviewRecord->id,
-                            'allowance_type' => $allowance['type'],
-                            'amount' => $allowance['amount'],
-                            'amount_unit' => $allowance['amount_unit'],
-                        ]);
-                    }
-                }
+            // G1: earnings, allowances and net are worked out on the server; the posted figures are ignored.
+            // Saves every part, so what is sent for approval is one consistent calculation.
+            $computed = $this->computePayroll($payroll);
+            if (!$computed['ok']) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => $computed['message']], 422);
             }
-        
-            DB::commit(); // ✅ Commit transaction
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Employees Earning Review successfully added to payroll.'
-            ]);
+            $this->persistComputed($payroll, $computed['rows'], ['attendance', 'service_charge', 'deductions', 'review'], $computed['unit']);
+            DB::commit();
+            $this->flagMinimumWage();
+            return response()->json(['success' => true, 'message' => 'Employees Earning Review successfully added to payroll.']);
 
         } catch (\Exception $e) {
             DB::rollBack(); // ✅ Rollback in case of error
@@ -1303,6 +1419,9 @@ class PayrollController extends Controller
                 ], 422);
             }
 
+            if ($mismatch = $this->payrollMismatches($payroll)) {
+                return response()->json(['success' => false, 'message' => $mismatch], 422);
+            }
             DB::transaction(fn () => $this->finalizeAndLockPayroll($payroll, now()->format('Y-m-d')));
             $this->notifyPayrollLocked($payroll);
 
@@ -1340,6 +1459,13 @@ class PayrollController extends Controller
                 'message' => 'Only a draft payroll can be sent for approval.',
             ], 422);
         }
+
+        // G1: what goes into the approval chain is a fresh server calculation.
+        $computed = $this->computePayroll($payroll);
+        if (!$computed['ok']) {
+            return response()->json(['success' => false, 'message' => $computed['message']], 422);
+        }
+        DB::transaction(fn () => $this->persistComputed($payroll, $computed['rows'], ['attendance', 'service_charge', 'deductions', 'review'], $computed['unit']));
 
         // Define the 3-step approval chain
         $approvalChain = [
@@ -1425,6 +1551,15 @@ class PayrollController extends Controller
             ->firstOrFail();
 
         $isReject = $request->action === 'reject';
+
+        if ($payroll->status !== 'pending_approval') {
+            return response()->json(['success' => false, 'message' => 'This payroll is not awaiting approval.'], 422);
+        }
+        // G1: every approval step re-checks the saved figures against a fresh calculation (runs already in the
+        // chain included). A reject is always allowed — it sends the run back to draft to be corrected.
+        if (!$isReject && ($mismatch = $this->payrollMismatches($payroll))) {
+            return response()->json(['success' => false, 'message' => $mismatch], 422);
+        }
 
         // Frozen signature, only for an approve (same pattern as Final Settlement).
         $signatureFields = $isReject ? [] : Common::snapshotSignature($currentUser->id, 'payroll-approval', $approval->id);
@@ -2247,14 +2382,6 @@ class PayrollController extends Controller
             ->pluck('id')
             ->all();
 
-        $latestAttendanceUpdates = DB::table('payroll_attendance_activity_log')
-            ->whereIn('employee_id', $scopedEmployeeIds)
-            ->where('resort_id', $resortId)
-            ->where('payroll_id', $request->payrollId)
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->groupBy('employee_id');
-
         $attendanceRecords = ParentAttendace::whereIn('Emp_id', $scopedEmployeeIds)
             ->whereBetween('date', [$request->startDate, $request->endDate])
             ->get();
@@ -2379,13 +2506,27 @@ class PayrollController extends Controller
         $nextMonthDate = Carbon::parse($request->startDate)->addMonthNoOverflow()->startOfMonth();
         // External lookup: a slow / unreachable / odd answer must not break the payroll
         // calculation — treat it as "not Ramadan" (only affects the Ramadan-bonus hint).
-        try {
-            $response = Http::timeout(5)->get("https://api.aladhan.com/v1/gToH", ['date' => $nextMonthDate->format('d M Y')]);
-            $isNextMonthRamadan = $response->successful() && (int) data_get($response->json(), 'data.hijri.month.number') === 9;
-        } catch (\Throwable $e) {
-            \Log::warning('Ramadan lookup failed: ' . $e->getMessage());
-            $isNextMonthRamadan = false;
+        // A successful answer is cached for the month, so the bonus can't flip between saving the run and the
+        // re-check at each approval step (G1) just because the lookup failed once.
+        $ramadanKey = 'payroll:ramadan:' . $nextMonthDate->format('Y-m');
+        $isNextMonthRamadan = \Cache::get($ramadanKey);
+        if ($isNextMonthRamadan === null) {
+            try {
+                $response = Http::timeout(5)->get("https://api.aladhan.com/v1/gToH", ['date' => $nextMonthDate->format('d M Y')]);
+                $isNextMonthRamadan = $response->successful() && (int) data_get($response->json(), 'data.hijri.month.number') === 9;
+                if ($response->successful()) {
+                    \Cache::put($ramadanKey, $isNextMonthRamadan, now()->addDays(62));
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Ramadan lookup failed: ' . $e->getMessage());
+                $isNextMonthRamadan = false;
+            }
         }
+
+        // One-off extra payments HR added to this run (G1) are paid as allowance lines.
+        $extraPayments = $request->payrollId
+            ? PayrollManualEntry::live()->where('payroll_id', $request->payrollId)->where('kind', 'extra_payment')->get()->groupBy('employee_id')
+            : collect();
 
         // Load employee data
         $employees = Employee::with(['resortAdmin', 'department', 'position', 'allowance'])
@@ -2398,8 +2539,8 @@ class PayrollController extends Controller
             $employees,
             $currency,
             $settings,
-            $latestAttendanceUpdates,
             $request,
+            $extraPayments,
             $isNextMonthRamadan,
             $rosterContext
         ) {
@@ -2601,19 +2742,8 @@ class PayrollController extends Controller
                 }
             }
 
-            // Apply overrides from logs
-            if (isset($latestAttendanceUpdates[$empId])) {
-                foreach ($latestAttendanceUpdates[$empId] as $log) {
-                    // A manual HR override of present_days is a deliberate
-                    // whole-day correction — treat it as that many full-day
-                    // equivalents too, not re-fractionalized.
-                    if ($log->field === 'present_days') { $presentCount = $log->new_value; $presentDayEquivalent = (float) $log->new_value; }
-                    if ($log->field === 'absent_days') $absentCount = $log->new_value;
-                    if ($log->field === 'total_ot') $totalHours = $log->new_value;
-                    if ($log->field === 'regular_ot_hours') $regularOT = $log->new_value;
-                    if ($log->field === 'holiday_ot_hours') $holidayOT = $log->new_value;
-                }
-            }
+            // Saved attendance edits are no longer replayed here as overrides (G1, founder 2026-11-06): days and
+            // OT always come from Time & Attendance; wrong attendance is fixed there.
 
             // WP3/WP34 (D3) — Interns fold into this same Permanent payroll
             // run, but must NEVER be paid from employees.basic_salary —
@@ -2672,6 +2802,16 @@ class PayrollController extends Controller
                 $allowanceBreakdown[$label] = round($amount, 2);
                 $totalAllowance += $amount;
             }
+            $extras = ($extraPayments[$employee->id] ?? collect())->map(function ($entry) use ($currency, $settings) {
+                $amount = (float) $entry->amount;
+                if ($currency === 'MVR' && $entry->currency === 'USD') {
+                    $amount *= $settings->DollertoMVR;
+                } elseif ($currency === 'Dollar' && $entry->currency === 'MVR') {
+                    $amount /= $settings->DollertoMVR;
+                }
+                return ['name' => $entry->label ?: 'Extra payment', 'amount' => round($amount, 2), 'unit' => $entry->currency];
+            })->values();
+            $totalAllowance += $extras->sum('amount');
 
             $serviceCharge = Common::getServiceCharge($employee->id, $this->resort->resort_id, $request->payrollId, $employee);
              if ($currency === 'MVR')
@@ -2754,7 +2894,7 @@ class PayrollController extends Controller
                         'amount' => round($amount, 2),
                         'unit' => $a->amount_unit ?? 'USD'
                     ];
-                }),
+                })->concat($extras)->values(),
                 'service_charge' => $serviceCharge,
                 'ramadan_bonus' => $ramadanBonus,
                 'normal_pay' => $normalPay,
@@ -3104,74 +3244,28 @@ class PayrollController extends Controller
             ], 400);
         }
 
-        $currency = $request->input('currency', 'Dollar');
-        $payrollId = $request->input('payrollId');
-        $employeeData = $request->input('employees'); // array of ['id' => ..., 'earned_salary' => ...]
-        // dd($employeeData);
-        $employees = collect($employeeData)->map(function ($emp) use ($resortId) {
-        // resort_id scoped — otherwise any posted employee id returned that
-        // employee's nationality/salary/allowance data for the pension &
-        // EWT breakdown, regardless of resort.
-        $employee = Employee::with('allowance.allowanceName','resortAdmin','department', 'position')
-            ->select('id', 'emp_id', 'basic_salary', 'basic_salary_currency', 'nationality','ewt_status')
-            ->where('resort_id', $resortId)
-            ->find($emp['id']);
-
-            if ($employee) {
-                // Attach custom fields to the model
-                $employee->earned_salary = $emp['earned_salary'];
-                $employee->total_ot_pay = $emp['totalOTPay']; // attach OT pay
-            }
-
-            return $employee;
-        })->filter();
+        // G1: pension and EWT come from the server's own calculation of the run (computePayroll) — the earned
+        // salary / OT the browser posts are ignored; only the employee ids are used, to pick the rows to show.
+        $payroll = Payroll::where('id', $request->input('payrollId'))->where('resort_id', $resortId)->first();
+        if (!$payroll) {
+            return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
+        }
+        $computed = $this->computePayroll($payroll);
+        if (!$computed['ok']) {
+            return response()->json(['success' => false, 'message' => $computed['message']], 422);
+        }
+        $currency = $computed['unit'] === 'MVR' ? 'MVR' : 'Dollar';
+        $rate = (float) $settings['DollertoMVR'];
+        $wanted = collect($request->input('employees', []))->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $employees = Employee::with('resortAdmin', 'position')->select('id', 'emp_id', 'Admin_Parent_id', 'Position_id', 'nationality', 'ewt_status')
+            ->where('resort_id', $resortId)->whereIn('id', array_intersect($wanted, array_keys($computed['rows'])))->get();
         $responseData = [];
 
-        foreach ($employees as $employee) 
+        foreach ($employees as $employee)
         {
-            $basicSalary = floatval($employee->basic_salary);
-            $basicCurrency = $employee->basic_salary_currency;
-
-            // Convert basic salary to MVR for pension calculation
-            $salaryInMVR = ($basicCurrency === 'USD') ? $basicSalary * $settings['DollertoMVR'] : $basicSalary;
-
-            // Get earned salary (prorated) — this is what the employee actually earns this period
-            $earnedSalaryDisplay = isset($employee->earned_salary) ? floatval($employee->earned_salary) : 0;
-            // Convert earned salary to MVR if display currency is Dollar
-            $earnedSalaryMVR = ($currency === 'Dollar') ? $earnedSalaryDisplay * $settings['DollertoMVR'] : $earnedSalaryDisplay;
-
-            // Allowance in MVR
-            $totalAllowanceMVR = 0;
-            foreach ($employee->allowance as $allowance)
-            {
-                $amount = floatval($allowance->amount);
-                if ($allowance->amount_unit === 'USD') {
-                    $amount *= $settings['DollertoMVR'];
-                }
-                $totalAllowanceMVR += $amount;
-            }
-
-            // Service Charge in MVR
-            $serviceCharge = Common::getServiceCharge($employee->id, $resortId, $payrollId, $employee);
-            $serviceChargeInMVR = ($currency === 'Dollar') ? $serviceCharge * $settings['DollertoMVR'] : $serviceCharge;
-
-            // Total OT pay in MVR
-            $totalOTPay = isset($employee->total_ot_pay) ? floatval($employee->total_ot_pay) : 0;
-            $totalOTPayInMVR = ($currency === 'Dollar') ? $totalOTPay * $settings['DollertoMVR'] : $totalOTPay;
-
-            // Total Earnings = Earned Salary + Allowances + Service Charge + OT
-            $totalEarningsMVR = $earnedSalaryMVR + $totalAllowanceMVR + $serviceChargeInMVR + $totalOTPayInMVR;
-
-            // Pension for Maldivian — 7% of earned salary (prorated based on actual working days)
-            // Calculate directly in display currency to avoid rounding errors from double conversion
-            $isMaldivian = $employee->nationality === 'Maldivian';
-            $pensionDisplay = $isMaldivian ? round($earnedSalaryDisplay * 0.07, 2) : 0;
-            $pensionMVR = ($currency === 'Dollar') ? $pensionDisplay * $settings['DollertoMVR'] : $pensionDisplay;
-
-            // EWT is calculated on total earnings minus pension
-            $taxableIncomeMVR = max($totalEarningsMVR - $pensionMVR, 0);
-
-            $ewtMVR = Common::calculateEWT($taxableIncomeMVR);
+            $row = $computed['rows'][$employee->id];
+            $taxableIncomeMVR = $row['tax']['taxable_mvr'];
+            $ewtMVR = $row['tax']['ewt_mvr'];
 
             // ewt_status is stored lowercase 'yes'/'no' (EmployeeController) — "Yes" never matched, so the alert never fired.
             if(strtolower((string) $employee->ewt_status) === 'yes' && $taxableIncomeMVR > 60000)
@@ -3179,7 +3273,7 @@ class PayrollController extends Controller
                 // Raw rank=3 (with a resort-wide, department-blind rank=2
                 // fallback) excluded this resort's real HR employee.
                 $notify_person = Employee::whereIn('id', Common::getResortHrEmployeeIds($this->resort->resort_id))->first();
-                if($ewtMVR === 0)
+                if((float) $ewtMVR === 0.0)
                 {
                     try {
                         event(new ResortNotificationEvent(Common::nofitication(
@@ -3256,8 +3350,8 @@ class PayrollController extends Controller
 
             }
 
-            $pensionFinal = $pensionDisplay; // Already in display currency, no double conversion needed
-            $ewtFinal = ($currency === 'Dollar') ? $ewtMVR * $settings['MVRtoDoller'] : $ewtMVR;
+            $pensionFinal = $row['deductions']['pension'];
+            $ewtFinal = $row['deductions']['ewt'];
 
             // Build EWT breakdown for tooltip
             $ewtBreakdown = [];
@@ -3275,15 +3369,15 @@ class PayrollController extends Controller
                             $ewtBreakdown[] = [
                                 'slab' => 'MVR ' . number_format($min) . ' - ' . ($bracket->max_salary ? 'MVR ' . number_format($max) : 'Above'),
                                 'rate' => $rate . '%',
-                                'taxable' => round(($currency === 'Dollar') ? $taxableAmount * $settings['MVRtoDoller'] : $taxableAmount, 2),
-                                'tax' => round(($currency === 'Dollar') ? $slabTax * $settings['MVRtoDoller'] : $slabTax, 2),
+                                'taxable' => round(($currency === 'Dollar') ? $taxableAmount / $rate : $taxableAmount, 2),
+                                'tax' => round(($currency === 'Dollar') ? $slabTax / $rate : $slabTax, 2),
                             ];
                         }
                     }
                 }
             }
 
-            $totalEarningsFinal = ($currency === 'Dollar') ? $totalEarningsMVR * $settings['MVRtoDoller'] : $totalEarningsMVR;
+            $totalEarningsFinal = $row['review']['total_earnings'];
 
             $responseData[] = [
                 'Emp_id' => $employee->emp_id,
@@ -3291,7 +3385,7 @@ class PayrollController extends Controller
                 'ewt' => round($ewtFinal, 2),
                 'currency' => $currency,
                 'total_earnings' => round($totalEarningsFinal, 2),
-                'taxable_income' => round(($currency === 'Dollar') ? $taxableIncomeMVR * $settings['MVRtoDoller'] : $taxableIncomeMVR, 2),
+                'taxable_income' => round(($currency === 'Dollar') ? $taxableIncomeMVR / $rate : $taxableIncomeMVR, 2),
                 'ewt_breakdown' => $ewtBreakdown,
             ];
         }

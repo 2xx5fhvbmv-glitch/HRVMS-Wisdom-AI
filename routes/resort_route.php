@@ -912,6 +912,11 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::post('/payroll/save-deductions', 'Payroll\PayrollController@saveDeductionsToPayroll')->name('payroll.saveDeductions');
     Route::post('/payroll/save-reviews', 'Payroll\PayrollController@saveReviewsToPayroll')->name('payroll.saveReviews');
     Route::post('/payroll/save-summary', 'Payroll\PayrollController@saveSummaryToPayroll')->name('payroll.saveSummary');
+    // G1: HR-entered amounts (who / when / why) — "Other" deductions, one-off extra payments, city ledger upload.
+    Route::post('/payroll/entries/add', 'Payroll\PayrollController@addPayrollEntry')->name('payroll.entries.add');
+    Route::post('/payroll/entries/remove', 'Payroll\PayrollController@removePayrollEntry')->name('payroll.entries.remove');
+    Route::post('/payroll/entries/list', 'Payroll\PayrollController@listPayrollEntries')->name('payroll.entries.list');
+    Route::post('/payroll/city-ledger', 'Payroll\PayrollController@uploadCityLedger')->name('payroll.cityLedger.upload');
 
     Route::post('payroll/fetch-time-attendance', 'Payroll\PayrollController@fetchTimeAttendance')->name('fetch.time.attendance');
     Route::post('payroll/fetch-service-charges', 'Payroll\PayrollController@fetchServiceCharge')->name('fetch.service.charge');

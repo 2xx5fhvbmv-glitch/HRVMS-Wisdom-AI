@@ -75,6 +75,16 @@ class DemoEnvSeeder
             }
         }
 
+        // The exit seeder takes leavers out of runs after payroll was seeded; re-save the runs still in draft /
+        // approval through the payroll calculation itself (G1), so the demo agrees with what the approval re-check
+        // computes — e.g. a leaver's service-charge share goes back to the pool, Casual pension/EWT are filled in.
+        foreach (DB::table('payroll')->where('resort_id', $resortId)->where('status', '!=', 'locked')->pluck('id') as $runId) {
+            $result = app(\App\Http\Controllers\Resorts\Payroll\PayrollController::class)->recalculateRun(\App\Models\Payroll::find($runId));
+            if (!$result['ok']) {
+                $failed["Payroll run {$runId} recalculated"] = $result['message'];
+            }
+        }
+
         try {
             Common::createFolderByResort($resortId);
         } catch (\Throwable $e) {

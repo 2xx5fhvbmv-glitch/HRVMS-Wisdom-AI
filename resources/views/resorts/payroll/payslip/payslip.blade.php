@@ -217,10 +217,12 @@
 
                 $employee = $payroll->employees->first()?->employee;
 
-                function convertToWords($number) {
+                // A closure, not a global function: final_settlement_review declares its own convertToWords()
+                // with different wording, and a process that renders both (queue worker, tests) would fatal.
+                $convertToWords = function ($number) {
                     $formatter = new NumberFormatter('en', NumberFormatter::SPELLOUT);
                     return ucfirst($formatter->format($number));
-                }
+                };
             @endphp
 
             @if($employee?->payment_mode == 'Bank')
@@ -244,7 +246,7 @@
                 </div>
 
                 <div class="bg-themeGrayLight">
-                    USD {{ convertToWords($net_salary) }} Only
+                    USD {{ $convertToWords($net_salary) }} Only
                 </div>
             @endif
 

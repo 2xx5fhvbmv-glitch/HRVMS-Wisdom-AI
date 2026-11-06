@@ -316,6 +316,10 @@
                                         <a id="download-city-ledger-template" href="#" class="a-link">Download City Ledger Template</a>
                                     </div>
                                     <div class="col-auto">
+                                        <input type="text" class="form-control form-control-sm" id="city-ledger-reason" maxlength="500"
+                                            placeholder="Reason for this upload (required)" aria-label="Reason for the city ledger upload">
+                                    </div>
+                                    <div class="col-auto">
                                         <div class="uploadFile-btn me-0">
                                             <a href="javascript:void(0)" id="upload-city-ledger-button" class="btn payroll-btn-primary btn-sm"
                                                 >
@@ -380,6 +384,10 @@
                                     <div class="col-auto">
                                         <a href="#" id="distribute-service-charge" class="btn payroll-btn-primary">Distribute Amount</a>
                                     </div>
+                                    <div class="col-lg-6 col-md-8 col-sm-12">
+                                        <input type="text" class="form-control" id="total-ser-reason" maxlength="500"
+                                            placeholder="Reason for this amount (required when it changes)" aria-label="Reason for the service charge amount">
+                                    </div>
                                 </div>
                             </div>
                             <div class="table-responsive">
@@ -416,6 +424,9 @@
                                             <h3>Review</h3>
                                             <p>Review the final payroll data</p>
                                         </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <a href="#extraPayment-modal" data-bs-toggle="modal" id="add-extra-payment" class="btn payroll-btn-primary btn-sm">Add extra payment</a>
                                     </div>
                                 </div>
                             </div>
@@ -702,10 +713,63 @@
                             <label for="amount_unit" class="form-label">Currency</label>
                             <input type="text" class="form-control" id="amount_unit" placeholder="Currency" readonly>
                         </div>
+
+                        <div class="mb-3">
+                            <label for="deduction_reason" class="form-label">REASON <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="deduction_reason" rows="2" maxlength="500" placeholder="Why is this deducted?"></textarea>
+                        </div>
+                        <div id="other-entries" class="small"></div>
                     </div>
                     <div class="modal-footer">
                         <a href="#" data-bs-dismiss="modal" class="btn payroll-btn-secondary ms-auto">Cancel</a>
                         <button type="submit" class="btn payroll-btn-primary" id="submitDeduction">Submit</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {{-- One-off extra payment (G1): amount + required reason, kept with who / when; paid as an allowance line. --}}
+    <div class="modal fade" id="extraPayment-modal" tabindex="-1" aria-labelledby="extraPaymentLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="extraPaymentLabel">Add extra payment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="extraPaymentForm">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="extra_emp" class="form-label">EMPLOYEE</label>
+                            <select class="form-select" id="extra_emp" required>
+                                <option value="">Select</option>
+                                @foreach($employees as $employee)
+                                    <option value="{{ $employee->Emp_id }}">{{ $employee->resortAdmin->first_name }} {{ $employee->resortAdmin->last_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="extra_label" class="form-label">PAYMENT FOR</label>
+                            <input type="text" class="form-control" id="extra_label" maxlength="100" placeholder="e.g. Bonus" required>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-8">
+                                <label for="extra_amount" class="form-label">AMOUNT</label>
+                                <input type="number" step="0.01" min="0.01" class="form-control" id="extra_amount" required>
+                            </div>
+                            <div class="col-4">
+                                <label for="extra_currency" class="form-label">CURRENCY</label>
+                                <select class="form-select" id="extra_currency"><option value="USD">USD</option><option value="MVR">MVR</option></select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="extra_reason" class="form-label">REASON <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="extra_reason" rows="2" maxlength="500" required placeholder="Why is this paid?"></textarea>
+                        </div>
+                        <div id="extra-entries" class="small"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="#" data-bs-dismiss="modal" class="btn payroll-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn payroll-btn-primary">Add</button>
                     </div>
                 </form>
             </div>
@@ -810,6 +874,69 @@
         return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    // "$1,234.50" / "MVR 1,234.50" -> 1234.5 (parseFloat alone stopped at the comma: 1,234.00 became 1).
+    function moneyVal(text) {
+        return parseFloat(String(text).replace(/[^0-9.\-]/g, '')) || 0;
+    }
+
+    // The server's message (pending leave, reason required, figures changed...) instead of a generic one.
+    function payrollXhrError(xhr, fallback) {
+        toastr.error((xhr && xhr.responseJSON && xhr.responseJSON.message) || fallback, 'Error', { positionClass: 'toast-bottom-right' });
+    }
+
+    // G1: every deduction is worked out on the server — show its figures (rows keyed by Employee ID).
+    function applyDeductionRows(rows) {
+        var sym = (selectedCurrency === 'Dollar') ? '$' : 'MVR ';
+        var cols = ['attendance_deduction', 'city_ledger', 'staff_shop', 'advance_loan', 'pension', 'ewt', 'other', 'total_deductions'];
+        $("#table-deductions tbody tr").each(function () {
+            var row = rows[$(this).find("td:eq(0)").text().trim()];
+            if (!row) return;
+            var $row = $(this);
+            cols.forEach(function (col, i) { $row.find("td:eq(" + (i + 3) + ")").text(sym + fmtNum(row.deductions[col])); });
+        });
+    }
+
+    // HR entries of one kind (who / when / why), each removable while the run is a draft.
+    function loadPayrollEntries(kind, target) {
+        $.post('{{ route("payroll.entries.list") }}', { payroll_id: localStorage.getItem("payroll_id"), kind: kind, _token: '{{ csrf_token() }}' }, function (res) {
+            var list = (res.entries || []).map(function (e) {
+                return '<li class="d-flex justify-content-between gap-2 py-1 border-bottom"><span><b>' + $('<i>').text(e.employee + ' · ' + (e.label || '')).html()
+                    + '</b> ' + e.currency + ' ' + fmtNum(e.amount) + '<br><span class="text-muted">' + $('<i>').text(e.reason + ' — ' + e.by + ', ' + e.at).html()
+                    + '</span></span><a href="#" class="text-danger remove-payroll-entry" data-id="' + e.id + '" data-kind="' + kind + '">Remove</a></li>';
+            }).join('');
+            $(target).html(list ? '<div class="mt-2"><b>Already added</b><ul class="list-unstyled mb-0">' + list + '</ul></div>' : '');
+        });
+    }
+
+    $(document).on('click', '.remove-payroll-entry', function (e) {
+        e.preventDefault();
+        var kind = $(this).data('kind');
+        $.post('{{ route("payroll.entries.remove") }}', { payroll_id: localStorage.getItem("payroll_id"), entry_id: $(this).data('id'), _token: '{{ csrf_token() }}' })
+            .done(function (res) {
+                toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                if (kind === 'other_deduction') { applyDeductionRows(res.rows); loadPayrollEntries(kind, '#other-entries'); }
+                else { loadPayrollEntries(kind, '#extra-entries'); getstep6data(currency, 1); }
+            })
+            .fail(function (xhr) { payrollXhrError(xhr, 'Could not remove the entry.'); });
+    });
+
+    $(document).on('shown.bs.modal', '#addDeduction-modal', function () { loadPayrollEntries('other_deduction', '#other-entries'); });
+    $(document).on('shown.bs.modal', '#extraPayment-modal', function () { loadPayrollEntries('extra_payment', '#extra-entries'); });
+
+    $(document).on('submit', '#extraPaymentForm', function (e) {
+        e.preventDefault();
+        $.post('{{ route("payroll.entries.add") }}', {
+            payroll_id: localStorage.getItem("payroll_id"), kind: 'extra_payment', employee: $('#extra_emp').val(),
+            label: $('#extra_label').val(), amount: $('#extra_amount').val(), currency: $('#extra_currency').val(),
+            reason: $('#extra_reason').val(), _token: '{{ csrf_token() }}'
+        }).done(function (res) {
+            toastr.success('Extra payment added.', 'Success', { positionClass: 'toast-bottom-right' });
+            $('#extraPaymentForm')[0].reset();
+            loadPayrollEntries('extra_payment', '#extra-entries');
+            getstep6data(currency, 1);
+        }).fail(function (xhr) { payrollXhrError(xhr, 'Could not add the extra payment.'); });
+    });
+
     // Helper: get selected employee IDs (numeric) — uses checkboxes or falls back to localStorage
     function getSelectedEmployeeIds() {
         var ids = [];
@@ -878,7 +1005,7 @@
             setTimeout(function() {
                 $('#msform').find('input, select, textarea').not('#searchField, #review-search').prop('disabled', true);
                 $('.editable').off('dblclick click');
-                $('.add-deduction-btn, #distribute-service-charge, #upload-city-ledger-button, #OverTimeform, #download-city-ledger-template, #upload-city-ledger, #saveAsDraft').hide();
+                $('.add-deduction-btn, #distribute-service-charge, #upload-city-ledger-button, #OverTimeform, #download-city-ledger-template, #upload-city-ledger, #saveAsDraft, #add-extra-payment, #city-ledger-reason, #total-ser-reason').hide();
                 // Hide Action column in deductions table
                 $('#table-deductions th:last-child, #table-deductions td:last-child').hide();
                 // Disable checkboxes in employee selection
@@ -1330,10 +1457,8 @@
                             });
                         }
                     },
-                    error: function () {
-                        toastr.error("Error saving employees.", 'Error',{
-                            positionClass: 'toast-bottom-right'
-                        });
+                    error: function (xhr) {
+                        payrollXhrError(xhr, "Error saving attendance.");
                     }
                 });
 
@@ -1346,7 +1471,7 @@
                 var payrollId = localStorage.getItem("payroll_id"); // Retrieve stored payroll ID
                 var selectedEmployees = localStorage.getItem("selectedEmployees"); // Retrieve stored payroll ID
 
-                var totalServiceCharge = parseFloat($("#total-ser").val()); // Get service charge amount
+                var totalServiceCharge = moneyVal($("#total-ser").val()); // "10,000" was read as 10
 
                 if (!payrollId) {
                     toastr.error("Payroll draft not found. Please start again.", 'Error', {
@@ -1398,10 +1523,18 @@
                     data: {
                         payroll_id: payrollId,
                         ServiceChargesData : ServiceChargesData,
+                        total_service_charge: totalServiceCharge,
+                        reason: $("#total-ser-reason").val(),
                         _token: '{{ csrf_token() }}'
                     },
                     success: function (response) {
                         if (response.success) {
+                            // The shares the server worked out (eligible staff only) — show those.
+                            var sym = (currency === 'Dollar') ? '$' : 'MVR ';
+                            $("#table-serviceCharge tbody tr").each(function () {
+                                var row = (response.rows || {})[$(this).find("td:eq(0)").text().trim()];
+                                if (row) $(this).find(".service-charge").text(sym + fmtNum(row.service_charge));
+                            });
                             toastr.success("Service Charges added to payroll successfully!", 'Success',{
                                 positionClass: 'toast-bottom-right'
                             });
@@ -1422,10 +1555,8 @@
                             });
                         }
                     },
-                    error: function () {
-                        toastr.error("Error saving employees.",'Error',{
-                            positionClass: 'toast-bottom-right'
-                        });
+                    error: function (xhr) {
+                        payrollXhrError(xhr, "Error saving service charges.");
                     }
                 });
 
@@ -1506,10 +1637,7 @@
                         }
                     },
                     error: function (xhr) {
-                        console.error('Save deductions error:', xhr.status, xhr.responseText);
-                        toastr.error("Error saving deductions.", 'Error', {
-                            positionClass: 'toast-bottom-right'
-                        });
+                        payrollXhrError(xhr, "Error saving deductions.");
                     }
                 });
 
@@ -1625,10 +1753,8 @@
                             });
                         }
                     },
-                    error: function () {
-                        toastr.error("Error saving employees.", 'Error', {
-                            positionClass: 'toast-bottom-right'
-                        });
+                    error: function (xhr) {
+                        payrollXhrError(xhr, "Error saving the review.");
                     }
                 });
 
@@ -1699,7 +1825,7 @@
         $("#distribute-service-charge").click(async function (e) {
             e.preventDefault();
 
-            var totalServiceCharge = parseFloat($("#total-ser").val().replace(currencySymbol, '').replace(',', ''));
+            var totalServiceCharge = moneyVal($("#total-ser").val());
             if (isNaN(totalServiceCharge) || totalServiceCharge <= 0) {
                 toastr.error("Please enter a valid service charge amount.", 'Error', {
                     positionClass: 'toast-bottom-right'
@@ -1882,124 +2008,57 @@
         });
     
         // Function to handle file upload
-        $("#upload-city-ledger").change(async function (e) {
+        // G1: the file is read on the server (column A Employee ID, column C amount in USD), kept with a reason.
+        $("#upload-city-ledger").change(function (e) {
             var file = e.target.files[0];
+            var $input = $(this);
             if (!file) return;
-
-            // Validate file type
-            var validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', 'text/csv'];
-            if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
+            if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
                 toastr.error("Please upload a valid Excel file (.xlsx, .xls, or .csv).", 'Error', { positionClass: 'toast-bottom-right' });
-                $(this).val('');
+                $input.val('');
                 return;
             }
-
-            var rates = await fetchRates(resortid);
-            var currencySymbol = (selectedCurrency === 'Dollar') ? '$' : 'MVR ';
-
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                try {
-                    var data = new Uint8Array(e.target.result);
-                    var workbook = XLSX.read(data, { type: 'array' });
-                    var worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-                    if (jsonData.length <= 1) {
-                        toastr.warning("Excel file is empty or has no data rows.", 'Warning', { positionClass: 'toast-bottom-right' });
-                        return;
+            var reason = $.trim($("#city-ledger-reason").val());
+            if (reason.length < 3) {
+                toastr.error("Please give a reason for this city ledger upload first.", 'Error', { positionClass: 'toast-bottom-right' });
+                $("#city-ledger-reason").focus();
+                $input.val('');
+                return;
+            }
+            var form = new FormData();
+            form.append('payroll_id', localStorage.getItem("payroll_id"));
+            form.append('file', file);
+            form.append('reason', reason);
+            form.append('_token', '{{ csrf_token() }}');
+            $.ajax({ url: '{{ route("payroll.cityLedger.upload") }}', method: 'POST', data: form, processData: false, contentType: false })
+                .done(function (res) {
+                    applyDeductionRows(res.rows || {});
+                    toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                    if ((res.not_found || []).length) {
+                        toastr.warning("Employee IDs not in this payroll: " + res.not_found.join(', '), 'Warning', { positionClass: 'toast-bottom-right' });
                     }
-
-                    var updatedCount = 0;
-                    var notFoundIds = [];
-
-                    jsonData.slice(1).forEach(function (row) {
-                        if (!row[0]) return;
-                        var employeeId = String(row[0]).trim();
-                        var cityLedgerUSD = parseFloat(row[2]) || 0;
-
-                        // Store original USD value
-                        cityLedgerData[employeeId] = cityLedgerUSD;
-
-                        // Convert based on selected currency
-                        var cityLedgerFinal = (selectedCurrency === "MVR")
-                            ? cityLedgerUSD * (rates.usd_to_mvr || 15.42)
-                            : cityLedgerUSD;
-
-                        var found = false;
-                        $("#table-deductions tbody tr").each(function () {
-                            var $row = $(this);
-                            if ($row.find("td:eq(0)").text().trim() === employeeId) {
-                                $row.find("td:eq(4)").text(currencySymbol + fmtNum(cityLedgerFinal));
-                                updateTotal($row, employeeId);
-                                found = true;
-                                updatedCount++;
-                            }
-                        });
-
-                        if (!found) notFoundIds.push(employeeId);
-                    });
-
-                    if (updatedCount > 0) {
-                        toastr.success(updatedCount + " employee(s) city ledger updated successfully!", 'Success', { positionClass: 'toast-bottom-right' });
-                    }
-                    if (notFoundIds.length > 0) {
-                        toastr.warning("Employee IDs not found in table: " + notFoundIds.join(', '), 'Warning', { positionClass: 'toast-bottom-right' });
-                    }
-                } catch (err) {
-                    console.error('Excel parse error:', err);
-                    toastr.error("Failed to parse Excel file. Please check the format.", 'Error', { positionClass: 'toast-bottom-right' });
-                }
-            };
-            reader.onerror = function () {
-                toastr.error("Failed to read the file.", 'Error', { positionClass: 'toast-bottom-right' });
-            };
-            reader.readAsArrayBuffer(file);
-            // Reset file input so same file can be re-uploaded
-            $(this).val('');
+                    $("#city-ledger-reason").val('');
+                })
+                .fail(function (xhr) { payrollXhrError(xhr, "Failed to read the city ledger file."); })
+                .always(function () { $input.val(''); });
         });
 
-        $("#addDeductionForm").submit(async function (e) {
+        // G1: each "Other" deduction is saved on the server as its own entry with a reason (who / when kept).
+        $("#addDeductionForm").submit(function (e) {
             e.preventDefault();
-
             var employeeId = $("#select_emp").val();
-            var deductionAmount = parseFloat($("#amount").val()) || 0;
-            var deductionUnit = $("#amount_unit").val(); // Get selected currency (MVR or USD)
-            var rates = await fetchRates(resortid);
-            var amountInUSD = deductionUnit === "Rufiyaa" ? (deductionAmount * rates.mvr_to_usd ) : deductionAmount;
-
-            otherData[employeeId] = (otherData[employeeId] || 0) + amountInUSD;
-
-            var finalAmount = (selectedCurrency === "MVR")
-                        ? amountInUSD * rates.usd_to_mvr
-                        : amountInUSD;
-
-            var currencySymbol = (selectedCurrency === 'Dollar') ? '$' : 'MVR ';
-            var updated = false;
-
-            $("#table-deductions tbody tr").each(function () {
-                var $row = $(this);
-                if ($row.find("td:eq(0)").text().trim() === employeeId) {
-                    var currentOther = parseFloat($row.find("td:eq(9)").text().replace(currencySymbol, '').trim()) || 0;
-                    var newOther = currentOther + finalAmount;
-                    $row.find("td:eq(9)").text(currencySymbol + fmtNum(newOther));
-                    updateTotal($row, employeeId);
-                    updated = true;
-                }
-            });
-
-            $('#addDeductionForm')[0].reset();
-            $("#addDeduction-modal").modal("hide");
-
-            if (updated) {
-                toastr.success("Deduction of " + currencySymbol + fmtNum(finalAmount) + " added for " + employeeId + ".", 'Success', {
-                    positionClass: 'toast-bottom-right'
-                });
-            } else {
-                toastr.warning("Employee " + employeeId + " not found in deductions table.", 'Warning', {
-                    positionClass: 'toast-bottom-right'
-                });
-            }
+            var unit = $("#amount_unit").val();
+            $.post('{{ route("payroll.entries.add") }}', {
+                payroll_id: localStorage.getItem("payroll_id"), kind: 'other_deduction', employee: employeeId,
+                label: $("#deductionFor option:selected").text(), amount: moneyVal($("#amount").val()),
+                currency: (unit === 'Rufiyaa' || unit === 'MVR') ? 'MVR' : 'USD',
+                reason: $("#deduction_reason").val(), _token: '{{ csrf_token() }}'
+            }).done(function (res) {
+                applyDeductionRows(res.rows || {});
+                $('#addDeductionForm')[0].reset();
+                $("#addDeduction-modal").modal("hide");
+                toastr.success("Deduction added for " + employeeId + ".", 'Success', { positionClass: 'toast-bottom-right' });
+            }).fail(function (xhr) { payrollXhrError(xhr, "Could not add the deduction."); });
         });
 
         $('#addDeduction-modal').on('hidden.bs.modal', function () {
@@ -2394,6 +2453,7 @@
                     toastr.error(res.message, 'Error', { positionClass: 'toast-bottom-right' });
                 }
             },
+            error: function(xhr) { payrollXhrError(xhr, 'Could not send the payroll for approval.'); },
             complete: function() {
                 $('#sendForApproval').prop('disabled', false).html('<i class="fa-solid fa-paper-plane me-1"></i> Send Payroll for Approval');
             }
@@ -2419,6 +2479,7 @@
                     toastr.error(res.message, 'Error', { positionClass: 'toast-bottom-right' });
                 }
             },
+            error: function(xhr) { payrollXhrError(xhr, 'Could not approve the payroll.'); },
             complete: function() {
                 $('#approvePayroll').prop('disabled', false).html('<i class="fa-solid fa-check me-1"></i> Approve');
             }
@@ -2447,6 +2508,7 @@
                     toastr.error(res.message, 'Error', { positionClass: 'toast-bottom-right' });
                 }
             },
+            error: function(xhr) { payrollXhrError(xhr, 'Could not reject the payroll.'); },
             complete: function() {
                 $('#rejectPayroll').prop('disabled', false).html('<i class="fa-solid fa-times me-1"></i> Reject');
             }
@@ -3091,29 +3153,24 @@
 
                     updatePageLength();
 
-                    $("#table-deductions tbody tr").each(async function () {
-                        var $row = $(this);
-                        var employeeId = $row.find("td:eq(0)").text();
-                       
-                        var currencySymbol = (currency === 'Dollar') ? '$' : 'MVR ';
-
-                        // City Ledger update
-                        if (cityLedgerData[employeeId] !== undefined) {
-                            var cityLedgerUSD = cityLedgerData[employeeId];
-                            var cityLedgerFinal = (currency === "MVR") 
-                                ? cityLedgerUSD * rates.usd_to_mvr 
-                                : cityLedgerUSD;
-                            $row.find("td:eq(4)").text(currencySymbol + fmtNum(cityLedgerFinal));
-                        }
-
-                        // Other deduction update
-                        if (otherData[employeeId] !== undefined) {
-                            var amountInUSD = otherData[employeeId];
-                            var FinalOtherAmount = (currency === "MVR") 
-                                ? amountInUSD * rates.usd_to_mvr 
-                                : amountInUSD;
-                            $row.find("td:eq(9)").text(currencySymbol + fmtNum(FinalOtherAmount));
-                        }
+                    // City ledger and "Other" are HR entries kept on the server (G1) — show what is saved for this run.
+                    $.post('{{ route("payroll.entries.list") }}', { payroll_id: payrollId, _token: '{{ csrf_token() }}' }, function (res) {
+                        var sums = {};
+                        (res.entries || []).forEach(function (e) {
+                            if (e.kind !== 'city_ledger' && e.kind !== 'other_deduction') return;
+                            var display = (currency === 'MVR') ? (e.currency === 'USD' ? e.amount * rates.usd_to_mvr : e.amount)
+                                                               : (e.currency === 'MVR' ? e.amount / rates.usd_to_mvr : e.amount);
+                            sums[e.employee] = sums[e.employee] || { city_ledger: 0, other_deduction: 0 };
+                            sums[e.employee][e.kind] += display;
+                        });
+                        var sym = (currency === 'Dollar') ? '$' : 'MVR ';
+                        $("#table-deductions tbody tr").each(function () {
+                            var employeeId = $(this).find("td:eq(0)").text().trim();
+                            if (!sums[employeeId]) return;
+                            $(this).find("td:eq(4)").text(sym + fmtNum(sums[employeeId].city_ledger));
+                            $(this).find("td:eq(9)").text(sym + fmtNum(sums[employeeId].other_deduction));
+                            updateTotal($(this), employeeId);
+                        });
                     });
 
                     fetchStaffShopData(selectedEmployees, startDate, endDate, currency, conversionRate);
@@ -3933,13 +3990,13 @@
         // console.log(employeeId);
         var currencySymbol = $row.find("td:eq(3)").text().includes('$') ? '$' : 'MVR ';
         
-        var attendance = parseFloat($row.find("td:eq(3)").text().replace(currencySymbol, '')) || 0;
-        var cityLedger = parseFloat($row.find("td:eq(4)").text().replace(currencySymbol, '')) || 0;
-        var staffShop = parseFloat($row.find("td:eq(5)").text().replace(currencySymbol, '')) || 0;
-        var advancedLoan = parseFloat($row.find("td:eq(6)").text().replace(currencySymbol, '')) || 0;
-        var pension = parseFloat($row.find("td:eq(7)").text().replace(currencySymbol, '')) || 0;
-        var ewt = parseFloat($row.find("td:eq(8)").text().replace(currencySymbol, '')) || 0;
-        var other = parseFloat($row.find("td:eq(9)").text().replace(currencySymbol, '')) || 0;
+        var attendance = moneyVal($row.find("td:eq(3)").text());
+        var cityLedger = moneyVal($row.find("td:eq(4)").text());
+        var staffShop = moneyVal($row.find("td:eq(5)").text());
+        var advancedLoan = moneyVal($row.find("td:eq(6)").text());
+        var pension = moneyVal($row.find("td:eq(7)").text());
+        var ewt = moneyVal($row.find("td:eq(8)").text());
+        var other = moneyVal($row.find("td:eq(9)").text());
         // console.log(other,"22222");
 
         var total = attendance + cityLedger + staffShop + advancedLoan + pension + ewt + other;
