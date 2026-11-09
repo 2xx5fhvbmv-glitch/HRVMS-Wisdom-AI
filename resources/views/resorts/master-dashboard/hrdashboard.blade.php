@@ -778,13 +778,20 @@
 #hrmd .rs-sel{font:inherit;font-size:11.5px;color:var(--g1);background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px 10px;outline:none;cursor:pointer}
 #hrmd .rs-sel:hover{border-color:#cfdcde}
 #hrmd .rs-sel:focus{border-color:var(--teal)}
-#hrmd .tl{--nw:168px;margin-top:14px;position:relative;padding-top:30px}
+#hrmd .tl{--nw:168px;--sb:8px;margin-top:14px;position:relative;padding-top:30px}
 #hrmd .tl-axis,#hrmd .tl-row{display:grid;grid-template-columns:var(--nw) minmax(0,1fr);align-items:center}
+#hrmd .tl-axis{padding-right:var(--sb)}
 #hrmd .tl-ticks{position:relative;height:16px}
 #hrmd .tl-ticks span{position:absolute;transform:translateX(-50%);font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums}
 #hrmd .tl-ticks span:first-child{transform:none}
 #hrmd .tl-ticks span:last-child{transform:translateX(-100%)}
-#hrmd .tl-body{position:relative}
+/* Fixed height: ~9 rows, the next one peeks so it reads as scrollable. The scrollbar gutter (--sb) is reserved on the axis and the Now line so the hours stay aligned. */
+#hrmd .tl-body{position:relative;max-height:430px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable}
+#hrmd .tl-body::-webkit-scrollbar{width:var(--sb)}
+#hrmd .tl-body::-webkit-scrollbar-thumb{background:var(--g4);border-radius:8px}
+/* the scroll box clips above its first row, so that row's tooltip opens downward */
+#hrmd .tl-row:first-child .tl-bar[data-tip]:hover::after{bottom:auto;top:calc(100% + 10px)}
+#hrmd .tl-row:first-child .tl-bar[data-tip]:hover::before{bottom:auto;top:calc(100% + 4px);border-top:0;border-bottom:6px solid rgba(20,35,42,.82)}
 #hrmd .tl-row{padding:7px 0;border-top:1px solid var(--line-2)}
 #hrmd .tl-row:first-child{border-top:none}
 #hrmd .tl-who{display:flex;align-items:center;gap:10px;min-width:0;padding-right:12px}
@@ -799,7 +806,7 @@
 #hrmd .tl-bar.lv{color:var(--violet);background:repeating-linear-gradient(135deg,rgba(107,95,199,.10) 0 6px,rgba(107,95,199,.04) 6px 12px);border:1px solid rgba(107,95,199,.22)}
 #hrmd .tl-bar[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%);z-index:5;font-size:11px;font-weight:500;color:#fff;white-space:nowrap;padding:7px 11px;border-radius:10px;background:rgba(20,35,42,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 20px rgba(1,45,54,.25);pointer-events:none}
 #hrmd .tl-bar[data-tip]:hover::before{content:"";position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);z-index:5;border:6px solid transparent;border-bottom:0;border-top-color:rgba(20,35,42,.82);pointer-events:none}
-#hrmd .tl-now{position:absolute;top:0;bottom:0;left:calc(var(--nw) + (100% - var(--nw)) * var(--t) / 24);width:0;z-index:3;pointer-events:none}
+#hrmd .tl-now{position:absolute;top:0;bottom:0;left:calc(var(--nw) + (100% - var(--nw) - var(--sb)) * var(--t) / 24);width:0;z-index:3;pointer-events:none}
 #hrmd .tl-now::before{content:"";position:absolute;top:20px;bottom:0;left:-.75px;width:1.5px;background:var(--lime,#E0FF02);border-radius:1px}
 #hrmd .tl-now span{position:absolute;top:0;left:50%;transform:translateX(-50%);font-size:10.5px;font-weight:600;color:#4a5a00;background:var(--lime,#E0FF02);border-radius:7px;padding:3px 9px;line-height:1.3;white-space:nowrap;font-variant-numeric:tabular-nums}
 #hrmd .tl-wrap{position:relative;padding-top:6px}

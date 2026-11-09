@@ -11,7 +11,7 @@
 <link href="{{ URL::asset('resorts_assets/css/daterangepicker.css')}}" rel=stylesheet>
 <link rel="stylesheet" href="{{ URL::asset('applicant_form_assets/css/croppie.css')}}">
 <link href="{{ URL::asset('resorts_assets/css/default.css')}}?v={{ @filemtime(public_path('resorts_assets/css/default.css')) }}" rel=stylesheet>
-<link href="{{ URL::asset('resorts_assets/css/developer.min.css')}}" rel="stylesheet">
+<link href="{{ URL::asset('resorts_assets/css/developer.min.css')}}?v={{ @filemtime(public_path('resorts_assets/css/developer.min.css')) }}" rel="stylesheet">
 <link href="{{ URL::asset('resorts_assets/css/media.css')}}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/buttons.css')}}?v={{ @filemtime(public_path('resorts_assets/css/buttons.css')) }}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/header-band.css')}}?v={{ @filemtime(public_path('resorts_assets/css/header-band.css')) }}" rel=stylesheet>
