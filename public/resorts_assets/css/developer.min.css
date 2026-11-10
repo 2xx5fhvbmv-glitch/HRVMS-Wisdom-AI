@@ -785,7 +785,7 @@ display: inline-block;
 } */
 
 .resort-image-header{
-    border-radius: 100px;
+    border-radius: 0; /* client logos keep their own shape; the old 100px clipped wide logos into a capsule */
 }
 .shopkeeper-image-header{
     border-radius: 100px;

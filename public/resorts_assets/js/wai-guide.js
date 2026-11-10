@@ -339,7 +339,7 @@
   function vis(e) { return e && e.offsetParent ? e : null; }
   var TOUR = [
     { el: function () { return vis($('#navbar-desktop-view')) || vis($('#navbar-vertical-view-menu')) || vis($('#navbar-mobile-view')); }, t: 'Every module lives here', p: 'Payroll, Leave, Accommodation and the rest. Click a module to see its screens.' },
-    { el: function () { var l = $$('.carosel-menu .btn-group > a, .dropdown-submenu > a, #navbar-mobile-view .nav-item > a').filter(vis); return l.filter(function (a) { return /accommodation/i.test(a.textContent); })[0] || l[0] || null; }, t: 'Each module has a few screens', p: 'Most modules start with a Dashboard and end with Configuration, where you set things up once.' },
+    { el: function () { var l = $$('.carosel-menu .btn-group > a, .dropdown-submenu > a, #navbar-mobile-view .nav-item > a').filter(vis); var ok = l.filter(function (a) { var r = a.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; }); return ok.filter(function (a) { return /workforce/i.test(a.textContent); })[0] || ok[0] || l[0] || null; } /* the first module that is fully on screen (Workforce Planning when you have it), so its menu opens inside the window */, t: 'Each module has a few screens', p: 'Most modules start with a Dashboard and end with Configuration, where you set things up once.' },
     { el: function () { return null; }, t: 'Lost? Search for it', p: 'Type a screen or a task, like “assign a bed” or “run payroll”. Press <kbd>' + KEY + '</kbd> from anywhere.' },
     { el: function () { return N; }, t: 'Every screen has a Guide', p: 'It sits on the right edge, out of the way. Hover to see your next step, click to open it.' }
   ];
