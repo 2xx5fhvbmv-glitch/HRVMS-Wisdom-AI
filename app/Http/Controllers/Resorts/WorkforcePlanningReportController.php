@@ -331,7 +331,13 @@ class WorkforcePlanningReportController extends Controller
         if (!$c) {
             return abort(404, 'Unknown report');
         }
-        return $this->exportComputedReport($c['name'], $c['description'], $c['columns'], $c['rows'], $request->input('format', 'pdf'));
+        $pdfView = [];
+        if ($request->input('report') === 'annual_plan') {
+            // Schedule of Labor Costs layout; MVR budget lines restated in USD at the resort's DollertoMVR (divided, never a stored inverse).
+            $settings = Common::getCachedResortSettings($this->resort->resort_id);
+            $pdfView  = ['layout' => 'labor_cost_schedule', 'fxRate' => (float) (optional($settings)->DollertoMVR ?: 15.42)];
+        }
+        return $this->exportComputedReport($c['name'], $c['description'], $c['columns'], $c['rows'], $request->input('format', 'pdf'), $pdfView);
     }
 
     /** WAI Insights for a predefined report. */

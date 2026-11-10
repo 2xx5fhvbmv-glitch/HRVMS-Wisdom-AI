@@ -196,7 +196,8 @@ class VisaReportController extends Controller
         if (!$c) {
             return abort(404, 'Unknown report');
         }
-        return $this->exportComputedReport($c['name'], $c['description'], $c['columns'], $c['rows'], $request->input('format', 'pdf'));
+        $pdfView = $request->input('report') === 'expat_register' ? ['layout' => 'expat_register'] : [];
+        return $this->exportComputedReport($c['name'], $c['description'], $c['columns'], $c['rows'], $request->input('format', 'pdf'), $pdfView);
     }
 
     public function insights(Request $request)

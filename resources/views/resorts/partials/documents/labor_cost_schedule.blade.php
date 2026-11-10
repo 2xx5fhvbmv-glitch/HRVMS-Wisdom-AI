@@ -1,47 +1,23 @@
 {{-- Schedule of Labor Costs (Workforce Planning › Reports › Annual Workforce Plan).
      Binds to the rows the report already builds: Department, Position, Grade, Approved/Planned Headcount, Total Budget
      (a "$1,234.00" or "MVR 1,234.00" string, salary + allowances). Grouping, management split, totals and currency
-     conversion are all computed here.
+     conversion: App\Services\Reports\LaborCostSchedule; this view only formats.
 
-     Currency: MVR lines are converted to USD ONLY when the caller passes $fxRate (MVR per 1 USD). Without it nothing is
-     converted and MVR / USD are never added together: every total is shown per source currency. --}}
+     Currency: MVR lines are converted to USD ONLY when the caller passes $fxRate (MVR per 1 USD; the Workforce Planning
+     export passes the resort's DollertoMVR). Without it nothing is converted and MVR / USD are never added together. --}}
 @extends('resorts.partials.documents._frame')
 
 @php
     $FX = (isset($fxRate) && is_numeric($fxRate) && (float) $fxRate > 0) ? (float) $fxRate : null;
 
-    // ── View-level maps ─────────────────────────────────────────────────────────────────────────
-    // Source department (lower-cased, "&" → "and") → [report department, group]. Array order = print order of sub-departments.
-    $OPS = 'Operated departments'; $UND = 'Undistributed operating expenses'; $OTH = 'Other departments';
-    $DEPT_MAP = [
-        'front office'     => ['Rooms', $OPS],
-        'housekeeping'     => ['Rooms', $OPS],
-        'f and b service'  => ['Food & Beverage', $OPS],
-        'kitchen'          => ['Food & Beverage', $OPS],
-        'executive'        => ['Administrative & General', $UND],
-        'executive office' => ['Administrative & General', $UND],
-        'finance'          => ['Administrative & General', $UND],
-        'human resources'  => ['Administrative & General', $UND],
-        'engineering'      => ['Property Operation & Maintenance', $UND],
-    ];
-    $DEPT_ORDER = ['Rooms', 'Food & Beverage', 'Administrative & General', 'Property Operation & Maintenance'];
-    $GROUP_ORDER = [$OPS, $UND, $OTH];
-    // Position-name override: this position moves out of its source department.
-    $POSITION_OVERRIDE = ['gardener' => ['from' => 'housekeeping', 'dept' => 'Property Operation & Maintenance', 'group' => $UND, 'sub' => 'Grounds (from Housekeeping)']];
-    // Grades counted as management; every other grade is non-management.
-    $MGMT_GRADES = ['GM', 'EXCOM', 'HOD', 'MGR'];
-
-    $norm  = fn($s) => trim(preg_replace('/\s+/', ' ', str_replace(['&', '/', '-', '.'], [' and ', ' ', ' ', ' '], strtolower((string) $s))));
-    $parse = fn($s) => [stripos(trim((string) $s), 'MVR') === 0 ? 'MVR' : 'USD', (float) preg_replace('/[^0-9.]/', '', (string) $s)];
-    $f     = fn($n) => number_format(round($n));
-    $src   = fn($n) => floor($n) == $n ? number_format($n) : number_format($n, 2);
-    $zero  = fn() => ['hc' => 0, 'mh' => 0, 'm' => ['USD' => 0, 'MVR' => 0], 'n' => ['USD' => 0, 'MVR' => 0], 't' => ['USD' => 0, 'MVR' => 0]];
-    $add   = function (array &$a, int $hc, bool $mg, string $cur, float $v) {
-        $a['hc'] += $hc; $a['t'][$cur] += $v;
-        if ($mg) { $a['mh'] += $hc; $a['m'][$cur] += $v; } else { $a['n'][$cur] += $v; }
-    };
+    // Grouping, management split and totals: App\Services\Reports\LaborCostSchedule (unit-tested).
+    ['groups' => $groups, 'tree' => $tree, 'grp' => $grp, 'grand' => $grand, 'approved' => $approved, 'lines' => $lines]
+        = \App\Services\Reports\LaborCostSchedule::build($data ?? [], $FX);
+    $norm = fn($s) => \App\Services\Reports\LaborCostSchedule::norm($s);
+    $f    = fn($n) => number_format(round($n));
+    $src  = fn($n) => floor($n) == $n ? number_format($n) : number_format($n, 2);
     // Money cell for a ['USD' => x, 'MVR' => y] bucket: one number when converted, else one line per source currency.
-    $cell  = function (array $b) use ($FX, $f) {
+    $cell = function (array $b) use ($FX, $f) {
         if ($FX) return $f($b['USD']);
         $o = [];
         if ($b['USD'] > 0) $o[] = 'USD ' . $f($b['USD']);
@@ -49,45 +25,6 @@
         return $o ? implode('<br>', $o) : '0';
     };
 
-    // ── Aggregate ───────────────────────────────────────────────────────────────────────────────
-    $tree = []; $grp = []; $grand = $zero(); $approved = 0; $lines = 0;
-    foreach (array_values($data ?? []) as $r) {
-        $srcDept = trim((string) ($r['Department'] ?? '')) !== '' ? trim((string) $r['Department']) : 'N/A';
-        $key  = $norm($srcDept);
-        $pos  = trim((string) ($r['Position'] ?? ''));
-        [$dept, $g] = $DEPT_MAP[$key] ?? [$srcDept, $OTH];
-        $sub  = $srcDept;
-        $ov   = $POSITION_OVERRIDE[strtolower($pos)] ?? null;
-        if ($ov && $ov['from'] === $key) { $dept = $ov['dept']; $g = $ov['group']; $sub = $ov['sub']; }
-
-        $hc    = (int) ($r['Planned Headcount'] ?? 0);
-        $approved += (int) ($r['Approved Headcount'] ?? 0); $lines++;
-        [$cur, $amt] = $parse($r['Total Budget'] ?? 0);
-        $grade = trim((string) ($r['Grade'] ?? ''));
-        $mg    = in_array(strtoupper($grade), $MGMT_GRADES, true);
-        $bk    = ($FX && $cur === 'MVR') ? 'USD' : $cur;      // bucket the amount is added to
-        $v     = ($FX && $cur === 'MVR') ? $amt / $FX : $amt;
-
-        if (!isset($tree[$g][$dept])) { $tree[$g][$dept] = ['a' => $zero(), 'subs' => []]; }
-        if (!isset($tree[$g][$dept]['subs'][$sub])) { $tree[$g][$dept]['subs'][$sub] = ['a' => $zero(), 'rows' => [], 'ord' => $ov ? 98 : (($i = array_search($key, array_keys($DEPT_MAP), true)) === false ? 99 : $i)]; }
-        $add($tree[$g][$dept]['subs'][$sub]['a'], $hc, $mg, $bk, $v);
-        $add($tree[$g][$dept]['a'], $hc, $mg, $bk, $v);
-        if (!isset($grp[$g])) { $grp[$g] = $zero(); }
-        $add($grp[$g], $hc, $mg, $bk, $v);
-        $add($grand, $hc, $mg, $bk, $v);
-        $tree[$g][$dept]['subs'][$sub]['rows'][] = ['pos' => $pos, 'grade' => $grade, 'mg' => $mg, 'hc' => $hc, 'cur' => $cur, 'amt' => $amt, 'v' => $v];
-    }
-    // Print order: groups fixed, mapped departments fixed, unmapped alphabetical; sub-departments by map order.
-    $groups = array_values(array_filter($GROUP_ORDER, fn($g) => isset($tree[$g])));
-    foreach ($tree as $g => &$depts) {
-        uksort($depts, function ($a, $b) use ($DEPT_ORDER) {
-            $ia = array_search($a, $DEPT_ORDER, true); $ib = array_search($b, $DEPT_ORDER, true);
-            return ($ia === false ? 99 : $ia) <=> ($ib === false ? 99 : $ib) ?: strcasecmp($a, $b);
-        });
-        foreach ($depts as &$d) { uasort($d['subs'], fn($a, $b) => $a['ord'] <=> $b['ord']); }
-        unset($d);
-    }
-    unset($depts);
     // A single sub-department that just repeats its department's name is not shown as its own row.
     $showSubs = fn($dept, $d) => count($d['subs']) > 1 || $norm(array_key_first($d['subs'])) !== $norm($dept);
 

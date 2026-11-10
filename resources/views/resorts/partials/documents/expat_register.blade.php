@@ -35,7 +35,7 @@
     $doc = [
         'kicker'       => 'Human Resources · People',
         'title'        => 'Expat Employee Register',
-        'subtitle'     => 'Active expatriate employees by nationality, department and position',
+        'subtitle'     => 'Expatriate employees by nationality, department and position',
         'meta'         => [
             'Generated' => now()->format('j M Y, H:i'),
             'Scope'     => 'Expatriate employees',

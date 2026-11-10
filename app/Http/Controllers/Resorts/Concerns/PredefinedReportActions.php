@@ -17,8 +17,11 @@ use Maatwebsite\Excel\Facades\Excel;
  */
 trait PredefinedReportActions
 {
-    /** Build a CSV / Excel / PDF download from computed report data. */
-    protected function exportComputedReport(string $name, ?string $description, array $columns, array $rows, string $format)
+    /**
+     * Build a CSV / Excel / PDF download from computed report data.
+     * $pdfView: extra PDF view data, e.g. ['layout' => 'expat_register'] for a report with its own document layout.
+     */
+    protected function exportComputedReport(string $name, ?string $description, array $columns, array $rows, string $format, array $pdfView = [])
     {
         $insights = $this->computeAiInsightsText($name, $description, $columns, $rows);
 
@@ -29,7 +32,7 @@ trait PredefinedReportActions
                     'data'         => $rows,
                     'columns'      => $columns,
                     'insightsHtml' => $insights !== '' ? $this->markdownToHtmlSimple($insights) : '',
-                ]);
+                ] + $pdfView);
                 return $pdf->download($name . '.pdf');
 
             case 'excel':
