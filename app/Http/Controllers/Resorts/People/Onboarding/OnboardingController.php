@@ -183,6 +183,10 @@ class OnboardingController extends Controller
      */
     public function convertApplicant(Request $request)
     {
+        // Audit run-3 §5: onboarding (and turning an applicant into an employee) is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $request->validate([
             'applicant_id'   => 'required|integer|exists:applicant_form_data,id',
             // Frontend supplies this on retry after an email_collision prompt.
@@ -536,6 +540,10 @@ class OnboardingController extends Controller
 
     public function store(Request $request)
     {
+        // Audit run-3 §5: onboarding (and turning an applicant into an employee) is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $validatedData = $request->validate([
             'template_type' => 'required|in:supervisor_line,manager_above',
             'template_name' => 'required|string|max:255',
@@ -614,6 +622,10 @@ class OnboardingController extends Controller
     }
 
     public function update(Request $request,$id){
+        // Audit run-3 §5: onboarding (and turning an applicant into an employee) is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         if(!is_numeric($id)){
             $id = base64_decode($id);
         }
@@ -637,6 +649,10 @@ class OnboardingController extends Controller
    
     public function destroy($id)
     {
+        // Audit run-3 §5: onboarding (and turning an applicant into an employee) is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         if(!is_numeric($id)){
             $id = base64_decode($id);
         }
@@ -696,6 +712,10 @@ class OnboardingController extends Controller
 
     public function storeEvents(Request $request)
     {
+        // Audit run-3 §5: onboarding (and turning an applicant into an employee) is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $this->validate($request, [
             'events' => 'required|array',
             'events.*' => 'required|string|max:255',
@@ -746,6 +766,10 @@ class OnboardingController extends Controller
 
     public function updateEvent(Request $request, $id)
     {
+        // Audit run-3 §5: onboarding (and turning an applicant into an employee) is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         if(!is_numeric($id)){
             $id = base64_decode($id);
         }
@@ -763,6 +787,10 @@ class OnboardingController extends Controller
 
     public function destroyEvent($id)
     {
+        // Audit run-3 §5: onboarding (and turning an applicant into an employee) is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         if(!is_numeric($id)){
             $id = base64_decode($id);
         }
@@ -777,6 +805,10 @@ class OnboardingController extends Controller
 
     public function storeOrUpdateCI(Request $request)
     {
+        // Audit run-3 §5: onboarding (and turning an applicant into an employee) is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         // Validate the input
         $request->validate([
             'cultural_insights' => 'required|string|max:65535',
@@ -1236,6 +1268,10 @@ class OnboardingController extends Controller
 
     public function storeItinerary(Request $request)
     {
+        // Audit run-3 §5: onboarding (and turning an applicant into an employee) is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         try {
             // dd($request->all()); // For debugging purposes, remove this line in production
             // Was unscoped — the itinerary created below is tagged with
@@ -1827,6 +1863,10 @@ class OnboardingController extends Controller
 
     public function updateItinerary(Request $request, $id)
     {
+        // Audit run-3 §5: onboarding (and turning an applicant into an employee) is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         try {
             // Was unscoped — same cross-tenant itinerary-write gap as
             // storeItinerary.

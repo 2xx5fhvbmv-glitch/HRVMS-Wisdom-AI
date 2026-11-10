@@ -332,6 +332,9 @@ class GrievanceAppealController extends Controller
         if (Common::checkRouteWisePermission('GrievanceAndDisciplinery.Appeals.Index', config('settings.resort_permissions.edit')) == false) {
             abort(403, 'Unauthorized to modify appeals.');
         }
+        // Audit run-3 M2: the page check above names a module_pages row that doesn't exist, so it allowed everyone.
+        // Deciding an appeal or setting its hearing is HR's (or the GM's / master admin's) — isHrEquivalent().
+        abort_unless($this->isHrEquivalent(), 403, 'Only HR can decide appeals or set hearings.');
         $decoded = base64_decode($id, true);
         if ($decoded === false || !is_numeric($decoded)) abort(404);
         $appeal = GrievanceAppeal::where('resort_id', $this->resort->resort_id)

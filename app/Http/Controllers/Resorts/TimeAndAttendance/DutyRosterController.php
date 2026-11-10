@@ -973,6 +973,12 @@ class DutyRosterController extends Controller
             'geofence_zone_ids.*' => ['integer', Rule::exists('resort_geofences', 'id')->where('resort_id', $this->resort->resort_id)],
         ]);
 
+        // Audit run-3 §5: HR, or the employee's own HOD / EXCOM — the rule StoreDutyRoster / UpdateDutyRoster use.
+        $rosterEmpId = DutyRoster::where('id', $request->roster_id)->where('resort_id', $this->resort->resort_id)->value('Emp_id');
+        if (!Common::canManageAttendanceFor($rosterEmpId, $this->resort->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => "You can only change your own team's rosters."], 403);
+        }
+
         try {
             $updated = DutyRoster::where('id', $request->roster_id)
                 ->where('resort_id', $this->resort->resort_id)

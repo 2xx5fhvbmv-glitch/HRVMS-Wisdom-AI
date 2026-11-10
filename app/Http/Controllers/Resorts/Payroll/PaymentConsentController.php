@@ -111,7 +111,11 @@ class PaymentConsentController extends Controller
             })
             ->findOrFail(base64_decode($id));
 
-        // Update the status
+        // Audit run-3 §5: only a purchase still waiting for consent can be consented (not a Paid / Partial Paid one —
+        // that would put an already-recovered amount back into the payroll deduction).
+        if ($payment->status !== 'Pending Consent') {
+            return response()->json(['success' => false, 'message' => "This purchase is {$payment->status}; it can't be consented again."], 422);
+        }
         $payment->status = "Consented";
         $payment->save();
 

@@ -1,5 +1,7 @@
 <?php
 namespace App\Http\Controllers\Resorts\TalentAcquisition;
+
+use Illuminate\Validation\Rule;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Auth;
@@ -1320,6 +1322,10 @@ class VacancyController extends Controller
      */
     public function markAsRecruited(Request $request, $id)
     {
+        // Audit run-3 §5: marking recruited creates the employee and their login — HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $vacancy = Vacancies::where('Resort_id', $this->resort->resort_id)->findOrFail($id);
 
         if (!in_array($vacancy->employee_type, ['Casual/Agency', 'Trainee / Intern'], true)) {
@@ -1336,7 +1342,7 @@ class VacancyController extends Controller
             'last_name' => 'required|string|max:255',
             'passport_number' => 'required|string|max:255',
             'nationality' => 'required|string|max:255',
-            'reporting_to' => 'required|integer|exists:employees,id',
+            'reporting_to' => ['required', 'integer', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],   // audit run-3 §5
             'college_institute_name' => $isIntern ? 'required|string|max:255' : 'nullable|string|max:255',
             'service_provider' => 'nullable|string|max:255',
             'new_service_provider' => 'nullable|string|max:255',

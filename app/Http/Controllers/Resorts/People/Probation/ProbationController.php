@@ -582,12 +582,20 @@ class ProbationController extends Controller
 
     public function confirmProbation(Request $request, $id)
     {
+        // Audit run-3 H2: confirming / failing / extending probation changes employment status — HR only.
+        if (!Common::canManageEmployeeRecords()) {
+            return response()->json(['message' => 'Unauthorized action.'], 403);
+        }
         // Was Employee::findOrFail($id) with no resort filter — any
         // resort-admin could confirm another resort's employee's
         // probation by id (raw, unencoded per the blade template).
         $employee = Employee::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
         if (!$employee) {
             return response()->json(['message' => 'Employee not found.'], 404);
+        }
+        // Confirming would set them back to Active — never for someone who has already left.
+        if (in_array($employee->status, ['Terminated', 'Inactive', 'Offboarding'], true)) {
+            return response()->json(['message' => "This employee is {$employee->status}; their probation can't be confirmed."], 422);
         }
         $employee->probation_status = 'Confirmed';
         $employee->employment_type = $request->employment_type ?? 'Full-time'; // default fallback
@@ -614,6 +622,10 @@ class ProbationController extends Controller
 
     public function failProbation(Request $request, $id)
     {
+        // Audit run-3 H2: confirming / failing / extending probation changes employment status — HR only.
+        if (!Common::canManageEmployeeRecords()) {
+            return response()->json(['message' => 'Unauthorized action.'], 403);
+        }
         // Was Employee::findOrFail($id) with no resort filter — same
         // cross-tenant gap as confirmProbation().
         $employee = Employee::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
@@ -703,6 +715,10 @@ class ProbationController extends Controller
 
     public function extendProbation(Request $request, $id)
     {
+        // Audit run-3 H2: confirming / failing / extending probation changes employment status — HR only.
+        if (!Common::canManageEmployeeRecords()) {
+            return response()->json(['message' => 'Unauthorized action.'], 403);
+        }
         $formattedProbationEndDate = $request->extension_date ? \Carbon\Carbon::createFromFormat('d/m/Y', $request->extension_date)->format('Y-m-d') : null;
         // Was Employee::findOrFail($id) with no resort filter — same
         // cross-tenant gap as confirmProbation()/failProbation().

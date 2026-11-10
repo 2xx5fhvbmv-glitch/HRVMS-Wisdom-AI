@@ -432,7 +432,7 @@ class GrievanceReportController extends Controller
         if (($f['case_type'] ?? null) !== 'Disciplinary') {
             $g = DB::table('grivance_investigation_child_models as c')
                 ->join('grivance_investigation_models as ip', 'ip.id', '=', 'c.investigation_p_id')
-                ->join('grivance_submission_models as g', 'g.id', '=', 'ip.Grievance_s_id')
+                ->join('grivance_submission_models as g', 'g.id', '=', 'ip.Grievance_s_id')->whereNull('g.deleted_at')
                 ->where('g.resort_id', $rid)->when(true, fn($q) => $this->applyDuration($q, $f, 'g.created_at'))->get(['g.Grivance_id', 'c.investigation_stage', 'c.resolution_date']);
             foreach ($g as $r) $rows->push(['Case ID' => $r->Grivance_id, 'Investigator' => 'Committee', 'Current Stage' => $r->investigation_stage ?? 'N/A', 'Completion Percentage' => $r->resolution_date ? '100%' : 'In Progress']);
         }
@@ -451,7 +451,7 @@ class GrievanceReportController extends Controller
         $rid = $this->resort->resort_id;
         $rows = DB::table('grivance_investigation_child_models as c')
             ->join('grivance_investigation_models as ip', 'ip.id', '=', 'c.investigation_p_id')
-            ->join('grivance_submission_models as g', 'g.id', '=', 'ip.Grievance_s_id')
+            ->join('grivance_submission_models as g', 'g.id', '=', 'ip.Grievance_s_id')->whereNull('g.deleted_at')
             ->where('g.resort_id', $rid)->whereNotNull('c.resolution_date')
             ->when(true, fn($q) => $this->applyDuration($q, $f, 'c.resolution_date'))
             ->orderByDesc('c.resolution_date')
@@ -468,7 +468,7 @@ class GrievanceReportController extends Controller
         $rid = $this->resort->resort_id;
         $rows = collect();
         if (($f['case_type'] ?? null) !== 'Disciplinary') {
-            $g = DB::table('grivance_investigation_child_models as c')->join('grivance_investigation_models as ip', 'ip.id', '=', 'c.investigation_p_id')->join('grivance_submission_models as g', 'g.id', '=', 'ip.Grievance_s_id')->where('g.resort_id', $rid)->whereNotNull('c.follow_up_action')->when(true, fn($q) => $this->applyDuration($q, $f, 'g.created_at'))->get(['g.Grivance_id', 'c.follow_up_action', 'c.follow_up_description', 'c.resolution_date']);
+            $g = DB::table('grivance_investigation_child_models as c')->join('grivance_investigation_models as ip', 'ip.id', '=', 'c.investigation_p_id')->join('grivance_submission_models as g', 'g.id', '=', 'ip.Grievance_s_id')->whereNull('g.deleted_at')->where('g.resort_id', $rid)->whereNotNull('c.follow_up_action')->when(true, fn($q) => $this->applyDuration($q, $f, 'g.created_at'))->get(['g.Grivance_id', 'c.follow_up_action', 'c.follow_up_description', 'c.resolution_date']);
             foreach ($g as $r) $rows->push(['Case ID' => $r->Grivance_id, 'Action Description' => $r->follow_up_action ?? ($r->follow_up_description ?? 'N/A'), 'Responsible Person' => 'Committee', 'Due Date' => 'N/A', 'Status' => $r->resolution_date ? 'Completed' : 'Open']);
         }
         if (($f['case_type'] ?? null) !== 'Grievance') {

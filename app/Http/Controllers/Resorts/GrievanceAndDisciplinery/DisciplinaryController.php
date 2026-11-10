@@ -679,6 +679,10 @@ class DisciplinaryController extends Controller
     }
     public function RequestForStatement(Request $request)
     {
+        // Audit run-3 M3 (same gap as the grievance one): HR only.
+        if (!Common::isDisciplinaryHR()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         // D-02: same gap as S2-02 (Grievance) — Disciplinary_id is a
         // human-readable case number, one global sequence across every
         // resort, with no resort_id filter here at all. Any resort's admin

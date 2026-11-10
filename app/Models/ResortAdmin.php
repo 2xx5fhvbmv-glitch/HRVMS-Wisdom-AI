@@ -28,6 +28,10 @@ class ResortAdmin extends Authenticatable
     use HasFactory,Notifiable,SoftDeletes;
     use HasApiTokens;
 
+    // Every login is an ordinary ('sub') account unless a creator says otherwise — resort_admins.type has no DB default
+    // and non-strict MySQL stored 'super' (full access) for any create that left it out (audit run-3 H3).
+    protected $attributes = ['type' => 'sub'];
+
     protected $fillable = [
         'role_id',
         'resort_id',

@@ -26,8 +26,10 @@ class CheckAdminModuleAccess
         $admin = Auth::guard('admin')->user();
         if ($admin && $admin->type !== 'super' && request()->route()->getPrefix() == config('settings.route_prefix.admin'))
         {
-            // Match on the path inside the admin prefix, never the full URL (host or prefix could contain a module word).
-            $path = Str::after($request->path(), trim(config('settings.route_prefix.admin'), '/') . '/');
+            // Match on the ROUTE TEMPLATE inside the admin prefix ("resorts/update/{id}"), never the requested path: the
+            // path is the client's text — "/resorts/%75pdate/5" ran update as View, an id like "2-create" re-classified a
+            // route (audit run-3 H5). The template is fixed in routes/admin_route.php.
+            $path = Str::after($request->route()->uri(), trim(config('settings.route_prefix.admin'), '/') . '/');
             $seg = array_values(array_diff(explode('/', $path), ['admin'])); // "/admin/supports/view/1" -> supports
             $key = ($seg[0] ?? '') === 'admins' && in_array($seg[1] ?? '', ['modules', 'module-pages'], true) ? $seg[1] : ($seg[0] ?? '');
 
@@ -43,6 +45,10 @@ class CheckAdminModuleAccess
             } else if ($is('delete|destroy|remove|massremove')) {
                 $permissionId = config('settings.permissions.delete');
             } else if ($is('edit|update|active|inactive|block|restore|assign|send|reply')) {
+                $permissionId = config('settings.permissions.edit');
+            } else if ($request->isMethod('DELETE')) {
+                $permissionId = config('settings.permissions.delete');
+            } else if ($request->isMethod('PUT') || $request->isMethod('PATCH')) {
                 $permissionId = config('settings.permissions.edit');
             } else {
                 $permissionId = config('settings.permissions.view');

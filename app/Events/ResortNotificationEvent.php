@@ -33,6 +33,13 @@ class ResortNotificationEvent implements ShouldBroadcast
      */
     public function broadcastOn()
     {
+        // Audit run-3 M1: a notification for one person (`sendto` = their employees.id) goes on that person's own
+        // channel — on the resort-wide one every user of the resort received it and only page JS hid it.
+        $sendto = (int) ($this->html['sendto'] ?? 0);
+        if ($sendto > 0) {
+            return collect(explode(',', (string) ($this->html['resortid'] ?? '')))->map(fn ($id) => (int) trim($id))->filter()->unique()
+                ->map(fn ($id) => new PrivateChannel("resort-notifications.{$id}.employee.{$sendto}"))->values()->all();
+        }
         return self::channelsFor($this->html['resortid'] ?? '');
     }
 

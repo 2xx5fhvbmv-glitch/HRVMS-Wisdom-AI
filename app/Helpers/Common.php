@@ -9275,6 +9275,19 @@ class Common
      * already paid out in a finalized F&F settlement, on an active benefit grid with service charge. Used by the
      * payroll calculation (PayrollController::computePayroll) and the demo payroll seeder.
      */
+    /**
+     * The AES-256 key for tenant document encryption (raw SHA-256 of ENCRYPTION_KEY). Audit run-3 §4: with the key
+     * empty every document was encrypted with a publicly known key (sha256 of ''), so refuse instead.
+     */
+    public static function fileEncryptionKey(): string
+    {
+        $secret = (string) config('app.file_encryption_key');
+        if (trim($secret) === '') {
+            throw new \RuntimeException('ENCRYPTION_KEY is not set — documents cannot be encrypted or opened.');
+        }
+        return hash('sha256', $secret, true);
+    }
+
     public static function serviceChargeEligibleIds($resortId, array $employeeIds): array
     {
         $employees = \App\Models\Employee::where('resort_id', $resortId)->whereIn('id', $employeeIds)->get(['id', 'rank', 'benefit_grid_level', 'Position_id', 'employment_type']);
@@ -10428,7 +10441,7 @@ class Common
 
 
     //         // AES-256-CBC Encryption setup
-    //         $key = hash('sha256', config('app.file_encryption_key'), true); // AES-256 key
+    //         $key = \App\Helpers\Common::fileEncryptionKey(); // AES-256 key
     //         $iv = random_bytes(16); // Generate IV (16 bytes for AES-256-CBC)
     //         // For image files that were converted to PDF, use the PDF content
     //         // For other files, use the original file content
@@ -10592,7 +10605,7 @@ class Common
             $uploadContent = $fileContent;
 
             if ($is_secure == 1) {
-                $key = hash('sha256', config('app.file_encryption_key'), true);
+                $key = \App\Helpers\Common::fileEncryptionKey();
                 $iv = random_bytes(16);
                 $encrypted = $iv . openssl_encrypt(
                     $fileContent,
@@ -10782,7 +10795,7 @@ class Common
         if ($ChildFiles->is_secure == 1 || (!empty($is_secure) && $is_secure != null) || substr($filePath, -4) === '.enc') {
 
 
-            $key = hash('sha256', config('app.file_encryption_key'), true);
+            $key = \App\Helpers\Common::fileEncryptionKey();
             $encryptedData = StorageHelper::disk()->get($ChildFiles->File_Path);
 
             if (empty($encryptedData) || strlen($encryptedData) < 16) {
@@ -11150,7 +11163,7 @@ class Common
     //     $ChildFiles = ChildFileManagement::where("id",$id)->where("resort_id"   ,$resort_id)->first();
     //     if (isset($ChildFiles) && StorageHelper::disk()->exists($ChildFiles->File_Path))
     //     {
-    //         $key = hash('sha256', config('app.file_encryption_key'), true);
+    //         $key = \App\Helpers\Common::fileEncryptionKey();
 
     //         $encryptedData = StorageHelper::disk()->get($ChildFiles->File_Path);
 
@@ -11357,7 +11370,7 @@ class Common
 
 
     //         // AES-256-CBC Encryption setup
-    //         $key = hash('sha256', config('app.file_encryption_key'), true); // AES-256 key
+    //         $key = \App\Helpers\Common::fileEncryptionKey(); // AES-256 key
     //         $iv = random_bytes(16); // Generate IV (16 bytes for AES-256-CBC)
     //         // For image files that were converted to PDF, use the PDF content
     //         // For other files, use the original file content
@@ -12934,7 +12947,7 @@ class Common
      */
     public static function encryptFileBytes(string $plaintext): string
     {
-        $key = hash('sha256', config('app.file_encryption_key'), true);
+        $key = \App\Helpers\Common::fileEncryptionKey();
         $iv = random_bytes(16);
         $encrypted = $iv . openssl_encrypt($plaintext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
         if ($encrypted === false) {
@@ -12952,7 +12965,7 @@ class Common
         if (empty($encryptedData) || strlen($encryptedData) < 16) {
             throw new \Exception('Invalid or corrupted encrypted data');
         }
-        $key = hash('sha256', config('app.file_encryption_key'), true);
+        $key = \App\Helpers\Common::fileEncryptionKey();
         $iv = substr($encryptedData, 0, 16);
         $cipherText = substr($encryptedData, 16);
         $decryptedData = openssl_decrypt($cipherText, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
@@ -13265,7 +13278,7 @@ class Common
             $resortFolder = optional($resortData)->resort_id ?: $record->resort_id;
             $path = $resortFolder . '/public/categorized/' . $folder->Folder_unique_id . '/jd_' . $record->id . '.pdf.enc';
 
-            $key = hash('sha256', config('app.file_encryption_key'), true);
+            $key = \App\Helpers\Common::fileEncryptionKey();
             $iv  = random_bytes(16);
             $encrypted = $iv . openssl_encrypt($pdfBinary, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
             if ($encrypted === false) {

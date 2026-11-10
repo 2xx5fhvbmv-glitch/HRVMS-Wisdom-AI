@@ -326,6 +326,10 @@ class IncidentController extends Controller
 
     public function assign(Request $request)
     {
+        // Audit run-3 §5: assigning an incident / sending it to the GM is HR's step.
+        if (!(\App\Helpers\Common::isIncidentHR())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         // dd($request->all());
         $request->validate([
             'incident_id' => [
@@ -727,6 +731,10 @@ class IncidentController extends Controller
 
     public function approve(Request $request)
     {
+        // Audit run-3 §5: assigning an incident / sending it to the GM is HR's step.
+        if (!(\App\Helpers\Common::isIncidentHR())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $incident = Incidents::where('resort_id', $this->resort->resort_id)->find($request->incident_id);
 
         if (!$incident) {

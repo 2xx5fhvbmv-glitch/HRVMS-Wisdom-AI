@@ -779,7 +779,8 @@ class PayrollController extends Controller
             return response()->json(['success' => false, 'message' => 'This employee is not in the payroll.'], 404);
         }
         PayrollManualEntry::create(['payroll_id' => $payroll->id, 'employee_id' => $employeeId, 'kind' => $request->kind,
-            'label' => $request->label, 'amount' => round((float) $request->amount, 2), 'currency' => $request->currency,
+            // Audit run-3 M10: the label becomes a review-table column header — plain text only.
+            'label' => trim(strip_tags((string) $request->label)) ?: null, 'amount' => round((float) $request->amount, 2), 'currency' => $request->currency,
             'reason' => trim($request->reason), 'created_by' => Auth::guard('resort-admin')->id()]);
         return $this->recomputeAndRespond($payroll, $request->kind === 'extra_payment' ? ['deductions', 'review'] : ['deductions'], 'Saved.');
     }

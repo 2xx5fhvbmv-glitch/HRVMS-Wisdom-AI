@@ -85,9 +85,9 @@ Route::prefix(config('settings.route_prefix.admin'))->namespace('Admin')->group(
         Route::post('/roles/update/{id}', 'RolePermissionController@update')->middleware('admin.reauth')->name('admin.role.update');
         Route::get('/roles/edit-permissions/{id}', 'RolePermissionController@editRolePermissions')->name('admin.role.edit_role_permissions');
         Route::post('/roles/update-permissions/{id}', 'RolePermissionController@updateRolePermissions')->middleware('admin.reauth')->name('admin.role.update_role_permissions');
-        Route::get('/roles/massremove', 'RolePermissionController@massremove')->name('admin.role.massremove');
-        Route::get('/roles/block/{id}', 'RolePermissionController@block')->name('admin.role.block');
-        Route::get('/roles/active/{id}', 'RolePermissionController@active')->name('admin.role.active');
+        Route::get('/roles/massremove', 'RolePermissionController@massremove')->middleware('admin.reauth')->name('admin.role.massremove');
+        Route::get('/roles/block/{id}', 'RolePermissionController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.role.block');
+        Route::get('/roles/active/{id}', 'RolePermissionController@active')->middleware('admin.reauth')->whereNumber('id')->name('admin.role.active');
 
 
         /**Resorts Module**/
@@ -98,14 +98,14 @@ Route::prefix(config('settings.route_prefix.admin'))->namespace('Admin')->group(
         Route::get('/resorts/list', 'ResortsController@list')->name('admin.resorts.list');
         Route::get('/resorts/archived-list', 'ResortsController@archivedlist')->name('admin.resorts.archivedList');
         Route::get('/resorts/edit/{id}', 'ResortsController@edit')->name('admin.resorts.edit');
-        Route::post('/resorts/update/{id}', 'ResortsController@update')->name('admin.resorts.update');
+        Route::post('/resorts/update/{id}', 'ResortsController@update')->middleware('admin.reauth')->whereNumber('id')->name('admin.resorts.update');
         Route::delete('/resorts/destroy/{id}', 'ResortsController@destroy')->middleware('admin.reauth')->name('admin.resorts.destroy');
         Route::post('/resorts/restore/{id}', 'ResortsController@restore')->middleware('admin.reauth')->name('admin.resorts.restore');
-        Route::get('/resorts/inactive/{id}', 'ResortsController@block')->name('admin.resorts.block');
-        Route::get('/resorts/active/{id}', 'ResortsController@active')->name('admin.resorts.active');
-        Route::get('/resorts/mass-remove', 'ResortsController@massremove')->name('admin.resorts.massremove');
-        Route::get('/resorts/block/{id}', 'ResortsController@block')->name('admin.resorts.block');
-        Route::get('/resorts/active/{id}', 'ResortsController@active')->name('admin.resorts.active');
+        Route::get('/resorts/inactive/{id}', 'ResortsController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.resorts.block');
+        Route::get('/resorts/active/{id}', 'ResortsController@active')->middleware('admin.reauth')->whereNumber('id')->name('admin.resorts.active');
+        Route::get('/resorts/mass-remove', 'ResortsController@massremove')->middleware('admin.reauth')->name('admin.resorts.massremove');
+        Route::get('/resorts/block/{id}', 'ResortsController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.resorts.block');
+        Route::get('/resorts/active/{id}', 'ResortsController@active')->middleware('admin.reauth')->whereNumber('id')->name('admin.resorts.active');
         Route::post('/resorts/store/image', 'ResortsController@storeImage')->name('admin.resorts.store.image');
         Route::post('/resorts/delete/image', 'ResortsController@deleteImage')->name('admin.resorts.delete.image');
         Route::post('/resorts/check-email-exists', 'ResortsController@checkEmailExists')->name('admin.resorts.checkEmailExists');

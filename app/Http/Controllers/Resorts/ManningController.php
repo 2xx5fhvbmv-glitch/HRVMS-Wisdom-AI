@@ -185,6 +185,10 @@ class ManningController extends Controller
 
     public function store_divisions(Request $request)
     {
+        // Audit run-3 §5: the org structure is HR/Finance's (as OccupancyController).
+        if (!(\App\Helpers\Common::budgetAccessLevel() === 'full')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         if ($request->filled('division_id')) {
             $request->merge(['name' => $request->division_id]);
         }
@@ -248,6 +252,10 @@ class ManningController extends Controller
 
     public function inlineDivisionUpdate(Request $request, $id)
     {
+        // Audit run-3 §5: the org structure is HR/Finance's (as OccupancyController).
+        if (!(\App\Helpers\Common::budgetAccessLevel() === 'full')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
 
         // Find the division by ID, scoped to this resort — bare find($id)
         // let any resort-admin edit another resort's division.
@@ -325,6 +333,10 @@ class ManningController extends Controller
 
     public function destroy_division($id)
     {
+        // Audit run-3 §5: the org structure is HR/Finance's (as OccupancyController).
+        if (!(\App\Helpers\Common::budgetAccessLevel() === 'full')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         try {
             // Find the division, scoped to this resort — bare findOrFail($id)
             // let any resort-admin delete another resort's division.
@@ -429,6 +441,10 @@ class ManningController extends Controller
 
     public function store_departments(Request $request)
     {
+        // Audit run-3 §5: the org structure is HR/Finance's (as OccupancyController).
+        if (!(\App\Helpers\Common::budgetAccessLevel() === 'full')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         if ($request->filled('dept_id')) {
             $request->merge(['name' => $request->dept_id]);
         }
@@ -509,6 +525,10 @@ class ManningController extends Controller
 
     public function inlineDepartmentUpdate(Request $request, $id)
     {
+        // Audit run-3 §5: the org structure is HR/Finance's (as OccupancyController).
+        if (!(\App\Helpers\Common::budgetAccessLevel() === 'full')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         // Find the division by ID, scoped to this resort — bare find($id)
         // let any resort-admin edit another resort's department.
         $dept = ResortDepartment::where('resort_id', $this->resort_id)->find($id);
@@ -607,6 +627,10 @@ class ManningController extends Controller
 
     public function destroy_department($id)
     {
+        // Audit run-3 §5: the org structure is HR/Finance's (as OccupancyController).
+        if (!(\App\Helpers\Common::budgetAccessLevel() === 'full')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         try {
             // Scoped to this resort — bare findOrFail($id) let any
             // resort-admin delete another resort's department.
@@ -721,6 +745,10 @@ class ManningController extends Controller
 
     public function store_sections(Request $request)
     {
+        // Audit run-3 §5: the org structure is HR/Finance's (as OccupancyController).
+        if (!(\App\Helpers\Common::budgetAccessLevel() === 'full')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         if ($request->filled('section_id')) {
             $request->merge(['name' => $request->section_id]);
         }
@@ -800,6 +828,10 @@ class ManningController extends Controller
 
     public function inlinesectionsUpdate(Request $request)
     {
+        // Audit run-3 §5: the org structure is HR/Finance's (as OccupancyController).
+        if (!(\App\Helpers\Common::budgetAccessLevel() === 'full')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
 
 
          // Scoped to this resort — bare find($request->id) let any
@@ -908,6 +940,10 @@ class ManningController extends Controller
 
     public function destroy_sections($id)
     {
+        // Audit run-3 §5: the org structure is HR/Finance's (as OccupancyController).
+        if (!(\App\Helpers\Common::budgetAccessLevel() === 'full')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         try {
             // Scoped to this resort — bare findOrFail($id) let any
             // resort-admin delete another resort's section.
@@ -1029,6 +1065,10 @@ class ManningController extends Controller
 
     public function store_positions(Request $request)
     {
+        // Audit run-3 §5: the org structure is HR/Finance's (as OccupancyController).
+        if (!(\App\Helpers\Common::budgetAccessLevel() === 'full')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         if ($request->filled('position_id')) {
             $request->merge(['position_title' => $request->position_id]);
         }
@@ -1120,6 +1160,10 @@ class ManningController extends Controller
 
     public function inlinePositionUpdate(Request $request, $id)
     {
+        // Audit run-3 §5: the org structure is HR/Finance's (as OccupancyController).
+        if (!(\App\Helpers\Common::budgetAccessLevel() === 'full')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         if ($request->has('name')) {
             $request->merge(['position_title' => $request->name]);
         }
@@ -1266,6 +1310,10 @@ class ManningController extends Controller
 
     public function destroy_position($id)
     {
+        // Audit run-3 §5: the org structure is HR/Finance's (as OccupancyController).
+        if (!(\App\Helpers\Common::budgetAccessLevel() === 'full')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         try {
             // Scoped to this resort — bare findOrFail($id) let any
             // resort-admin delete another resort's position.

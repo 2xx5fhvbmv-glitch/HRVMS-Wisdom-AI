@@ -933,6 +933,10 @@ class AccommodationController extends Controller
         if (!$this->user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
+        // Audit run-3 §4: housing someone or moving them is the accommodation team's job (web's canWriteAccommodation rule).
+        if (!Common::canWriteAccommodation($this->user->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'You are not allowed to change accommodation.'], 403);
+        }
 
         $validator = Validator::make($request->all(), [
             'emp_id'                                        =>    'required',
@@ -1088,6 +1092,10 @@ class AccommodationController extends Controller
     {
         if (!$this->user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        // Audit run-3 §4: housing someone or moving them is the accommodation team's job (web's canWriteAccommodation rule).
+        if (!Common::canWriteAccommodation($this->user->GetEmployee)) {
+            return response()->json(['success' => false, 'message' => 'You are not allowed to change accommodation.'], 403);
         }
 
         $validator = Validator::make($request->all(), [

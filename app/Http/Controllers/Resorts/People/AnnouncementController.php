@@ -182,6 +182,10 @@ class AnnouncementController extends Controller
 
     public function store(Request $request)
     {
+        // Audit run-3 §5: announcements are published by HR.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         // PE-03: both rules were unscoped ('exists:table,id' with no
         // resort_id filter) — unlike update(), which already scopes both
         // fields correctly. A resort's HR could submit another resort's
@@ -247,6 +251,10 @@ class AnnouncementController extends Controller
 
     public function archive(Request $request)
     {
+        // Audit run-3 §5: announcements are published by HR.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         // Was unscoped — cross-tenant IDOR on Announcement rows.
         $announcement = Announcement::where('resort_id', $this->resort->resort_id)->find($request->id);
 
@@ -262,6 +270,10 @@ class AnnouncementController extends Controller
 
     public function restore(Request $request)
     {
+        // Audit run-3 §5: announcements are published by HR.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         // Was unscoped — same IDOR pattern as archive().
         $announcement = Announcement::where('resort_id', $this->resort->resort_id)->findOrFail($request->id);
         $announcement->archived = false;
@@ -286,6 +298,10 @@ class AnnouncementController extends Controller
 
     public function update(Request $request, $id)
     {
+        // Audit run-3 §5: announcements are published by HR.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $announcementId = base64_decode($id); // Decode the ID
         // Was unscoped — same IDOR pattern as archive()/restore()/edit().
         $announcement = Announcement::where('resort_id', $this->resort->resort_id)->findOrFail($announcementId);

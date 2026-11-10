@@ -65,6 +65,10 @@ class IncrementTypeController extends Controller
   
     
     public function store(Request $request){
+        // Audit run-3 M4: People settings are HR's.
+        if (!\App\Helpers\Common::canManageEmployeeRecords()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         
         $data = $request->types;
 
@@ -92,6 +96,10 @@ class IncrementTypeController extends Controller
     }
 
     public function update(Request $request){
+        // Audit run-3 M4: People settings are HR's.
+        if (!\App\Helpers\Common::canManageEmployeeRecords()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
          $id = base64_decode($request->Main_id);
 
         // Was ->where('id', $id)->update(...) with no resort filter — any
@@ -111,6 +119,10 @@ class IncrementTypeController extends Controller
     }
 
     public function destroy(Request $request){
+        // Audit run-3 M4: People settings are HR's.
+        if (!\App\Helpers\Common::canManageEmployeeRecords()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $id = base64_decode($request->id);
 
         // Was ->where('id', $id)->delete() with no resort filter — same

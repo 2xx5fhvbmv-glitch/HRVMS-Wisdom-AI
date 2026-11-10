@@ -113,6 +113,24 @@ class InfoUpdateController extends Controller
      }
 
    
+     /**
+      * Audit run-3 M5: deciding an info-update request is HR's, only while it is Pending, and never on your own
+      * request (the employee could otherwise approve the change they asked for). Null when the caller may decide.
+      */
+     private function refuseDecision(?EmployeeInfoUpdateRequest $request)
+     {
+          if (!Common::canManageEmployeeRecords()) {
+               return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+          }
+          if ($request && $request->status !== 'Pending') {
+               return response()->json(['success' => false, 'message' => 'This request has already been ' . strtolower((string) $request->status) . '.'], 422);
+          }
+          if ($request && (int) $request->employee_id === (int) optional($this->resort->GetEmployee)->id) {
+               return response()->json(['success' => false, 'message' => 'You cannot decide your own request.'], 403);
+          }
+          return null;
+     }
+
      public function statusChange(Request $request){
           if($request->status == 'approve'){
                // Was unscoped — no tenant check on the request row, then
@@ -133,6 +151,7 @@ class InfoUpdateController extends Controller
                          'message' => 'Request not found.',
                     ], 404);
                }
+               if ($refused = $this->refuseDecision($employeeinfoUpdateRequest)) return $refused;
 
                // Defense in depth: the creation side (ProfileController::
                // profilePersonalUpdate) now allow-lists info_payload to
@@ -264,6 +283,7 @@ class InfoUpdateController extends Controller
           if (!$employeeinfoUpdateRequest) {
                return redirect()->route('people.info-update.index')->with('error','Request not found.');
           }
+          if ($refused = $this->refuseDecision($employeeinfoUpdateRequest)) return $refused;
 
           $employeeinfoUpdateRequest->update([
                'status' => 'Rejected',

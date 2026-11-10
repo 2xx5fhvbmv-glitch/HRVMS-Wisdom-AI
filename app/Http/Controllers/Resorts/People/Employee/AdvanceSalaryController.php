@@ -433,6 +433,10 @@ class AdvanceSalaryController extends Controller
 
 
     public function paymentRescheduleStore(Request $request){
+        // Audit run-3 §5: rewriting a repayment schedule changes what payroll recovers — payroll access only (HR / Finance).
+        if (!Common::canAccessPayroll()) {
+            return response()->json(['success' => false, 'status' => 'error', 'message' => 'Unauthorized action.'], 403);
+        }
 
         if(!isset($request->data) && empty($request->data)){
             return response()->json([
@@ -449,6 +453,12 @@ class AdvanceSalaryController extends Controller
         if (!$payrollAdvance) {
             return response()->json(['success' => false, 'status' => 'error', 'message' => 'Advance salary request not found.'], 404);
         }
+        if ($payrollAdvance->hr_status !== 'Approved') {
+            return response()->json(['success' => false, 'status' => 'error', 'message' => 'The request must be approved before a repayment schedule is set.'], 422);
+        }
+        // A new schedule replaces the instalments not yet recovered; recovered (Paid) ones stay. Adding on top doubled
+        // what payroll recovered each month.
+        PayrollRecoverySchedule::where('payroll_advance_id', $payrollAdvanceId)->where('status', 'Pending')->delete();
 
         // Check for duplicate months in repayment schedule
         foreach($request->data as $key => $value){

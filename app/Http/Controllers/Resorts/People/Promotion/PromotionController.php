@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Resorts\People\Promotion;
 
+use Illuminate\Validation\Rule;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
@@ -90,7 +91,9 @@ class PromotionController extends Controller
     {
         // dd($request->all());
         $request->validate([
-            'select_employee' => 'required|exists:employees,id',
+            // Audit run-3 §5: this resort's employee, and for a HOD one in their own department(s).
+            'select_employee' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)
+                ->where(fn ($q) => is_array($scoped = Common::getScopedDepartmentIds()) ? $q->whereIn('Dept_id', $scoped) : $q)],
             'new_position' => 'required|exists:resort_positions,id',
             'level' => 'nullable',
             'salary_inc' => 'nullable|numeric',
@@ -1183,6 +1186,10 @@ class PromotionController extends Controller
 
     public function sendPromotionLetter(Request $request)
     {
+        // Audit run-3 §5: confirming / changing a promotion (rank, position, salary) is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         // Was missing the resort_id filter — unscoped read let a foreign
         // resort's promotionId trigger a real promotion-letter email.
         $promotion = EmployeePromotion::with([
@@ -1322,6 +1329,10 @@ class PromotionController extends Controller
 
     public function confirmPromotion(Request $request)
     {
+        // Audit run-3 §5: confirming / changing a promotion (rank, position, salary) is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         // Most severe finding in this file per the audit: was
         // EmployeePromotion::findOrFail($request->promotionId) with no
         // resort filter, then directly overwrote the target employee's
@@ -1416,6 +1427,10 @@ class PromotionController extends Controller
 
     public function inlineUpdate(Request $request)
     {
+        // Audit run-3 §5: confirming / changing a promotion (rank, position, salary) is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         try {
             // Was EmployeePromotion::findOrFail($request->id) with no
             // resort filter — unscoped write let another resort's

@@ -446,6 +446,10 @@ class SalaryIncrementController extends Controller
 
 
     public function update(Request $request,$id){
+        // Audit run-3 §5: salary increments are raised and changed by HR.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
 
         // Was ->find($id) with no resort filter — unscoped write let a
         // foreign resort's increment id/value/salary be overwritten and
@@ -806,6 +810,10 @@ class SalaryIncrementController extends Controller
     // store data in PeopleSalaryIncrement and PeopleSalaryIncrementStatus table
     public function bulkStore(Request $request)
     {
+        // Audit run-3 §5: salary increments are raised and changed by HR.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $approvalRank = [
             'Finance',
             'GM'
@@ -942,6 +950,10 @@ class SalaryIncrementController extends Controller
     }
 
     public function bulkUpdate(Request $request){
+        // Audit run-3 §5: salary increments are raised and changed by HR.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $ids = $request->selected_ids;
         $effectiveDate = Carbon::createFromFormat('d/m/Y', $request->effective_date)->format('Y-m-d');
         // Default to Fixed when the form no longer sends the field.
@@ -1005,6 +1017,10 @@ class SalaryIncrementController extends Controller
     }
 
     public function bulkUpdateStatus(Request $request){
+        // Audit run-3 §5: salary increments are raised and changed by HR.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $ids = $request->ids;
         $resortId = (int) $this->resort->resort_id;
         // Same Finance pool the single-item update() re-notifies with when
@@ -1016,7 +1032,8 @@ class SalaryIncrementController extends Controller
             // Was ->find($id) with no resort filter — unscoped write let
             // client-posted ids from another resort be mutated in bulk.
             $peopleSalaryIncrement = PeopleSalaryIncrement::where('resort_id', $this->resort->resort_id)->find($id);
-            if (!$peopleSalaryIncrement) {
+            // An Approved increment is final (as update() / bulkUpdate()) — re-opening it is refused (audit run-3 §5).
+            if (!$peopleSalaryIncrement || $peopleSalaryIncrement->status === 'Approved') {
                 continue;
             }
 
@@ -1890,6 +1907,10 @@ class SalaryIncrementController extends Controller
      */
     public function sendSalaryIncrementLetter(Request $request)
     {
+        // Audit run-3 §5: salary increments are raised and changed by HR.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $increment = PeopleSalaryIncrement::with(['employee.resortAdmin', 'employee.position', 'employee.department'])
             ->where('id', $request->incrementId)
             ->where('resort_id', $this->resort->resort_id)

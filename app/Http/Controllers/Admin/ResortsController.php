@@ -83,9 +83,9 @@ class ResortsController extends Controller
 
           ->editColumn('payment_status', function ($data) {
               if ($data->payment_status == "Pending") {
-                  return '<a href="javascript:void(0)" class="inactive-status" title="' . $data->payment_status . '" ><span class="badge badge-danger">' . $data->payment_status . '</span></a>';
+                  return '<a href="javascript:void(0)" class="inactive-status" title="' . e($data->payment_status) . '" ><span class="badge badge-danger">' . e($data->payment_status) . '</span></a>';
               } else {
-                  return '<a href="javascript:void(0)" class="active-status" title="' . $data->payment_status . '" ><span class="badge badge-success">' . $data->payment_status . '</span></a>';
+                  return '<a href="javascript:void(0)" class="active-status" title="' . e($data->payment_status) . '" ><span class="badge badge-success">' . e($data->payment_status) . '</span></a>';
               }
           })
 
@@ -141,9 +141,9 @@ class ResortsController extends Controller
     })
     ->editColumn('payment_status', function ($data) {
       if( $data->payment_status == "Pending") {
-        return '<a href="javascript:void(0)" class="inactive-status" title="'.$data->payment_status.'" ><span class="badge badge-danger">'.$data->payment_status.'</span></a>';
+        return '<a href="javascript:void(0)" class="inactive-status" title="'.e($data->payment_status).'" ><span class="badge badge-danger">'.e($data->payment_status).'</span></a>';
       } else {
-        return '<a href="javascript:void(0)" class="active-status" title="'.$data->payment_status.'" ><span class="badge badge-success">'.$data->payment_status.'</span></a>';
+        return '<a href="javascript:void(0)" class="active-status" title="'.e($data->payment_status).'" ><span class="badge badge-success">'.e($data->payment_status).'</span></a>';
       }
     })
     ->addColumn('action', function ($tableData) {

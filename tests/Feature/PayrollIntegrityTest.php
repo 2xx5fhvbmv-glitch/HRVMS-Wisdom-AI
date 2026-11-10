@@ -132,6 +132,15 @@ class PayrollIntegrityTest extends TestCase
         $this->assertEqualsWithDelta((float) $this->line->total_earnings, $this->saved('payroll_reviews', 'total_earnings'), 0.01);
     }
 
+    public function test_an_extra_payment_label_is_plain_text()   // security audit run-3 M10
+    {
+        $this->backToDraft();
+        $this->signIn('finance');
+        $this->postJson(route('payroll.entries.add'), ['payroll_id' => $this->run->id, 'employee' => $this->line->Emp_id, 'currency' => 'USD', 'amount' => 10,
+            'kind' => 'extra_payment', 'label' => '<img src=x onerror=alert(1)>Bonus', 'reason' => 'night shifts'])->assertOk();
+        $this->assertSame('Bonus', DB::table('payroll_manual_entries')->where('payroll_id', $this->run->id)->where('kind', 'extra_payment')->value('label'));
+    }
+
     public function test_the_city_ledger_file_is_read_on_the_server()
     {
         $this->backToDraft();

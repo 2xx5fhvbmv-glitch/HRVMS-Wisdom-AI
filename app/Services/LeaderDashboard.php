@@ -115,7 +115,7 @@ class LeaderDashboard
             'in_pdp' => DB::table('employee_pdp_plans')->where('resort_id', $this->resortId)->where('status', 'active')->whereIn('employee_id', $ids)->count(),
             'overtime_hours' => round($otThis, 1),
             'overtime_vs_last' => $otLast > 0 ? round($otThis / $otLast, 1) : null,
-            'open_grievances' => DB::table('grivance_submission_models')->where('resort_id', $this->resortId)
+            'open_grievances' => DB::table('grivance_submission_models')->where('resort_id', $this->resortId)->whereNull('deleted_at')
                 ->whereIn('status', ['pending', 'in_review'])->whereIn('Employee_id', $ids)->count(),
             'disciplinary_cases' => DB::table('disciplinary_submits')->where('resort_id', $this->resortId)
                 ->whereIn('status', ['pending', 'In_Review', 'Acknowledged'])->whereIn('Employee_id', $ids)->count(),

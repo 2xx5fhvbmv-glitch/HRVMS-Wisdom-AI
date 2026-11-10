@@ -98,6 +98,10 @@ class BenefitGradeLevelController extends Controller
 
     public function store(Request $request)
     {
+        // Audit run-3 §5: benefit grade settings are HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $validator = $this->validateName($request);
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
@@ -119,6 +123,10 @@ class BenefitGradeLevelController extends Controller
 
     public function inlineUpdate(Request $request, $id)
     {
+        // Audit run-3 §5: benefit grade settings are HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $mainId = (int) base64_decode($request->Main_id);
         $validator = $this->validateName($request, $mainId);
         if ($validator->fails()) {
@@ -144,6 +152,10 @@ class BenefitGradeLevelController extends Controller
 
     public function destroy($id)
     {
+        // Audit run-3 §5: benefit grade settings are HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $id = (int) base64_decode($id);
         $resort_id = $this->resort->resort_id;
 
@@ -189,6 +201,10 @@ class BenefitGradeLevelController extends Controller
      */
     public function updateRanks(Request $request, $id)
     {
+        // Audit run-3 §5: benefit grade settings are HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $id = (int) base64_decode($id);
         $resort_id = $this->resort->resort_id;
 
@@ -271,6 +287,10 @@ class BenefitGradeLevelController extends Controller
      */
     public function storeHousekeepingService(Request $request)
     {
+        // Audit run-3 §5: benefit grade settings are HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $resort_id = $this->resort->resort_id;
         $validator = Validator::make($request->all(), [
             'name' => [
@@ -302,6 +322,10 @@ class BenefitGradeLevelController extends Controller
 
     public function destroyHousekeepingService($id)
     {
+        // Audit run-3 §5: benefit grade settings are HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $id = (int) base64_decode($id);
         $resort_id = $this->resort->resort_id;
 
@@ -337,6 +361,10 @@ class BenefitGradeLevelController extends Controller
      */
     public function updateHousekeepingServices(Request $request, $id)
     {
+        // Audit run-3 §5: benefit grade settings are HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $id = (int) base64_decode($id);
         $resort_id = $this->resort->resort_id;
 

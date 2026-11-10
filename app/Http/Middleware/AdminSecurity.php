@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
  */
 class AdminSecurity
 {
-    private const IDLE_SECONDS = 900;
+    public const IDLE_SECONDS = 900;   // also ends an impersonated resort session (EnsureAccountActive)
 
     /** Reachable before MFA enrolment: enrolment itself, logout, and the must_change_password flow (ForcePasswordChange runs first). */
     private const ALLOWED_BEFORE_MFA = ['admin.2fa.setup', 'admin.2fa.confirm', 'admin.logout', 'admin.profile', 'admin.changePassword', 'admin.checkPassword'];
@@ -57,7 +57,8 @@ class AdminSecurity
         }
 
         // These GETs carry no CSRF token, so only accept them from this site's own pages (Fetch Metadata, else Referer).
-        $stateGet = $request->isMethod('GET') && preg_match(self::STATE_CHANGING_GET_URI, (string) $request->route()?->uri());
+        // HEAD too: Laravel runs a GET route's action for a HEAD request (audit run-3 §4).
+        $stateGet = in_array($request->method(), ['GET', 'HEAD'], true) && preg_match(self::STATE_CHANGING_GET_URI, (string) $request->route()?->uri());
         if ($stateGet) {
             $site = $request->header('Sec-Fetch-Site');
             $sameSite = $site ? in_array($site, ['same-origin', 'none'], true)

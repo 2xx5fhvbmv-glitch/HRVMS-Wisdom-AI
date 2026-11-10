@@ -2094,6 +2094,8 @@ class ConfigurationController extends Controller
 
     public function GrievanceCategoryStore(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $resort_id = $this->resort->resort_id;
         $validator = Validator::make($request->all(), [
@@ -2139,6 +2141,8 @@ class ConfigurationController extends Controller
     }
     public function GrievanceCategorinlineUpdate(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $Main_id = (int) base64_decode($request->Main_id);
 
         $resort_id = $this->resort->resort_id;
@@ -2192,6 +2196,8 @@ class ConfigurationController extends Controller
     }
     public function GrievanceCategoryDestory($id)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($id);
         DB::beginTransaction();
         try
@@ -2218,6 +2224,8 @@ class ConfigurationController extends Controller
 
     public function GrievanceSubCategoryStore(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $resort_id = $this->resort->resort_id;
         $validator = Validator::make($request->all(), [
@@ -2305,6 +2313,8 @@ class ConfigurationController extends Controller
 
     public function GrievanceSubCategorinlineUpdate(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $Main_id = (int) base64_decode($request->Main_id);
         $resort_id = $this->resort->resort_id;
@@ -2362,6 +2372,8 @@ class ConfigurationController extends Controller
     }
     public function GrievanceSubCategoryDestory($id)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($id);
         DB::beginTransaction();
         try
@@ -2399,6 +2411,8 @@ class ConfigurationController extends Controller
     }
     public function GrievanceCatAndSubCategoryStore(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
 
         $resort_id = $this->resort->resort_id;
@@ -2551,6 +2565,8 @@ class ConfigurationController extends Controller
     }
     public function GrievanceCatAndSubCategoryinlineUpdate(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $Main_id           = base64_decode($request->Main_id);
         $resort_id = $this->resort->resort_id;
         $validator = Validator::make($request->all(), [
@@ -2624,6 +2640,8 @@ class ConfigurationController extends Controller
     }
     public function GrievanceCatAndSubCategoryDestory($id)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($id);
         DB::beginTransaction();
         try
@@ -2648,6 +2666,8 @@ class ConfigurationController extends Controller
     }
     public function GrieDelegationRuleStore(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $resort_id = $this->resort->resort_id;
 
@@ -2765,6 +2785,8 @@ class ConfigurationController extends Controller
     }
     public function GrievanceDelegeationRuleinlineUpdate(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
 
         $Main_id = base64_decode($request->Main_id);
@@ -2839,6 +2861,8 @@ class ConfigurationController extends Controller
 
     public function GrievanceDelegeationRuleDestory($id)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($id);
         DB::beginTransaction();
         try
@@ -2861,6 +2885,8 @@ class ConfigurationController extends Controller
     }
     public function GrievanceRightToBeAccompanied(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $grievanceRightToBeAccompanied = isset($request->grievanceRightToBeAccompanied) && $request->grievanceRightToBeAccompanied == "on" ? $grievanceRightToBeAccompanied = 'yes' : $grievanceRightToBeAccompanied = 'no';
 
@@ -2889,6 +2915,8 @@ class ConfigurationController extends Controller
 
     public function GrievanceNonRetaliation(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         //
         DB::beginTransaction();
@@ -2925,6 +2953,8 @@ class ConfigurationController extends Controller
     }
     public function GrievanceAppealStore(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $Grievance_Enable_Appeal = (isset($request->Grievance_Enable_Appeal)) ? 'on':'off';
         $AppealDeadLine = $request->AppealDeadLine;
@@ -2985,6 +3015,8 @@ class ConfigurationController extends Controller
     }
     public function GrievanceTempleteStore(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         if($request->GrievanectempleteFlag =="EditMode")
         {
@@ -3126,6 +3158,8 @@ class ConfigurationController extends Controller
 
     public function GrivanceTempleteDestory($id)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($id);
         DB::beginTransaction();
         try
@@ -3148,6 +3182,8 @@ class ConfigurationController extends Controller
     }
     public function GrivanceResoultionTimeLineStore(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $Grivance_high_priority = $request->Grivance_high_priority;
         $Grivance_medium_priority = $request->Grivance_medium_priority;
         $Grivance_low_priority = $request->Grivance_low_priority;
@@ -3179,6 +3215,8 @@ class ConfigurationController extends Controller
 
     public function GrivanceEscaltionStore(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
 
         $validator = Validator::make($request->all(), [
             'Grievance_Cat_id'   => ['required', 'array', 'min:1'],
@@ -3292,6 +3330,8 @@ class ConfigurationController extends Controller
 
     public function GrievanceEscalationinlineUpdate(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $mainId = base64_decode($request->Main_id); // Decode Main ID
         $validator = Validator::make($request->all(), [
             'Main_id'            => ['required', 'string'], // Assuming it's Base64 encoded
@@ -3361,6 +3401,8 @@ class ConfigurationController extends Controller
     }
     public function GrievanceEscalationDestory($id)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($id);
         DB::beginTransaction();
         try
@@ -3383,6 +3425,8 @@ class ConfigurationController extends Controller
     }
     public function GrievanceCommitteeStore(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $validator = Validator::make($request->all(), [
             'Grivance_CommitteeName'  => [
                 'required',
@@ -3513,6 +3557,8 @@ class ConfigurationController extends Controller
     }
     public function GrivanceCommitteeinlineUpdate(Request $request)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($request->Main_id);
         $CommitteeName = $request->Grivance_CommitteeName;
         $assign_members= $request->Committee_Member_Id;
@@ -3607,6 +3653,8 @@ class ConfigurationController extends Controller
     }
     public function GrivevanceCommitteesDestory($id)
     {
+        // Audit run-3 M3: grievance settings are HR's, like the disciplinary ones (D-04).
+        if ($guard = $this->requireDisciplinaryHr()) return $guard;
         $id = base64_decode($id);
         DB::beginTransaction();
         try

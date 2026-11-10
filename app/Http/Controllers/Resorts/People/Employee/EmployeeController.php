@@ -509,6 +509,9 @@ class EmployeeController extends Controller
 
     public function store(Request $request)
     {
+        // Audit run-3 H3: creating an employee (and their login) is HR's job — and the rank, department, position,
+        // division and section come from the vacancy, never from the form, so a posted rank can't make someone HR.
+        if ($guard = $this->requireHrAccess()) return $guard;
 
         try{
             $check_admin = ResortAdmin::where('resort_id', $this->resort->resort_id)
@@ -590,6 +593,11 @@ class EmployeeController extends Controller
                 'state' => $request->parmanent_state,
                 'zip' => $request->parmanent_postal_code,
                 'country' => $request->parmanent_country,
+                // Was never set: resort_admins.type is a NOT NULL enum('super','sub') with no default and strict mode is
+                // off, so MySQL stored the first value, 'super' — which passes every page permission check.
+                'type' => 'sub',
+                'is_employee' => 1,
+                'status' => 'Active',
             ];
 
             $dob = Carbon::createFromFormat('d/m/Y', $request->date_birth)->format('Y-m-d');
@@ -625,42 +633,18 @@ class EmployeeController extends Controller
             // moment they're activated.
             $initial_status = 'Onboarding';
 
-            // ----------------------------------------------------------------
-            // Department / Position / Division resolution.
-            //
-            // The create page locks these dropdowns via prop('disabled', true)
-            // when HR picks a vacancy. Browsers SKIP disabled inputs when
-            // serializing forms, so the canonical `department`/`position`/
-            // `division` fields can arrive empty even though the values are
-            // visibly chosen. The view also writes hidden fallbacks
-            // (`vacancy_department_id`, `vacancy_position_id`,
-            // `vacancy_division_id`) — prefer the visible value if present,
-            // otherwise fall back to the vacancy hidden field, otherwise
-            // re-read straight off the vacancy row as a last line of
-            // defence. This is the fix for "Column 'Dept_id' cannot be null"
-            // on vacancy-tied hires.
-            // ----------------------------------------------------------------
-            $deptId = $request->filled('department')
-                ? $request->department
-                : ($request->filled('vacancy_department_id')
-                    ? $request->vacancy_department_id
-                    : ($vacancy->department ?? null));
-            $positionId = $request->filled('position')
-                ? $request->position
-                : ($request->filled('vacancy_position_id')
-                    ? $request->vacancy_position_id
-                    : ($vacancy->position ?? null));
-            $divisionId = $request->filled('division')
-                ? $request->division
-                : ($request->filled('vacancy_division_id')
-                    ? $request->vacancy_division_id
-                    : ($vacancy->division ?? null));
+            // Department / Position / Division / Section / rank: the vacancy's (audit run-3 H3). The form's dropdowns
+            // are locked to the vacancy and disabled inputs aren't even posted, so nothing legitimate is lost.
+            $deptId = $vacancy->department ?? null;
+            $positionId = $vacancy->position ?? null;
+            $divisionId = $vacancy->division ?? null;
+            $vacancyRank = $vacancy->rank ?? \App\Models\ResortPosition::where('id', $positionId)->where('resort_id', $this->resort->resort_id)->value('Rank');
 
             $employeeData = [
                 'resort_id' => $this->resort->resort_id,
                 'title' => $request->gender =='male'? 'Mr.' : 'Ms.',
                 'Dept_id'=> $deptId,
-                'Section_id' => $request->section,
+                'Section_id' => $vacancy->section ?? null,
                 'Position_id' => $positionId,
                 // Link this employee back to the vacancy they were hired
                 // against. Used by /resort/people/employees/create to count
@@ -669,7 +653,7 @@ class EmployeeController extends Controller
                 'division_id'=> $divisionId,
                 'reporting_to'=> $request->reporting_person,
                 'is_employee' => 1,
-                'rank'=> $request->position_rank,
+                'rank'=> $vacancyRank,
                 'status' => $initial_status,
                 'dob' =>$dob ,
                 'marital_status' => $request->marital_status,
@@ -1636,6 +1620,7 @@ class EmployeeController extends Controller
 
     public function assignToTeam(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
         // dd($request->all());
         $request->validate([
             'emp_id' => 'required|exists:employees,id',
@@ -1784,6 +1769,7 @@ class EmployeeController extends Controller
      */
     public function updateLocation(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
         $validator = \Validator::make($request->all(), [
             'employee_id' => 'required|exists:employees,id',
             'location'    => 'nullable|in:Malé,Resorts',
@@ -1807,6 +1793,7 @@ class EmployeeController extends Controller
      */
     public function updateProfilePicture(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
         $validator = \Validator::make($request->all(), [
             'employee_id'      => 'required|exists:employees,id',
             'profile_picture'  => 'nullable|file|mimes:jpg,jpeg,png,gif,svg,webp,heic,heif',
@@ -1937,6 +1924,7 @@ class EmployeeController extends Controller
 
     public function updatePersonal(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
         $formattedDOB = \Carbon\Carbon::createFromFormat('d/m/Y', $request->dob)->format('Y-m-d');
 
         $employee = Employee::where('resort_id', $this->resort->resort_id)->findOrFail($request->employee_id);
@@ -1965,8 +1953,15 @@ class EmployeeController extends Controller
 
     public function updateContacts(Request $request)
     {
+        // Audit run-3 H1: this rewrote any employee's login email (then a password reset took the account over) for
+        // any portal user. HR only; the email must be valid and not someone else's login; the old address is told.
+        if ($guard = $this->requireHrAccess()) return $guard;
 
         $employee = Employee::where('resort_id', $this->resort->resort_id)->findOrFail($request->employee_id);
+        $request->validate([
+            'email' => ['required', 'email:rfc', 'max:191', Rule::unique('resort_admins', 'email')->ignore($employee->Admin_Parent_id)],
+            'personal_phone' => ['nullable', 'string', 'max:30'],
+        ]);
 
         // Snapshot the audit-loggable fields BEFORE save so we can diff
         // them after. Previously this endpoint silently updated
@@ -2001,11 +1996,27 @@ class EmployeeController extends Controller
             'personal_phone' => $request->personal_phone,
         ]);
 
+        // Tell the previous address its login email changed, so a takeover can't happen silently.
+        $oldEmail = $oldSnapshot['email'];
+        if ($oldEmail && strcasecmp($oldEmail, (string) $request->email) !== 0) {
+            try {
+                \Illuminate\Support\Facades\Mail::raw(
+                    "The email address used to sign in to your Wisdom AI account was changed to {$request->email} by "
+                    . trim(($this->resort->first_name ?? '') . ' ' . ($this->resort->last_name ?? '')) . ' on ' . now()->format('d M Y H:i')
+                    . ". If you did not expect this, contact your HR department straight away.",
+                    fn ($m) => $m->to($oldEmail)->subject('Your sign-in email was changed')
+                );
+            } catch (\Throwable $e) {
+                \Log::warning('Contact-email change notice failed: ' . $e->getMessage());
+            }
+        }
+
         return response()->json(['success' => true ,'message' => "Contacts Details Updated!"]);
     }
 
     public function updateEmergencyContacts(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
 
         $employee = Employee::where('resort_id', $this->resort->resort_id)->findOrFail($request->employee_id);
         $employee->emg_cont_first_name = $request->emg_cont_first_name;
@@ -2021,6 +2032,7 @@ class EmployeeController extends Controller
 
     public function updateAdditionalInfo(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
         $request->validate([
             'leave_destination' => 'nullable|string|max:255',
             'biometric_file' => 'nullable|file|mimes:jpg,jpeg,png,gif,svg,webp,heic,heif,pdf',
@@ -2506,6 +2518,7 @@ class EmployeeController extends Controller
 
     public function updateEducationDetails(Request $request, $id)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
         // Find the education record by ID
         $education = EmployeeEducation::whereHas('employee', function ($q) {
                 $q->where('resort_id', $this->resort->resort_id);
@@ -2565,6 +2578,7 @@ class EmployeeController extends Controller
 
     public function addEducationDetails(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
         $request->validate([
             'employee_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             'education_level' => 'required|string|max:255',
@@ -2626,6 +2640,7 @@ class EmployeeController extends Controller
 
     public function updateExperianceDetails(Request $request, $id)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
         // Find the education record by ID
         $exp = EmployeeExperiance::whereHas('employee', function ($q) {
                 $q->where('resort_id', $this->resort->resort_id);
@@ -2659,6 +2674,7 @@ class EmployeeController extends Controller
 
     public function addExperianceDetails(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
         $request->validate([
             'employee_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             'company_name' => 'required|string|max:255',
@@ -2691,6 +2707,7 @@ class EmployeeController extends Controller
 
     public function updateExpiryDocuments(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
         $documentIds = $request->document_ids;
         if (empty($documentIds)) {
             return response()->json(['success' => false, 'message' => 'No documents provided.'], 501);
@@ -2712,6 +2729,7 @@ class EmployeeController extends Controller
 
     public function updateTravelQuota(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
         $employeeId = $request->employee_id;
         $transportationIds = $request->transportation_ids;
         if (empty($employeeId) || empty($transportationIds)) {

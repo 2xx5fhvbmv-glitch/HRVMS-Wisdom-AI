@@ -1275,6 +1275,7 @@ class TimeAndAttendanceController extends Controller
             //brerak notification
             $requireBreak = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
                 ->join('parent_attendaces as pa', "pa.Emp_id", "=", "employees.id")
+                ->where('employees.resort_id', $resort_id)   // audit run-3 M9: listed every resort's staff
                 ->join('child_attendaces as ca', "ca.Parent_attd_id", "=", "pa.id")
                 ->leftJoin('break_attendaces as ba', "ba.Parent_attd_id", "=", "pa.id")
                 ->where('pa.status', "=", 'Present')

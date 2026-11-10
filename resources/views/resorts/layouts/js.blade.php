@@ -1088,8 +1088,8 @@
             const RankOfResort     = '{{ isset(Auth::guard("resort-admin")->user()->GetEmployee) ? Auth::guard("resort-admin")->user()->GetEmployee->rank : "" }}';
             const Dept_id          = parseInt('{{ isset(Auth::guard("resort-admin")->user()->GetEmployee) ? Auth::guard("resort-admin")->user()->GetEmployee->Dept_id : "0" }}', 10);
 
-            window.Echo.private('resort-notifications.' + ReciverResortId)
-                .listen('.ResorteNotification-event', function (data) {
+            const MyEmployeeId     = '{{ optional(Auth::guard("resort-admin")->user()->GetEmployee)->id }}';
+            const onResortNotification = function (data) {
                     if (!data || !data.html) return;
                     const htmlview            = data.html.html;
                     const type                = data.html.type;
@@ -1156,7 +1156,12 @@
                             }
                         }
                     }
-                });
+                };
+            window.Echo.private('resort-notifications.' + ReciverResortId).listen('.ResorteNotification-event', onResortNotification);
+            // Notifications for this person only arrive on their own channel (audit run-3 M1).
+            if (MyEmployeeId) {
+                window.Echo.private('resort-notifications.' + ReciverResortId + '.employee.' + MyEmployeeId).listen('.ResorteNotification-event', onResortNotification);
+            }
         }
         // End of real-time resort notifications
         $(document).on("keyup", "#occupancytotalRooms", function () {

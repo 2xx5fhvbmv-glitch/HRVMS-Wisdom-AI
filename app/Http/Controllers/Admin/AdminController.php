@@ -307,12 +307,17 @@ class AdminController extends Controller
   /** A non-super admin may only give a role whose every permission they hold themselves: they can delegate, not hand out (or take) more. */
   private function assertAssignableRole($roleId): void
   {
+    abort_if(!$this->roleWithinCaller($roleId), 403, 'You can only assign a role with permissions you hold yourself.');
+  }
+
+  /** Every permission of the role is one the caller holds (always true for a super admin or no role). */
+  private function roleWithinCaller($roleId): bool
+  {
     if (!$roleId || Auth::guard('admin')->user()->type === 'super') {
-      return;
+      return true;
     }
-    $exceeds = \App\Models\AdminRoleModulePermission::where('role_id', $roleId)->with('module_permission')->get()
+    return !\App\Models\AdminRoleModulePermission::where('role_id', $roleId)->with('module_permission')->get()
       ->contains(fn ($p) => !$p->module_permission || !Common::hasPermission($p->module_permission->module_id, $p->module_permission->permission_id));
-    abort_if($exceeds, 403, 'You can only assign a role with permissions you hold yourself.');
   }
 
   private function editableAdmin($id, bool $statusChange = false): Admin
@@ -320,6 +325,17 @@ class AdminController extends Controller
     $caller = Auth::guard('admin')->user();
     $target = Admin::findOrFail($id);
     abort_if($target->id == 1 || ($caller->type !== 'super' && ($target->type === 'super' || ($statusChange && $target->id == $caller->id))), 403);
+    // Audit run-3 M7: a non-super editor can't change (e.g. reset the email / password of) an admin whose role
+    // carries permissions the editor doesn't hold — that would be a way into the broader role.
+    abort_if($caller->type !== 'super' && !$this->roleWithinCaller($target->role_id), 403, 'This admin has permissions you do not hold.');
+    return $target;
+  }
+
+  /** Delete targets: as editableAdmin() for a status change, and never the caller themselves — super admins included. */
+  private function deletableAdmin($id): Admin
+  {
+    $target = $this->editableAdmin($id, true);
+    abort_if($target->id == Auth::guard('admin')->id(), 403, 'You cannot delete your own account.');
     return $target;
   }
 
@@ -368,8 +384,8 @@ class AdminController extends Controller
 
   public function destroy($id)
   {
+    $admin = $this->deletableAdmin($id);   // audit run-3 M6: was any admin but id 1 — other super admins and the caller too
     try {
-      $admin = Admin::where('id','!=',1)->findOrFail($id);
       $admin->email = base64_encode($admin->email);
       $admin->save();
       $admin->delete();
@@ -429,9 +445,9 @@ class AdminController extends Controller
 
   public function massremove(Request $request)
   {
+    // Audit run-3 M6: the same rules as a single delete, per admin (outside the catch, so a refusal is a 403).
+    $data = collect((array) $request->input('id'))->map(fn ($id) => $this->deletableAdmin($id));
     try {
-      $ids = $request->input('id');
-      $data = Admin::where('id','!=',1)->whereIn('id', $ids)->get();
 
       foreach ($data as $key => $value) {
         $value->email = Common::generateUniqueCode(35, 'admins', 'email');

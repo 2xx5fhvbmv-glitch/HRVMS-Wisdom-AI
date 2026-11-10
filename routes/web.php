@@ -12,7 +12,11 @@ use Illuminate\Support\Facades\Broadcast;
 // middleware group already behaves elsewhere.
 Route::post('/broadcasting/auth', function (\Illuminate\Http\Request $request) {
     if (Auth::guard('admin')->check()) {
-        abort_if(Auth::guard('admin')->user()->status !== 'active', 403);
+        $admin = Auth::guard('admin')->user();
+        abort_if($admin->status !== 'active', 403);
+        // Audit run-3 §4: the console's own rules apply here too — MFA set up, not idle past the 15-minute limit.
+        $last = $request->session()->get('admin_last_activity');
+        abort_if(!$admin->two_factor_confirmed_at || ($last && time() - $last > \App\Http\Middleware\AdminSecurity::IDLE_SECONDS), 403);
         Auth::shouldUse('admin');
     } elseif (Auth::guard('resort-admin')->check()) {
         Auth::shouldUse('resort-admin');

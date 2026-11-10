@@ -15,7 +15,9 @@ class Kernel extends HttpKernel
      */
     protected $middleware = [
         // \App\Http\Middleware\TrustHosts::class,
-        \Illuminate\Session\Middleware\StartSession::class,
+        // No StartSession here (audit run-3, "not fixed" item): the 'web' and 'api' groups start the session. Running it
+        // globally too saved the session twice per request — the id changed on every request, an old id kept working after
+        // logout, the cookie skipped EncryptCookies, and flash data (->with / ->withErrors) was gone before the next page.
         \App\Http\Middleware\TrustProxies::class,
         \Illuminate\Http\Middleware\HandleCors::class,
         \App\Http\Middleware\PreventRequestsDuringMaintenance::class,

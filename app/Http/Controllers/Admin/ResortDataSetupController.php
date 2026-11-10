@@ -302,7 +302,10 @@ class ResortDataSetupController extends Controller
             'history'     => $history,
             'options'     => ResortDataImporter::options($import),
             'notices'     => $notices,
-            'credentials' => ResortDataImport::where('resort_id', $resort->id)->whereNotNull('credentials')->orderByDesc('id')->first()?->credentials ?? [],
+            // Audit run-3 M8: decrypted temporary passwords only for admins who may run the import (Resorts Edit), not View.
+            'credentials' => $this->canResorts('edit')
+                ? (ResortDataImport::where('resort_id', $resort->id)->whereNotNull('credentials')->orderByDesc('id')->first()?->credentials ?? [])
+                : [],
             'fields'      => SheetMapper::FIELDS,
             'ranks'       => config('settings.Position_Rank'),
             'shifts'      => ShiftSettings::where('resort_id', $resort->id)->get(['id', 'ShiftName', 'StartTime', 'EndTime']),
@@ -352,6 +355,11 @@ class ResortDataSetupController extends Controller
 
     private function authorizeResorts(string $permission): void
     {
-        abort_unless(Common::hasPermission(config('settings.admin_modules.resorts'), config('settings.permissions.' . $permission)), 403);
+        abort_unless($this->canResorts($permission), 403);
+    }
+
+    private function canResorts(string $permission): bool
+    {
+        return (bool) Common::hasPermission(config('settings.admin_modules.resorts'), config('settings.permissions.' . $permission));
     }
 }

@@ -946,6 +946,10 @@ class GrivanceController extends Controller
     
     public function RequestForStatement(Request $request)
     {
+        // Audit run-3 M3: asking witnesses for statements is part of running the case — HR only.
+        if (!Common::isDisciplinaryHR()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $id = $request->id;
         // Grivance_id (e.g. "GR-0001") is one global sequence across every
         // resort (see S2-10), and this lookup had no resort_id filter at
@@ -1130,6 +1134,11 @@ class GrivanceController extends Controller
 
     public function GrivnanceDestory($id)
     {
+        // Audit run-3 M3: any portal user could wipe a grievance case. HR only, and the case is soft-deleted (its
+        // investigation and witness records are kept with it).
+        if (!Common::isDisciplinaryHR()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
 
        
             $id = base64_decode($id);
@@ -1145,14 +1154,7 @@ class GrivanceController extends Controller
             {
 
 
-                    $investigations = GrivanceInvestigationModel::where("Grievance_s_id", $id)->get();
-                    foreach ($investigations as $investigation)
-                    {
-                        GrivanceInvestigationChildModel::where("investigation_p_id", $investigation->id)->delete();
-                    }
-                    GrivanceInvestigationModel::where("Grievance_s_id", $id)->delete();
-                    GrivanceSubmissionWitness::where("G_S_Parent_id", $id)->delete();
-                    $grievance->delete();
+                    $grievance->delete();   // soft delete
                 DB::commit();
                 return response()->json([
                     'success' => true,

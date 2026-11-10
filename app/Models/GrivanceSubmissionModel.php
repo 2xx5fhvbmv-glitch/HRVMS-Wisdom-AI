@@ -4,12 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Auth;
 use Carbon\Carbon;
 use App\Helpers\Common;
 class GrivanceSubmissionModel extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;   // audit run-3 M3: a deleted case is kept (deleted_at), not wiped
     protected $table="grivance_submission_models";
 
     protected $fillable = [

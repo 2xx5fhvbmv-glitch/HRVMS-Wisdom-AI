@@ -3448,7 +3448,7 @@
 
                     // Update thead - Fixed to use the unit from each allowance
                     let allowanceHeaderHtml = allowanceList.map(allowance => 
-                        `<th data-allowance="${allowance.name}" data-currency="${allowance.unit}">${allowance.name}</th>`
+                        `<th data-allowance="${$('<i>').text(allowance.name).html().replace(/"/g, '&quot;')}" data-currency="${$('<i>').text(allowance.unit).html()}">${$('<i>').text(allowance.name).html()}</th>`
                     ).join('');
                     // console.log(allowanceHeaderHtml);
 

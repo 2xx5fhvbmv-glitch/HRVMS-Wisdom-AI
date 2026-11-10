@@ -157,6 +157,16 @@ class LoginController extends Controller
     return view('admin.permission_deny')->with(compact('page_title', 'page_header'));
   }
 
+  /** Ends a "log in as resort" session started from this admin session; the admin stays signed in. */
+  public function endImpersonation(Request $request)
+  {
+    if (session()->has('impersonated_by')) {
+      Auth::guard('resort-admin')->logout();
+      session()->forget(['impersonated_by', 'impersonation_last_activity']);
+    }
+    return redirect()->route('admin.resorts.index');
+  }
+
   public function AdminToResort(Request $request)
   {
       abort_unless(Common::hasPermission(config('settings.admin_modules.resorts'), config('settings.permissions.edit')), 403);
@@ -184,7 +194,7 @@ class LoginController extends Controller
           if (Auth::guard('resort-admin')->check())
           {
             // Store original admin ID as the impersonator
-            session(['impersonated_by' => Auth::guard('admin')->id()]);
+            session(['impersonated_by' => Auth::guard('admin')->id(), 'impersonation_last_activity' => now()->getTimestamp()]);
             // Determine redirect URL based on the impersonated user's role
             $role = $resortAdmin->GetEmployee->rank ?? null;
             $rankConfig = config('settings.Position_Rank');

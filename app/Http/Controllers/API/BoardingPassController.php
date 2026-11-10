@@ -1331,6 +1331,10 @@ class BoardingPassController extends Controller
                                                             'employee.position:id,position_title',
                                                             ])
                                                             ->where('resort_id', $resortId)
+                                                            // Audit run-3 §4: the whole resort's comings and goings are for those who run island
+                                                            // passes (HR, the GM, the manifest/security staff) — everyone else sees their own.
+                                                            ->when(!(Common::isHR($employee) || (int) $employee->rank === 8 || $this->userCanManageManifests()),
+                                                                fn ($q) => $q->where('employee_id', $employee->id))
                                                             ->where('status', 'Approved')
                                                             ->where(function ($q) use ($startDate, $endDate) {
                                                                 // Filter by date ranges

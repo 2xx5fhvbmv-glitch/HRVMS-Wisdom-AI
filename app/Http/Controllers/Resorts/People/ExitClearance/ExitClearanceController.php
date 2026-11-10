@@ -412,6 +412,10 @@ class ExitClearanceController extends Controller
     }
 
     public function assignmentSubmitDepartment(Request $request){
+        // Audit run-3 §5: assigning clearance forms / departure arrangements is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
 
         $resort_id = $this->resort->resort_id;
 
@@ -658,6 +662,10 @@ class ExitClearanceController extends Controller
     }
 
     public function assignmentSubmitEmployee(Request $request){
+        // Audit run-3 §5: assigning clearance forms / departure arrangements is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
 
         $resort_id = $this->resort->resort_id;
    
@@ -1147,6 +1155,10 @@ class ExitClearanceController extends Controller
     // mark as Complete by hr
     public function markAsComplete(Request $request, $id)
     {
+        // Audit run-3 H2: completing exit clearance terminates the employee (and revokes their app tokens) — HR only.
+        if (!Common::canManageEmployeeRecords()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $id = base64_decode($id);
         $resort_id = $this->resort->resort_id;
 
@@ -1401,6 +1413,10 @@ class ExitClearanceController extends Controller
 
     public function sendReminder(Request $request, $id)
     {
+        // Audit run-3 §5: assigning clearance forms / departure arrangements is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $id = base64_decode($id);
         $resort_id = $this->resort->resort_id;  
         $employeeResignation = EmployeeResignation::where('id', $id)
@@ -1451,6 +1467,10 @@ class ExitClearanceController extends Controller
     }
 
     public function employeeDepartureArrangement(Request $request, $id){
+        // Audit run-3 §5: assigning clearance forms / departure arrangements is HR's.
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $id = base64_decode($id);
         $page_title = 'Departure Arrangements';
         $resort_id = $this->resort->resort_id;

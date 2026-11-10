@@ -73,6 +73,10 @@ class ExitClearanceController extends Controller
     }
 
     public function store(Request $request){
+        // Audit run-3 M4: People settings are HR's.
+        if (!\App\Helpers\Common::canManageEmployeeRecords()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
 
         $exit_clearance  = ExitClearanceForm::create([
             'resort_id' => $this->resort->resort_id,
@@ -108,6 +112,10 @@ class ExitClearanceController extends Controller
     }
 
     public function update(Request $request,$id){
+        // Audit run-3 M4: People settings are HR's.
+        if (!\App\Helpers\Common::canManageEmployeeRecords()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         if(!is_numeric($id)){
             $id = base64_decode($id);
         }
@@ -134,6 +142,10 @@ class ExitClearanceController extends Controller
    
     public function destroy($id)
     {
+        // Audit run-3 M4: People settings are HR's.
+        if (!\App\Helpers\Common::canManageEmployeeRecords()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
           if(!is_numeric($id)){
             $id = base64_decode($id);
         }

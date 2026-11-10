@@ -44,8 +44,10 @@ class NotificationController extends Controller
 
             // Theme column: Text with font color and notice background
             ->editColumn('theme', function ($notification) {
+                // Audit run-3: a stored colour goes into a style attribute — accept only a CSS colour value.
+                $safeColor = fn ($c) => preg_match('/^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20}|rgba?\([0-9.,\s%]+\))$/', (string) $c) ? $c : 'inherit';
                 return '<a href="javascript:void(0)" class="inactive-status" title="Notification Theme" >
-                            <span class="badge" style="color:'.$notification->font_color.';background:'.$notification->notice_color.'">Texts</span>
+                            <span class="badge" style="color:'.$safeColor($notification->font_color).';background:'.$safeColor($notification->notice_color).'">Texts</span>
                         </a>';
             })
 
@@ -149,8 +151,8 @@ class NotificationController extends Controller
             'content' => 'required|string|max:1000',
             'start_date' => 'required|date',
             'end_date' => 'required|date',
-            'notice_color' => 'required|string', // Color inputs are string in hex format
-            'font_color' => 'required|string',
+            'notice_color' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{3,8}$/'], // Color inputs are string in hex format
+            'font_color' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{3,8}$/'],
             // 'sticky' => 'required|in:yes,no',
             'status' => 'required|in:active,inactive',
             'resorts' => 'required|array',
@@ -247,8 +249,8 @@ class NotificationController extends Controller
                 'content' => 'required|string',
                 'start_date' => 'required|date',
                 'end_date' => 'required|date',
-                'notice_color' => 'required|string',
-                'font_color' => 'required|string',
+                'notice_color' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{3,8}$/'],
+                'font_color' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{3,8}$/'],
                 // 'sticky' => 'required|in:yes,no',
                 'status' => 'required|in:active,inactive',
                 'resorts' => 'required|array', // Expecting array of resort IDs

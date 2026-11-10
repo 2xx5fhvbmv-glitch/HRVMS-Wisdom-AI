@@ -38,6 +38,10 @@ class ConfigController extends Controller
 
     public function storeCategory(Request $request)
     {
+        // Audit run-3 M4: People settings are HR's.
+        if (!\App\Helpers\Common::canManageEmployeeRecords()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $request->validate([
             'category_name' => 'required|array',
             'category_name.*' => 'required|string|max:50'
@@ -106,6 +110,10 @@ class ConfigController extends Controller
 
     public function CategoryinlineUpdate(Request $request,$id)
     {
+        // Audit run-3 M4: People settings are HR's.
+        if (!\App\Helpers\Common::canManageEmployeeRecords()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $Main_id = (int) base64_decode($request->Main_id);
 
         $resort_id = $this->resort->resort_id;
@@ -158,6 +166,10 @@ class ConfigController extends Controller
 
     public function categoryDestory($id)
     {
+        // Audit run-3 M4: People settings are HR's.
+        if (!\App\Helpers\Common::canManageEmployeeRecords()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $id = base64_decode($id);
         DB::beginTransaction();
         try
@@ -186,6 +198,10 @@ class ConfigController extends Controller
 
     public function EmployeeResignationWithdrawalConfigStore(Request $request)
     {
+        // Audit run-3 M4: People settings are HR's.
+        if (!\App\Helpers\Common::canManageEmployeeRecords()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $emp_resignation_withdrawal = EmployeeResignationWithdrawalConfig::where('resort_id', $this->resort->resort_id)->first();
         if($emp_resignation_withdrawal){
             $emp_resignation_withdrawal->update([
@@ -227,6 +243,10 @@ class ConfigController extends Controller
      */
     public function letterheadStore(Request $request)
     {
+        // Audit run-3 M4: People settings are HR's.
+        if (!\App\Helpers\Common::canManageEmployeeRecords()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         // No `image` rule — it rejects SVG/HEIC; mimes covers the allowed set
         // and matches the site-wide HEIC-friendly upload convention.
         $imageRule = 'nullable|file|mimes:jpeg,jpg,png,gif,svg,webp,heic,heif|max:5120';

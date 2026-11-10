@@ -20,6 +20,8 @@ class ReadQueryGuardTest extends TestCase
             'subquery scoped too' => ['SELECT e.Emp_id FROM employees e WHERE e.resort_id = :resort_id AND e.Dept_id IN (SELECT d.id FROM resort_departments d WHERE d.resort_id = :resort_id)'],
             'OR and keywords inside a string are data' => ["SELECT Emp_id FROM employees WHERE resort_id = :resort_id AND notes LIKE '%delete or update; union%'"],
             'trailing semicolon and comment' => ['SELECT Emp_id FROM employees WHERE resort_id = :resort_id; -- latest'],
+            'IS NOT NULL is fine' => ['SELECT e.Emp_id FROM employees e WHERE e.resort_id = :resort_id AND e.joining_date IS NOT NULL'],
+            'filter then GROUP BY / ORDER BY' => ['SELECT e.status, COUNT(*) n FROM employees e WHERE e.joining_date >= \'2026-01-01\' AND e.resort_id = :resort_id GROUP BY e.status ORDER BY n'],
         ];
     }
 
@@ -79,6 +81,17 @@ class ReadQueryGuardTest extends TestCase
             'scope padded with a string literal' => ["SELECT x.Emp_id FROM employees e JOIN employees x ON x.id > 0 WHERE e.resort_id = :resort_id AND x.notes <> 'x.resort_id'"],
             ':resort_id inside an IN list' => ['SELECT Emp_id FROM employees WHERE resort_id IN (:resort_id, 27)'],
             ':resort_id with another operator' => ['SELECT Emp_id FROM employees WHERE resort_id <> :resort_id'],
+            // audit run-3 H4: lexically present, structurally not a filter
+            'NOT in front of the filter' => ['SELECT e.Emp_id FROM employees e WHERE NOT e.resort_id = :resort_id'],
+            '! in front of the filter' => ['SELECT e.Emp_id FROM employees e WHERE !(e.resort_id = :resort_id)'],
+            'filter in the SELECT list only' => ['SELECT e.Emp_id, e.resort_id = :resort_id AS mine FROM employees e'],
+            'filter compared again' => ['SELECT e.Emp_id FROM employees e WHERE e.resort_id = :resort_id = 0'],
+            'filter inside a function' => ['SELECT e.Emp_id FROM employees e WHERE GREATEST(e.resort_id = :resort_id, 1)'],
+            'filter inside CASE' => ['SELECT e.Emp_id FROM employees e WHERE CASE WHEN 1 THEN e.resort_id = :resort_id ELSE 1 END'],
+            'filter swallowed by BETWEEN' => ['SELECT e.Emp_id FROM employees e WHERE e.id BETWEEN 1 AND e.resort_id = :resort_id'],
+            'filter inside IF()' => ['SELECT e.Emp_id FROM employees e WHERE IF(1, e.resort_id = :resort_id, 1)'],
+            'bracketed join hides an auth table' => ['SELECT ra.email FROM employees e JOIN (resort_admins ra) ON ra.id = e.Admin_Parent_id AND ra.resort_id = :resort_id WHERE e.resort_id = :resort_id'],
+            'derived table' => ['SELECT x.Emp_id FROM (SELECT Emp_id FROM employees) x WHERE x.resort_id = :resort_id'],
         ];
     }
 

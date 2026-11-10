@@ -99,6 +99,18 @@ class ReadQueryGuard
         if (preg_match('/\b(or|xor)\b|\|\|/i', $bare)) {
             return self::fail('OR is not allowed (it could widen the resort filter); use IN (...) or run separate queries.');
         }
+        // Audit run-3 H4: anything that can turn the resort filter into an operand instead of a condition — NOT / !,
+        // CASE, IF(), BETWEEN (`x BETWEEN 1 AND e.resort_id = :resort_id` swallows it) — and bracketed tables after
+        // FROM / JOIN (`JOIN (resort_admins ra)` hid the table from the deny-list; derived tables escape the scope check).
+        if (preg_match('/\bnot\b/i', preg_replace('/\bis\s+not\s+null\b/i', ' ', $bare)) || preg_match('/!(?!=)/', $bare)) {
+            return self::fail('NOT is not allowed (use IS NOT NULL, <> or != instead).');
+        }
+        if (preg_match('/\b(case|between)\b|\bif\s*\(/i', $bare)) {
+            return self::fail('CASE, IF() and BETWEEN are not allowed; use >= ... AND <= ... and plain conditions.');
+        }
+        if (preg_match('/\b(?:from|join)\s*\(/i', $bare)) {
+            return self::fail('Name a table after FROM / JOIN (no derived tables or brackets).');
+        }
         // Tables must be named plainly and joined with JOIN ... ON: a schema-qualified name (db.table) or a comma
         // join (FROM a, b) slips past the table and per-table scope checks below.
         if (preg_match('/\b(?:from|join)\s+`?\w+`?\s*\.\s*`?\w/i', $bare)) {
@@ -127,7 +139,7 @@ class ReadQueryGuard
         // that form: `resort_id IN (:resort_id, 27)` or `resort_id <> :resort_id` would read other resorts. With OR
         // refused above, these AND-ed equalities can only narrow the result, so each table is held to this resort.
         // (Was WA-01's count of resort_id mentions, which repeating one table's predicate could pad.)
-        if ($error = self::scopeError($bare)) {
+        if ($error = self::scopeError($bare) ?? self::scopePlacementError($bare)) {
             return self::fail($error);
         }
 
@@ -187,6 +199,44 @@ class ReadQueryGuard
         }
         $missing = array_diff(array_unique($names), $scoped);
         return $missing ? 'Every table must be scoped by its own resort_id = :resort_id; missing for: ' . implode(', ', $missing) . '.' : null;
+    }
+
+    /**
+     * Each `alias.resort_id = :resort_id` must be a condition that filters its table, not an expression: in the WHERE or
+     * ON clause of its own SELECT (top level or a subquery — not inside a function call, a bracketed group or the
+     * SELECT list), directly after WHERE / AND / ON, and followed only by AND, a closing bracket, the end of the query
+     * or the next clause. With OR / NOT / CASE / IF / BETWEEN refused, such a condition can only narrow the rows.
+     */
+    private static function scopePlacementError(string $sql): ?string
+    {
+        $clauses = ['select', 'from', 'where', 'on', 'join', 'group', 'order', 'having', 'limit'];
+        preg_match_all('/\(|\)|:resort_id\b|[a-z_][a-z0-9_]*/i', $sql, $tokens, PREG_OFFSET_CAPTURE);
+        $stack = [['query' => true, 'clause' => null]];
+        $tokens = $tokens[0];
+        foreach ($tokens as $i => [$tok, $at]) {
+            $lower = strtolower($tok);
+            if ($tok === '(') {
+                $next = strtolower($tokens[$i + 1][0] ?? '');
+                $stack[] = ['query' => in_array($next, ['select', 'with'], true), 'clause' => null];
+            } elseif ($tok === ')') {
+                if (count($stack) > 1) {
+                    array_pop($stack);
+                }
+            } elseif (in_array($lower, $clauses, true)) {
+                $stack[count($stack) - 1]['clause'] = $lower;
+            } elseif ($lower === ':resort_id') {
+                $frame = end($stack);
+                $before = substr($sql, 0, $at);
+                $after = ltrim(substr($sql, $at + strlen($tok)));
+                $direct = preg_match('/\b(where|and|on)\s+(?:`?\w+`?\s*\.\s*)?`?resort_id`?\s*=\s*$/i', $before);
+                $ends = $after === '' || $after[0] === ')'
+                    || preg_match('/^(and|group|order|limit|having|join|inner|left|right|cross|natural|where)\b/i', $after);
+                if (!$frame['query'] || !in_array($frame['clause'], ['where', 'on'], true) || !$direct || !$ends) {
+                    return 'Put each `table.resort_id = :resort_id` as its own condition in WHERE or ON (joined with AND), not inside an expression, a function, brackets or the SELECT list.';
+                }
+            }
+        }
+        return null;
     }
 
     /** True if a table is auth/system/sensitive and must never be read. */
