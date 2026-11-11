@@ -207,4 +207,32 @@ class SecurityRound2PeopleTest extends TestCase
         $this->as('employee');
         $this->postJson(route('resort.timeandattendance.UpdateDutyRosterGeofence'), ['roster_id' => $roster, 'geofence_zone_ids' => []])->assertForbidden();
     }
+
+    public function test_a_browser_session_login_reaches_controllers_that_read_the_user_in_their_constructor()
+    {
+        // Signed in through the session cookie only, like a browser (actingAs() hides this): the session has to be
+        // started before Laravel builds the controller, or Auth::guard()->user() in __construct is null and the page 500s.
+        $hr = ResortAdmin::where('email', 'hr@demo.thewisdom.ai')->firstOrFail();
+        $this->app['auth']->forgetGuards();
+        foreach ($this->app['router']->getRoutes()->getRoutes() as $route) {
+            $route->flushController();
+        }
+        // A real stored session + encrypted cookie (withSession() fills the session before any middleware, which hides it).
+        config(['session.driver' => 'file']);
+        $this->app['session']->forgetDrivers();
+        $store = $this->app['session']->driver();
+        $store->start();
+        $store->put(\Illuminate\Support\Facades\Auth::guard('resort-admin')->getName(), $hr->id);
+        $store->save();
+        $this->app['session']->forgetDrivers();
+        $this->app->forgetInstance('session.store');
+        $this->app['auth']->forgetGuards();
+        try {
+            $this->withCookie(config('session.cookie'), $store->getId())
+                ->get('/resort/master/hr-dashboard')
+                ->assertOk();
+        } finally {
+            $store->getHandler()->destroy($store->getId());
+        }
+    }
 }

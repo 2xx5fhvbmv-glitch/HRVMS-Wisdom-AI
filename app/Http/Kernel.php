@@ -15,9 +15,6 @@ class Kernel extends HttpKernel
      */
     protected $middleware = [
         // \App\Http\Middleware\TrustHosts::class,
-        // No StartSession here (audit run-3, "not fixed" item): the 'web' and 'api' groups start the session. Running it
-        // globally too saved the session twice per request — the id changed on every request, an old id kept working after
-        // logout, the cookie skipped EncryptCookies, and flash data (->with / ->withErrors) was gone before the next page.
         \App\Http\Middleware\TrustProxies::class,
         \Illuminate\Http\Middleware\HandleCors::class,
         \App\Http\Middleware\PreventRequestsDuringMaintenance::class,
@@ -25,6 +22,14 @@ class Kernel extends HttpKernel
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
         \App\Http\Middleware\SecurityHeaders::class,
+        // The session starts here, ONCE, before routing: ~190 controllers read Auth::guard(...)->user() in __construct,
+        // and Laravel builds the controller before the route's group middleware runs. It must not ALSO be in the
+        // 'web'/'api' groups (audit run-3): running it twice saved the session twice per request — the id changed every
+        // request, an old id kept working after logout and flash data was lost. EncryptCookies comes first so the
+        // session cookie is encrypted on the way out.
+        \App\Http\Middleware\EncryptCookies::class,
+        \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+        \Illuminate\Session\Middleware\StartSession::class,
     ];
 
     /**
@@ -34,9 +39,7 @@ class Kernel extends HttpKernel
      */
     protected $middlewareGroups = [
         'web' => [
-            \App\Http\Middleware\EncryptCookies::class,
-            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-            \Illuminate\Session\Middleware\StartSession::class,
+            // EncryptCookies / AddQueuedCookiesToResponse / StartSession are global (see $middleware above).
             \Illuminate\Session\Middleware\AuthenticateSession::class, // a password change ends the account's other sessions
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \App\Http\Middleware\VerifyCsrfToken::class,
@@ -46,7 +49,7 @@ class Kernel extends HttpKernel
         'api' => [
             // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
            // 'throttle:api',
-           \Illuminate\Session\Middleware\StartSession::class,
+            // StartSession is global (see $middleware above).
             // Single shared bucket across the ENTIRE mobile API surface —
             // every screen's calls count against the same counter, not
             // just the one that happens to trip it. A single data-dense
