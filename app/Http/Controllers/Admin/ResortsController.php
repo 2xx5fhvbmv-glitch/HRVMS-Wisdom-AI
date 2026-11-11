@@ -24,6 +24,7 @@ use App\Models\ResortRoleModulePermission;
 use App\Models\ResortPagewisePermission;
 use App\Models\ResortModule;
 use App\Models\Modules;
+use App\Models\ModulePages;
 
 use App\Models\Position;
 use App\Helpers\Common;
@@ -974,58 +975,59 @@ class ResortsController extends Controller
       }
   }
 
+  /**
+   * Save the resort's module/page grants. The ticked boxes ARE the grants: the resort's rows for the pages this screen
+   * shows are replaced in one transaction. (This used to delete only rows whose PAGE id was not among the submitted
+   * MODULE ids, so pages 1-19 could never be unticked and were re-added as duplicates on every save.) Position-level rights
+   * (resort_interal_pages_permissions) link by page id, not by these rows' ids, so replacing the rows is safe.
+   */
   public function updatePermissions(Request $request, $resort_id)
   {
-      // Retrieve all submitted permissions
-      DB::beginTransaction();
+      $resort = Resort::findOrFail($resort_id);
 
-      try
-      {
-        $submittedPermissions = $request->input('module_permissions', []);
-
-        if (empty($submittedPermissions)) {
-            // Optionally handle the case where no permissions are submitted
-            $response['success'] = false;
-            $response['msg'] = __('Please Select Module wise Pages to  give resort permission', ['name' => 'Permission']);
-            return response()->json($response);
-        }
-        $existingPermissions = ResortPagewisePermission::where('resort_id', $resort_id)
-            ->get()
-            ->groupBy( 'Module_id');
-
-
-            $Module_id = array_keys($submittedPermissions);
-            ResortPagewisePermission::where('resort_id', $resort_id)
-            ->whereNotIn('page_permission_id',$Module_id )
-            ->delete();
-
-
-                foreach ($submittedPermissions as $Module_id=>$modulePermissionId)
-                {
-                    foreach($modulePermissionId as $permissionId)
-                    {
-                        ResortPagewisePermission::create([
-                            'resort_id' => $resort_id,
-                            'Module_id' => $Module_id, // role_id refers to position_id
-                            'page_permission_id' => $permissionId,
-                        ]);
-                    }
-                }
-                DB::commit();
-                $response['success'] = true;
-                $response['msg'] = __('Resort Permission granted successfully', ['name' => 'Permission']);
-                return response()->json($response);
-
-
+      $validator = Validator::make($request->all(), [
+          'module_permissions'     => 'required|array',
+          'module_permissions.*'   => 'array',
+          'module_permissions.*.*' => 'integer',
+      ], [
+          'module_permissions.required' => __('Please Select Module wise Pages to  give resort permission'),
+      ]);
+      if ($validator->fails()) {
+          return response()->json(['success' => false, 'msg' => $validator->errors()->first()]);
       }
-      catch (\Exception $e)
-      {
-        DB::rollBack();
-          $response['success'] = false;
-          $response['msg'] = __('Somthing Wrong ', ['name' => 'Permission']);
-          return response()->json($response);
+
+      // The pages this screen shows (editPermissions: active pages of active modules) => their module. Only those are
+      // replaced; a grant on a page the screen doesn't show (e.g. an inactive page) is left alone.
+      $pageModule = ModulePages::where('status', 'Active')
+          ->whereIn('Module_Id', Modules::where('status', 'Active')->select('id'))
+          ->pluck('Module_Id', 'id');
+      // Keep only those pages, filed under the module they belong to.
+      $submitted = collect($request->input('module_permissions'))
+          ->flatMap(fn ($pageIds, $moduleId) => collect($pageIds)->map(fn ($pageId) => [(int) $moduleId, (int) $pageId]))
+          ->unique(fn ($pair) => $pair[0] . '-' . $pair[1]);
+      $now = now();
+      $rows = $submitted
+          ->filter(fn ($pair) => (int) ($pageModule[$pair[1]] ?? 0) === $pair[0])
+          ->map(fn ($pair) => ['resort_id' => $resort->id, 'Module_id' => $pair[0], 'page_permission_id' => $pair[1], 'created_at' => $now, 'updated_at' => $now])
+          ->values()
+          ->all();
+
+      if (!$rows) {
+          return response()->json(['success' => false, 'msg' => __('Please Select Module wise Pages to  give resort permission')]);
       }
-    }
+
+      try {
+          DB::transaction(function () use ($resort, $rows, $pageModule) {
+              ResortPagewisePermission::where('resort_id', $resort->id)->whereIn('page_permission_id', $pageModule->keys())->delete();
+              ResortPagewisePermission::insert($rows);
+          });
+      } catch (\Throwable $e) {
+          Log::error('Resort permission update failed', ['resort_id' => $resort->id, 'error' => $e->getMessage()]);
+          return response()->json(['success' => false, 'msg' => __('Something went wrong')]);
+      }
+
+      return response()->json(['success' => true, 'msg' => __('Resort Permission granted successfully')]);
+  }
 
   // public function loginAsResortAdmin($resort_id)
   // {

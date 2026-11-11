@@ -154,4 +154,37 @@ class SecurityRound2AdminTest extends TestCase
         $this->expectException(\RuntimeException::class);
         \App\Helpers\Common::fileEncryptionKey();
     }
+
+    public function test_resort_permissions_save_exactly_the_ticked_pages()
+    {
+        $editor = $this->sub([['resorts', 'view'], ['resorts', 'edit']]);
+        $resort = DB::table('resorts')->value('id');
+        $T = 'resort_pagewise_permissions';
+        $active = DB::table('module_pages')->where('status', 'Active')->whereIn('Module_Id', DB::table('modules')->where('status', 'Active')->select('id'));
+        $low = (clone $active)->where('id', '<=', 19)->first(['id', 'Module_Id']);    // a page id that is also a module id
+        $other = (clone $active)->where('id', '>', 19)->where('Module_Id', '!=', $low->Module_Id)->first(['id', 'Module_Id']);
+        $hidden = DB::table('module_pages')->where('status', '!=', 'Active')->first(['id', 'Module_Id']);
+
+        DB::table($T)->where('resort_id', $resort)->delete();
+        $grant = fn ($p) => DB::table($T)->insert(['resort_id' => $resort, 'Module_id' => $p->Module_Id, 'page_permission_id' => $p->id]);
+        $grant($low); $grant($low); $grant($other);                                    // incl. an old duplicate
+        if ($hidden) { $grant($hidden); }
+        $save = fn (array $perm) => $this->as($editor)->postJson(route('admin.resorts.update_permissions', $resort), ['module_permissions' => $perm]);
+
+        // untick $low, keep $other (sent twice), and try a page under the wrong module
+        $save([$other->Module_Id => [$other->id, $other->id], $low->Module_Id => [$other->id]])->assertOk()->assertJson(['success' => true]);
+        $pages = DB::table($T)->where('resort_id', $resort)->pluck('page_permission_id')->all();
+        $this->assertNotContains($low->id, $pages, 'a page whose id is 1-19 can be unticked');
+        $this->assertSame(1, DB::table($T)->where('resort_id', $resort)->where('page_permission_id', $other->id)->count(), 'one row per grant');
+        $this->assertSame(0, DB::table($T)->where('resort_id', $resort)->where('Module_id', $low->Module_Id)->where('page_permission_id', $other->id)->count());
+        if ($hidden) {
+            $this->assertContains($hidden->id, $pages, 'a grant on a page the screen does not show is kept');
+        }
+
+        // tick it again, and nothing at all is refused
+        $save([$low->Module_Id => [$low->id], $other->Module_Id => [$other->id]])->assertJson(['success' => true]);
+        $this->assertSame(1, DB::table($T)->where('resort_id', $resort)->where('page_permission_id', $low->id)->count());
+        $this->as($editor)->postJson(route('admin.resorts.update_permissions', $resort), [])->assertJson(['success' => false]);
+        $this->assertSame(1, DB::table($T)->where('resort_id', $resort)->where('page_permission_id', $low->id)->count());
+    }
 }
