@@ -4,6 +4,7 @@ namespace App\Exceptions;
 
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
 
@@ -40,6 +41,17 @@ class Handler extends ExceptionHandler
             if (app()->bound('sentry')) {
                 app('sentry')->captureException($e);
             }
+        });
+
+        // A browser request with the wrong method (e.g. a form POSTed before its JavaScript loaded, or a POST-only URL
+        // opened in the address bar) gets a redirect instead of a 405 error page: back to the same page when it can be
+        // opened with GET, otherwise to the home page. AJAX / API callers still get the 405.
+        $this->renderable(function (MethodNotAllowedHttpException $e, $request) {
+            if ($request->expectsJson() || $request->ajax() || $request->is('api/*')) {
+                return null;
+            }
+            $allowed = array_map('trim', explode(',', $e->getHeaders()['Allow'] ?? ''));
+            return redirect()->to(in_array('GET', $allowed, true) && !$request->isMethod('GET') ? $request->url() : url('/'));
         });
 
         // A resort's master admin is not an employee (no employees row), but
