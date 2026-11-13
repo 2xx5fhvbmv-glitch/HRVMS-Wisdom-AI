@@ -13324,56 +13324,13 @@ class Common
 
     public static function UploadProfileAwsPic($basePath,$file)
     {
-        $data = [];
-        try {
-            // Read from config — env() returns null when prod runs
-            // `php artisan config:cache`, which made this helper silently
-            // route to the 's3' default disk. That's the source of the
-            // 403 InvalidAccessKeyId error on profile-picture uploads on
-            // live (resort uses Wasabi for storage, but the AWS_* keys
-            // were never set, so the 's3' fallback hit Amazon with bad
-            // credentials).
-            $storageDriver = config('settings.storage_driver');
-
-            $newFileName = $file->getClientOriginalName();
-            $mimeType = $file->getClientMimeType();
-            $filePath = $basePath . '/' . $newFileName;
-
-            // Route to appropriate storage based on environment variable
-            if ($storageDriver === 'local') {
-                // Upload to local storage
-                $disk = Storage::disk('local');
-                // Ensure directory exists
-                $fullPath = $disk->path($filePath);
-                $directory = dirname($fullPath);
-                if (!file_exists($directory)) {
-                    mkdir($directory, 0755, true);
-                }
-                $disk->put($filePath, file_get_contents($file->getRealPath()));
-                $data['status'] = true;
-                $data['path'] = $filePath;
-                $data['filename'] = $newFileName;
-            } elseif ($storageDriver === 'wasabi') {
-                // Upload to Wasabi (S3-compatible)
-                $wasabi = Storage::disk('wasabi');
-                $wasabi->put($filePath, file_get_contents($file->getRealPath()));
-                $data['status'] = true;
-                $data['path'] = $filePath;
-                $data['filename'] = $newFileName;
-            } else {
-                // Default to S3
-                $s3 = StorageHelper::disk();
-                $s3->put($filePath, file_get_contents($file->getRealPath()));
-                $data['status'] = true;
-                $data['path'] = $filePath;
-                $data['filename'] = $newFileName;
-            }
-
-            return $data;
-        } catch (\Exception $e) {
-            \Log::error('Failed to upload profile image: ' . $e->getMessage());
-            return ['status' => false, 'msg' => 'Failed to upload profile image: ' . $e->getMessage()];
+        // Same write as every other upload. The old copy here ignored put()'s result, so a refused write (e.g. the
+        // storage account blocked) still reported success and saved a picture that was never stored.
+        $result = StorageHelper::uploadImage($basePath, $file);
+        if (!$result['status']) {
+            return ['status' => false, 'msg' => 'The profile picture could not be stored. Please try again.'];
         }
+        return $result;
     }
 
 

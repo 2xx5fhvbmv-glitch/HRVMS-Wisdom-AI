@@ -96,6 +96,27 @@ class WisdomTools
         $tools = [
             $policySearch,
             $moduleGuide,
+            // Generic, catalog-driven data access (config/wisdom_catalog.php): one tool for any question over the
+            // datasets this user may see, instead of one function per question. DataCatalog builds the SQL itself.
+            self::fn('list_datasets',
+                'List the datasets you can query with query_data (employees, leave requests, attendance, ...), with their fields, field types and known values. Call it first when no dedicated tool fits a data question, or when unsure of a field name.',
+                [
+                    'module' => ['type' => 'string', 'description' => 'Optional module name to narrow the list, e.g. "Leave".'],
+                ]),
+            self::fn('query_data',
+                'Answer a data question from one dataset (see list_datasets). Either list rows with `fields`, or summarise with `group_by` + `metrics`. Results are already limited to this resort and to what this user may see. Example, approved leave days per department this year: {"dataset":"leave_requests","group_by":["department"],"metrics":[{"fn":"sum","field":"total_days"}],"filters":[{"field":"status","op":"=","value":"Approved"},{"field":"from_date","op":">=","value":"2026-01-01"}],"sort":[{"by":"sum_total_days","dir":"desc"}]}',
+                [
+                    'dataset'  => ['type' => 'string', 'description' => 'Dataset name from list_datasets.'],
+                    'fields'   => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Fields to list (row mode).'],
+                    'group_by' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Fields to group by (summary mode, max 3).'],
+                    'metrics'  => ['type' => 'array', 'description' => 'Summary values, e.g. {"fn":"count"} or {"fn":"sum","field":"total_days"}. fn: count, count_distinct, sum, avg, min, max. Result column is fn_field (or count).',
+                        'items' => ['type' => 'object', 'properties' => ['fn' => ['type' => 'string'], 'field' => ['type' => 'string']], 'required' => ['fn']]],
+                    'filters'  => ['type' => 'array', 'description' => 'Conditions, all must match. op: =, !=, >, >=, <, <=, in, not_in, contains, starts_with, is_null, not_null, between. Dates YYYY-MM-DD or "today".',
+                        'items' => ['type' => 'object', 'properties' => ['field' => ['type' => 'string'], 'op' => ['type' => 'string'], 'value' => (object) []], 'required' => ['field', 'op']]],
+                    'sort'     => ['type' => 'array', 'description' => 'Order by a returned column: {"by":"count","dir":"desc"}.',
+                        'items' => ['type' => 'object', 'properties' => ['by' => ['type' => 'string'], 'dir' => ['type' => 'string']], 'required' => ['by']]],
+                    'limit'    => ['type' => 'integer', 'description' => 'Max rows (default 50, max 200).'],
+                ], ['dataset']),
             self::fn('get_headcount',
                 'Get the number of active employees at the resort. Optionally filter by a department name.',
                 [
@@ -553,6 +574,8 @@ class WisdomTools
 
         try {
             switch ($name) {
+                case 'list_datasets':            return DataCatalog::describe($ctx, $args['module'] ?? null);
+                case 'query_data':               return DataCatalog::query($args, $ctx);
                 case 'get_headcount':            return self::getHeadcount($rid, $args);
                 case 'get_department_breakdown': return self::getDepartmentBreakdown($rid);
                 case 'count_employees_by_status':return self::countByStatus($rid);

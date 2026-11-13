@@ -40,13 +40,14 @@ class BrandLogoUploadTest extends TestCase
 
         // the bucket refuses the write (putFileAs returns false, nothing stored)
         $disk = \Mockery::mock(\Illuminate\Contracts\Filesystem\Filesystem::class);
-        $disk->shouldReceive('putFileAs')->andReturn(false);
+        $disk->shouldReceive('put')->andReturn(false);
         $disk->shouldReceive('exists')->andReturn(false);
         Storage::set('wasabi', $disk);
         $this->save()->assertStatus(500)->assertJson(['success' => false]);
         $this->assertSame($before, DB::table('resorts')->where('id', $this->resortId)->value('logo'));
 
         // the write works
+        (new \ReflectionClass(StorageHelper::class))->setStaticPropertyValue('cachedDisk', null);
         Storage::set('wasabi', Storage::createLocalDriver(['root' => storage_path('framework/testing/disks/wasabi')]));
         $this->save()->assertOk()->assertJson(['success' => true]);
         $logo = DB::table('resorts')->where('id', $this->resortId)->value('logo');

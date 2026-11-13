@@ -161,7 +161,9 @@ class SitesettignsController extends Controller
                                 // Storage::disk handles directory creation,
                                 // content-type detection, and bucket paths
                                 // for the 'wasabi' / 's3' disks.
-                                $stored = StorageHelper::disk()->putFileAs($basePath, $logoFile, $fileName);
+                                // Same write as every other upload (StorageHelper::uploadFile): the contents as one
+                                // string. putFileAs() streams the file, a different S3 code path that failed on Wasabi.
+                                $stored = StorageHelper::put($basePath . '/' . $fileName, file_get_contents($logoFile->getRealPath()));
                                 \Log::info('[brand-logo-upload] '.strtoupper($driver).' putFileAs returned', ['stored' => $stored]);
 
                                 // Confirm the file actually landed by re-reading
