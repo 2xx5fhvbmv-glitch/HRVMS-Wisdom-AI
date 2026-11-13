@@ -158,12 +158,12 @@ class LeaderDashboardTest extends TestCase
             ->push(['choices' => [['message' => ['content' => "Overtime is paid at 1.25x.\n[[topic: overtime | source: employment_act]]"]]], 'usage' => []])
             ->push(['choices' => [['message' => ['content' => "Some answer\n[[topic: leave | source: company_handbook]]"]]], 'usage' => []])]);
 
-        $res = $this->as('hod.housekeeping')->postJson(route('resort.wisdom.chat'), ['message' => 'How is overtime paid?'])->assertOk();
+        $res = $this->as('hr')->postJson(route('resort.wisdom.chat'), ['message' => 'How is overtime paid?'])->assertOk();
         $res->assertJson(['reply' => 'Overtime is paid at 1.25x.', 'label' => 'Employment law · overtime',
             'source' => 'Maldives Employment Act (Law No. 2/2008, as amended)']);
         $this->assertStringNotContainsString('[[', json_encode(session('wisdom_ai_history')), 'the tag never reaches the stored conversation');
 
-        $res = $this->as('hod.housekeeping')->postJson(route('resort.wisdom.chat'), ['message' => 'Leave?'])->assertOk();
+        $res = $this->as('hr')->postJson(route('resort.wisdom.chat'), ['message' => 'Leave?'])->assertOk();
         $this->assertSame('Some answer', $res->json('reply'));
         $this->assertNull($res->json('label'), 'a source the prompt does not contain is dropped');
     }

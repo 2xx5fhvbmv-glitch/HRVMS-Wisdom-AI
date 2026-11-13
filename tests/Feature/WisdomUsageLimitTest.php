@@ -24,7 +24,11 @@ class WisdomUsageLimitTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->admin = ResortAdmin::where('is_master_admin', 1)->whereNotNull('resort_id')->firstOrFail();
+        // Wisdom AI is open only to the HR department's EXCOM / HOD.
+        $this->admin = ResortAdmin::findOrFail(DB::table('employees as e')->join('resort_departments as d', 'd.id', '=', 'e.Dept_id')
+            ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->whereIn(DB::raw('LOWER(d.name)'), ['human resources', 'hr', 'human resource'])->whereIn('e.rank', [1, 2])
+            ->where('ra.status', 'Active')->whereNull('e.deleted_at')->value('ra.id'));
         config(['services.openrouter.key' => 'test-key', 'services.wisdom_ai.resort_monthly_budget' => null]);
         DB::table('resorts')->where('id', $this->admin->resort_id)->update(['wisdom_daily_limit' => 2, 'wisdom_monthly_budget' => null]);
         DB::table('wisdom_usage')->where('user_id', $this->admin->id)->delete();

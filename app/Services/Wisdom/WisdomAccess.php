@@ -8,7 +8,8 @@ use App\Helpers\Common;
 /**
  * Wisdom AI — access-control model.
  *
- * Implements the three-tier access blueprint for the in-app HR chatbot:
+ * Current rule (2026-11-13): only the HR department's EXCOM (HR Director) and HOD get access (tier FULL);
+ * every other user is NONE. The blueprint below describes the tiers kept in code for when access widens again:
  *
  *   TIER 1 — HR Director / HR Manager          → FULL
  *            Full database access (all modules, all employee records) +
@@ -18,11 +19,16 @@ use App\Helpers\Common;
  *            All databases EXCEPT payroll/compensation, which is fully
  *            restricted. Plus policy & employment law.
  *
- *   TIER 2 — HOD / EXCOM / Managers (non-HR)    → POLICY (limited)
- *            No database access at all. Company policy & employment law
- *            questions only.
+ *   TIER 2 — HOD / EXCOM / Managers (non-HR)    → LEADER (scoped)
+ *            Policy & law, plus the data catalog (list_datasets / query_data)
+ *            limited to their own department; no pay; none of the older
+ *            resort-wide tools.
  *
- *   Everyone else (Supervisors, Line workers, Finance, …) → NONE
+ *   Finance (rank 7, or Finance-dept EXCOM/HOD) → FINANCE
+ *            Policy & law, plus the catalog's payroll / advance datasets
+ *            resort-wide (amounts yes; names and personal data no).
+ *
+ *   Everyone else (Supervisors, Line workers, …) → NONE
  *            Chatbot is hidden; endpoints reject them.
  *
  * Rank map (config/settings.php → Position_Rank):
@@ -33,7 +39,9 @@ class WisdomAccess
 {
     const TIER_FULL   = 'full';    // HR Director / HR Manager
     const TIER_GM     = 'gm';      // General Manager (no payroll)
-    const TIER_POLICY = 'policy';  // HOD / EXCOM / Managers — policy & law only
+    const TIER_LEADER  = 'leader';  // HOD / EXCOM / Managers outside HR — own department, catalog only
+    const TIER_FINANCE = 'finance'; // Finance (rank 7) — payroll catalog datasets, no personal data
+    const TIER_POLICY = 'policy';  // kept for old references; no longer assigned
     const TIER_NONE   = 'none';    // no access
 
     /**
@@ -41,40 +49,18 @@ class WisdomAccess
      */
     public static function tier(): string
     {
+        // Decision 2026-11-13: Wisdom AI is open ONLY to the HR department's Director (EXCOM, rank 1) and HOD (rank 2).
+        // Everyone else (other HR staff, GM, resort master admin, other departments' heads, Finance) has no access.
+        // The GM / leader / finance tiers stay defined (prompt blocks, catalog rules) so access can be widened again
+        // by changing this method alone.
         $user = Auth::guard('resort-admin')->user();
-        if (!$user) {
-            return self::TIER_NONE;
-        }
-
-        // Platform super / master admins get the full HR experience.
-        if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
-            return self::TIER_FULL;
-        }
-
-        $emp = $user->getEmployee ?? null;
+        $emp = $user ? ($user->getEmployee ?? null) : null;
         if (!$emp) {
             return self::TIER_NONE;
         }
 
-        $rank = (int) $emp->rank;
-        $isHR = Common::isHRDepartment($emp->Dept_id ?? null);
-
-        // TIER 1 — HR Director / HR Manager (HR rank, or HR-department head/excom)
-        if ($rank === 3) {
+        if (in_array((int) $emp->rank, [1, 2], true) && Common::isHRDepartment($emp->Dept_id ?? null)) {
             return self::TIER_FULL;
-        }
-        if (in_array($rank, [1, 2], true) && $isHR) {
-            return self::TIER_FULL;
-        }
-
-        // TIER 3 — General Manager
-        if ($rank === 8) {
-            return self::TIER_GM;
-        }
-
-        // TIER 2 — HOD / EXCOM / Managers in any non-HR department
-        if (in_array($rank, [1, 2, 4], true)) {
-            return self::TIER_POLICY;
         }
 
         return self::TIER_NONE;
@@ -125,13 +111,15 @@ class WisdomAccess
             'tier_label'   => self::tierLabel($tier),
             'can_db'       => self::canUseDatabase($tier),
             'can_payroll'  => self::canAccessPayroll($tier),
+            // Leader / Finance: only the catalog tools (list_datasets / query_data), never the resort-wide ones.
+            'catalog_only' => in_array($tier, [self::TIER_LEADER, self::TIER_FINANCE], true),
             'resort_id'    => $user->resort_id,
             'resort_name'  => $resortName,
             'user_name'    => trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'there',
             'role_label'   => $roleLabel,
             'dept_name'    => $deptName,
             'today'        => now()->toDateString(),
-        ];
+        ] + ($tier === self::TIER_LEADER ? ['dept_ids' => Common::getScopedDepartmentIds() ?? []] : []);
     }
 
     public static function tierLabel(string $tier): string
@@ -139,6 +127,8 @@ class WisdomAccess
         switch ($tier) {
             case self::TIER_FULL:   return 'HR — Full Access';
             case self::TIER_GM:     return 'General Manager — Payroll Restricted';
+            case self::TIER_LEADER:  return 'Department Leader — Own Department';
+            case self::TIER_FINANCE: return 'Finance — Payroll Data';
             case self::TIER_POLICY: return 'Policy & Employment Law';
             default:                return 'No Access';
         }

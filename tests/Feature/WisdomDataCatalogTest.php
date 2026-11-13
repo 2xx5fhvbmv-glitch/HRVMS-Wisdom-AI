@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\Wisdom\DataCatalog;
+use App\Services\Wisdom\WisdomAccess;
 use App\Services\Wisdom\WisdomTools;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -88,5 +89,71 @@ class WisdomDataCatalogTest extends TestCase
         $this->assertNotContains('query_data', $names(['tier' => 'policy', 'resort_id' => $this->resortId, 'can_db' => false]));
         $this->assertArrayHasKey('error', WisdomTools::execute('query_data', ['dataset' => 'employees', 'fields' => ['employee_id']], ['tier' => 'policy', 'resort_id' => $this->resortId, 'can_db' => false]));
         $this->assertArrayHasKey('rows', WisdomTools::execute('query_data', ['dataset' => 'employees', 'fields' => ['employee_id'], 'limit' => 1], $this->full()));
+    }
+
+    private function ctxFor(string $login): ?array
+    {
+        $this->as($login);
+        return WisdomAccess::context();
+    }
+
+    public function test_only_the_hr_departments_director_and_hod_have_wisdom_ai()
+    {
+        // decision 2026-11-13: HR Director (EXCOM) and HR HOD only
+        foreach (['hr', 'hr.manager'] as $login) {
+            $this->assertSame(WisdomAccess::TIER_FULL, $this->ctxFor($login)['tier'] ?? null, $login);
+        }
+        foreach (['gm', 'finance', 'finance.manager', 'hod.kitchen', 'manager', 'supervisor', 'employee'] as $login) {
+            $this->assertNull($this->ctxFor($login), "{$login} has no Wisdom AI");
+            $this->postJson(route('resort.wisdom.chat'), ['message' => 'How many staff do we have?'])->assertForbidden();
+        }
+        // the resort master admin (not an employee) has none either
+        $master = \App\Models\ResortAdmin::where('resort_id', $this->resortId)->where('is_master_admin', 1)->first();
+        if ($master) {
+            $this->app['auth']->forgetGuards();
+            $this->actingAs($master, 'resort-admin');
+            $this->assertNull(WisdomAccess::context());
+        }
+    }
+
+    public function test_department_scoping_in_the_engine_still_holds()
+    {
+        // kept for when department-level access is opened again: a scoped context only ever sees its departments
+        $dept = (int) $this->emp('hod.kitchen')->Dept_id;
+        $ctx = ['tier' => 'leader', 'resort_id' => $this->resortId, 'dept_ids' => [$dept]];
+        $rows = DataCatalog::query(['dataset' => 'employees', 'group_by' => ['department']], $ctx)['rows'];
+        $this->assertSame([DB::table('resort_departments')->where('id', $dept)->value('name')], array_column($rows, 'department'));
+        $this->assertArrayHasKey('error', DataCatalog::query(['dataset' => 'employees', 'fields' => ['basic_salary']], $ctx));
+    }
+
+    public function test_payslip_totals_match_the_stored_payroll_lines()
+    {
+        $expected = (float) DB::table('payroll_reviews as pr')->join('payroll as p', 'p.id', '=', 'pr.payroll_id')->where('p.resort_id', $this->resortId)->sum('pr.net_salary');
+        $r = WisdomTools::execute('query_data', ['dataset' => 'payslips', 'metrics' => [['fn' => 'sum', 'field' => 'net_salary']]], $this->full());
+        $this->assertEqualsWithDelta($expected, (float) $r['rows'][0]['sum_net_salary'], 0.01);
+    }
+
+    public function test_a_table_without_a_resort_column_is_reached_only_through_its_resort_filtered_parent()
+    {
+        [$q] = DataCatalog::build(['dataset' => 'payslips', 'metrics' => [['fn' => 'count']]], $this->full());
+        $this->assertStringContainsString('inner join `payroll` as `p` on `p`.`id` = `pr`.`payroll_id` and `p`.`resort_id` = ?', $q->toSql());
+        [$q] = DataCatalog::build(['dataset' => 'training_participants', 'metrics' => [['fn' => 'count']]], $this->full());
+        $this->assertStringContainsString('inner join `training_schedules` as `ts` on `ts`.`id` = `tpp`.`training_schedule_id` and `ts`.`resort_id` = ?', $q->toSql());
+
+        // a catalog entry that forgets its resort filter is refused, not run
+        config(['wisdom_catalog.datasets.broken' => ['module' => 'X', 'description' => 'x', 'table' => 'payroll_reviews', 'alias' => 'pr', 'resort' => null,
+            'fields' => ['net' => ['col' => 'pr.net_salary', 'type' => 'number']]]]);
+        $this->expectException(\LogicException::class);
+        DataCatalog::build(['dataset' => 'broken', 'fields' => ['net']], $this->full());
+    }
+
+    public function test_every_dataset_runs_for_every_tier()
+    {
+        foreach (['full', 'gm', 'finance'] as $tier) {
+            foreach (DataCatalog::datasets(['tier' => $tier, 'resort_id' => $this->resortId]) as $name => $ds) {
+                $r = DataCatalog::query(['dataset' => $name, 'fields' => array_keys($ds['fields']), 'limit' => 3], ['tier' => $tier, 'resort_id' => $this->resortId]);
+                $this->assertArrayNotHasKey('error', $r, "{$tier} {$name}: " . ($r['error'] ?? ''));
+            }
+        }
     }
 }

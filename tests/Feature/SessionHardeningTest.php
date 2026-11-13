@@ -57,7 +57,8 @@ class SessionHardeningTest extends TestCase
         $user = $this->master();
         DB::table('resort_admins')->where('id', $user->id)->update(['password' => Hash::make('Old#Pass1'), 'must_change_password' => 0]);
         $this->postJson(route('resort.login'), ['email' => $user->email, 'password' => 'Old#Pass1'])->assertJson(['success' => true]);
-        $this->getJson(route('resort.wisdom.history'))->assertOk();
+        // still signed in: 403 (the master admin has no Wisdom AI), not 401
+        $this->getJson(route('resort.wisdom.history'))->assertForbidden();
 
         DB::table('resort_admins')->where('id', $user->id)->update(['password' => Hash::make('New#Pass1')]); // changed from another browser
         app('auth')->forgetGuards();

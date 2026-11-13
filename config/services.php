@@ -124,7 +124,7 @@ return [
         // Chat usage limits (WisdomChatController). Daily limits are per user
         // per Maldives calendar day, by WisdomAccess tier; resorts.wisdom_daily_limit
         // overrides them for every tier of that resort.
-        'daily_limits'  => ['full' => 100, 'gm' => 100, 'policy' => 50],
+        'daily_limits'  => ['full' => 100, 'gm' => 100, 'leader' => 50, 'finance' => 50, 'policy' => 50],
         'per_minute'    => 15,
         'max_in_flight' => 2,
         // Monthly AI spend cap per resort in USD (resorts.wisdom_monthly_budget

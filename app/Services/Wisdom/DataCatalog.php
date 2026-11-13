@@ -26,6 +26,13 @@ class DataCatalog
         $allowed = config('wisdom_catalog.sensitivity', []);
         $out = [];
         foreach (config('wisdom_catalog.datasets', []) as $name => $ds) {
+            if (isset($ds['tiers']) && !in_array($tier, $ds['tiers'], true)) {
+                continue;
+            }
+            $only = config("wisdom_catalog.tier_datasets.{$tier}");
+            if ($only !== null && !in_array($name, $only, true)) {
+                continue;
+            }
             // A scoped user (department ids in ctx) can only use datasets that can be scoped to a department.
             if (isset($ctx['dept_ids']) && empty($ds['scope']['department'])) {
                 continue;
@@ -141,20 +148,32 @@ class DataCatalog
         if (isset($ctx['dept_ids']) && !empty($ds['scope']['needs'])) {
             $needs[] = $ds['scope']['needs'];
         }
+        // A table without its own resort column is reached only through a required INNER join that carries it.
+        $required = $ds['required'] ?? [];
+        $anchored = !empty($ds['resort']) || (bool) array_filter($required,
+            fn ($j) => ($ds['joins'][$j]['type'] ?? '') === 'inner' && !empty($ds['joins'][$j]['resort']));
+        if (!$anchored) {
+            throw new \LogicException("Catalog dataset '{$name}' has no resort filter.");
+        }
 
-        $q = DB::connection('mysql_readonly')->table($ds['table'] . ' as ' . $ds['alias'])
-            ->where($ds['resort'], $rid);
+        $q = DB::connection('mysql_readonly')->table($ds['table'] . ' as ' . $ds['alias']);
+        if (!empty($ds['resort'])) {
+            $q->where($ds['resort'], $rid);
+        }
         foreach ($ds['where_null'] ?? [] as $col) {
             $q->whereNull($col);
         }
         foreach ($ds['where'] ?? [] as [$col, $op, $val]) {
             $q->where($col, $op, $val);
         }
-        foreach (self::joinOrder($ds['joins'] ?? [], array_unique($needs)) as $j) {
+        foreach (self::joinOrder($ds['joins'] ?? [], array_unique(array_merge($required, $needs))) as $j) {
             $join = $ds['joins'][$j];
-            $q->leftJoin($join['table'] . ' as ' . $join['alias'], function ($on) use ($join, $rid) {
+            $on = function ($on) use ($join, $rid) {
                 $on->on($join['on'][0], '=', $join['on'][1])->where($join['resort'], '=', $rid);
-            });
+            };
+            ($join['type'] ?? 'left') === 'inner'
+                ? $q->join($join['table'] . ' as ' . $join['alias'], $on)
+                : $q->leftJoin($join['table'] . ' as ' . $join['alias'], $on);
         }
         if (isset($ctx['dept_ids'])) {
             $q->whereIn($ds['scope']['department'], array_map('intval', (array) $ctx['dept_ids']) ?: [0]);

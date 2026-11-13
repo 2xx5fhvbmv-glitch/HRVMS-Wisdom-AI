@@ -1,7 +1,7 @@
 {{--
     Wisdom AI — floating HR chatbot widget.
     Rendered globally from the resort footer, but ONLY for users whose tier is
-    not "none" (HR full, GM moderate, or HOD/EXCOM/Manager policy). The backend
+    not "none" (HR full, GM moderate, HOD/EXCOM/Manager own-department, Finance payroll). The backend
     independently enforces the same access model.
 --}}
 @php
@@ -25,6 +25,20 @@
                 'Who is on leave today?',
                 'Show me the recruitment pipeline',
                 'Give me the department headcount breakdown',
+            ];
+            break;
+        case \App\Services\Wisdom\WisdomAccess::TIER_LEADER:
+            $wisdomSuggestions = [
+                'Who in my department is on leave this week?',
+                'How many leave days has my team taken this year, by leave type?',
+                'Who in my department has a probation ending soon?',
+            ];
+            break;
+        case \App\Services\Wisdom\WisdomAccess::TIER_FINANCE:
+            $wisdomSuggestions = [
+                'What was the total net pay in the last locked payroll?',
+                'Overtime pay by department in the last payroll run',
+                'Which salary advances are waiting for Finance approval?',
             ];
             break;
         default:

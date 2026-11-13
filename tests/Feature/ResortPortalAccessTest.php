@@ -78,8 +78,15 @@ class ResortPortalAccessTest extends TestCase
     public function test_data_changing_actions_no_longer_accept_get()   // NV05: a GET carries no CSRF check
     {
         $this->actingAs(ResortAdmin::where('type', 'super')->where('status', 'Active')->firstOrFail(), 'resort-admin');
-        $this->get(route('people.info-update.status-change', ['id' => 1, 'status' => 'approve']))->assertStatus(405);
-        $this->get(route('people.advance-salary-repayment-tracker.markAsComplete', base64_encode(1)))->assertStatus(405);
+        // The action never runs on a GET: a browser is redirected away (wrong-method handler), an AJAX call gets 405.
+        $info = route('people.info-update.status-change', ['id' => 1, 'status' => 'approve']);
+        $repay = route('people.advance-salary-repayment-tracker.markAsComplete', base64_encode(1));
+        $before = DB::table('employee_info_update_request')->where('id', 1)->value('status');
+        $this->get($info)->assertRedirect();
+        $this->get($repay)->assertRedirect();
+        $this->getJson($info)->assertStatus(405);
+        $this->getJson($repay)->assertStatus(405);
+        $this->assertSame($before, DB::table('employee_info_update_request')->where('id', 1)->value('status'));
     }
 
     public function test_master_admin_still_passes_the_gates()

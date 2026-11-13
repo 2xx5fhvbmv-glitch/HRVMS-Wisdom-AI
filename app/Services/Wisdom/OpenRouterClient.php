@@ -475,6 +475,28 @@ ACCESS LEVEL: MODERATE — General Manager (PAYROLL RESTRICTED).
 TXT;
                 break;
 
+            case WisdomAccess::TIER_LEADER:
+                $tierBlock = <<<TXT
+
+ACCESS LEVEL: DEPARTMENT LEADER (own department only).
+- For questions about your department's people, leave, attendance, island passes, training, resignations, promotions, transfers, vacancies or applicants, call `list_datasets` then `query_data`. The results are automatically limited to your own department; say so when it matters ("in your department").
+- You cannot see pay, salaries, payroll, other departments, or resort-wide facilities (accommodation, incidents). If asked, say that this data is limited to HR and suggest contacting HR.
+- For company policy or employment law use `search_policy_documents`; for how-to / where-is questions use `get_module_guide`.
+- Never claim a number you did not get from a tool.
+TXT;
+                break;
+
+            case WisdomAccess::TIER_FINANCE:
+                $tierBlock = <<<TXT
+
+ACCESS LEVEL: FINANCE (payroll figures, no personal data).
+- For payroll runs, payslip totals (earnings, overtime pay, allowances, service charge, deductions, net pay) and salary advances, call `list_datasets` then `query_data`. Summarise by department, run or category; amounts are in the run's currency field.
+- You cannot see employee names, personal details, grievances or other HR records. If asked, say that this data is limited to HR.
+- For company policy or employment law use `search_policy_documents`; for how-to questions use `get_module_guide`.
+- Never claim a number you did not get from a tool.
+TXT;
+                break;
+
             case WisdomAccess::TIER_POLICY:
             default:
                 $tierBlock = <<<TXT
