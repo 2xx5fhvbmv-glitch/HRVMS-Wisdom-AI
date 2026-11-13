@@ -9,6 +9,7 @@ use Validator;
 use App\Models\ResortSiteSettings;
 use App\Models\Resort;
 use App\Helpers\Common;
+use App\Helpers\StorageHelper;
 use App\Models\ResortAdmin;
 
 use App\Models\ResortNotification;
@@ -160,16 +161,19 @@ class SitesettignsController extends Controller
                                 // Storage::disk handles directory creation,
                                 // content-type detection, and bucket paths
                                 // for the 'wasabi' / 's3' disks.
-                                $stored = \Storage::disk($driver)->putFileAs($basePath, $logoFile, $fileName);
+                                $stored = StorageHelper::disk()->putFileAs($basePath, $logoFile, $fileName);
                                 \Log::info('[brand-logo-upload] '.strtoupper($driver).' putFileAs returned', ['stored' => $stored]);
 
                                 // Confirm the file actually landed by re-reading
-                                // the object. If exists() returns false the
-                                // upload silently failed (credentials, ACL,
-                                // bucket policy, etc.) and the DB column would
-                                // point at a non-existent object.
-                                $exists = \Storage::disk($driver)->exists($basePath . '/' . $fileName);
+                                // the object. putFileAs() returns false instead of
+                                // throwing when the write fails (credentials, ACL,
+                                // an unreadable temp file…), and saving the name
+                                // anyway left the logo pointing at a missing object.
+                                $exists = $stored && StorageHelper::exists($basePath . '/' . $fileName);
                                 \Log::info('[brand-logo-upload] post-write exists()', ['exists' => $exists]);
+                                if (!$exists) {
+                                    throw new \RuntimeException('the file could not be stored. Please try again.');
+                                }
                             }
                             $resort->logo = $fileName;
                         } catch (\Throwable $e) {
