@@ -32,6 +32,27 @@ class ResortAdmin extends Authenticatable
     // and non-strict MySQL stored 'super' (full access) for any create that left it out (audit run-3 H3).
     protected $attributes = ['type' => 'sub'];
 
+    /**
+     * Demo ENV: the named demo logins (gm@, hr@… on the demo login domain) share one password, DEMO_PASSWORD, so the
+     * team can always sign in. Any path that tries to give one of them another password (profile change, forgot
+     * password, HR "send credentials"…) keeps the shared one; demo:reset still works because it sets DEMO_PASSWORD.
+     */
+    public static function isSharedDemoLogin(?string $email): bool
+    {
+        return \App\Support\Demo\Demo::enabled() && \App\Support\Demo\Demo::isLogin($email);
+    }
+
+    protected static function booted(): void
+    {
+        static::updating(function (ResortAdmin $admin) {
+            if ($admin->isDirty('password') && self::isSharedDemoLogin($admin->email)
+                && !\Illuminate\Support\Facades\Hash::check((string) config('demo.password'), (string) $admin->password)) {
+                $admin->password = $admin->getOriginal('password');
+                \Illuminate\Support\Facades\Log::info('Demo login password change ignored', ['resort_admin_id' => $admin->id]);
+            }
+        });
+    }
+
     protected $fillable = [
         'role_id',
         'resort_id',

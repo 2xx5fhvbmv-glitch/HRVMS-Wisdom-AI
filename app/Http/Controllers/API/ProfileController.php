@@ -382,6 +382,10 @@ class ProfileController extends Controller
         return response()->json(['status' => false, 'message' => 'Old password is incorrect']);
       }
 
+      if (\App\Models\ResortAdmin::isSharedDemoLogin($employee->email)) {
+        return response()->json(['status' => false, 'message' => 'Demo logins share one password, so it cannot be changed.']);
+      }
+
       $employee->password = Hash::make($request->password);
       $employee->must_change_password = false;
       $employee->save();

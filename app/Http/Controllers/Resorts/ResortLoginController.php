@@ -617,6 +617,10 @@ class ResortLoginController extends Controller
             ]);
         }
 
+        if (\App\Models\ResortAdmin::isSharedDemoLogin($user->email)) {
+            return response()->json(['success' => false, 'msg' => 'Demo logins share one password, so it cannot be changed.']);
+        }
+
         // ✅ Update password
         $user->password = Hash::make($request->password);
         $user->must_change_password = false;
