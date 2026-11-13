@@ -36,6 +36,21 @@ class ModuleGuide
             ->pluck('ModuleName')->values()->all();
     }
 
+    /**
+     * The signed-in user's whole menu as one line per module ("Leave: Dashboard, Leave Requests, …"), the same
+     * navbar data as modules() / the screen. Put in WAI's system prompt as the only screen names it may mention.
+     */
+    public static function menuSummary(): string
+    {
+        $user = Auth::guard('resort-admin')->user();
+        if (!$user) {
+            return '';
+        }
+        return collect(Common::visibleResortMenu($user))->filter(fn ($m) => !empty($m['submenu']))
+            ->map(fn ($m) => $m['ModuleName'] . ': ' . collect($m['submenu'])->pluck('PageName')->implode(', '))
+            ->implode("\n");
+    }
+
     /** Tool result for get_module_guide. */
     public static function guide(array $args): array
     {

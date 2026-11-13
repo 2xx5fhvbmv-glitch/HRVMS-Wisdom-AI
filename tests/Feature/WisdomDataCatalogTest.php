@@ -156,4 +156,143 @@ class WisdomDataCatalogTest extends TestCase
             }
         }
     }
+
+    public function test_leave_balances_come_from_the_leave_engine_with_a_settlement_liability()
+    {
+        $emp = DB::table('employees')->where('resort_id', $this->resortId)->where('status', 'Active')->whereNull('deleted_at')->first();
+        $engine = collect(\App\Helpers\Common::getEmployeeLeaveBalance($emp->id, $this->resortId))->keyBy('leave_type');
+        $this->assertNotEmpty($engine, 'demo employee has leave allocations');
+
+        $r = DataCatalog::query(['dataset' => 'leave_balances', 'fields' => ['leave_type', 'balance', 'daily_rate_mvr', 'liability_mvr'],
+            'filters' => [['field' => 'employee_id', 'op' => '=', 'value' => $emp->Emp_id]]], $this->full());
+        $this->assertCount($engine->count(), $r['rows']);
+        $rate = (float) (DB::table('resort_site_settings')->where('resort_id', $this->resortId)->value('DollertoMVR') ?: 15.42);
+        $daily = round((strtoupper((string) $emp->basic_salary_currency) === 'USD' ? $emp->basic_salary * $rate : $emp->basic_salary) / 30, 2);
+        foreach ($r['rows'] as $row) {
+            $this->assertEquals($engine[$row['leave_type']]['balance'], $row['balance']);
+            $this->assertEqualsWithDelta(round(max($row['balance'], 0) * $daily, 2), $row['liability_mvr'], 0.01);
+        }
+
+        // summaries, filters and unknown names behave like table datasets
+        $byDept = DataCatalog::query(['dataset' => 'leave_balances', 'group_by' => ['department'], 'metrics' => [['fn' => 'sum', 'field' => 'liability_mvr']],
+            'filters' => [['field' => 'balance', 'op' => '>', 'value' => 0]], 'sort' => [['by' => 'sum_liability_mvr', 'dir' => 'desc']]], $this->full());
+        $this->assertArrayNotHasKey('error', $byDept);
+        $this->assertArrayHasKey('error', DataCatalog::query(['dataset' => 'leave_balances', 'fields' => ['basic_salary']], $this->full()));
+        $this->assertArrayHasKey('error', DataCatalog::query(['dataset' => 'leave_balances', 'fields' => ['name'], 'filters' => [['field' => 'balance', 'op' => 'like', 'value' => 1]]], $this->full()));
+
+        // pay figures follow sensitivity; a department scope is applied by the source itself
+        $this->assertArrayHasKey('error', DataCatalog::query(['dataset' => 'leave_balances', 'fields' => ['liability_mvr']], ['tier' => 'gm', 'resort_id' => $this->resortId]));
+        $dept = (int) $this->emp('hod.kitchen')->Dept_id;
+        $scoped = DataCatalog::query(['dataset' => 'leave_balances', 'group_by' => ['department']], ['tier' => 'leader', 'resort_id' => $this->resortId, 'dept_ids' => [$dept]]);
+        $this->assertSame([DB::table('resort_departments')->where('id', $dept)->value('name')], array_column($scoped['rows'], 'department'));
+    }
+
+    public function test_visa_spending_for_a_year_matches_the_paid_fees_and_deposits()
+    {
+        $year = now()->year;
+        $wp = (float) DB::table('work_permits')->where('resort_id', $this->resortId)->where('Status', 'Paid')
+            ->whereYear(DB::raw('COALESCE(Payment_Date, Due_Date)'), $year)->sum('Amt');
+        $r = DataCatalog::query(['dataset' => 'work_permit_fees', 'metrics' => [['fn' => 'sum', 'field' => 'amount']], 'filters' => [
+            ['field' => 'status', 'op' => '=', 'value' => 'Paid'], ['field' => 'paid_or_due_date', 'op' => 'between', 'value' => ["{$year}-01-01", "{$year}-12-31"]]]], $this->full());
+        $this->assertEqualsWithDelta($wp, (float) $r['rows'][0]['sum_amount'], 0.01);
+
+        $dep = (float) DB::table('total_expensess_since_joings')->where('resort_id', $this->resortId)->whereYear('Date', $year)->sum('Deposit_Amt');
+        $r = DataCatalog::query(['dataset' => 'visa_deposits', 'metrics' => [['fn' => 'sum', 'field' => 'deposit_amount']],
+            'filters' => [['field' => 'deposit_date', 'op' => '>=', 'value' => "{$year}-01-01"]]], $this->full());
+        $this->assertEqualsWithDelta($dep, (float) $r['rows'][0]['sum_deposit_amount'], 0.01);
+    }
+
+    public function test_probation_counts_people_whose_review_is_overdue()
+    {
+        $id = DB::table('employees')->where('resort_id', $this->resortId)->where('status', 'Active')->whereNull('deleted_at')->value('id');
+        DB::table('employees')->where('id', $id)->update(['probation_status' => 'Active', 'probation_end_date' => now()->subMonth()->toDateString()]);
+        $r = WisdomTools::execute('get_probation_overview', [], $this->full());
+        $expected = DB::table('employees')->where('resort_id', $this->resortId)->whereIn('status', ['Active', 'Onboarding'])
+            ->whereIn('probation_status', ['Active', 'Extended'])->count();
+        $this->assertSame($expected, $r['on_probation']);
+        $this->assertGreaterThanOrEqual(1, $r['review_overdue']);
+    }
+
+    public function test_vacancy_meaning_is_in_the_data_not_left_to_the_model()
+    {
+        $open = DB::table('vacancies')->where('Resort_id', $this->resortId)->whereIn('status', ['Active', 'Open'])
+            ->whereDate('required_starting_date', '<', today())->pluck('id')->sort()->values()->all();
+        $r = DataCatalog::query(['dataset' => 'vacancies', 'fields' => ['vacancy_id', 'applicant_count'], 'limit' => 200,
+            'filters' => [['field' => 'is_open', 'op' => '=', 'value' => 1], ['field' => 'days_past_start', 'op' => '>', 'value' => 0]]], $this->full());
+        $this->assertSame($open, collect($r['rows'])->pluck('vacancy_id')->map(fn ($v) => (int) $v)->sort()->values()->all());
+        foreach ($r['rows'] as $row) {
+            $this->assertSame(DB::table('applicant_form_data')->where('resort_id', $this->resortId)->where('Parent_v_id', $row['vacancy_id'])->count(), (int) $row['applicant_count']);
+        }
+    }
+
+    public function test_expat_documents_follow_the_xpat_screen_rules_and_only_a_visa_blocks_work()
+    {
+        $rows = collect(DataCatalog::query(['dataset' => 'expat_documents', 'limit' => 200, 'fields' => ['employee_id', 'visa_expiry', 'work_permit_expiry', 'insurance_expiry', 'medical_expiry', 'missing_count', 'can_work_legally', 'visa_days_left']], $this->full())['rows']);
+        $expats = DB::table('employees')->where('resort_id', $this->resortId)->where('status', 'Active')->whereNull('deleted_at')
+            ->where(fn ($w) => $w->whereNull('nationality')->orWhere('nationality', '!=', 'Maldivian'))->get(['id', 'Emp_id']);
+        $this->assertSame($expats->count(), $rows->count());
+        foreach ($expats as $e) {
+            $row = $rows->firstWhere('employee_id', $e->Emp_id);
+            $ins = \App\Helpers\Common::visaNextDue(\App\Models\EmployeeInsurance::class, $this->resortId, $e->id, 'insurance_end_date', 'desc');
+            if ($ins) {
+                $this->assertSame(\Carbon\Carbon::parse($ins)->toDateString(), $row['insurance_expiry']);
+            }
+            $wp = \App\Helpers\Common::visaNextDue(\App\Models\WorkPermit::class, $this->resortId, $e->id, 'Due_Date', 'asc');
+            if ($wp) {
+                $this->assertSame(\Carbon\Carbon::parse($wp)->toDateString(), $row['work_permit_expiry']);
+            }
+            $expected = $row['visa_expiry'] === null ? 'unknown (no visa on record)' : ($row['visa_expiry'] >= today()->toDateString() ? 'yes' : 'no (visa expired)');
+            $this->assertSame($expected, $row['can_work_legally'], 'only the visa decides');
+        }
+
+        $types = collect(DataCatalog::query(['dataset' => 'immigration_renewals', 'group_by' => ['document', 'blocks_work']], $this->full())['rows']);
+        foreach ($types as $t) {
+            $this->assertSame(in_array($t['document'], ['Visa', 'Work Permit'], true) ? 'yes' : 'no', $t['blocks_work']);
+        }
+    }
+
+    public function test_tools_a_dataset_replaces_are_not_offered_but_still_run()
+    {
+        $names = array_map(fn ($t) => $t['function']['name'], WisdomTools::definitions($this->full()));
+        foreach (config('wisdom_catalog.replaces_tools') as $hidden) {
+            $this->assertNotContains($hidden, $names);
+        }
+        $this->assertContains('query_data', $names);
+        $this->assertArrayNotHasKey('error', WisdomTools::execute('get_headcount', [], $this->full()));
+        // the dataset index the model sees names every dataset and its fields
+        $desc = collect(WisdomTools::definitions($this->full()))->firstWhere('function.name', 'query_data')['function']['description'];
+        $this->assertStringContainsString('- expat_documents (Visa):', $desc);
+        $this->assertStringContainsString('visa_days_left', $desc);
+    }
+
+    public function test_employee_relations_survey_and_compliance_carry_their_meaning()
+    {
+        $emp = DB::table('employees')->where('resort_id', $this->resortId)->where('status', 'Active')->whereNull('deleted_at')->first();
+        $gid = DB::table('grivance_submission_models')->insertGetId(['resort_id' => $this->resortId, 'Employee_id' => $emp->id, 'Grivance_id' => 'GR-T1',
+            'status' => 'pending', 'Priority' => 'High', 'Request_Identity_Disclosure' => 'No', 'created_at' => now()->subDays(30), 'updated_at' => now()]);
+        DB::table('grivance_resoultion_time_line_models')->insert(['resort_id' => $this->resortId, 'HighPriority' => 2, 'MediumPriority' => 4, 'LowPriority' => 6, 'created_at' => now(), 'updated_at' => now()]);
+        $row = collect(DataCatalog::query(['dataset' => 'grievance_cases', 'limit' => 200], $this->full())['rows'])->firstWhere('case_id', 'GR-T1');
+        $this->assertNull($row['raised_by'], 'a confidential grievance never shows who raised it');
+        $this->assertSame('yes', $row['confidential']);
+        $this->assertSame(1, (int) $row['is_overdue'], 'open 30 days, high priority = 2-day limit');
+
+        // survey: who responded, never names on an anonymous survey
+        $sid = DB::table('parent_surveys')->insertGetId(['resort_id' => $this->resortId, 'Surevey_title' => 'T anon', 'Status' => 'OnGoing', 'survey_privacy_type' => 'Anonymous', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('survey_employees')->insert(['Parent_survey_id' => $sid, 'Emp_id' => $emp->id, 'emp_status' => 'yes', 'created_at' => now(), 'updated_at' => now()]);
+        $r = DataCatalog::query(['dataset' => 'survey_participation', 'fields' => ['name', 'responded'], 'filters' => [['field' => 'survey_id', 'op' => '=', 'value' => $sid]]], $this->full());
+        $this->assertSame([['name' => null, 'responded' => 'yes']], $r['rows']);
+
+        // compliance: soft-deleted flags are not open issues
+        DB::table('compliances')->insert([
+            ['resort_id' => $this->resortId, 'employee_id' => $emp->id, 'compliance_breached_name' => 'T Rule', 'status' => 'Breached', 'deleted_at' => null, 'created_at' => now(), 'updated_at' => now()],
+            ['resort_id' => $this->resortId, 'employee_id' => $emp->id, 'compliance_breached_name' => 'T Rule', 'status' => 'Breached', 'deleted_at' => now(), 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        $c = DataCatalog::query(['dataset' => 'compliance_issues', 'metrics' => [['fn' => 'count'], ['fn' => 'count_distinct', 'field' => 'employee_rule']], 'filters' => [['field' => 'rule', 'op' => '=', 'value' => 'T Rule']]], $this->full());
+        $this->assertSame(1, (int) $c['rows'][0]['count']);
+
+        // the engine: no field list = every field; true/false work on yes/no fields
+        $all = DataCatalog::query(['dataset' => 'grievance_cases', 'filters' => [['field' => 'confidential', 'op' => '=', 'value' => true]]], $this->full());
+        $this->assertArrayNotHasKey('error', $all);
+        $this->assertArrayHasKey('is_overdue', $all['rows'][0]);
+    }
 }

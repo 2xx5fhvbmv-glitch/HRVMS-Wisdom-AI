@@ -96,8 +96,12 @@ class WisdomTools
             [
                 'module' => ['type' => 'string', 'description' => 'Optional module name to narrow the list, e.g. "Leave".'],
             ]);
+        // The datasets this user may query, named right in the tool description so the model picks one without
+        // spending a round on list_datasets (it still calls list_datasets for exact field names).
+        $datasetIndex = implode("\n", array_map(fn ($n, $d) => "- {$n} ({$d['module']}): {$d['description']} Fields: " . implode(', ', array_keys($d['fields'])) . '.',
+            array_keys($catalog = DataCatalog::datasets($ctx)), $catalog));
         $queryData = self::fn('query_data',
-            'Answer a data question from one dataset (see list_datasets). Either list rows with `fields`, or summarise with `group_by` + `metrics`. Results are already limited to this resort and to what this user may see. Example, approved leave days per department this year: {"dataset":"leave_requests","group_by":["department"],"metrics":[{"fn":"sum","field":"total_days"}],"filters":[{"field":"status","op":"=","value":"Approved"},{"field":"from_date","op":">=","value":"2026-01-01"}],"sort":[{"by":"sum_total_days","dir":"desc"}]}',
+            "Answer a data question from one dataset. Either list rows with `fields`, or summarise with `group_by` + `metrics`. Results are already limited to this resort and to what this user may see. Call list_datasets first if you are unsure of a field name. Example, approved leave days per department this year: {\"dataset\":\"leave_requests\",\"group_by\":[\"department\"],\"metrics\":[{\"fn\":\"sum\",\"field\":\"total_days\"}],\"filters\":[{\"field\":\"status\",\"op\":\"=\",\"value\":\"Approved\"},{\"field\":\"from_date\",\"op\":\">=\",\"value\":\"2026-01-01\"}],\"sort\":[{\"by\":\"sum_total_days\",\"dir\":\"desc\"}]}\nDatasets you can use:\n" . $datasetIndex,
             [
                 'dataset'  => ['type' => 'string', 'description' => 'Dataset name from list_datasets.'],
                 'fields'   => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Fields to list (row mode).'],
@@ -547,7 +551,10 @@ class WisdomTools
         if (empty($ctx['can_payroll'])) {
             $tools = array_values(array_filter($tools, fn ($t) => !in_array($t['function']['name'] ?? '', self::PAYROLL_TOOLS, true)));
         }
-        return $tools;
+        // Tools a catalog dataset replaces aren't offered either: one consistent path per question (and a smaller
+        // prompt every round). See config/wisdom_catalog.php 'replaces_tools'.
+        $replaced = config('wisdom_catalog.replaces_tools', []);
+        return array_values(array_filter($tools, fn ($t) => !in_array($t['function']['name'] ?? '', $replaced, true)));
     }
 
     /**
@@ -2055,7 +2062,7 @@ class WisdomTools
      * visa) whose due/expiry date falls within [$from, $to]. Returns a plain
      * collection of ['employee_id','type','expiry','amount'].
      */
-    private static function visaDocs(int $rid, string $type, Carbon $from, Carbon $to): \Illuminate\Support\Collection
+    public static function visaDocs(int $rid, string $type, Carbon $from, Carbon $to): \Illuminate\Support\Collection
     {
         $type = strtolower($type ?: 'all');
         $want = fn ($t) => $type === 'all' || $type === $t;
@@ -3137,16 +3144,18 @@ class WisdomTools
         $today    = Carbon::today()->toDateString();
         $monthEnd = Carbon::now()->endOfMonth()->toDateString();
         $base = fn () => Employee::where('resort_id', $rid);
+        // Still on probation = probation_status Active / Extended among current staff, whatever the end date says:
+        // a passed end date without confirmation means the review is overdue, not that probation ended.
+        $current = fn () => $base()->whereIn('status', ['Active', 'Onboarding'])->whereIn('probation_status', ['Active', 'Extended']);
+        $endExpr = "COALESCE(probation_end_date, DATE_ADD(joining_date, INTERVAL 3 MONTH))";
 
-        $onProbation = $base()->whereIn('probation_status', ['Active', 'Extended'])
-            ->whereRaw("COALESCE(probation_end_date, DATE_ADD(joining_date, INTERVAL 3 MONTH)) >= ?", [$today])
-            ->count();
-        $endingThisMonth = $base()->whereIn('probation_status', ['Active', 'Extended'])
-            ->whereRaw("COALESCE(probation_end_date, DATE_ADD(joining_date, INTERVAL 3 MONTH)) BETWEEN ? AND ?", [$today, $monthEnd])
-            ->count();
+        $onProbation = $current()->count();
+        $overdue = $current()->whereRaw("{$endExpr} < ?", [$today])->count();
+        $endingThisMonth = $current()->whereRaw("{$endExpr} BETWEEN ? AND ?", [$today, $monthEnd])->count();
 
         return [
             'on_probation'      => $onProbation,
+            'review_overdue'    => $overdue,
             'ending_this_month' => $endingThisMonth,
             'confirmed'         => $base()->where('probation_status', 'Confirmed')->count(),
             'failed'            => $base()->where('probation_status', 'Failed')->count(),

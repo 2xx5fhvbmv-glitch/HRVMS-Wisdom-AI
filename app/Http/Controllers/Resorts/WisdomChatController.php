@@ -38,6 +38,8 @@ class WisdomChatController extends Controller
      */
     public function chat(Request $request, OpenRouterClient $client)
     {
+        // A multi-part question can take up to OpenRouterClient::TIME_BUDGET (110 s) of lookups; give PHP room to finish.
+        @set_time_limit(150);
         $ctx = WisdomAccess::context();
         if (!$ctx) {
             return response()->json(['success' => false, 'message' => 'You do not have access to Wisdom AI.'], 403);
@@ -124,7 +126,10 @@ class WisdomChatController extends Controller
             $reply = rtrim(preg_replace('/\n?\[\[\s*pick_module\s*\]\]/i', '', $reply));
             $modules = \App\Services\Wisdom\ModuleGuide::modules() ?: null;
         }
-        $history[] = ['role' => 'assistant', 'content' => $reply];
+        // Keep what the answer was based on (lookups only — tool, dataset, filters; never the data) so a follow-up
+        // like "which of them…" can narrow the same lookup instead of guessing from the answer text.
+        $lookups = implode('; ', array_map(fn ($t) => $t[0] . ' ' . json_encode($t[1], JSON_UNESCAPED_UNICODE) . ' → ' . $t[2], $client->trace));
+        $history[] = array_filter(['role' => 'assistant', 'content' => $reply, 'lookups' => mb_substr($lookups, 0, 2000) ?: null]);
         session([self::SESSION_KEY => $this->trim($history)]);
 
         return response()->json(array_filter([
@@ -149,7 +154,7 @@ class WisdomChatController extends Controller
 
         return response()->json([
             'success'    => true,
-            'messages'   => array_values(session(self::SESSION_KEY, [])),
+            'messages'   => array_map(fn ($m) => ['role' => $m['role'], 'content' => $m['content']], array_values(session(self::SESSION_KEY, []))),
             'tier'       => $ctx['tier'],
             'tier_label' => $ctx['tier_label'],
             'user_name'  => $ctx['user_name'],

@@ -75,6 +75,15 @@ class DataCatalog
     /** `query_data`: validate the request against the catalog, build it, run it read-only. */
     public static function query(array $args, array $ctx): array
     {
+        $name = (string) ($args['dataset'] ?? '');
+        $computed = self::datasets($ctx)[$name] ?? null;
+        if ($computed && !empty($computed['source'])) {
+            try {
+                return self::queryComputed($name, $computed, $args, $ctx);
+            } catch (\InvalidArgumentException $e) {
+                return ['error' => $e->getMessage(), 'hint' => 'Call list_datasets to see the datasets and fields you can use.'];
+            }
+        }
         try {
             [$q, $meta] = self::build($args, $ctx);
         } catch (\InvalidArgumentException $e) {
@@ -133,7 +142,7 @@ class DataCatalog
         $limit    = max(1, min((int) ($args['limit'] ?? 50), $limits['rows']));
         $aggregate = $groupBy || $metrics;
         if (!$aggregate && !$select) {
-            throw new \InvalidArgumentException('Give `fields` to list rows, or `group_by` / `metrics` to summarise.');
+            $select = array_keys($fields);   // nothing asked for: list every field the user may see
         }
 
         // Joins needed by every field used (plus the department scope), with their own dependencies.
@@ -235,6 +244,162 @@ class DataCatalog
         return [$q, ['dataset' => $name, 'limit' => $limit]];
     }
 
+    /**
+     * A computed dataset: rows come from a PHP engine the app already uses (e.g. the leave-balance engine), named in
+     * the catalog as 'source' => [Class, method]. The method receives the resort id and the department scope and
+     * must return only that resort's (and those departments') rows, keyed by the catalog field names. The request
+     * is validated exactly like a table dataset; filters / group_by / metrics / sort are applied here in PHP.
+     */
+    private static function queryComputed(string $name, array $ds, array $args, array $ctx): array
+    {
+        $rid = (int) ($ctx['resort_id'] ?? 0);
+        if ($rid <= 0) {
+            throw new \InvalidArgumentException('No resort in context.');
+        }
+        $limits = config('wisdom_catalog.limits');
+        $fields = $ds['fields'];
+        $field = function ($f) use ($fields, $name) {
+            if (!is_string($f) || !isset($fields[$f])) {
+                throw new \InvalidArgumentException("Unknown field '" . (is_scalar($f) ? $f : '?') . "' in dataset '{$name}'.");
+            }
+            return $fields[$f];
+        };
+        $select  = self::list($args['fields'] ?? [], 30, 'fields');
+        $groupBy = self::list($args['group_by'] ?? [], $limits['group_by'], 'group_by');
+        $metrics = self::list($args['metrics'] ?? [], $limits['metrics'], 'metrics');
+        $filters = self::list($args['filters'] ?? [], $limits['filters'], 'filters');
+        $sort    = self::list($args['sort'] ?? [], 3, 'sort');
+        $limit   = max(1, min((int) ($args['limit'] ?? 50), $limits['rows']));
+        $aggregate = $groupBy || $metrics;
+        if (!$aggregate && !$select) {
+            $select = array_keys($fields);   // nothing asked for: list every field the user may see
+        }
+        array_map($field, $aggregate ? $groupBy : $select);
+
+        // Filters, validated like SQL ones, then matched in PHP (strings case-insensitive, like MySQL).
+        $tests = [];
+        foreach ($filters as $flt) {
+            if (!is_array($flt)) {
+                throw new \InvalidArgumentException('Each filter is {field, op, value}.');
+            }
+            $f = $field($flt['field'] ?? null);
+            $op = strtolower(trim((string) ($flt['op'] ?? '=')));
+            if (!in_array($op, self::OPS, true)) {
+                throw new \InvalidArgumentException("Unknown filter op '{$op}'. Use: " . implode(', ', self::OPS) . '.');
+            }
+            $raw = $flt['value'] ?? null;
+            $val = match ($op) {
+                'is_null', 'not_null' => null,
+                'in', 'not_in' => array_map(fn ($v) => self::value($f, $v), self::list($raw, $limits['in_values'], 'in value')),
+                'between' => (is_array($raw) && count($raw) === 2) ? array_map(fn ($v) => self::value($f, $v), array_values($raw))
+                    : throw new \InvalidArgumentException('between needs [from, to].'),
+                'contains', 'starts_with' => mb_strtolower((string) self::value(['type' => 'string'], $raw)),
+                default => self::value($f, $raw),
+            };
+            $tests[] = [$flt['field'], $op, $val, $f['type']];
+        }
+        $cmp = function ($a, $b, string $type): int {
+            if ($type === 'number') {
+                return (float) $a <=> (float) $b;
+            }
+            return strcmp(mb_strtolower((string) $a), mb_strtolower((string) $b));
+        };
+        $matches = function (array $r) use ($tests, $cmp): bool {
+            foreach ($tests as [$k, $op, $v, $type]) {
+                $x = $r[$k] ?? null;
+                $empty = $x === null || $x === '';
+                $ok = match ($op) {
+                    'is_null'  => $empty,
+                    'not_null' => !$empty,
+                    'in'       => !$empty && (bool) array_filter($v, fn ($y) => $cmp($x, $y, $type) === 0),
+                    'not_in'   => $empty || !array_filter($v, fn ($y) => $cmp($x, $y, $type) === 0),
+                    'between'  => !$empty && $cmp($x, $v[0], $type) >= 0 && $cmp($x, $v[1], $type) <= 0,
+                    'contains' => !$empty && str_contains(mb_strtolower((string) $x), $v),
+                    'starts_with' => !$empty && str_starts_with(mb_strtolower((string) $x), $v),
+                    '='  => !$empty && $cmp($x, $v, $type) === 0,
+                    '!=' => $empty || $cmp($x, $v, $type) !== 0,
+                    '>'  => !$empty && $cmp($x, $v, $type) > 0,
+                    '>=' => !$empty && $cmp($x, $v, $type) >= 0,
+                    '<'  => !$empty && $cmp($x, $v, $type) < 0,
+                    '<=' => !$empty && $cmp($x, $v, $type) <= 0,
+                };
+                if (!$ok) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        [$class, $method] = $ds['source'];
+        $rows = array_values(array_filter($class::$method($rid, $ctx['dept_ids'] ?? null), $matches));
+
+        if ($aggregate) {
+            $groups = [];
+            foreach ($rows as $r) {
+                $key = json_encode(array_map(fn ($g) => $r[$g] ?? null, $groupBy));
+                $groups[$key][] = $r;
+            }
+            $out = [];
+            foreach ($groups as $members) {
+                $row = [];
+                foreach ($groupBy as $g) {
+                    $row[$g] = $members[0][$g] ?? null;
+                }
+                foreach ($metrics ?: [['fn' => 'count']] as $m) {
+                    $fn = is_array($m) ? strtolower((string) ($m['fn'] ?? '')) : '';
+                    if (!in_array($fn, self::METRIC_FNS, true)) {
+                        throw new \InvalidArgumentException('Metric fn must be one of: ' . implode(', ', self::METRIC_FNS) . '.');
+                    }
+                    if ($fn === 'count' && empty($m['field'])) {
+                        $row['count'] = count($members);
+                        continue;
+                    }
+                    $f = $field($m['field'] ?? null);
+                    if (in_array($fn, ['sum', 'avg'], true) && $f['type'] !== 'number') {
+                        throw new \InvalidArgumentException("{$fn} needs a number field; '{$m['field']}' is {$f['type']}.");
+                    }
+                    $vals = array_values(array_filter(array_column($members, $m['field']), fn ($v) => $v !== null && $v !== ''));
+                    $row[$fn . '_' . $m['field']] = match ($fn) {
+                        'count'          => count($vals),
+                        'count_distinct' => count(array_unique($vals)),
+                        'sum'            => round(array_sum($vals), 2),
+                        'avg'            => $vals ? round(array_sum($vals) / count($vals), 2) : null,
+                        'min'            => $vals ? min($vals) : null,
+                        'max'            => $vals ? max($vals) : null,
+                    };
+                }
+                $out[] = $row;
+            }
+            $rows = $out;
+        } else {
+            $rows = array_map(fn ($r) => array_intersect_key($r, array_flip($select)) + array_fill_keys($select, null), $rows);
+        }
+
+        $columns = array_keys($rows[0] ?? []);
+        foreach (array_reverse($sort) as $s) {
+            $by = is_array($s) ? ($s['by'] ?? null) : $s;
+            if ($rows && !in_array($by, $columns, true)) {
+                throw new \InvalidArgumentException('Sort by one of the returned columns: ' . implode(', ', $columns) . '.');
+            }
+            $desc = is_array($s) && strtolower((string) ($s['dir'] ?? 'asc')) === 'desc';
+            usort($rows, function ($a, $b) use ($by, $desc) {
+                $x = $a[$by] ?? null;
+                $y = $b[$by] ?? null;
+                $c = is_numeric($x) && is_numeric($y) ? $x <=> $y : strcmp((string) $x, (string) $y);
+                return $desc ? -$c : $c;
+            });
+        }
+
+        return [
+            'dataset'   => $name,
+            'as_of'     => now()->toDateTimeString(),
+            'basis'     => $ds['basis'] ?? null,
+            'row_count' => min(count($rows), $limit),
+            'truncated' => count($rows) > $limit,
+            'rows'      => array_slice($rows, 0, $limit),
+        ];
+    }
+
     private static function applyFilter(Builder $q, array $f, \Closure $sql, string $op, $value): void
     {
         $op = strtolower(trim($op));
@@ -270,6 +435,9 @@ class DataCatalog
     /** A filter value, checked against the field's type. */
     private static function value(array $f, $v)
     {
+        if (is_bool($v)) {
+            $v = $f['type'] === 'number' ? (int) $v : ($v ? 'yes' : 'no');   // yes/no and 1/0 fields
+        }
         if (!is_scalar($v)) {
             throw new \InvalidArgumentException('Filter values must be plain values.');
         }
