@@ -987,6 +987,12 @@ class XpactEmployeeController extends Controller
                     return response()->json(['status' => false, 'message' =>  $err]);
                 } 
                 $AI_Data = json_decode($response, true); 
+                // An error reply (no extracted_fields) is not document data: file the
+                // document but store no AI data (mobile QA #11).
+                if (!is_array($AI_Data) || !is_array($AI_Data['extracted_fields'] ?? null)) {
+                    $AI_Data = ['extracted_fields' => []];
+                    $response = null;
+                }
             
                 DB::beginTransaction();
                 try
@@ -995,14 +1001,16 @@ class XpactEmployeeController extends Controller
                     {
                         $VisaRenewal =  VisaRenewal::where('resort_id', $this->resort->resort_id)
                                     ->where('employee_id', $employee->id)
-                                    ->update([  
+                                    ->update(array_filter([
+                                                // Unreadable dates/numbers must not fail the upload or wipe stored values.
+                                                'start_date' => Common::safeAiDate($AI_Data['extracted_fields']['Visa Issued Date'] ?? null),
+                                                'end_date'   => Common::safeAiDate($AI_Data['extracted_fields']['Visa Expiry Date'] ?? null),
+                                                'Visa_Number'=> $AI_Data['extracted_fields']['Visa No.'] ?? null,
+                                                'WP_No'=> $AI_Data['extracted_fields']['Work Permit Number (Starts with WP)'] ?? null,
+                                            ]) + [
                                                 'visa_file'=>$file_child_id,
                                                 'resort_id' => $this->resort->resort_id,
                                                 'employee_id' => $employee->id,
-                                                'Visa_Number'=> $AI_Data['extracted_fields']['Visa No.'] ?? null,
-                                                'WP_No'=> $AI_Data['extracted_fields']['Work Permit Number (Starts with WP)'] ?? null,
-                                                'start_date' =>  Carbon::createFromFormat('d/m/Y', $AI_Data['extracted_fields']['Visa Issued Date']),
-                                                'end_date' =>Carbon::createFromFormat('d/m/Y', $AI_Data['extracted_fields']['Visa Expiry Date']),
                                             ]);
                     }
                     elseif($DocumentType == "Work_Permit_Card")
@@ -1010,9 +1018,10 @@ class XpactEmployeeController extends Controller
 
                             WorkPermit::where('resort_id', $this->resort->resort_id)
                             ->where('employee_id', $employee->id)
-                            ->update([
-                                'Reciept_file'=> $file_child_id,
+                            ->update(array_filter([
                                 'Work_Permit_Number' => $AI_Data['extracted_fields']['Work Permit Number'] ?? null,
+                            ]) + [
+                                'Reciept_file'=> $file_child_id,
                             ]);
                     }
                         VisaEmployeeExpiryData::where('resort_id', $this->resort->resort_id)

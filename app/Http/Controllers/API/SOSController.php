@@ -702,9 +702,13 @@ class SOSController extends Controller
 
 
             if (!$SOSHistoryModel) {
+                // A Pending SOS has no team or locations until the Security Manager
+                // approves it — say so instead of "not found" (mobile QA #15).
+                $pending = SOSHistoryModel::where('id', $sosId)->where('resort_id', $this->resort_id)->where('status', 'Pending')->exists();
                 return response()->json([
                     'success'                           =>  false,
-                    'message'                           =>  'No employee location found'
+                    'sos_status'                        =>  $pending ? 'Pending' : null,
+                    'message'                           =>  $pending ? 'This SOS is waiting for the Security Manager to approve or reject it.' : 'No employee location found'
                 ], 200);
             }
 

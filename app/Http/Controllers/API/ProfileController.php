@@ -683,6 +683,9 @@ class ProfileController extends Controller
       $response['status']                               = true;
       $response['message']                              = 'Visa categories fetched successfully';
       $response['visa_category']                        = $visaCategories;
+      // Which categories have a document, so the app needn't call visa-data per category (mobile QA #11).
+      $filed = VisaEmployeeExpiryData::where('employee_id', Auth::guard('api')->user()->GetEmployee->id)->pluck('DocumentName')->all();
+      $response['has_data']                             = collect($visaCategories)->map(fn ($label, $key) => in_array($key, $filed, true));
 
       return response()->json($response);
     } catch (\Exception $e) {
@@ -721,7 +724,8 @@ class ProfileController extends Controller
                 $transformedFields = [];
                 foreach ($VisaEmployeeExpiryData->Ai_extracted_data['extracted_fields'] as $key => $value) {
                     $transformedFields[] = [
-                        'Title' => $key,
+                        // "passport no.:" -> "Passport no." (mobile QA #11)
+                        'Title' => ucfirst(rtrim(trim($key), ': ')),
                         'Value' => $value
                     ];
                 }

@@ -379,8 +379,10 @@ class RenewalController extends Controller
                 {
                     return response()->json(['status' => false, 'message' =>  $err]);
                 }
-                $ai_encode =$response;
                 $AI_Data = json_decode($response, true);
+                // An error reply is not document data — store none (mobile QA #11).
+                $ai_encode = is_array($AI_Data['extracted_fields'] ?? null) ? $response : null;
+                if ($ai_encode === null) { $AI_Data = ['extracted_fields' => []]; }
        
         $main_folder = $this->resort->resort->resort_id;
         $employee    = Employee::where('resort_id',$this->resort->resort_id)->where("id",$emp_id)->first();

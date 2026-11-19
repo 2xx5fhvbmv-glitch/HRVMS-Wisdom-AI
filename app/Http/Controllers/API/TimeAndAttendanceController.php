@@ -1003,7 +1003,9 @@ class TimeAndAttendanceController extends Controller
                 't1.id as admin_id'
             )->get();
             $ot_requests_count                               =   $otReqList->count();
-            $ot_requests                                     =   $otReqList->map(function ($row) {
+            $ot_requests                                     =   $otReqList->map(function ($row) use ($employee) {
+                // Same rule approve-reject-ot enforces (never own OT; HR, or HOD/EXCOM of the same department).
+                $canAct =   Common::canManageAttendanceFor($row->emp_id, $employee);
                 $name   =   trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? ''));
                 $date   =   $row->date ? \Carbon\Carbon::parse($row->date)->format('d M Y') : '';
                 $hrs    =   $row->OverTime ? (explode(':', $row->OverTime)[0] ?? '0') : '0';
@@ -1016,8 +1018,8 @@ class TimeAndAttendanceController extends Controller
                     'description'   => $desc,
                     'date'          => $row->date,
                     'hours'         => $hrs,
-                    'can_accept'    => true,
-                    'can_reject'    => true,
+                    'can_accept'    => $canAct,
+                    'can_reject'    => $canAct,
                 ];
             })->values()->toArray();
 

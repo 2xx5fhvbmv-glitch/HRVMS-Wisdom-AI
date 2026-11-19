@@ -43,15 +43,18 @@ class Logincontroller extends Controller
 
         try {
 
-            // Find the Employee by Emp_id
-            $employee                               =   Employee::where('Emp_id', $request->emp_id)->first();
-            $resortAdmin                            =   $employee ? ResortAdmin::where('id', $employee->Admin_Parent_id)->first() : null;
+            // Emp_id is not unique across resorts (e.g. SR-1 exists in two), and the app sends no resort.
+            // So check the password against every account with this Emp_id and log in only on exactly one
+            // match — `->first()` used to pick an arbitrary resort's employee. Locked accounts are skipped
+            // (no password check during lockout).
+            $candidates = Employee::where('Emp_id', $request->emp_id)->get()
+                ->map(fn ($e) => [$e, ResortAdmin::where('id', $e->Admin_Parent_id)->first()])
+                ->filter(fn ($pair) => $pair[1] !== null)
+                ->values();
+            $open = $candidates->reject(fn ($pair) => Common::isAccountLocked($pair[1]))->values();
 
-            // S8 — account lockout: same shared resort_admins state the web
-            // portal login checks (Common::isAccountLocked()), checked
-            // before the password hash so a locked account can't be
-            // brute-forced during its lockout window.
-            if ($resortAdmin && Common::isAccountLocked($resortAdmin)) {
+            // S8 — account lockout: same shared resort_admins state the web portal login checks.
+            if ($candidates->isNotEmpty() && $open->isEmpty()) {
                 Common::logLoginAttempt('mobile', $request->emp_id, false, $request);
                 return response()->json([
                     'success'                       =>  false,
@@ -59,29 +62,24 @@ class Logincontroller extends Controller
                 ], 200);
             }
 
-            // Enumeration fix: account-state checks (inactive employee,
-            // non-permanent employment type, inactive resort admin) used to
-            // run BEFORE the password check, so a wrong password on a real
-            // Emp_id still leaked "Account is deactivated" etc. without ever
-            // proving the caller knew the password. Password is now checked
-            // first, and unknown-emp_id runs a dummy hash so the response
-            // time doesn't distinguish "no such employee" from "wrong
-            // password" (self::INVALID_CREDENTIALS_HASH is a fixed bcrypt
-            // hash of a random string, never a real password).
-            // Hash::check() must run unconditionally — `!$x || !Hash::check()`
-            // short-circuits on null $x, so the dummy hash above was never
-            // actually reached and timing kept leaking which branch ran.
-            $passwordValid = Hash::check(is_string($request->password) ? $request->password : '', $resortAdmin->password ?? self::INVALID_CREDENTIALS_HASH);
-            if (!$resortAdmin || !$passwordValid) {
+            // Enumeration fix: password first, account-state checks after; an unknown Emp_id still runs one
+            // dummy hash so response time doesn't tell "no such employee" from "wrong password".
+            $password = is_string($request->password) ? $request->password : '';
+            $matches  = $open->filter(fn ($pair) => Hash::check($password, $pair[1]->password ?? self::INVALID_CREDENTIALS_HASH))->values();
+            if ($open->isEmpty()) {
+                Hash::check($password, self::INVALID_CREDENTIALS_HASH);
+            }
+            if ($matches->count() !== 1) {
                 Common::logLoginAttempt('mobile', $request->emp_id, false, $request);
-                if ($resortAdmin) {
-                    Common::registerFailedLogin($resortAdmin);
+                if ($matches->isEmpty()) {
+                    $open->each(fn ($pair) => Common::registerFailedLogin($pair[1]));
                 }
                 return response()->json([
                     'success'                       =>  false,
                     'message'                       =>  'Invalid Employee ID or password. Please try again'
                 ],200);
             }
+            [$employee, $resortAdmin] = $matches->first();
 
             // Allow-list, not a block-list (S4-02): Terminated/Resigned/
             // Suspended must also be blocked, and any future status is

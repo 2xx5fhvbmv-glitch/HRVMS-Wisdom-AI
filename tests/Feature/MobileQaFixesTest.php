@@ -15,7 +15,7 @@ use Laravel\Passport\Passport;
 use Tests\Concerns\BuildsDemoOrganisation;
 use Tests\TestCase;
 
-/** Backend fixes for the mobile-app QA report (2026-11-18): items 1, 3, 5, 6, 8, 12, 13, 17, 18. */
+/** Backend fixes for the mobile-app QA report (2026-11-18): items 1, 3, 5, 6, 8, 9, 11, 12, 13, 15, 17, 18. */
 class MobileQaFixesTest extends TestCase
 {
     use DatabaseTransactions, BuildsDemoOrganisation;
@@ -241,5 +241,79 @@ class MobileQaFixesTest extends TestCase
         // a `status`-style endpoint now also says `success`, and a `success`-style one also says `status`
         $this->postJson('api/resort/profile-change-password', [])->assertJsonStructure(['success', 'status']);
         $this->getJson('api/job-description')->assertJson(['success' => true, 'status' => true]);
+    }
+
+    public function test_9_holidays_carry_the_year_and_come_sorted()
+    {
+        DB::table('resortholidays')->where('resort_id', $this->resortId)->delete();
+        foreach (['2026-12-31', '2025-12-31', '2026-01-01'] as $d) {
+            DB::table('resortholidays')->insert(['resort_id' => $this->resortId, 'PublicHolidaydate' => $d, 'PublicHolidayName' => "H $d"]);
+        }
+        $this->app_as('employee');
+        $rows = $this->getJson('api/calendar/get-holidays')->assertOk()->json('data');
+        $this->assertSame(['2025-12-31', '2026-01-01', '2026-12-31'], array_column($rows, 'full_date'));
+        $this->assertSame('31 Dec', $rows[0]['date']);   // old field kept for app builds already out
+    }
+
+    public function test_11_visa_categories_say_which_have_a_file_and_labels_are_clean()
+    {
+        $emp = $this->emp('employee');
+        DB::table('visa_employee_expiry_data')->insert(['resort_id' => $this->resortId, 'employee_id' => $emp->id, 'DocumentName' => 'Passport_Copy',
+            'Ai_extracted_data' => json_encode(['extracted_fields' => ['passport no.:' => 'P123', 'Date of Expiry' => '01/01/2030']])]);
+        $this->app_as('employee');
+        $has = $this->getJson('api/profile/visa-category')->assertOk()->json('has_data');
+        $this->assertTrue($has['Passport_Copy']);
+        $this->assertFalse($has['Visa']);
+        $titles = array_column($this->getJson('api/profile/visa-data/Passport_Copy')->json('visa_data.Ai_extracted_data.extracted_fields'), 'Title');
+        $this->assertSame(['Passport no.', 'Date of Expiry'], $titles);
+    }
+
+    public function test_login_picks_the_account_whose_password_matches_when_an_emp_id_is_shared()
+    {
+        $a = $this->emp('employee');
+        $b = $this->emp('supervisor');
+        DB::table('employees')->where('id', $b->id)->update(['Emp_id' => $a->Emp_id]);   // same ID, as across two resorts
+        DB::table('resort_admins')->where('id', $b->Admin_Parent_id)->update(['password' => \Illuminate\Support\Facades\Hash::make('Other#Passw0rd26')]);
+        $tokens = fn ($e) => DB::table('oauth_access_tokens')->where('user_id', $e->Admin_Parent_id)->count();
+        [$ta, $tb] = [$tokens($a), $tokens($b)];
+
+        $this->postJson('api/login', ['emp_id' => $a->Emp_id, 'password' => config('demo.password')])->assertJson(['success' => true]);
+        $this->assertSame([$ta + 1, $tb], [$tokens($a), $tokens($b)]);
+        $this->postJson('api/login', ['emp_id' => $a->Emp_id, 'password' => 'Other#Passw0rd26'])->assertJson(['success' => true]);
+        $this->assertSame([$ta + 1, $tb + 1], [$tokens($a), $tokens($b)]);
+        $this->postJson('api/login', ['emp_id' => $a->Emp_id, 'password' => 'wrong'])->assertJson(['success' => false]);
+    }
+
+    public function test_overtime_rows_can_only_be_acted_on_by_someone_allowed_to_approve_them()
+    {
+        $ids = collect(['employee', 'hod.kitchen', 'hr'])->map(fn ($l) => $this->emp($l)->id)
+            ->push(Common::getSubordinates($this->emp('hod.kitchen')->id)[0]);   // one of the kitchen HOD's team
+        foreach ($ids as $id) {
+            DB::table('parent_attendaces')->insert(['resort_id' => $this->resortId, 'Emp_id' => $id, 'date' => now()->toDateString(),
+                'OverTime' => '02:00', 'Status' => 'present', 'created_at' => now(), 'updated_at' => now()]);
+        }
+        foreach (['hod.kitchen', 'hr'] as $login) {
+            $this->app_as($login);
+            $me = $this->emp($login);
+            $rows = $this->getJson('api/timeandattendance/time-attendance-hod-dashboard')->assertOk()->json('dashboard.pending_requests.ot_requests');
+            $this->assertNotEmpty($rows, $login);
+            foreach ($rows as $row) {
+                // the flag is exactly the rule approve-reject-ot enforces (never own overtime)
+                $this->assertSame(Common::canManageAttendanceFor($row['emp_id'], $me), $row['can_accept'], "$login / emp {$row['emp_id']}");
+                if ((int) $row['emp_id'] === (int) $me->id) {
+                    $this->assertFalse($row['can_accept']);
+                }
+            }
+        }
+    }
+
+    public function test_15_a_pending_sos_says_it_is_waiting_for_approval()
+    {
+        $emp = $this->emp('employee');
+        $id = DB::table('sos_history')->insertGetId(['resort_id' => $this->resortId, 'emergency_id' => 1, 'emp_initiated_by' => $emp->id,
+            'location' => 'Jetty', 'latitude' => '4.17', 'longitude' => '73.5', 'date' => now()->toDateString(), 'time' => '10:00', 'status' => 'Pending']);
+        $this->app_as('hr');
+        $this->getJson('api/sos/employee-team-location/' . base64_encode((string) $id))
+            ->assertOk()->assertJson(['success' => false, 'sos_status' => 'Pending']);
     }
 }

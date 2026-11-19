@@ -1700,8 +1700,8 @@ class LeaveController extends Controller
                 return response()->json($response);
             }
         } catch (QueryException $qe) {
-            \Log::emergency("File: " . $e->getFile());
-            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("File: " . $qe->getFile());
+            \Log::emergency("Line: " . $qe->getLine());
             \Log::error("Database Query Error: " . $qe->getMessage());
             return response()->json(['success' => false, 'message' => 'A database error occurred. Please contact support.'], 500);
         } catch (\Exception $e) {
@@ -1836,8 +1836,8 @@ class LeaveController extends Controller
 
             return response()->json($response);
         } catch (QueryException $qe) {
-            \Log::emergency("File: " . $e->getFile());
-            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("File: " . $qe->getFile());
+            \Log::emergency("Line: " . $qe->getLine());
             \Log::error("Database Query Error: " . $qe->getMessage());
             return response()->json(['success' => false, 'message' => 'A database error occurred. Please contact support.'], 500);
         } catch (\Exception $e) {
@@ -2035,8 +2035,8 @@ class LeaveController extends Controller
                 return response()->json($response);
             }
         } catch (QueryException $qe) {
-            \Log::emergency("File: " . $e->getFile());
-            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("File: " . $qe->getFile());
+            \Log::emergency("Line: " . $qe->getLine());
             \Log::error("Database Query Error: " . $qe->getMessage());
             return response()->json(['success' => false, 'message' => 'A database error occurred. Please contact support.'], 500);
         } catch (\Exception $e) {
@@ -2191,8 +2191,8 @@ class LeaveController extends Controller
                 return response()->json($response);
             }
         } catch (QueryException $qe) {
-            \Log::emergency("File: " . $e->getFile());
-            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("File: " . $qe->getFile());
+            \Log::emergency("Line: " . $qe->getLine());
             \Log::error("Database Query Error: " . $qe->getMessage());
             return response()->json(['success' => false, 'message' => 'A database error occurred. Please contact support.'], 500);
         } catch (\Exception $e) {
@@ -3417,8 +3417,8 @@ class LeaveController extends Controller
                 return response()->json($response);
             }
         } catch (QueryException $qe) {
-            \Log::emergency("File: " . $e->getFile());
-            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("File: " . $qe->getFile());
+            \Log::emergency("Line: " . $qe->getLine());
             \Log::error("Database Query Error: " . $qe->getMessage());
             return response()->json(['success' => false, 'message' => 'A database error occurred. Please contact support.'], 500);
         } catch (\Exception $e) {
@@ -3735,8 +3735,8 @@ class LeaveController extends Controller
                 return response()->json($response);
             }
         } catch (QueryException $qe) {
-            \Log::emergency("File: " . $e->getFile());
-            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("File: " . $qe->getFile());
+            \Log::emergency("Line: " . $qe->getLine());
             \Log::error("Database Query Error: " . $qe->getMessage());
             return response()->json(['success' => false, 'message' => 'A database error occurred. Please contact support.'], 500);
         } catch (\Exception $e) {
@@ -3822,8 +3822,8 @@ class LeaveController extends Controller
 
             return response()->json($response);
         } catch (QueryException $qe) {
-            \Log::emergency("File: " . $e->getFile());
-            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("File: " . $qe->getFile());
+            \Log::emergency("Line: " . $qe->getLine());
             \Log::error("Database Query Error: " . $qe->getMessage());
             return response()->json(['success' => false, 'message' => 'A database error occurred. Please contact support.'], 500);
         } catch (\Exception $e) {

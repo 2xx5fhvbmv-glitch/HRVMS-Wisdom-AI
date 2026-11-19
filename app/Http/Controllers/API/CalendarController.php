@@ -72,14 +72,17 @@ class CalendarController extends Controller
                                             ->where('resort_id',$this->resort_id)                 
                                             ->get();
 
+            // `full_date` (Y-m-d) carries the year; `date`/`day` stay for older app builds. Sorted oldest first (mobile QA #9).
             $formattedHolidays  = $holidays->map(function ($holiday) {
+                $d = $holiday->date ? \Carbon\Carbon::parse($holiday->date) : null;
                 return [
                     'id'        => $holiday->id,
                     'title'     => $holiday->title,
-                    'date'      => $holiday->date ? \Carbon\Carbon::parse($holiday->date)->format('j M') : null,
-                    'day'       => $holiday->date ? \Carbon\Carbon::parse($holiday->date)->format('D') : null,
+                    'full_date' => $d?->format('Y-m-d'),
+                    'date'      => $d?->format('j M'),
+                    'day'       => $d?->format('D'),
                 ];
-        });
+        })->sortBy('full_date')->values();
         
           return response()->json([
               'message'   => 'Holidays fetched successfully',
