@@ -7186,6 +7186,23 @@ class Common
      *
      * @return array{approval_flow: object, can_approve: bool, can_reject: bool, current_pending_rank: ?string, overall_status: string}
      */
+    /**
+     * Leaves of this resort waiting for THIS employee's decision right now: the parent is Pending and its current step
+     * (the first stage row still Pending, by id — the same pick as buildLeaveApprovalFlow() and handleLeaveAction())
+     * is theirs. Returns [leave_id => that stage's approver_rank]. Every "leave requests for you to act on" list uses
+     * this, so the leave dashboard, the request list and the T&A dashboards can't disagree (mobile QA #6).
+     */
+    public static function leavesAwaitingApprover(int $resortId, int $employeeId): array
+    {
+        return DB::table('employees_leaves_status as els')
+            ->join('employees_leaves as el', 'el.id', '=', 'els.leave_request_id')
+            ->where('el.resort_id', $resortId)->where('el.status', 'Pending')
+            ->where('els.status', 'Pending')->where('els.approver_id', $employeeId)
+            ->whereRaw('els.id = (SELECT MIN(x.id) FROM employees_leaves_status x WHERE x.leave_request_id = els.leave_request_id AND x.status = ?)', ['Pending'])
+            ->pluck('els.approver_rank', 'el.id')
+            ->all();
+    }
+
     public static function buildLeaveApprovalFlow(int $leaveId, ?int $viewerEmployeeId): array
     {
         $overallStatus = \App\Models\EmployeeLeave::where('id', $leaveId)->value('status') ?? 'Pending';
@@ -12898,6 +12915,73 @@ class Common
      * @param string $rawImageContents Raw bytes of the uploaded photo.
      * @return string Raw PNG bytes with background pixels made transparent.
      */
+    /**
+     * A phone number in one stored format (E.164: "+9607654321"), or null when it isn't a valid number. Needs the
+     * country code ("+" and 8-15 digits in total); a Maldives number (+960) must have exactly 7 local digits.
+     * Spaces, dashes and brackets as typed are ignored.
+     */
+    public static function normalizePhone($value): ?string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '' || $raw[0] !== '+') {
+            return null;
+        }
+        $digits = preg_replace('/[\s\-().]/', '', substr($raw, 1));
+        if (!preg_match('/^\d{8,15}$/', $digits)) {
+            return null;
+        }
+        if (str_starts_with($digits, '960') && strlen($digits) !== 10) {
+            return null;
+        }
+        return '+' . $digits;
+    }
+
+    /** Validation rule for a person's name: letters (any language), spaces, dots and hyphens — no digits, quotes or <>. */
+    public const PERSON_NAME_RULE = 'regex:/^[\pL\pM][\pL\pM\s.\-]*$/u';
+
+    /**
+     * Why a background-removed image doesn't look like a signature, or null when it does. A signature on paper leaves
+     * a small share of dark, mostly colourless ink after removeSignatureBackground(); a photo (grass, a face, a room)
+     * leaves most of the picture, or lots of colour. Shown to the user as-is.
+     */
+    public static function signatureImageProblem(string $processedPng): ?string
+    {
+        $gd = @imagecreatefromstring($processedPng);
+        if (!$gd) {
+            return 'This file could not be read as an image.';
+        }
+        $w = imagesx($gd);
+        $h = imagesy($gd);
+        $step = max(1, (int) floor(sqrt(($w * $h) / 40000)));   // sample ~40k pixels whatever the size
+        $total = $ink = $coloured = 0;
+        for ($y = 0; $y < $h; $y += $step) {
+            for ($x = 0; $x < $w; $x += $step) {
+                $total++;
+                $rgba = imagecolorat($gd, $x, $y);
+                if ((($rgba >> 24) & 0x7F) >= 120) {
+                    continue;   // transparent background
+                }
+                $ink++;
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+                // Blue / black pen is normal ink; strongly coloured non-blue pixels (grass, skin, a flower) are not.
+                if (max($r, $g, $b) - min($r, $g, $b) > 80 && !($b >= $r && $b >= $g)) {
+                    $coloured++;
+                }
+            }
+        }
+        imagedestroy($gd);
+        $inkShare = $total ? $ink / $total : 0;
+        if ($inkShare < 0.003) {
+            return 'No signature was found in this photo. Sign in dark ink on plain white paper and try again.';
+        }
+        if ($inkShare > 0.35 || ($ink && $coloured / $ink > 0.3)) {
+            return 'This does not look like a signature. Photograph only your signature, in dark ink on plain white paper.';
+        }
+        return null;
+    }
+
     public static function removeSignatureBackground(string $rawImageContents): string
     {
         $image = \Intervention\Image\Laravel\Facades\Image::read($rawImageContents);

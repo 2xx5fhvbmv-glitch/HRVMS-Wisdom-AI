@@ -2018,10 +2018,29 @@ class EmployeeController extends Controller
     {
         if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
 
+        // Names can't be phone numbers and the number needs its country code (mobile QA #13: a phone saved as a last name).
+        $phone = function ($attr, $value, $fail) {
+            if ($value !== null && $value !== '' && \App\Helpers\Common::normalizePhone($value) === null) {
+                $fail('Enter the phone number with its country code, e.g. +960 7654321.');
+            }
+        };
+        $v = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'emg_cont_first_name' => ['nullable', 'string', 'max:255', \App\Helpers\Common::PERSON_NAME_RULE],
+            'emg_cont_last_name'  => ['nullable', 'string', 'max:255', \App\Helpers\Common::PERSON_NAME_RULE],
+            'emg_cont_no'         => ['nullable', $phone],
+            'emg_cont_email'      => 'nullable|email|max:255',
+        ], [
+            'emg_cont_first_name.regex' => 'A name can only contain letters, spaces, dots and hyphens.',
+            'emg_cont_last_name.regex'  => 'A name can only contain letters, spaces, dots and hyphens.',
+        ]);
+        if ($v->fails()) {
+            return response()->json(['success' => false, 'message' => $v->errors()->first(), 'errors' => $v->errors()], 422);
+        }
+
         $employee = Employee::where('resort_id', $this->resort->resort_id)->findOrFail($request->employee_id);
         $employee->emg_cont_first_name = $request->emg_cont_first_name;
         $employee->emg_cont_last_name = $request->emg_cont_last_name;
-        $employee->emg_cont_no = $request->emg_cont_no;
+        $employee->emg_cont_no = $request->filled('emg_cont_no') ? \App\Helpers\Common::normalizePhone($request->emg_cont_no) : null;
         $employee->emg_cont_relationship = $request->emg_cont_relationship;
         $employee->emg_cont_email = $request->emg_cont_email;
         $employee->emg_cont_current_address = $request->emg_cont_current_address;

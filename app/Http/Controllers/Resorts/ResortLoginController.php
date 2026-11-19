@@ -369,7 +369,7 @@ class ResortLoginController extends Controller
     public function signaturePreview(Request $request)
     {
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
-            'signature_image' => 'required|file|mimes:jpg,jpeg,png,gif,webp,heic,heif',
+            'signature_image' => 'required|file|mimes:jpg,jpeg,png,gif,webp,heic,heif|max:10240',
         ], [
             'signature_image.mimes' => 'The image must be a type of:jpg,jpeg,png,gif,webp,heic,heif',
         ]);
@@ -386,6 +386,9 @@ class ResortLoginController extends Controller
 
             $rawContents = file_get_contents($request->file('signature_image')->getRealPath());
             $processed = Common::removeSignatureBackground($rawContents);
+            if ($problem = Common::signatureImageProblem($processed)) {
+                return response()->json(['success' => false, 'msg' => $problem], 422);
+            }
 
             $token = Str::random(40);
             $mainFolder = $resortAdmin->resort->resort_id;

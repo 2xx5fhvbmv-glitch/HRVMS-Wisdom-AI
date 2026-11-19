@@ -62,11 +62,20 @@ class JobDescriptionController extends Controller
             return response()->json(['success' => false, 'message' => 'Job description not found'], 404);
         }
 
+        // Only what the app shows. The record also holds the employee's DOB, ID card number, addresses, both signature
+        // storage paths and the HR signatory's ID card number — none of that goes to the app.
         $jd = $record->jobDescription;
-        $data = $record->toArray();
-        $data['job_title']  = optional(ResortPosition::find(optional($jd)->Position_id))->position_title;
-        $data['department'] = optional(ResortDepartment::find(optional($jd)->Department_id))->name;
-        $data['can_act']    = $record->status === 'Pending';
+        $data = [
+            'id'              => $record->id,
+            'job_title'       => optional(ResortPosition::find(optional($jd)->Position_id))->position_title,
+            'department'      => optional(ResortDepartment::find(optional($jd)->Department_id))->name,
+            'status'          => $record->status,
+            'can_act'         => $record->status === 'Pending',
+            'sent_at'         => $record->sent_at,
+            'signed_at'       => $record->signed_at,
+            'decline_reason'  => $record->decline_reason,
+            'job_description' => ['jobdescription' => optional($jd)->jobdescription],   // same shape the app already reads
+        ];
 
         return response()->json([
             'success' => true,
@@ -134,7 +143,9 @@ class JobDescriptionController extends Controller
             return response()->json(['success' => false, 'message' => 'No signature on file. Please add your signature in your profile first.'], 422);
         }
 
-        $signature = Common::snapshotSignature($employee->Admin_Parent_id, 'job_description', $record->id);
+        // Own file per signer: records issued before the employer side moved to 'job_description_employer' still have
+        // their employer signature at .../job_description/{id}/signature.png, which this used to overwrite.
+        $signature = Common::snapshotSignature($employee->Admin_Parent_id, 'job_description_employee', $record->id);
         if (empty($signature['signature_img']) || !Common::signatureImageDataUri($signature['signature_img'])) {
             return response()->json(['success' => false, 'message' => 'No signature on file. Please add your signature in your profile first.'], 422);
         }

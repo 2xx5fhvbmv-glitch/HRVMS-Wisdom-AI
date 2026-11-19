@@ -2679,8 +2679,12 @@ class LeaveController extends Controller
                                                             ->where('el.resort_id', $resort_id)
                                                             ->whereNull('flag');
 
-        if (!$isHR && !$isGM) {
-            $query->join('employees as e', 'e.id', '=', 'el.emp_id')->where('e.reporting_to', $reporting_to);
+        // Standard data scope (CLAUDE.md invariant #5): HR / GM / HR-department heads see the resort, everyone else
+        // their own department. It used to filter on the caller's OWN manager (e.reporting_to = their reporting_to),
+        // which counted colleagues' leave instead of their team's (mobile QA #6).
+        $deptIds                                        =   Common::getScopedDepartmentIds(Auth::guard('api')->user()?->GetEmployee);   // the app user, not the web guard
+        if ($deptIds !== null) {
+            $query->join('employees as e', 'e.id', '=', 'el.emp_id')->whereIn('e.Dept_id', $deptIds ?: [0]);
         }
 
         return [
@@ -2737,70 +2741,19 @@ class LeaveController extends Controller
         $isHOD                                          = ($available_rank === "HOD");
         $leaveRequest                                   =   collect();
 
-        if($emp_rank == 1 || $emp_rank == 3 || $emp_rank == 8) {
-
-            $leaveRequest                               =   DB::table('employees_leaves as el')
-                                                                ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
-                                                                ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
-                                                                ->join('employees as e', 'e.id', '=', 'el.emp_id')
-                                                                ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-                                                                ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
-                                                                ->where('el.status', 'Pending')
-                                                                ->where('el.resort_id', $resort_id)
-                                                                ->where('els.approver_rank', $emp_rank)
-                                                                ->where('els.status', 'Pending')
-                                                                ->select(
-                                                                    'el.id',
-                                                                    'el.emp_id',
-                                                                    'el.resort_id',
-                                                                    'el.leave_category_id',
-                                                                    'el.flag',
-                                                                    'el.total_days',
-                                                                    'el.from_date',
-                                                                    'el.to_date',
-                                                                    'el.status',
-                                                                    'el.reason',
-                                                                    'el.created_at',
-                                                                    'ra.first_name',
-                                                                    'ra.last_name',
-                                                                    'e.Admin_Parent_id as admin_parent_id',
-                                                                    'lc.leave_type as leave_category',
-                                                                    'rp.position_title as position',
-                                                                    'els.id as emp_l_s_id',
-                                                                    'els.approver_rank',
-                                                                    'els.approver_id',
-                                                                    'els.approved_at',
-                                                                    'els.status as approve_status',
-                                                                )
-                                                                ->orderBy('el.created_at', 'DESC')
-                                                                ->take(2)
-                                                                ->get();
-        }
-
-        if ($isHOD) {
-
-            $leaveRequest                               =   DB::table('employees_leaves as el')
+        // Leaves whose CURRENT approval step is this user's — the same set Approve/Reject accepts and the T&A
+        // dashboards list (Common::leavesAwaitingApprover). It used to pick stages by rank (any approver of that rank,
+        // or by reporting line for HODs) and stop at 2 rows, so the lists disagreed (mobile QA #6).
+        $awaiting                                       =   Common::leavesAwaitingApprover((int) $resort_id, (int) $emp_id);
+        $leaveRequest                                   =   DB::table('employees_leaves as el')
                                                             ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                                                             ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
                                                             ->join('employees as e', 'e.id', '=', 'el.emp_id')
                                                             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
                                                             ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
-                                                            ->where('el.status', 'Pending')
                                                             ->where('el.resort_id', $resort_id)
-                                                            ->where('e.reporting_to', $emp_id)
-                                                            // Unlike the HR/GM branch above, this had no
-                                                            // els.approver_rank/els.status filter at all — the
-                                                            // employees_leaves_status join is one-to-many (one
-                                                            // row per approval stage), so el.status='Pending'
-                                                            // could pick up ANY stage row, not necessarily the
-                                                            // one currently awaiting this HOD. That's why a
-                                                            // request whose overall status is still "Pending"
-                                                            // could display approve_status="Approved" (a stale,
-                                                            // already-passed stage) at the top level — the real
-                                                            // cause behind Approve/Reject appearing to vanish if
-                                                            // the app reads that field instead of can_approve/
-                                                            // can_reject below.
-                                                            ->where('els.approver_rank', $emp_rank)
+                                                            ->whereIn('el.id', array_keys($awaiting) ?: [0])
+                                                            ->where('els.approver_id', $emp_id)
                                                             ->where('els.status', 'Pending')
                                                             ->select(
                                                                 'el.id',
@@ -2816,10 +2769,6 @@ class LeaveController extends Controller
                                                                 'el.created_at',
                                                                 'ra.first_name',
                                                                 'ra.last_name',
-                                                                // Was never selected — the leave_request list
-                                                                // had no photo field at all (island_pass on the
-                                                                // same dashboard does, via Admin_Parent_id +
-                                                                // getResortUserPicture(); this had neither).
                                                                 'e.Admin_Parent_id as admin_parent_id',
                                                                 'lc.leave_type as leave_category',
                                                                 'rp.position_title as position',
@@ -2830,9 +2779,8 @@ class LeaveController extends Controller
                                                                 'els.status as approve_status',
                                                             )
                                                             ->orderBy('el.created_at', 'DESC')
-                                                            ->take(2)
+                                                            ->take(50)
                                                             ->get();
-        }
 
         // Group data by 'id'
         $finalData                                      =   $leaveRequest->groupBy('id')->map(function ($group) use ($emp_id) {
@@ -3172,7 +3120,7 @@ class LeaveController extends Controller
                 ->where('el.resort_id', $resort_id)
                 ->where('el.status', 'Approved')
                 ->whereDate('el.from_date', '<=', $endDate)
-                ->whereDate('el.to_date', '>=', $startDate);
+                ->whereDate('el.to_date', '>=', max($startDate, Carbon::today()->format('Y-m-d')));   // upcoming = not yet finished (mobile QA #8)
 
             $data =  $query->select(
                 'ra.id as emp_id',
@@ -3256,7 +3204,7 @@ class LeaveController extends Controller
                 ->whereIn('el.emp_id', $underEmp_id)
                 ->where('el.status', 'Approved')
                 ->whereDate('el.from_date', '<=', $endDate)
-                ->whereDate('el.to_date', '>=', $startDate);
+                ->whereDate('el.to_date', '>=', max($startDate, Carbon::today()->format('Y-m-d')));   // upcoming = not yet finished (mobile QA #8)
 
             // if ($isHOD) {
             //     $query->where('e.Dept_id', $dept_id);
@@ -4310,6 +4258,15 @@ class LeaveController extends Controller
             $lastStatus                                 =   EmployeeLeaveStatus::where('leave_request_id', $leaveId)
                                                                 ->where('status', 'Pending')
                                                                 ->first();
+
+            if (!$lastStatus) {
+                // A pending leave with no approval steps (created before its chain was built) can't be approved here.
+                return response()->json([
+                    'status'                            =>  false,
+                    'success'                           =>  false,
+                    'message'                           =>  'This leave request has no approval steps. Please ask HR to review it.',
+                ], 200);
+            }
 
             $rankConfig                                 =   config('settings.Position_Rank');
             $currentApproverRank                        =   array_key_exists($employee->rank, $rankConfig) ? $rankConfig[$employee->rank] : '';

@@ -226,16 +226,25 @@ class ProfileController extends Controller
       // PE-04 defence in depth: a name never needs <, >, or quote
       // characters — reject them here rather than relying only on every
       // rawColumn that later prints the name escaping it correctly.
-      'first_name'                                  => ['required', 'string', 'max:255', 'regex:/^[^<>"\']+$/'],
+      // Names: letters, spaces, dots, hyphens — so a phone number can't be saved as a name (mobile QA #13).
+      'first_name'                                  => ['required', 'string', 'max:255', Common::PERSON_NAME_RULE],
       // middle_name isn't collected by the mobile app's Personal Info
       // screen today — the approval flow (InfoUpdateController) already
       // supports it end-to-end (routes it to ResortAdmin, shows it in the
       // Request Approval diff) if it's ever present in the payload, so
       // accepting it here (once the app starts sending it) needs no
       // further backend change.
-      'middle_name'                                  => ['nullable', 'string', 'max:255', 'regex:/^[^<>"\']+$/'],
-      'last_name'                                   => ['required', 'string', 'max:255', 'regex:/^[^<>"\']+$/'],
-      'personal_phone'                              => 'required',
+      'middle_name'                                  => ['nullable', 'string', 'max:255', Common::PERSON_NAME_RULE],
+      'last_name'                                   => ['required', 'string', 'max:255', Common::PERSON_NAME_RULE],
+      'personal_phone'                              => ['required', function ($attr, $value, $fail) {
+        if (Common::normalizePhone($value) === null) {
+          $fail('Enter the phone number with its country code, e.g. +960 7654321.');
+        }
+      }],
+    ], [
+      'first_name.regex'  => 'A name can only contain letters, spaces, dots and hyphens.',
+      'middle_name.regex' => 'A name can only contain letters, spaces, dots and hyphens.',
+      'last_name.regex'   => 'A name can only contain letters, spaces, dots and hyphens.',
     ]);
 
     if ($validator->fails()) {
@@ -260,7 +269,7 @@ class ProfileController extends Controller
         'resort_id'                                   => $this->resort_id,
         'title'                                       => 'Personal Information',
         'employee_id'                                 =>  $this->user->GetEmployee->id,
-        'info_payload'                                => $request->only($personalInfoFields)
+        'info_payload'                                => ['personal_phone' => Common::normalizePhone($request->personal_phone)] + $request->only($personalInfoFields)
       ]);
 
       // Was fully commented out — HR never found out a mobile user had
@@ -348,23 +357,32 @@ class ProfileController extends Controller
 
   public function changePassword(Request $request)
   {
+    // `success` (like the other endpoints) plus `status` for app builds that still read it.
+    $reply = fn (bool $ok, string $message) => response()->json(['success' => $ok, 'status' => $ok, 'message' => $message]);
     try {
+      $employee = Auth::guard('api')->user();
+
+      // The current password first, under the same lockout as login: a stolen app token must not allow unlimited
+      // guesses at it (mobile QA #17). Locked accounts are refused before any password is checked.
+      if (Common::isAccountLocked($employee)) {
+        return $reply(false, 'Too many wrong passwords. Please try again in a few minutes.');
+      }
+      if (!$request->filled('old_password') || !Hash::check((string) $request->old_password, $employee->password)) {
+        Common::registerFailedLogin($employee);
+        return $reply(false, Common::isAccountLocked($employee)
+          ? 'Too many wrong passwords. Please try again in a few minutes.'
+          : 'Old password is incorrect');
+      }
+      Common::registerSuccessfulLogin($employee);
+
       if ($request->password == '') {
-        $response['status']   = false;
-        $response['message']  = 'Password is required';
-        return response()->json($response);
+        return $reply(false, 'Password is required');
       }
-
       if ($request->confirm_password == '') {
-        $response['status']   = false;
-        $response['message']  = 'Confirm password is required';
-        return response()->json($response);
+        return $reply(false, 'Confirm password is required');
       }
-
       if ($request->password != $request->confirm_password) {
-        $response['status']   = false;
-        $response['message']  = 'Confirm password does not match';
-        return response()->json($response);
+        return $reply(false, 'Confirm password does not match');
       }
 
       // Same policy as the web reset flows — this writes the same
@@ -373,17 +391,11 @@ class ProfileController extends Controller
         'password' => [PasswordRule::min(12)->mixedCase()->numbers()->uncompromised()],
       ]);
       if ($validator->fails()) {
-        return response()->json(['status' => false, 'message' => $validator->errors()->first('password')]);
-      }
-
-      $employee = Auth::guard('api')->user();
-
-      if (!$request->filled('old_password') || !Hash::check($request->old_password, $employee->password)) {
-        return response()->json(['status' => false, 'message' => 'Old password is incorrect']);
+        return $reply(false, $validator->errors()->first('password'));
       }
 
       if (\App\Models\ResortAdmin::isSharedDemoLogin($employee->email)) {
-        return response()->json(['status' => false, 'message' => 'Demo logins share one password, so it cannot be changed.']);
+        return $reply(false, 'Demo logins share one password, so it cannot be changed.');
       }
 
       $employee->password = Hash::make($request->password);
@@ -404,14 +416,10 @@ class ProfileController extends Controller
 
       Auth::guard('employee')->logout();
 
-      $response['status']   = true;
-      $response['message']  = 'Password updated';
-      return response()->json($response);
+      return $reply(true, 'Password updated');
     } catch (\Exception $e) {
-      $response['status']   = false;
-      $response['data']     = [];
-      $response['message']  = $e->getMessage();
-      return response()->json($response);
+      \Log::error('API changePassword failed: ' . $e->getMessage());
+      return $reply(false, 'Something went wrong. Please try again.');   // never the raw exception text
     }
   }
 
@@ -513,7 +521,7 @@ class ProfileController extends Controller
     }
 
     $validator = Validator::make($request->all(), [
-      'signature_image' => 'required|file|mimes:jpg,jpeg,png,gif,webp,heic,heif',
+      'signature_image' => 'required|file|mimes:jpg,jpeg,png,gif,webp,heic,heif|max:10240',
     ], [
       'signature_image.mimes' => 'The image must be a type of:jpg,jpeg,png,gif,webp,heic,heif',
     ]);
@@ -530,6 +538,9 @@ class ProfileController extends Controller
 
       $rawContents = file_get_contents($request->file('signature_image')->getRealPath());
       $processed = Common::removeSignatureBackground($rawContents);
+      if ($problem = Common::signatureImageProblem($processed)) {
+        return response()->json(['success' => false, 'message' => $problem], 422);
+      }
 
       $token = Str::random(40);
       $mainFolder = $resortAdmin->resort->resort_id;

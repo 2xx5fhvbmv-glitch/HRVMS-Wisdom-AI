@@ -65,6 +65,7 @@ class Kernel extends HttpKernel
             // bucket collectively. Named limiter below keys by the
             // authenticated employee instead (see RouteServiceProvider).
             'throttle:mobile-api',
+            \App\Http\Middleware\ApiResultKeys::class,   // every JSON answer carries both `success` and `status` (mobile QA #18)
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
     ];

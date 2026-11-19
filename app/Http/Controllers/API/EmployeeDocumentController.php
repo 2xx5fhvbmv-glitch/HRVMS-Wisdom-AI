@@ -41,43 +41,28 @@ class EmployeeDocumentController extends Controller
             $employee = $user->GetEmployee;
             $resortId = $user->resort_id;
 
-            $employeesDoc = new EmployeesDocument();
-            $employeesDoc->employee_id = $employee->id;
-            $employeesDoc->resort_id = $resortId;
-            $employeesDoc->document_title = $request->document_title;
-            $employeesDoc->document_category = $request->document_category;
-            $employeesDoc->save();
-
-            $getEmp_id = Employee::find($employeesDoc->employee_id);
-            // Handle Passport Upload
-            if ($request->hasFile('document_path')) {
-                $file           =   $request->file('document_path');
-                $fileName       =   $file->getClientOriginalName();
-                $fileSize       =   $file->getSize();
-                $formattedSize  =   $this->formatFileSize($fileSize);
-                $employeesDoc->document_file_size =   $formattedSize;
-                $SubFolder      =   "EmployeesDocument";
-                $status         =   Common::AWSEmployeeFileUpload($user->resort_id,$file, $getEmp_id->Emp_id,$SubFolder,true);
-
-                if ($status['status'] == false) {
-                    return response()->json([
-                        'success' => false, 
-                        'message' => 'File upload failed: ' . ($status['msg'] ?? 'Unknown error')
-                    ], 400);
-                } else {
-                    if($status['status'] == true && isset($status['Chil_file_id']) && !empty($status['Chil_file_id'])) {
-                        $filename = $file->getClientOriginalName();
-                        $filePath = ['Filename' => $filename, 'Child_id' => $status['Chil_file_id']];
-                    }
-                }
-
-                // Store the file-management reference (Child_id), not a raw path —
-                // getEmployeeDocument() resolves this to a signed URL via
-                // Common::GetAWSFile(), same pattern as IncidentController.
-                $employeesDoc->document_path = $filePath ? json_encode($filePath) : null;
+            // Upload first; the document row is created only once the file is stored (mobile QA #12: a failed upload
+            // used to leave a row with no file behind, shown in the app as a document that can't be opened).
+            $file   = $request->file('document_path');
+            $status = Common::AWSEmployeeFileUpload($user->resort_id, $file, $employee->Emp_id, 'EmployeesDocument', true);
+            if (empty($status['status']) || empty($status['Chil_file_id'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'File upload failed: ' . ($status['msg'] ?? 'the file could not be stored'),
+                ], 400);
             }
-            // Save updated file paths
-            $employeesDoc->save();
+
+            // Store the file-management reference (Child_id), not a raw path —
+            // getEmployeeDocument() resolves this to a signed URL via
+            // Common::GetAWSFile(), same pattern as IncidentController.
+            $employeesDoc = EmployeesDocument::create([
+                'employee_id'        => $employee->id,
+                'resort_id'          => $resortId,
+                'document_title'     => $request->document_title,
+                'document_category'  => $request->document_category,
+                'document_file_size' => $this->formatFileSize($file->getSize()),
+                'document_path'      => json_encode(['Filename' => $file->getClientOriginalName(), 'Child_id' => $status['Chil_file_id']]),
+            ]);
 
             if (!$employeesDoc) {
                 return response()->json(['success' => false, 'message' => 'File not uploaded'], 200);

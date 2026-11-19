@@ -1028,9 +1028,10 @@ class TimeAndAttendanceController extends Controller
                 ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                 ->leftJoin('leave_categories as lc', 'lc.id', '=', 'employees_leaves.leave_category_id')
                 ->where('t1.resort_id', $resort_id);
-            if ($underEmp_id !== null) {
-                $leaveReqQuery->whereIn('employees.id', $underEmp_id);
-            }
+            // Only leaves whose current approval step is this user's — the ones Approve/Reject will actually accept
+            // (it used to list every pending leave with can_accept/can_reject always true; mobile QA #6).
+            $awaiting                                        =   Common::leavesAwaitingApprover((int) $resort_id, (int) $emp_id);
+            $leaveReqQuery->whereIn('employees_leaves.id', array_keys($awaiting) ?: [0]);
             $leaveReqList                                    =   $leaveReqQuery->select(
                 'employees_leaves.id',
                 'employees_leaves.emp_id',
@@ -1041,7 +1042,7 @@ class TimeAndAttendanceController extends Controller
                 't1.id as admin_id',
                 'lc.leave_type'
             )->get();
-            $leave_requests                                  =   $leaveReqList->map(function ($row) {
+            $leave_requests                                  =   $leaveReqList->map(function ($row) use ($awaiting) {
                 $name   =   trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? ''));
                 $from   =   $row->from_date ? \Carbon\Carbon::parse($row->from_date)->format('d M Y') : '';
                 $to     =   $row->to_date ? \Carbon\Carbon::parse($row->to_date)->format('d M Y') : '';
@@ -1057,7 +1058,7 @@ class TimeAndAttendanceController extends Controller
                     'to_date'         => $row->to_date,
                     'leave_type'      => $row->leave_type ?? 'Leave',
                     'can_accept'      => true,
-                    'can_reject'      => true,
+                    'can_reject'      => (string) ($awaiting[$row->id] ?? '') !== '12',   // clinic stage approves, never rejects
                 ];
             })->values()->toArray();
 
@@ -1311,6 +1312,8 @@ class TimeAndAttendanceController extends Controller
                 ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                 ->leftJoin('leave_categories as lc', 'lc.id', '=', 'employees_leaves.leave_category_id')
                 ->where('t1.resort_id', $resort_id)
+                // Only leaves whose current approval step is this user's (mobile QA #6) — see the HOD dashboard.
+                ->whereIn('employees_leaves.id', array_keys($awaiting = Common::leavesAwaitingApprover((int) $resort_id, (int) $employee->id)) ?: [0])
                 ->select(
                     'employees_leaves.id',
                     'employees_leaves.emp_id',
@@ -1321,7 +1324,7 @@ class TimeAndAttendanceController extends Controller
                     't1.id as admin_id',
                     'lc.leave_type'
                 )->get();
-            $leave_requests                                 =   $leaveReqList->map(function ($row) {
+            $leave_requests                                 =   $leaveReqList->map(function ($row) use ($awaiting) {
                 $name   =   trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? ''));
                 $from   =   $row->from_date ? Carbon::parse($row->from_date)->format('d M Y') : '';
                 $to     =   $row->to_date ? Carbon::parse($row->to_date)->format('d M Y') : '';
@@ -1337,7 +1340,7 @@ class TimeAndAttendanceController extends Controller
                     'to_date'         => $row->to_date,
                     'leave_type'      => $row->leave_type ?? 'Leave',
                     'can_accept'      => true,
-                    'can_reject'      => true,
+                    'can_reject'      => (string) ($awaiting[$row->id] ?? '') !== '12',   // clinic stage approves, never rejects
                 ];
             })->values()->toArray();
 
