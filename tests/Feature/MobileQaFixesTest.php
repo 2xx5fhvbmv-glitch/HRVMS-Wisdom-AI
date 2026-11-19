@@ -132,6 +132,28 @@ class MobileQaFixesTest extends TestCase
         $this->assertSame(StorageHelper::get($old['signature_img']), StorageHelper::get($pending->employer_signature_path), 'pending: original copied');
     }
 
+    public function test_1_repair_falls_back_to_the_resorts_hr_director_when_the_record_has_no_signatory()
+    {
+        $director = Common::resolveHrDirector($this->resortId)['employee'];
+        $this->assertNotNull($director);
+        $this->giveSignature($director, $this->penSignature());
+        $employee = $this->emp('employee');
+        $this->giveSignature($employee, $this->png(fn ($im) => imagefill($im, 0, 0, imagecolorallocate($im, 10, 10, 10)), 40, 40));
+
+        // prod JD #4/#5: signed, shared file, and no signatory id on the record
+        $signed = $this->jdRecord($employee, $director, ['status' => 'Signed', 'signed_at' => now()]);
+        $shared = Common::snapshotSignature($employee->Admin_Parent_id, 'job_description', $signed->id);
+        $signed->update(['employer_signature_path' => $shared['signature_img'], 'employee_signature_path' => $shared['signature_img'],
+            'employer_signatory_employee_id' => null, 'employer_signatory_name' => 'Someone Else']);
+
+        $this->artisan('job-description:repair-signatures')->assertSuccessful();
+
+        $signed->refresh();
+        $this->assertStringContainsString('/approvals/job_description_employer/', $signed->employer_signature_path);
+        $this->assertSame($director->id, (int) $signed->employer_signatory_employee_id);
+        $this->assertNotSame('Someone Else', $signed->employer_signatory_name);
+    }
+
     public function test_5_a_photo_is_not_accepted_as_a_signature()
     {
         $grass = $this->png(function ($im) {

@@ -45,11 +45,19 @@ class RepairJobDescriptionSignatures extends Command
             try {
                 if ($r->status === 'Signed' || $shared) {
                     // Original employer signature was overwritten: re-snapshot the signatory director's signature.
-                    $director = Employee::find($r->employer_signatory_employee_id);
-                    if (!$director || !$director->Admin_Parent_id) {
-                        throw new \RuntimeException('signatory director not found');
+                    $director = $r->employer_signatory_employee_id ? Employee::find($r->employer_signatory_employee_id) : null;
+                    $fallback = !$director || !$director->Admin_Parent_id;
+                    if ($fallback) {
+                        // Older records have no (or a since-removed) signatory: use the resort's current HR Director,
+                        // the same person the issue step picks today, and put their details on the record too so the
+                        // PDF never shows one person's name over another's signature.
+                        $director = Common::resolveHrDirector($r->resort_id)['employee'] ?? null;
+                        if (!$director || !$director->Admin_Parent_id) {
+                            throw new \RuntimeException('no signatory on the record and no HR Director configured for the resort');
+                        }
                     }
-                    $this->line(($dry ? '[dry-run] ' : '') . "{$label}: new employer signature from the signatory director, rebuild PDF");
+                    $this->line(($dry ? '[dry-run] ' : '') . "{$label}: new employer signature from "
+                        . ($fallback ? "the resort's HR Director (employee #{$director->id}), signatory details updated" : 'the signatory director') . ', rebuild PDF');
                     if ($dry) {
                         continue;
                     }
@@ -58,6 +66,13 @@ class RepairJobDescriptionSignatures extends Command
                         throw new \RuntimeException('director has no usable signature');
                     }
                     $r->employer_signature_path = $sig['signature_img'];
+                    if ($fallback) {
+                        $admin = $director->resortAdmin;
+                        $r->employer_signatory_employee_id     = $director->id;
+                        $r->employer_signatory_name            = trim(collect([optional($admin)->first_name, optional($admin)->middle_name, optional($admin)->last_name])->filter()->implode(' ')) ?: $director->Emp_id;
+                        $r->employer_signatory_designation     = optional($director->position)->position_title;
+                        $r->employer_signatory_id_card_number  = $director->nid ?: $director->passport_number;
+                    }
                     $r->save();
                     Common::generateAndStoreJobDescriptionPdf($r);
                 } else {
