@@ -136,7 +136,7 @@ class PreviousWeekAttendanceSeeder extends Seeder
                     // Small jitter around Male', Maldives so points aren't identical.
                     $lat = 4.1730 + mt_rand(-50, 50) / 10000;
                     $lng = 73.5120 + mt_rand(-50, 50) / 10000;
-                    $mapUrl = fn($la, $lo) => "https://www.google.com/maps/embed/v1/view?key=AIzaSyB-hYfoNr_5ih_LIrP0kfmfZVNhfdCMNuY&center={$la},{$lo}&zoom=12";
+                    $mapUrl = fn($la, $lo) => "https://www.google.com/maps/embed/v1/view?key=" . config('services.google_maps.key') . "&center={$la},{$lo}&zoom=12";
 
                     DB::table('child_attendaces')->insert([
                         'Parent_attd_id'   => $parentId,

@@ -500,6 +500,17 @@ class AccommodationController extends Controller
                                                                     ->groupBy('t2.id')
                                                                     ->first(['available_accommodation_models.id as AvailableAccommodation_ID', 'available_accommodation_models.CleaningSchedule', 't8.AccommodationName', 't7.Floor', 't7.Room', 't5.BuildingName as BName', 't6.name as DepartmentName', 't4.position_title', 't2.id as employee_id', 't2.Emp_id', 't3.id as Parentid', 't3.first_name', 't3.last_name', 'available_accommodation_models.*', 't1.effected_date']);
 
+            if (!$employeData) {
+                return response()->json(['success' => false, 'message' => 'No accommodation found for this employee.'], 404);
+            }
+            // HR/GM and Housekeeping HOD/XCOM see every employee's room; any other HOD/EXCOM only their own
+            // department's (CLAUDE.md invariant #5) — was resort-wide for every HOD.
+            $me = $this->user->GetEmployee;
+            $scoped = Common::isHousekeepingHodXcom($me) ? null : Common::getScopedDepartmentIds($me);
+            if ($scoped !== null && !in_array((int) Employee::where('id', $employeData->employee_id)->value('Dept_id'), array_map('intval', $scoped), true)) {
+                return response()->json(['success' => false, 'message' => 'You can only view employees of your own department.'], 403);
+            }
+
             $AssingAccommodation                            =   AssingAccommodation::where("available_a_id", $employeData->AvailableAccommodation_ID)
                                                                 ->where("t2.id", "!=", $employeData->employee_id)
                                                                 ->join('employees as t2', 't2.id', '=', 'assing_accommodations.emp_id')

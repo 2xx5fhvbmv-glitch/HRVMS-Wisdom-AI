@@ -374,7 +374,7 @@ class FileManagementController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|max:20480',
+            'file' => 'required|file|max:20480|mimes:' . implode(',', Common::UPLOAD_EXTENSIONS),
         ]);
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);

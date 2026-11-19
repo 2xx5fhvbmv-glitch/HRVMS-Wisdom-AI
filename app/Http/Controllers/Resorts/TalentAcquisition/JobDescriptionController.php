@@ -262,7 +262,7 @@ class JobDescriptionController extends Controller
                 'Department_id'=> $request->Department_id,
                 'Position_id'=> $request->Position_id,
                 'Section_id '=> $request->Section_id,
-                'jobdescription'=> $request->jobdescription,
+                'jobdescription'=> \Mews\Purifier\Facades\Purifier::clean((string) $request->jobdescription, 'richtext'),   // rendered raw in the PDF/HTML views
                 "compliance"=>"Rejected",
                 "slug"=> $slug
             ]);
@@ -610,7 +610,7 @@ class JobDescriptionController extends Controller
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'Job description not found.'], 404);
             }
-            $j->jobdescription = $request->jobdescription;
+            $j->jobdescription = \Mews\Purifier\Facades\Purifier::clean((string) $request->jobdescription, 'richtext');   // rendered raw in the PDF/HTML views
             $j->save();
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Suceessfully Updated Job description  .'],200);
@@ -663,7 +663,7 @@ class JobDescriptionController extends Controller
 
     public function download($slug)
     {
-        $j = JobDescription::where("slug",$slug)->first();
+        $j = JobDescription::where('Resort_id', $this->resort->resort_id)->where("slug",$slug)->firstOrFail();   // was any resort's JD by slug
         $sitesettings = ResortSiteSettings::where('resort_id', $this->resort->resort_id)->first(['resort_id','header_img','footer_img','Footer']);
         $ResortData = Resort::find($this->resort->resort_id);
 

@@ -601,7 +601,7 @@
                             </div>
                             <div class="row g-4">
                                 <div class="col-12 terms-content" style="max-height: 400px; overflow-y: auto; padding: 15px; border: 1px solid #dee2e6; border-radius: 5px; background: #f8f9fa;">
-                                    {!! $termsAndCondition->terms_and_condition !!}
+                                    {!! \Mews\Purifier\Facades\Purifier::clean((string) $termsAndCondition->terms_and_condition, 'richtext') !!}
                                 </div>
                                 <div class="col-md-12">
                                     <div class="form-check ">

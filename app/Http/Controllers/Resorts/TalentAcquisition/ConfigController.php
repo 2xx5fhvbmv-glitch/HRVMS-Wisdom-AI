@@ -834,7 +834,7 @@ class ConfigController extends Controller
             // Retrieve or create the TermsAndCondition record for the logged-in resort admin
             $termsAndCondition = TermsAndCondition::updateOrCreate(
                 ['Resort_id' => Auth::guard('resort-admin')->user()->resort_id], // Find by Resort_id
-                ['terms_and_condition' => $request->input('terms_and_condition')] // Update or create this field
+                ['terms_and_condition' => \Mews\Purifier\Facades\Purifier::clean((string) $request->input('terms_and_condition'), 'richtext')] // shown raw on the public applicant form
             );
 
             return response()->json([

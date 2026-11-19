@@ -600,12 +600,19 @@ class AdvanceSalaryController extends Controller
   
         $isHR = ($available_rank === "HR"); 
 
+        // Nobody approves their own advance/loan at any stage (HR, Finance or GM).
+        if ($payrollAdvance && (int) $payrollAdvance->employee_id === (int) ($this->resort->GetEmployee->id ?? 0)) {
+            return response()->json(['success' => false, 'status' => 'error', 'message' => 'You cannot approve or reject your own request.'], 403);
+        }
+
         if($payrollAdvance){
             $employeeName = $payrollAdvance->employee->resortAdmin->full_name ?? 'the employee';
+            // Every guarantor counts — `->guarantor` is only the most recently updated one.
+            $guarantorStatuses = $payrollAdvance->guarantors()->pluck('status');
 
             if($request->action_by == 'hr' && $payrollAdvance->hr_status == 'Pending'){
 
-                if($payrollAdvance->guarantor->status == 'Pending'){
+                if($guarantorStatuses->contains('Pending')){
                     return response()->json([
                     'success' => false,
                     'status' => 'error',
@@ -638,7 +645,7 @@ class AdvanceSalaryController extends Controller
                 }
 
                 if($request->status == 'Approved' ){
-                    if($payrollAdvance->guarantor->status != 'Approved'){
+                    if($guarantorStatuses->contains(fn ($st) => $st !== 'Approved')){
                             return response()->json([
                                 'success' => false,
                                 'status' => 'error',

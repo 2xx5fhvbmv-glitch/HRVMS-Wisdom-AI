@@ -60,13 +60,13 @@ class SitesettignsController extends Controller
         $currency = $request->currency;
 
         $validator = Validator::make($request->all(), [
-            'profile_picture' => 'mimes:jpeg,png,jpg,gif,svg,webp,heic,heif',
+            'profile_picture' => 'mimes:jpeg,png,jpg,gif,webp,heic,heif',
             // 'MVRtoDoller' => 'required|numeric|string|min:2|max:7', // Ensures MVRtoDoller is numeric and has 2 to 7 characters
             // 'DollertoMVR' => 'required|numeric|string|min:2|max:7', // Ensures DollertoMVR is numeric and has 2 to 7 characters
-            'footer_img' => 'mimes:jpeg,png,jpg,gif,svg,webp,heic,heif',
+            'footer_img' => 'mimes:jpeg,png,jpg,gif,webp,heic,heif',
             'currency' => 'required',
         ], [
-            'profile_picture.mimes' => 'The profile picture must be a file of type: jpeg, png, jpg, gif, svg, webp, heic, heif.',
+            'profile_picture.mimes' => 'The profile picture must be a file of type: jpeg, png, jpg, gif, webp, heic, heif.',
             'MVRtoDoller.numeric' => 'The MVR to Dollar conversion must be a numeric value.',
             // 'MVRtoDoller.min' => 'The MVR to Dollar conversion must be at least :min characters.',
             // 'MVRtoDoller.max' => 'The MVR to Dollar conversion may not be greater than :max characters.',
@@ -106,7 +106,7 @@ class SitesettignsController extends Controller
                                         // "MVR_img"=>'maldives-currency-icon.svg',
                                         "Doller_img"=>'doller-currency-icon.svg',
                                         "MVR_img"=>'maldives-currency-icon-new.svg',
-                                        'Footer'=>$request->footer,
+                                        'Footer'=>\Mews\Purifier\Facades\Purifier::clean((string) $request->footer, 'richtext'),   // rendered raw in PDFs
                                         "FinalApproval"=>$request->FinalApproval
 
                         ];
@@ -293,7 +293,8 @@ class SitesettignsController extends Controller
     {
         try
         {
-            $r = ResortNotification::find($request->id);
+            // was any resort's notification by id
+            $r = ResortNotification::where('resort_id', Auth::guard('resort-admin')->user()->resort_id)->findOrFail($request->id);
             $r->status = 'read';
             $r->save();
             $response['success'] = true;

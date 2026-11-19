@@ -212,7 +212,7 @@
         {{-- Sections 3-7: the resort's own job-title/duties/place/hours content.
              Plain flowing div (not a table cell) so dompdf can split it across pages. --}}
         <div class="jd-body">
-            {!! $j->jobdescription !!}
+            {!! \Mews\Purifier\Facades\Purifier::clean((string) $j->jobdescription, 'richtext') !!}
         </div>
 
         @php
@@ -262,7 +262,7 @@
 
         <table style="width:100%;border-spacing:0;font-family:'Poppins',sans-serif;">
             <tr>
-                <td style="background-color:    #014653;color: #fff;font-size: 14px;font-weight: 400; line-height: 21px;padding:10px 15px 10px 15px ;"> {!!$sitesettings->Footer ?? ''!!}</td>
+                <td style="background-color:    #014653;color: #fff;font-size: 14px;font-weight: 400; line-height: 21px;padding:10px 15px 10px 15px ;"> {!! \Mews\Purifier\Facades\Purifier::clean((string) ($sitesettings->Footer ?? ''), 'richtext') !!}</td>
             </tr>
         </table>
     </div>

@@ -3144,7 +3144,10 @@ class ConfigurationController extends Controller
     {
         $id = base64_decode($request->id);
 
-        $d = GrievanceTempleteModel::find($id);
+        $d = GrievanceTempleteModel::where('resort_id', $this->resort->resort_id)->find($id);   // was any resort's template by id
+        if (!$d) {
+            return response()->json(['success' => false, 'message' => 'Template not found.'], 404);
+        }
 
         $form_structure = json_decode($d->Grievance_Temp_Structure, true);
         $data=[$form_structure,$d->Grievance_Temp_name,$d->Grievance_Cat_id,$d->id];

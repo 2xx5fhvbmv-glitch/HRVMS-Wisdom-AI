@@ -21,7 +21,7 @@ class AdminSecurity
     public const IDLE_SECONDS = 900;   // also ends an impersonated resort session (EnsureAccountActive)
 
     /** Reachable before MFA enrolment: enrolment itself, logout, and the must_change_password flow (ForcePasswordChange runs first). */
-    private const ALLOWED_BEFORE_MFA = ['admin.2fa.setup', 'admin.2fa.confirm', 'admin.logout', 'admin.profile', 'admin.changePassword', 'admin.checkPassword'];
+    private const ALLOWED_BEFORE_MFA = ['admin.2fa.setup', 'admin.2fa.confirm', 'admin.logout', 'admin.profile', 'admin.changePassword'];
 
     /** GET routes that change state (legacy): block/active/massremove... by URI, plus these names. Audited like POST/DELETE. */
     private const STATE_CHANGING_GET_URI = '#(^|/)(massremove|mass-remove|block|active|inactive|restore|destroy|delete)(/|$)#';

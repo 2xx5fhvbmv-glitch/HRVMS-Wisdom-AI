@@ -148,6 +148,7 @@ class Logincontroller extends Controller
             // Generate a new token
             $tokenResult                            =   $resortAdmin->createToken('ResortAdminToken');
             $token                                  =   $tokenResult->accessToken;
+            Common::alertNewLoginLocation($resortAdmin, 'mobile', (string) $request->emp_id, $request);
             Common::logLoginAttempt('mobile', $request->emp_id, true, $request);
             Common::registerSuccessfulLogin($resortAdmin);
 

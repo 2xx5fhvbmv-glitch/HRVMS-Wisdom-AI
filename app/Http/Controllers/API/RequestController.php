@@ -141,8 +141,9 @@ class RequestController extends Controller
         $validator = Validator::make($request->all(), [
             'request_type'                              =>  'required',
             'guarantor_id'                              =>  'required_if:request_type,Salary Advance,Loan Request|array',
-            'guarantor_id.*'                            =>  ['integer', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
-            'request_amount'                            =>  'required_if:request_type,Salary Advance,Loan Request',
+            // never yourself as your own guarantor
+            'guarantor_id.*'                            =>  ['integer', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $this->resort_id), \Illuminate\Validation\Rule::notIn([optional($this->user->GetEmployee)->id])],
+            'request_amount'                            =>  'required_if:request_type,Salary Advance,Loan Request|nullable|numeric|min:1',
             'currency'                                  =>  'nullable|in:MVR,USD',
             'priority'                                  =>  'required',
             'request_date'                              =>  'required',
@@ -154,7 +155,7 @@ class RequestController extends Controller
             // those get a clean, actionable error instead of accidentally
             // being allowed through unbounded. Matches the 20MB precedent
             // already used for general file uploads (FileManagementController).
-            'Attachments.*'                             =>  'file|max:20480',
+            'Attachments.*'                             =>  'file|max:20480|mimes:' . implode(',', Common::UPLOAD_EXTENSIONS),
         ]);
 
         if ($validator->fails()) {
@@ -522,8 +523,13 @@ class RequestController extends Controller
                                                                 ->where('payroll_advance_id', $request->payroll_advance_id)
                                                                 ->where('guarantor_id', $this->user->GetEmployee->id)
                                                                 ->first();
-            if (!$guarantorRequests) {
+            if (!$guarantorRequests || !$PayrollAdvance) {
                 return response()->json(['success' => false, 'message' => 'No requests found'], 200);
+            }
+            // A guarantor answers once, and only before HR has decided.
+            if ($guarantorRequests->status !== 'Pending' || !in_array($PayrollAdvance->hr_status, ['Pending', 'Hold'], true)) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'This guarantor request has already been answered.'], 422);
             }
 
             $guarantorRequests->status                =   $request->status;

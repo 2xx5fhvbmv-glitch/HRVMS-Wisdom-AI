@@ -3723,6 +3723,12 @@ class TimeAndAttendanceController extends Controller
 
             $parentAttendance                               =   ParentAttendace::where('resort_id', $resort_id)->whereNotNull('OverTime')->whereNotNull('CheckingTime')->whereNotNull('CheckingOutTime')->where('id', $attendaceId)->where('Status', 'present')->first();
 
+            // A decision is final: an Approved OT could be flipped to Rejected (or back), re-notifying each time.
+            if ($parentAttendance && in_array($parentAttendance->OTStatus, ['Approved', 'Rejected'], true)) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'This overtime has already been ' . strtolower($parentAttendance->OTStatus) . '.'], 422);
+            }
+
             // A-01: zero role check previously — any authenticated employee
             // could approve/reject any other employee's overtime, including
             // their own. HR/GM or the employee's own HOD/EXCOM only.

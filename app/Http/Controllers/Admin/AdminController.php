@@ -259,8 +259,25 @@ class AdminController extends Controller
       // logged-in admin change any other admin's password. Always use
       // the authenticated session's own id.
       $admin = Admin::where( 'id', Auth::guard('admin')->id() )->first();
+      // Wrong old passwords count toward the shared lockout; locked = refused even with the right one.
+      if (Common::isAccountLocked($admin)) {
+        return response()->json(['success' => false, 'msg' => 'Too many wrong passwords. Please try again in a few minutes.']);
+      }
       if (!$request->filled('old_pass') || !\Hash::check($request->old_pass, $admin->password)) {
+        Common::registerFailedLogin($admin);
         return response()->json(['success' => false, 'msg' => 'Old password is incorrect.']);
+      }
+      Common::registerSuccessfulLogin($admin);
+      // Same policy as the admin reset flow — a missing field used to hash an empty password.
+      $check = \Validator::make($request->all(), [
+        'password' => ['required', 'different:old_pass', \Illuminate\Validation\Rules\Password::min(12)->mixedCase()->numbers()->uncompromised()],
+        'password_confirm' => ['required', 'same:password'],
+      ], [
+        'password.different' => 'New password must be different from the old password.',
+        'password_confirm.same' => 'Confirm password must match the new password.',
+      ]);
+      if ($check->fails()) {
+        return response()->json(['success' => false, 'msg' => $check->errors()->first()]);
       }
       $admin->password = bcrypt($request->password);
       $admin->must_change_password = false;
@@ -366,19 +383,6 @@ class AdminController extends Controller
       $response['success'] = false;
       $response['msg'] = $e->getMessage();
       return response()->json($response);
-    }
-  }
-
-  public function checkPassword(Request $request)
-  {
-    try {
-      $admin = Auth::guard('admin')->user();
-
-      return Hash::check( $request->old_pass, $admin->password ) ? 'true' : 'false';
-    } catch( \Exception $e ) {
-      \Log::emergency( "File: ".$e->getFile() );
-      \Log::emergency( "Line: ".$e->getLine() );
-      \Log::emergency( "Message: ".$e->getMessage() );
     }
   }
 

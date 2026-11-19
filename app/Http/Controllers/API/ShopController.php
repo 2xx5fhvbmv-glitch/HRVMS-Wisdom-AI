@@ -220,6 +220,14 @@ class ShopController extends Controller
                     'message'                               =>  'Consent request not found.'
                 ], 200);
             }
+            // Only a purchase still waiting for consent can be answered — rejecting a Consented / Partial Paid / Paid
+            // one dropped it out of the payroll deduction (same rule as the web PaymentConsentController).
+            if ($pendingConsentview->status !== 'Pending Consent') {
+                return response()->json([
+                    'success'                               =>  false,
+                    'message'                               =>  "This purchase is {$pendingConsentview->status}; it can't be changed."
+                ], 422);
+            }
 
             if ($request->status == 'Approved') {
                 $request->status = 'Consented';

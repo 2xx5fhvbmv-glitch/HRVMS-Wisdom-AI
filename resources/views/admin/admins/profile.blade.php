@@ -112,7 +112,7 @@
 											<label for="first_name" class="col-xl-2 col-md-3 col-sm-4 col-form-label pr-0">Old Password <span class="red-mark">*</span></label>
 											<div class="col-xl-10 col-md-9 col-sm-8">
 												<div class="d-flex align-items-center">
-													<input type="text" class="form-control" id="old_pass" name="old_pass" placeholder="Old password">
+													<input type="password" class="form-control" id="old_pass" name="old_pass" placeholder="Old password">
 													<div class="input-group-append">
 														<button class="btn btn-outline-secondary" type="button" id="toggleOldPassword">
 															<i class="fa fa-eye-slash" aria-hidden="true"></i>
@@ -336,44 +336,31 @@
 			rules: {
 				'old_pass': {
 					required: true,
-					minlength: 8,
-					remote: {
-						url: '{{ route("admin.checkPassword") }}',
-						type: "post",
-						data: {
-							old_pass: function() {
-								return $('#old_pass').val();
-							},
-							id: function() {
-								return $('#admin_id').val();
-							}
-						}
-					}
+					minlength: 8
 				},
 				'password': {
 					required: true,
-					minlength: 8
+					minlength: 12
 				},
 				'password_confirm': {
 					required: true,
 					equalTo: "#password",
-					minlength: 8
+					minlength: 12
 				}
 			},
 			messages: {
 				'old_pass': {
 					required: "This field is required",
-					minlength: "Your password must be at least 8 characters long",
-					remote: "Incorrect password"
+					minlength: "Your password must be at least 8 characters long"
 				},
 				'password': {
 					required: "This field is required",
-					minlength: "Your password must be at least 8 characters long"
+					minlength: "Your password must be at least 12 characters long"
 				},
 				'password_confirm': {
 					required: "This field is required",
 					equalTo: "The password field is not matching",
-					minlength: "Your password must be at least 8 characters long"
+					minlength: "Your password must be at least 12 characters long"
 				}
 			},
 			errorPlacement: function(error, element) {

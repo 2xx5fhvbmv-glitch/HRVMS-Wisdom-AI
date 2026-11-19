@@ -20,6 +20,8 @@ class SecurityHeaders
      */
     private const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https:; frame-ancestors 'none'";
 
+    private const ENFORCED_CSP = "object-src 'none'; base-uri 'self'; frame-ancestors 'none'";
+
     public function handle(Request $request, Closure $next)
     {
         $response = $next($request);
@@ -28,6 +30,9 @@ class SecurityHeaders
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Content-Security-Policy-Report-Only', self::CSP);
+        // Enforced now: the parts no page relies on (no <object>/<embed>/<base> anywhere in the views). Script/style
+        // sources stay report-only until inline scripts are moved out — enforcing those today would break pages.
+        $response->headers->set('Content-Security-Policy', self::ENFORCED_CSP);
 
         if ($request->secure()) {
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');

@@ -134,4 +134,9 @@ return [
         'resort_monthly_budget' => env('WISDOM_RESORT_MONTHLY_BUDGET'),
         'budget_alert_email'    => env('WISDOM_BUDGET_ALERT_EMAIL'),
     ],
+    // Browser-side Maps JS key (public by design — restrict it to the app's domains in Google Cloud).
+    'google_maps' => [
+        'key' => env('GOOGLE_MAPS_API_KEY'),
+    ],
+
 ];

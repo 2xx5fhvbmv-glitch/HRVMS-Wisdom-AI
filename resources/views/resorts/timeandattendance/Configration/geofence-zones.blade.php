@@ -203,7 +203,7 @@
 @endsection
 
 @section('import-scripts')
-<script src="https://maps.googleapis.com/maps/api/js?key={{ env('GOOGLE_MAPS_API_KEY') }}&libraries=drawing"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.key') }}&libraries=drawing"></script>
 <script type="text/javascript">
 $(document).ready(function() {
 

@@ -5415,6 +5415,40 @@ class Common
         }
     }
 
+    /**
+     * Email HR / GM / EXCOM accounts when they log in from an IP not seen on a successful login in the last 90 days
+     * (the super-admin console already alerts this way). Call BEFORE logging the successful attempt. A very first
+     * login sends nothing. Never throws — an alert must not break the login.
+     */
+    public static function alertNewLoginLocation(ResortAdmin $admin, string $portal, string $identifier, $request): void
+    {
+        try {
+            $employee = \App\Models\Employee::where('Admin_Parent_id', $admin->id)->first();
+            if (!$employee) return;
+            $rank = strtoupper((string) (config('settings.Position_Rank')[$employee->rank ?? ''] ?? ''));
+            if (!self::isHR($employee) && !in_array($rank, ['GM', 'EXCOM'], true)) return;
+
+            $previous = \DB::table('login_attempts')->where('portal', $portal)->where('identifier', $identifier)
+                ->where('successful', true)->where('created_at', '>=', now()->subDays(90))->pluck('ip_address');
+            if ($previous->isEmpty() || $previous->contains($request->ip())) return;
+
+            $name = trim($admin->first_name . ' ' . $admin->last_name) ?: $admin->email;
+            self::applyResortSmtpConfig($admin->resort_id);
+            Mail::to($admin->email)->send(new \App\Mail\IncidentNotificationMail(
+                $name,
+                'New sign-in to your account',
+                'Your account was just signed in to ' . ($portal === 'mobile' ? 'from the mobile app' : 'on the web portal')
+                    . ' from a new location (IP ' . $request->ip() . ') at ' . now()->format('d M Y H:i') . '. If this wasn\'t you, change your password now and contact HR.',
+                [],
+                null,
+                null,
+                $admin->resort_id
+            ));
+        } catch (\Throwable $e) {
+            \Log::warning('New-login alert failed for admin ' . $admin->id . ': ' . $e->getMessage());
+        }
+    }
+
     /** S8 — account lockout after repeated failed logins. */
     const LOGIN_LOCKOUT_THRESHOLD = 5;
     const LOGIN_LOCKOUT_MINUTES = 15;
@@ -12937,6 +12971,10 @@ class Common
     }
 
     /** Validation rule for a person's name: letters (any language), spaces, dots and hyphens — no digits, quotes or <>. */
+    /** File types any employee may upload as a document/attachment: no HTML, SVG, scripts or executables. */
+    public const UPLOAD_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'ppt', 'pptx', 'txt', 'rtf', 'odt', 'ods',
+        'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'bmp', 'tif', 'tiff', 'mp4', 'mov', 'mp3', 'm4a', 'zip'];
+
     public const PERSON_NAME_RULE = 'regex:/^[\pL\pM][\pL\pM\s.\-]*$/u';
 
     /**

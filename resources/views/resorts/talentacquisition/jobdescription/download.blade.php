@@ -109,13 +109,13 @@
             <tr>
                 <td style="background-color: hsla(190, 98%, 16%, 0.05);padding:15px;">
                     <div class="">
-                        {!! $j->jobdescription !!}
+                        {!! \Mews\Purifier\Facades\Purifier::clean((string) $j->jobdescription, 'richtext') !!}
                     </div>
 
                 </td>
             </tr>
             <tr>
-                <td style="background-color:    #014653;color: #fff;font-size: 14px;font-weight: 400; line-height: 21px;padding:10px 15px 10px 15px ;"> {!!$sitesettings->Footer ?? ''!!}</td>
+                <td style="background-color:    #014653;color: #fff;font-size: 14px;font-weight: 400; line-height: 21px;padding:10px 15px 10px 15px ;"> {!! \Mews\Purifier\Facades\Purifier::clean((string) ($sitesettings->Footer ?? ''), 'richtext') !!}</td>
             </tr>
         </table>
     </div>

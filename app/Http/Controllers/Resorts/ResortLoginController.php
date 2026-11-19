@@ -139,6 +139,7 @@ class ResortLoginController extends Controller
 
             // 6. Successful login
             Auth::guard('resort-admin')->login($resort_admin, $request->remember);
+            Common::alertNewLoginLocation($resort_admin, 'resort', (string) $request->email, $request);
             Common::logLoginAttempt('resort', $request->email, true, $request);
             Common::registerSuccessfulLogin($resort_admin);
 
@@ -301,7 +302,8 @@ class ResortLoginController extends Controller
             $resortAdmin->first_name = $request->first_name;
             $resortAdmin->middle_name = $request->middle_name;
             $resortAdmin->last_name = $request->last_name;
-            $resortAdmin->email = $request->email;
+            // Login email is not self-editable (the field is readonly on the form). Accepting it let a stolen
+            // session switch the email and take the account over via "forgot password".
             $resortAdmin->personal_phone = $request->personal_phone;
             $resortAdmin->address_line_1 = $request->address_line_1;
             $resortAdmin->address_line_2 = $request->address_line_2;
@@ -339,8 +341,8 @@ class ResortLoginController extends Controller
             // the spec requires, and would need re-running through that
             // flow anyway.
 
+            // (a DB::commit() here had no matching beginTransaction — it committed whatever transaction the caller had open)
             $saveResortAdmin = $resortAdmin->save();
-            DB::commit();
             $response['success'] = true;
             $response['html']= '' ;
             $response['msg'] = __('Profile Updated successfully');
@@ -612,13 +614,19 @@ class ResortLoginController extends Controller
             ], 422);
         }
 
-        // Check if old password matches
+        // Wrong current passwords count toward the same lockout as login (the mobile endpoint already does this),
+        // so a stolen session can't guess the password here without limit.
+        if (Common::isAccountLocked($user)) {
+            return response()->json(['success' => false, 'msg' => 'Too many wrong passwords. Please try again in a few minutes.']);
+        }
         if (!Hash::check($request->old_password, $user->password)) {
+            Common::registerFailedLogin($user);
             return response()->json([
                 'success' => false,
                 'msg' => 'Old password is incorrect.'
             ]);
         }
+        Common::registerSuccessfulLogin($user);
 
         if (\App\Models\ResortAdmin::isSharedDemoLogin($user->email)) {
             return response()->json(['success' => false, 'msg' => 'Demo logins share one password, so it cannot be changed.']);

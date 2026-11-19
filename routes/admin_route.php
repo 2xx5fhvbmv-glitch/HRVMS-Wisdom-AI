@@ -72,8 +72,7 @@ Route::prefix(config('settings.route_prefix.admin'))->namespace('Admin')->group(
         /** Admin profile **/
         Route::get('/profile/edit', 'AdminController@profile')->name('admin.profile');
         Route::post('/profile/update', 'AdminController@profileUpdate')->name('admin.updateProfile');
-        Route::post('/change-password', 'AdminController@changePassword')->name('admin.changePassword');
-        Route::post('/check-password', 'AdminController@checkPassword')->middleware('throttle:admin-login')->name('admin.checkPassword');
+        Route::post('/change-password', 'AdminController@changePassword')->name('admin.changePassword');   // no admin.reauth: a new admin must change it before MFA exists; old password + lockout guard it
 
         /**Role Module **/
         Route::get('/roles', 'RolePermissionController@index')->name('admin.role.index');

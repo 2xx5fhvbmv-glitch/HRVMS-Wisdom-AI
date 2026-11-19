@@ -36,7 +36,7 @@
         ])
     </div>
     @if(!empty($sitesettings->Footer))
-        <div class="bgst-footer">{!! $sitesettings->Footer !!}</div>
+        <div class="bgst-footer">{!! \Mews\Purifier\Facades\Purifier::clean((string) ($sitesettings->Footer ?? ''), 'richtext') !!}</div>
     @endif
 </div>
 <script>

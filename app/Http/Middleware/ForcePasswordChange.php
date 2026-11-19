@@ -14,7 +14,7 @@ class ForcePasswordChange
 {
     private const ALLOWED = [
         'resort' => ['resort.logout', 'resort.user.profile', 'resort.profile.changePassword'],
-        'admin' => ['admin.logout', 'admin.profile', 'admin.changePassword', 'admin.checkPassword'],
+        'admin' => ['admin.logout', 'admin.profile', 'admin.changePassword'],
         'shopkeeper' => ['shopkeeper.logout', 'shopkeeper.profile', 'shopkeeper.update.profile'],
         'api' => ['api/logout', 'api/remove-device-token', 'api/resort/profile', 'api/resort/profile-change-password'],
     ];

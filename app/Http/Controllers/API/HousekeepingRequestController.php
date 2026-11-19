@@ -279,6 +279,9 @@ class HousekeepingRequestController extends Controller
             if (!$requestRow) {
                 return response()->json(['success' => false, 'message' => 'Housekeeping request not found'], 404);
             }
+            if (!$this->canHandle($requestRow)) {
+                return response()->json(['success' => false, 'message' => 'You can only view requests for your own department.'], 403);
+            }
 
             $requestRow->photos_urls = $this->resolveRequestPhotoUrls($requestRow->photos);
 
@@ -325,6 +328,9 @@ class HousekeepingRequestController extends Controller
             ->first();
         if (!$housekeepingRequest) {
             return response()->json(['success' => false, 'message' => 'Housekeeping request not found'], 404);
+        }
+        if (!$this->canHandle($housekeepingRequest)) {
+            return response()->json(['success' => false, 'message' => 'You can only handle requests for your own department.'], 403);
         }
 
         $housekeepingRequest->status = $request->status;
@@ -383,6 +389,9 @@ class HousekeepingRequestController extends Controller
             ->first();
         if (!$housekeepingRequest) {
             return response()->json(['success' => false, 'message' => 'Housekeeping request not found'], 404);
+        }
+        if (!$this->canHandle($housekeepingRequest)) {
+            return response()->json(['success' => false, 'message' => 'You can only handle requests for your own department.'], 403);
         }
         if ($housekeepingRequest->status === 'Completed') {
             return response()->json(['success' => false, 'message' => 'This request is already completed.'], 200);
@@ -608,6 +617,21 @@ class HousekeepingRequestController extends Controller
     }
 
     /** Resort- and ownership-scoped lookup shared by the employee actions. */
+    /**
+     * Same scope requestList() uses: Housekeeping HOD/XCOM and HR/GM handle every request; any other HOD/EXCOM only
+     * requests for employees of their own department(s). view/update-status/assign used to skip it, so any HOD
+     * could act on any department's request.
+     */
+    private function canHandle(HousekeepingRequest $row): bool
+    {
+        $me = $this->user->GetEmployee;
+        if (Common::isHousekeepingHodXcom($me)) return true;
+        $scoped = Common::getScopedDepartmentIds($me);
+        if ($scoped === null) return true;
+        $deptId = $row->employee_id ? Employee::where('id', $row->employee_id)->value('Dept_id') : null;
+        return $deptId !== null && in_array((int) $deptId, array_map('intval', $scoped), true);
+    }
+
     private function ownedAssignedRequest($id)
     {
         if (!$this->user) {

@@ -391,6 +391,12 @@ class FileManageController extends Controller
                 }
 
                 $main_folder = $this->resort->resort->resort_id;
+                // Same allowlist as the mobile drive: no HTML / SVG / scripts / executables.
+                foreach ($FolderFiles as $file) {
+                    if (!in_array(strtolower($file->getClientOriginalExtension()), Common::UPLOAD_EXTENSIONS, true)) {
+                        return response()->json(['success' => false, 'message' => 'File type not allowed: ' . e($file->getClientOriginalName())], 422);
+                    }
+                }
                 foreach ($FolderFiles as $file) 
                 {
                     // Get file details
