@@ -98,13 +98,14 @@ class DataCatalog
         }
 
         $limit = $meta['limit'];
-        return [
+        return array_filter([
             'dataset'   => $meta['dataset'],
             'as_of'     => now()->toDateTimeString(),
             'row_count' => min(count($rows), $limit),
             'truncated' => count($rows) > $limit,
             'rows'      => array_slice(array_map(fn ($r) => (array) $r, $rows), 0, $limit),
-        ];
+            'note'      => self::unknownDepartmentNote((int) $ctx['resort_id'], $args['filters'] ?? []),
+        ], fn ($v) => $v !== null);
     }
 
     /**
@@ -390,14 +391,41 @@ class DataCatalog
             });
         }
 
-        return [
+        return array_filter([
             'dataset'   => $name,
             'as_of'     => now()->toDateTimeString(),
             'basis'     => $ds['basis'] ?? null,
             'row_count' => min(count($rows), $limit),
             'truncated' => count($rows) > $limit,
             'rows'      => array_slice($rows, 0, $limit),
-        ];
+            'note'      => self::unknownDepartmentNote($rid, $filters),
+        ], fn ($v) => $v !== null);
+    }
+
+    /**
+     * A filter on a department the resort doesn't have returns nothing — which reads as "nobody". Say instead that
+     * the department doesn't exist, with the real names, so the answer can't treat it as an empty department.
+     */
+    private static function unknownDepartmentNote(int $resortId, $filters): ?string
+    {
+        $asked = [];
+        foreach ((array) $filters as $f) {
+            if (is_array($f) && in_array($f['field'] ?? '', ['department', 'from_department', 'to_department'], true)
+                && in_array(strtolower((string) ($f['op'] ?? '=')), ['=', 'in', 'contains', 'starts_with'], true)) {
+                foreach ((array) ($f['value'] ?? []) as $v) {
+                    if (is_scalar($v) && trim((string) $v) !== '') {
+                        $asked[] = trim((string) $v);
+                    }
+                }
+            }
+        }
+        if (!$asked) {
+            return null;
+        }
+        $names = DB::table('resort_departments')->where('resort_id', $resortId)->pluck('name')->filter()->unique()->values();
+        $missing = array_filter($asked, fn ($a) => !$names->contains(fn ($n) => stripos($n, $a) !== false));
+        return $missing ? 'No department named ' . implode(' / ', array_map(fn ($m) => "'{$m}'", $missing))
+            . ' exists in this resort. Its departments are: ' . $names->implode(', ') . '.' : null;
     }
 
     private static function applyFilter(Builder $q, array $f, \Closure $sql, string $op, $value): void

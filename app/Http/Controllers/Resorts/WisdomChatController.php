@@ -132,9 +132,14 @@ class WisdomChatController extends Controller
         $history[] = array_filter(['role' => 'assistant', 'content' => $reply, 'lookups' => mb_substr($lookups, 0, 2000) ?: null]);
         session([self::SESSION_KEY => $this->trim($history)]);
 
+        [$people, $pick] = self::peopleCards($ctx, array_keys($client->peopleRefs), $reply, $client->peoplePick);
+
         return response()->json(array_filter([
             'success'    => true,
             'reply'      => $reply,
+            // Photo cards for the people the reply names (from this turn's lookups); people_pick = "which one?".
+            'people'      => $people ?: null,
+            'people_pick' => $pick ?: null,
             'tier'       => $ctx['tier'],
             'tier_label' => $ctx['tier_label'],
             'usage'      => self::usage(),
@@ -143,6 +148,39 @@ class WisdomChatController extends Controller
             'source'     => $source,
             'modules'    => $modules,
         ], fn ($v) => $v !== null));
+    }
+
+    /**
+     * Cards for the employees the reply names: {id, emp_id, name, role, dept, photo}. Matched by full name against the
+     * asker's own resort and department scope (so it works whatever tool found them — several older tools return names
+     * without ids), plus the ids this turn's lookups returned. Only the asker's resort and department scope; photo = the app's own profile-picture URL (signed / short-lived on
+     * cloud storage), left out when the person has none. people_pick when a name lookup matched several people.
+     */
+    private static function peopleCards(array $ctx, array $empCodes, string $reply, bool $pick): array
+    {
+        if ($reply === '') {
+            return [[], false];
+        }
+        $rows = DB::table('employees as e')
+            ->leftJoin('resort_admins as ra', fn ($j) => $j->on('ra.id', '=', 'e.Admin_Parent_id')->where('ra.resort_id', '=', $ctx['resort_id']))
+            ->leftJoin('resort_departments as d', fn ($j) => $j->on('d.id', '=', 'e.Dept_id')->where('d.resort_id', '=', $ctx['resort_id']))
+            ->leftJoin('resort_positions as p', fn ($j) => $j->on('p.id', '=', 'e.Position_id')->where('p.resort_id', '=', $ctx['resort_id']))
+            ->where('e.resort_id', $ctx['resort_id'])->whereNull('e.deleted_at')
+            ->where(fn ($q) => $q->whereIn('e.Emp_id', array_slice($empCodes, 0, 300) ?: ['-'])->orWhereIn('e.status', ['Active', 'Onboarding', 'Offboarding']))
+            ->when(isset($ctx['dept_ids']), fn ($q) => $q->whereIn('e.Dept_id', array_map('intval', (array) $ctx['dept_ids']) ?: [0]))
+            ->get(['e.id', 'e.Emp_id', 'e.Admin_Parent_id', 'd.name as dept', 'p.position_title as role',
+                DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as name")]);
+
+        // Only the people the answer actually talks about, in the order it mentions them.
+        $named = $rows->filter(fn ($r) => $r->name !== '' && ($pos = mb_stripos($reply, $r->name)) !== false)
+            ->sortBy(fn ($r) => mb_stripos($reply, $r->name))->take($pick ? 10 : 8)->values();
+        $default = url(config('settings.default_picture'));
+        $cards = $named->map(function ($r) use ($default) {
+            $photo = \App\Helpers\Common::getResortUserPicture($r->Admin_Parent_id);
+            return array_filter(['id' => (int) $r->id, 'emp_id' => $r->Emp_id, 'name' => $r->name, 'role' => $r->role,
+                'dept' => $r->dept, 'photo' => ($photo && $photo !== $default) ? $photo : null], fn ($v) => $v !== null && $v !== '');
+        })->all();
+        return [$cards, $pick && count($cards) > 1];
     }
 
     public function history(Request $request)

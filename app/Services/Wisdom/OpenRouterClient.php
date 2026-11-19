@@ -30,6 +30,12 @@ class OpenRouterClient
     /** Tool calls of the last chat() call: [tool, args, outcome] — outcome is a size or the error, never the data. */
     public array $trace = [];
 
+    /** Employee IDs (employees.Emp_id) seen in this turn's tool results — WisdomChatController turns the ones the reply names into photo cards. */
+    public array $peopleRefs = [];
+
+    /** A name lookup this turn matched more than one person ("which one?"). */
+    public bool $peoplePick = false;
+
     /**
      * Run a chat turn.
      *
@@ -49,6 +55,8 @@ class OpenRouterClient
 
         $this->usage = ['prompt_tokens' => 0, 'completion_tokens' => 0, 'cost' => 0.0, 'tool_calls' => 0];
         $this->trace = [];
+        $this->peopleRefs = [];
+        $this->peoplePick = false;
 
         // Earlier answers carry the lookups they were based on (WisdomChatController); hand them to the model as part
         // of that answer so follow-ups narrow the same data. Only role + content go to the provider.
@@ -221,6 +229,10 @@ class OpenRouterClient
                     $result = WisdomTools::execute($fnName, $args, $ctx);
                 }
                 $this->trace[] = [$fnName, $args, self::outcome($result)];
+                $this->collectPeople($result);
+                if ($fnName === 'find_employee' && count($result['employees'] ?? []) > 1) {
+                    $this->peoplePick = true;
+                }
 
                 $messages[] = [
                     'role'         => 'tool',
@@ -233,6 +245,24 @@ class OpenRouterClient
 
         // Rounds or time used up: one more call WITHOUT tools, so the model answers from the results it already has.
         return $this->finalAnswer($messages, $model, $maxTokens, $send);
+    }
+
+    /** Remember every employee ID in a tool result (rows use employee_id = employees.Emp_id). */
+    private function collectPeople($node): void
+    {
+        if ($node instanceof \Illuminate\Contracts\Support\Arrayable) {
+            $node = $node->toArray();
+        }
+        if (!is_array($node) || count($this->peopleRefs) >= 300) {
+            return;
+        }
+        foreach ($node as $k => $v) {
+            if ($k === 'employee_id' && is_string($v) && $v !== '') {
+                $this->peopleRefs[$v] = true;
+            } elseif (is_array($v) || $v instanceof \Illuminate\Contracts\Support\Arrayable) {
+                $this->collectPeople($v);
+            }
+        }
     }
 
     /** A short, data-free description of a tool result for the trace. */
@@ -416,12 +446,16 @@ class OpenRouterClient
     {
         $supportEmail = config('services.wisdom_ai.support_email');
         $menu = ModuleGuide::menuSummary() ?: '(menu not available)';
+        $departments = \Illuminate\Support\Facades\DB::table('resort_departments')->where('resort_id', $ctx['resort_id'])
+            ->where('status', 'active')->orderBy('name')->pluck('name')->implode(', ') ?: '(none set up)';
         $base = <<<TXT
 You are "Wisdom AI", an intelligent HR assistant embedded in the resort's HR & Visa Management System for the resort "{$ctx['resort_name']}". When referring to the platform in your replies, always call it "Wisdom AI" — never the internal system name "HRVMS".
 
 You are speaking with {$ctx['user_name']} (role: {$ctx['role_label']}). Today's date is {$ctx['today']}.
 
 All data you access is automatically restricted to this user's resort ("{$ctx['resort_name']}"); never claim to have data about other resorts.
+
+THE RESORT'S DEPARTMENTS (the only ones that exist — if the user names another, say it does not exist here and list these): {$departments}
 
 THE USER'S MENU — the ONLY module and page names you may ever mention (Module: pages). Never name a screen, tab, dashboard or menu path that is not in this list; when you recommend an action, say what to do in plain words, and name a page only if it is listed here (as "Module › Page"):
 {$menu}

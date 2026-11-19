@@ -865,7 +865,10 @@ class WisdomTools
             return ['error' => 'Please provide a name or employee ID to search for.'];
         }
 
-        $employees = Employee::where('resort_id', $rid)
+        // An exact employee ID (e.g. the chat's "I mean Ahmed Hassan, DR-21") is that one person, not a LIKE search.
+        $employees = Employee::where('resort_id', $rid)->where('Emp_id', $term)
+            ->with(['resortAdmin:id,first_name,last_name', 'department:id,name', 'position:id,position_title'])->get();
+        if ($employees->isEmpty()) $employees = Employee::where('resort_id', $rid)
             ->where(function ($q) use ($term) {
                 $q->whereHas('resortAdmin', function ($r) use ($term) {
                         $r->where('first_name', 'like', "%{$term}%")
