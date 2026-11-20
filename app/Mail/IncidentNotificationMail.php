@@ -29,9 +29,12 @@ class IncidentNotificationMail extends Mailable implements ShouldQueue
     public $ctaLabel;
     protected $emailSubject;
     protected $resortId;
+    /** false for account/security alerts that reuse this layout — hides the "participant in this incident" note. */
+    public $incidentFooter;
 
-    public function __construct($recipientName, $subject, $body, array $details = [], $ctaUrl = null, $ctaLabel = null, $resortId = null)
+    public function __construct($recipientName, $subject, $body, array $details = [], $ctaUrl = null, $ctaLabel = null, $resortId = null, bool $incidentFooter = true)
     {
+        $this->incidentFooter = $incidentFooter;
         $this->recipientName = $recipientName;
         $this->emailSubject = $subject;
         $this->body = $body;
@@ -55,6 +58,7 @@ class IncidentNotificationMail extends Mailable implements ShouldQueue
                 'details'       => $this->details,
                 'ctaUrl'        => $this->ctaUrl,
                 'ctaLabel'      => $this->ctaLabel,
+                'incidentFooter' => $this->incidentFooter ?? true,
                 // No Auth session in the queue worker — header/footer can't
                 // fall back to auth('resort-admin')->user(), pass it directly.
                 'resortLogo'    => $this->resortId ? Common::GetResortLogo($this->resortId) : null,

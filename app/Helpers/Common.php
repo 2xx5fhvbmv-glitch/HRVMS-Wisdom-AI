@@ -5437,12 +5437,13 @@ class Common
             Mail::to($admin->email)->send(new \App\Mail\IncidentNotificationMail(
                 $name,
                 'New sign-in to your account',
-                'Your account was just signed in to ' . ($portal === 'mobile' ? 'from the mobile app' : 'on the web portal')
+                'Your account was just signed in ' . ($portal === 'mobile' ? 'from the mobile app' : 'on the web portal')
                     . ' from a new location (IP ' . $request->ip() . ') at ' . now()->format('d M Y H:i') . '. If this wasn\'t you, change your password now and contact HR.',
                 [],
                 null,
                 null,
-                $admin->resort_id
+                $admin->resort_id,
+                false   // account alert, not an incident
             ));
         } catch (\Throwable $e) {
             \Log::warning('New-login alert failed for admin ' . $admin->id . ': ' . $e->getMessage());
@@ -5505,7 +5506,8 @@ class Common
                 [],
                 null,
                 null,
-                $admin->resort_id
+                $admin->resort_id,
+                false   // account alert, not an incident
             ));
         } catch (\Exception $e) {
             \Log::warning('Account-lock notification failed for ' . $admin->email . ': ' . $e->getMessage());
@@ -5524,7 +5526,7 @@ class Common
                 ->push($subject->email)->unique()->filter();
             \Log::warning('[admin-security] ' . $title . ': ' . $body);
             foreach ($emails as $email) {
-                Mail::to($email)->send(new \App\Mail\IncidentNotificationMail('Wisdom owner', $title, $body));
+                Mail::to($email)->send(new \App\Mail\IncidentNotificationMail('Wisdom owner', $title, $body, [], null, null, null, false));
             }
         } catch (\Throwable $e) {
             \Log::warning('Super-admin alert failed: ' . $e->getMessage());

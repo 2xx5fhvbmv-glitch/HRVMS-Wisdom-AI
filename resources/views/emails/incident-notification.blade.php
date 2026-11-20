@@ -24,8 +24,10 @@
         </p>
     @endif
 
+    @if($incidentFooter ?? true)
     <p style="color:#6c757d;font-size:12px;margin-top:18px;">
         You're receiving this because you're a participant in this incident.
         Open HRVMS to view the full details.
     </p>
+    @endif
 @endsection
