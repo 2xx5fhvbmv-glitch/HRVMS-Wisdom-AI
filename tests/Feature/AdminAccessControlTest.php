@@ -93,23 +93,27 @@ class AdminAccessControlTest extends TestCase
         $this->assertEquals($weak, $me->fresh()->role_id);
     }
 
-    public function test_check_password_only_tests_the_callers_own_password()
+    public function test_change_password_only_checks_the_callers_own_password()
     {
         $me = $this->sub();
         $victim = $this->sub();
         DB::table('admins')->where('id', $victim->id)->update(['password' => Hash::make('Victim#1')]);
-        $this->assertSame('false', $this->as($me)->post(route('admin.checkPassword'), ['id' => $victim->id, 'old_pass' => 'Victim#1'])->getContent());
-        $this->assertSame('true', $this->as($me)->post(route('admin.checkPassword'), ['old_pass' => 'Sub#Pass1'])->getContent());
+        // the old check-password oracle (true/false for any guess, no lockout) is gone
+        $this->assertFalse(\Illuminate\Support\Facades\Route::has('admin.checkPassword'));
+        // another admin's password never passes for me, whatever id is posted
+        $this->as($me)->postJson(route('admin.changePassword'), ['admin_id' => $victim->id, 'old_pass' => 'Victim#1', 'password' => 'Str0ngPassw0rdX', 'password_confirm' => 'Str0ngPassw0rdX'])
+            ->assertJson(['success' => false]);
+        $this->assertTrue(Hash::check('Victim#1', $victim->fresh()->password));
     }
 
     public function test_audit_log_never_stores_passwords()
     {
         $me = $this->sub();
-        $this->as($me)->post(route('admin.checkPassword'), ['old_pass' => 'Sub#Pass1', 'password_confirm' => 'New#Pass1']);
+        $this->as($me)->post(route('admin.changePassword'), ['old_pass' => 'Sub#Pass1x', 'password' => 'New#Pass1xyzA', 'password_confirm' => 'New#Pass1xyzA']);
         $payload = DB::table('admin_audit_logs')->where('admin_id', $me->id)->latest('id')->value('payload');
         $this->assertNotNull($payload);
-        $this->assertStringNotContainsString('Sub#Pass1', $payload);
-        $this->assertStringNotContainsString('New#Pass1', $payload);
+        $this->assertStringNotContainsString('Sub#Pass1x', $payload);
+        $this->assertStringNotContainsString('New#Pass1xyzA', $payload);
     }
 
     public function test_state_changing_get_needs_same_site_and_massremove_needs_delete()

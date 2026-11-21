@@ -622,7 +622,7 @@ class BudgetController extends Controller
                     ->where('e.position_id', $p->id)
                     ->where('e.resort_id', $this->resort->resort_id)
                     ->whereNotIn('e.status', ['Terminated', 'Inactive', 'Offboarding'])
-                    ->select('e.id as Empid', 'ra.first_name', 'ra.last_name', 'e.Admin_Parent_id',
+                    ->select('e.id as Empid', 'ra.first_name', 'ra.last_name', 'ra.gender', 'e.Admin_Parent_id',
                              'e.rank', 'e.Dept_id', 'e.nationality', 'e.basic_salary', 'e.incremented_date')
                     ->get();
                 $p->employees = $emps;

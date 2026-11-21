@@ -1157,6 +1157,12 @@
             return $('<div>').text(s == null ? '' : s).html();
         }
 
+        // First + last initial (was built server-side).
+        function nameInitials(name) {
+            var parts = String(name || '').replace(/[^A-Za-z ]/g, '').trim().split(/\s+/).filter(Boolean);
+            return ((parts[0] || '').charAt(0) + (parts.length > 1 ? parts[parts.length - 1].charAt(0) : '')).toUpperCase() || '?';
+        }
+
         // Renders the .cat rows immediately (label/count/amount only — cheap)
         // but does NOT build each row's .emp-list content yet. The raw item
         // is stashed on the sibling .emp-list via .data() and only turned
@@ -1197,7 +1203,7 @@
             employees.forEach(function (emp) {
                 $scroll.append(
                     '<div class="er">' +
-                        '<span class="av">' + escapeHtml(emp.initials) + '</span>' +
+                        '<span class="av">' + escapeHtml(nameInitials(emp.name)) + '</span>' +
                         '<span class="who">' +
                             '<span class="n">' + escapeHtml(emp.name) + '</span>' +
                             '<span class="dp">' + escapeHtml(emp.context || '') + '</span>' +
@@ -1302,7 +1308,7 @@
                 var metaBits = [dept, (time + escapeHtml(row.note || '')).trim()].filter(Boolean).join(' &middot; ');
                 $list.append(
                     '<div class="er">' +
-                        '<span class="av">' + escapeHtml(row.initials) + '</span>' +
+                        '<span class="av">' + escapeHtml(nameInitials(row.name)) + '</span>' +
                         '<span class="who">' +
                             '<span class="n">' + escapeHtml(row.name) + '<span class="pill ' + pillClass + '">' + escapeHtml(row.status) + '</span></span>' +
                             '<span class="dp">' + metaBits + '</span>' +

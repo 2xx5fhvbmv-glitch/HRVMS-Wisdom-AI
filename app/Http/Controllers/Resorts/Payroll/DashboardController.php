@@ -474,12 +474,10 @@ class DashboardController extends Controller
             $totalDeductions = round($absentDeduction + $thirdParty + $pension + $ewt + $loanDue, 2);
 
             $name = trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? '')) ?: ('Employee #' . $empId);
-            $initials = strtoupper(substr(preg_replace('/[^A-Za-z ]/', '', $name), 0, 1) . (str_contains($name, ' ') ? substr(strrchr($name, ' '), 1, 1) : ''));
 
             $lines->push([
                 'employee_id'       => $empId,
                 'name'              => $name,
-                'initials'          => $initials ?: '?',
                 'gender'            => $employee->resortAdmin->gender ?? null,
                 'admin_id'          => $employee->Admin_Parent_id,
                 'department'        => optional($employee->department)->name,
@@ -546,7 +544,6 @@ class DashboardController extends Controller
                     }
                     return [
                         'name'     => $l['name'],
-                        'initials' => $l['initials'],
                         'employee_id' => $l['employee_id'],
                         'gender'   => $l['gender'],
                         'photo'    => $photos[$l['admin_id']] ?? null,
@@ -629,14 +626,13 @@ class DashboardController extends Controller
             if (!$employee) continue;
 
             $name = trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? '')) ?: ('Employee #' . $rec->Emp_id);
-            $initials = strtoupper(substr(preg_replace('/[^A-Za-z ]/', '', $name), 0, 1) . (str_contains($name, ' ') ? substr(strrchr($name, ' '), 1, 1) : ''));
 
             $basicUSD = (float) $employee->basic_salary;
             if (($employee->basic_salary_currency ?? 'USD') === 'MVR') $basicUSD /= $rate;
             $perDay = $basicUSD / $totalDaysInPeriod;
 
             $time = $rec->updated_at ? Carbon::parse($rec->updated_at)->format('h:i A') : null;
-            $base = ['employee_id' => $rec->Emp_id, 'name' => $name, 'initials' => $initials ?: '?', 'gender' => $employee->resortAdmin->gender ?? null, 'photo' => $photos[$employee->Admin_Parent_id] ?? null, 'department' => optional($employee->department)->name, 'time' => $time];
+            $base = ['employee_id' => $rec->Emp_id, 'name' => $name, 'gender' => $employee->resortAdmin->gender ?? null, 'photo' => $photos[$employee->Admin_Parent_id] ?? null, 'department' => optional($employee->department)->name, 'time' => $time];
 
             if ($rec->Status === 'HalfDayLeave') {
                 $rows->push($base + ['status' => 'Half Day', 'note' => "half a day's salary", 'amount' => round($perDay / 2, 2), 'type' => 'earn']);

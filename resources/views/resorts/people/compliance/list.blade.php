@@ -520,6 +520,10 @@
 
     function empCellHtml(row) {
         var html = row.employee_name || '';
+        // No photo → initials from the name (was built server-side).
+        var initials = String(row.employee_full_name || '').trim().split(/\s+/).filter(Boolean)
+            .slice(0, 2).map(function (p) { return p.charAt(0).toUpperCase(); }).join('') || '?';
+        html = html.replace('<div class="cc-emp-avatar"></div>', '<div class="cc-emp-avatar">' + escHtml(initials) + '</div>');
         var id = row.employee_id != null ? String(row.employee_id) : '';
         if (!id || id === '-') { return html; }
         if (/<div class="cc-emp-role">/.test(html)) {

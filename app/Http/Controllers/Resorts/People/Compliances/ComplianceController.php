@@ -730,21 +730,10 @@ class ComplianceController extends Controller
                          }
                          $name = e($compliance->employee->resortAdmin->full_name ?? 'N/A');
 
-                         // Real profile photo when the employee has one;
-                         // initials avatar as the fallback rather than a
-                         // generic placeholder image.
+                         // Real profile photo when the employee has one; empty
+                         // otherwise (the page draws the fallback avatar).
                          $photo = $photoOf($compliance);
-                         $hasRealPhoto = $photo !== '';
-
-                         if ($hasRealPhoto) {
-                              $avatarHtml = '<img src="' . e($photo) . '" alt="' . e($name) . '">';
-                         } else {
-                              $initials = collect(explode(' ', trim($name)))
-                                   ->filter()
-                                   ->map(fn($p) => mb_strtoupper(mb_substr($p, 0, 1)))
-                                   ->take(2)->implode('');
-                              $avatarHtml = e($initials ?: '?');
-                         }
+                         $avatarHtml = $photo !== '' ? '<img src="' . e($photo) . '" alt="' . e($name) . '">' : '';
 
                          $roleLine = trim((string) optional($compliance->employee->position)->position_title);
 
