@@ -65,22 +65,13 @@
                         <div class="fsr-cr fsr-pcard">
                             <div class="fsr-ct"><h2>Employee</h2></div>
                             @php
-                                // Photo-first avatar with an initials fallback —
-                                // Common::getResortUserPicture() always resolves to at
-                                // least the app's generic silhouette default, so only
-                                // treat it as a real photo when it differs from that
-                                // default; otherwise fall back to initials rather than
-                                // showing the generic placeholder.
+                                // Portrait avatar: real photo first (the app's generic default counts as none), else the drawn portrait by recorded gender.
                                 $fsrFullName = $finalSettlement->employee->resortAdmin->full_name ?? '';
-                                $fsrParts = preg_split('/\s+/', trim($fsrFullName));
-                                $fsrInitials = strtoupper(($fsrParts[0][0] ?? '') . (isset($fsrParts[1]) ? $fsrParts[1][0] : '')) ?: '?';
                                 $fsrPhoto = Common::getResortUserPicture($finalSettlement->employee->Admin_Parent_id);
-                                if ($fsrPhoto === url(config('settings.default_picture'))) { $fsrPhoto = null; }
                             @endphp
                             <div class="fsr-pc-head">
                                 <span class="fsr-pa">
-                                    <span class="fsr-pa-fallback">{{ $fsrInitials }}</span>
-                                    @if($fsrPhoto)<img src="{{ $fsrPhoto }}" alt="{{ $fsrFullName }}" onerror="this.remove()">@endif
+                                    <x-wai-avatar :photo="$fsrPhoto" :name="$fsrFullName" :gender="$finalSettlement->employee->resortAdmin->gender ?? null" :id="$finalSettlement->employee->Emp_id" :size="54" />
                                 </span>
                                 <div class="fsr-pn">{{ $fsrFullName }} <span class="fsr-id-chip">{{$finalSettlement->employee->Emp_id}}</span></div>
                             </div>
@@ -574,8 +565,6 @@
 .fsr-pcard .fsr-ct { border-bottom: 1px solid var(--line, #EEF2F2); padding-bottom: 14px; margin-bottom: 16px; }
 .fsr-pc-head { display: flex; align-items: center; gap: 14px; padding-bottom: 16px; border-bottom: 1px solid var(--line, #EEF2F2); }
 .fsr-pa { position: relative; width: 54px; height: 54px; flex: none; border-radius: 50%; background: var(--teal-soft, #f1f7f7); overflow: hidden; }
-.fsr-pa-fallback { position: absolute; inset: 0; display: grid; place-items: center; color: var(--teal); font-size: 17px; font-weight: 600; }
-.fsr-pa img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .fsr-pn { font-size: 17px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .fsr-id-chip { background: #F7F8F8; color: #3A4145; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 7px; }
 .fsr-prow { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid #F3F6F6; font-size: 14px; }

@@ -9,7 +9,7 @@
 
 @php
     // Client-side needs to tell "real photo" from "no photo on file" so it can
-    // draw an initials avatar instead of the generic default image — Common::
+    // draw the portrait avatar instead of the generic default image — Common::
     // getResortUserPicture() always returns a URL, falling back to this exact
     // one when the employee has none.
     $ma_defaultPic = url(config('settings.default_picture'));
@@ -148,8 +148,7 @@
     .ma-remp { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--line-2, #EEF4F4); }
     .ma-remp:last-child { border-bottom: none; }
     .ma-remp:hover { background: var(--teal-soft); }
-    .ma-remp .av { flex: none; width: 38px; height: 38px; border-radius: 50%; object-fit: cover; background: var(--ma-g4); }
-    .ma-remp .av-initials { flex: none; width: 38px; height: 38px; border-radius: 50%; background: var(--teal-3); color: var(--teal); display: grid; place-items: center; font-size: 13px; font-weight: 600; }
+    .ma-remp .wav { width: 38px; height: 38px; }
     .ma-remp .who { flex: 1; min-width: 0; }
     .ma-remp .nm { font-size: 13.5px; font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ma-remp .meta { font-size: 11.5px; color: var(--ma-g2); margin-top: 2px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -204,17 +203,9 @@
         var m = html.match(/<span class="userReviewTasks-btn">([^<]*)<\/span>/);
         return m ? m[1].trim() : '';
     }
-    function maInitials(name) {
-        var parts = (name || '').trim().split(/\s+/);
-        var a = parts[0] ? parts[0][0] : '';
-        var b = parts.length > 1 ? parts[parts.length - 1][0] : '';
-        return (a + b).toUpperCase() || '?';
-    }
-    function maAvatarNode(name, url) {
-        if (url && url !== MA_DEFAULT_PIC) {
-            return '<img class="av" src="' + url + '" alt="">';
-        }
-        return '<span class="av-initials">' + maInitials(name) + '</span>';
+    // Shared drawn-portrait avatar (wavHTML); gender isn't in this payload, so no-photo rows show the neutral figure.
+    function maAvatarNode(name, url, code) {
+        return wavHTML({ photo: (url && url !== MA_DEFAULT_PIC) ? url : '', name: name, id: code });
     }
 
     function maMapRow(row) {
@@ -281,7 +272,7 @@
     function maRowHTML(r) {
         var s = maState[r.id];
         return '<div class="ma-remp" data-id="' + r.id + '">' +
-            maAvatarNode(r.name, r.avatar) +
+            maAvatarNode(r.name, r.avatar, r.empId) +
             '<div class="who"><div class="nm">' + r.name + '</div>' +
                 '<div class="meta"><span class="tnum">' + (r.empId || '') + '</span><span class="sep"></span><span>' + (r.position || '') + '</span></div></div>' +
             '<div class="ma-toggle">' +

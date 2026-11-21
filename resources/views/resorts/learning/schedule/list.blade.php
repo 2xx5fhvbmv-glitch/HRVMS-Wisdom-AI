@@ -211,11 +211,10 @@
     /* Plain <span> placeholders, not <i> — Font Awesome is loaded globally and
        styles every bare <i> element as an icon glyph, which silently ate these
        (no image, no icon, so nothing painted). */
-    .att .avstack .avc { width: 26px; height: 26px; border-radius: 50%; background: var(--ts-g4); border: 2px solid #fff; margin-left: -8px; display: block; object-fit: cover; }
-    .att .avstack .avc:first-child { margin-left: 0; }
-    .att .avstack .avc.avc-initials { background: var(--teal-3); color: var(--teal); display: grid; place-items: center; font-size: 9px; font-weight: 600; }
+    .att .avstack .wav { width: 26px; height: 26px; box-sizing: border-box; border: 2px solid #fff; margin-left: -8px; display: block; }
+    .att .avstack .wav:first-child { margin-left: 0; }
     .att .avstack .more { min-width: 26px; height: 26px; padding: 0 6px; border-radius: 13px; background: var(--teal-3); border: 2px solid #fff; margin-left: -8px; display: grid; place-items: center; font-size: 10px; font-weight: 600; color: var(--teal); }
-    .att.solo .avstack .avc { margin-left: 0; }
+    .att.solo .avstack .wav { margin-left: 0; }
 
     .ts-acts { display: flex; gap: 8px; }
     .abtn { width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--ts-g4); background: #fff; display: grid; place-items: center; color: var(--ts-g2); cursor: pointer; transition: .15s; }
@@ -290,8 +289,7 @@
        avatar against the popover's rounded edge. Same fix as the Learning
        Programs audience popover earlier. */
     .att-pop .a-row { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--ink); font-weight: 400; }
-    .att-pop .a-row .av { width: 24px; height: 24px; border-radius: 50%; background: var(--ts-g4); flex: none; object-fit: cover; }
-    .att-pop .a-row .av.av-initials { background: var(--teal-3); color: var(--teal); display: grid; place-items: center; font-size: 9px; font-weight: 600; }
+    .att-pop .a-row .wav { width: 24px; height: 24px; }
 
     @media(max-width: 900px) {
         .tlr { flex-wrap: wrap; }
@@ -303,13 +301,6 @@
 @section('import-scripts')
 <script>
     var TS_DEFAULT_PIC = @json($ts_defaultPic);
-    function tsInitials(name) {
-        var parts = (name || '').trim().split(/\s+/);
-        var a = parts[0] ? parts[0][0] : '';
-        var b = parts.length > 1 ? parts[parts.length - 1][0] : '';
-        return (a + b).toUpperCase() || '?';
-    }
-
     var TS_CAP = 8;          // rows shown per month before "Show all"
     var TS_MONTH_BATCH = 3;  // months revealed per "Load older"
     var TS_MONTHNAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -389,17 +380,15 @@
     var ML = { 'face-to-face': 'Face-to-face', 'hybrid': 'Hybrid', 'online': 'Online' };
     var MC = { 'face-to-face': 'face', 'hybrid': 'hybrid', 'online': 'online' };
 
+    // Shared portrait avatar; gender isn't in the schedule payload, so no-photo attendees show the neutral figure.
     function tsAvatarNode(name, url) {
-        if (url && url !== TS_DEFAULT_PIC) {
-            return '<img class="avc" src="' + url + '" alt="" title="' + name + '">';
-        }
-        return '<span class="avc avc-initials" title="' + name + '">' + tsInitials(name) + '</span>';
+        return wavHTML({ photo: (url && url !== TS_DEFAULT_PIC) ? url : '', name: name, id: name });
     }
 
     function tsStack(s) {
         var n = s.names.length;
         var show = Math.min(n, 3), h = '';
-        for (var i = 0; i < show; i++) h += tsAvatarNode(s.names[i] || '', s.avatars[i]);
+        for (var i = 0; i < show; i++) h += tsAvatarNode(s.names[i] || '', s.avatars[i]).replace('<span class="wav"', '<span title="' + wavEsc(s.names[i] || '') + '" class="wav"');
         if (n > 3) h += '<span class="more">+' + (n - 3) + '</span>';
         var people = s.names.map(function (nm, i) { return { n: nm, a: s.avatars[i] || '' }; });
         return '<span class="att' + (n <= 1 ? ' solo' : '') + '" data-people="' + encodeURIComponent(JSON.stringify(people)) + '"><span class="avstack">' + h + '</span></span>';
@@ -540,9 +529,7 @@
         function fill(people) {
             countEl.textContent = people.length + ' attendee' + (people.length > 1 ? 's' : '');
             listEl.innerHTML = people.map(function (p) {
-                var av = (p.a && p.a !== TS_DEFAULT_PIC)
-                    ? '<img class="av" src="' + p.a + '" alt="">'
-                    : '<span class="av av-initials">' + tsInitials(p.n) + '</span>';
+                var av = tsAvatarNode(p.n, p.a);
                 return '<div class="a-row">' + av + p.n + '</div>';
             }).join('');
         }

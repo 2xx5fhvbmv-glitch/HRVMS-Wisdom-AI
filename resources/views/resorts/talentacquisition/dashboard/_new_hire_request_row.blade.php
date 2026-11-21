@@ -20,25 +20,14 @@
 @php
     $nhrDefaultPhoto = url(config('settings.default_picture'));
     $nhrPhoto = $nhrPhoto ?? Common::getResortUserPicture($vacancy->creator_admin_id ?? null);
-    $nhrHasPhoto = $nhrPhoto !== $nhrDefaultPhoto;
-    $nhrNameParts = preg_split('/\s+/', trim((string) $vacancy->created_by_name));
-    $nhrInitials = '';
-    foreach (array_slice($nhrNameParts, 0, 2) as $part) {
-        $nhrInitials .= mb_strtoupper(mb_substr($part, 0, 1));
-    }
-    $nhrInitials = $nhrInitials !== '' ? $nhrInitials : '?';
 @endphp
 <div class="nhr-req">
     <div class="nhr-qbig"><span class="n">{{ $vacancy->NoOfVacnacy }}</span><span class="x">need</span></div>
     <div class="nhr-body">
         <div class="nhr-role">{{ $vacancy->Position ?? 'Position' }}</div>
         <div class="nhr-who">
-            <span class="nhr-mini">
-                <span class="nhr-mini-fallback">{{ $nhrInitials }}</span>
-                @if($nhrHasPhoto)
-                    <img src="{{ $nhrPhoto }}" alt="{{ $vacancy->created_by_name }}" onerror="this.remove()">
-                @endif
-            </span>
+            {{-- Portrait avatar; the requester's gender isn't in the row, so no photo shows the neutral figure. --}}
+            <span class="nhr-mini"><x-wai-avatar :photo="$nhrPhoto !== $nhrDefaultPhoto ? $nhrPhoto : null" :name="$vacancy->created_by_name" :id="$vacancy->creator_admin_id ?? $vacancy->created_by_name" :size="20" /></span>
             <span class="nhr-wn"><b>{{ $vacancy->created_by_name }}</b> &middot; {{ $vacancy->Department }} &middot; {{ $vacancy->creator_rank_name }}</span>
         </div>
     </div>

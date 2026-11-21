@@ -44,7 +44,11 @@ window.WaiMd = (function () {
     Object.keys(CFG.leave).forEach(function (k) { CFG.leaveLc[k.toLowerCase()] = CFG.leave[k]; });
     return CFG;
   }
-  function initials(n) { return (String(n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(function (p) { return p[0].toUpperCase(); }).join('')) || '?'; }
+  // Name chips/subjects carry only a name (no gender recorded in the answer), so they show the shared neutral figure from the wai-avatar sprite.
+  function figEl(cls) {
+    var w = el('span', cls), ns = 'http://www.w3.org/2000/svg', sv = document.createElementNS(ns, 'svg'), us = document.createElementNS(ns, 'use');
+    us.setAttribute('href', '#wav-n'); sv.appendChild(us); sv.setAttribute('aria-hidden', 'true'); w.appendChild(sv); return w;
+  }
   function plain(c) { return c && c.pill ? c.text : mdPlain(String(c == null ? '' : c)); }
   var GENERIC_K = /^(field|item|detail|details|property|attribute|label|key|parameter|info|name)?$/i, GENERIC_V = /^(value|values|details?|info|description|data)?$/i;
   // Any 2-column table is a key/value table (.acc). Its header row is dropped when it only says "Field / Value" (or is
@@ -84,7 +88,7 @@ window.WaiMd = (function () {
       function draw() {
         var hit = g.names.filter(function (n) { return !q || n.toLowerCase().indexOf(q) >= 0; }), cut = open || q || hit.length <= 12 ? hit : hit.slice(0, 12);
         list.textContent = '';
-        cut.forEach(function (n) { var c = el('div', 'rs-n'); c.appendChild(el('span', 'av sm', initials(n))); c.appendChild(el('span', '', n)); list.appendChild(c); });
+        cut.forEach(function (n) { var c = el('div', 'rs-n'); c.appendChild(figEl('av sm')); c.appendChild(el('span', '', n)); list.appendChild(c); });
         if (!hit.length) list.appendChild(el('div', 'rs-empty', 'No name matches'));
         more.textContent = 'Show all ' + hit.length; more.hidden = cut.length === hit.length;
       }
@@ -128,7 +132,7 @@ window.WaiMd = (function () {
         var td = el('td'), txt = plain(c), col = i > 0 && cfg().leaveLc[txt.toLowerCase()];
         if (c && c.pill) td.appendChild(el('span', 'a-pill ' + c.pill, c.text));
         else if (col && /^#[0-9a-f]{3,8}$/i.test(col)) { var lt = el('span', 'lt', txt); lt.style.setProperty('--c', col); td.appendChild(lt); }
-        else if (i === 0 && whoCol) { var who = el('div', 'who'); who.appendChild(el('span', 'av sm', initials(txt))); var nm = el('span'); mdInline(nm, c == null ? '—' : c); who.appendChild(nm); td.appendChild(who); }
+        else if (i === 0 && whoCol) { var who = el('div', 'who'); who.appendChild(figEl('av sm')); var nm = el('span'); mdInline(nm, c == null ? '—' : c); who.appendChild(nm); td.appendChild(who); }
         else mdInline(td, c == null ? '—' : c);
         tr.appendChild(td);
       });
@@ -295,7 +299,7 @@ window.WaiMd = (function () {
     var d = el('div', 'fig'); d.appendChild(el('div', 'k', f.k)); d.appendChild(el('div', 'v', f.v)); if (f.sub) d.appendChild(el('div', 'sub', f.sub)); return d;
   }
   function subjEl(s) {
-    var w = el('div', 'subj'), d = el('div'); w.appendChild(el('span', 'av', initials(s.name)));
+    var w = el('div', 'subj'), d = el('div'); w.appendChild(figEl('av'));
     d.appendChild(el('div', 'nm', s.name)); if (s.sub) d.appendChild(el('div', 'ps', s.sub)); w.appendChild(d); return w;
   }
   function goEl(o, who) {
@@ -398,5 +402,99 @@ window.WaiMd = (function () {
     });
     return w;
   }
-  return { render: render, tideIn: tideIn, roll: roll, modulePicker: modulePicker };
+  /* ---------- people in answers ----------
+   * When an answer is about particular employees the server sends `people` next to `reply`:
+   *   [{ id, emp_id, name, role, dept, photo, status:{state:'on'|'away'|'off', text}, facts:[[label, value, warn?]] }]
+   * (+ `people_pick: true` when the question was ambiguous and the user should choose). Only name is required.
+   * One person -> photo card; several -> stack of photos; several + pick -> tappable photo cards.
+   * The photo is an <img> over round initials, so initials show while it loads or if it fails. Text is set with
+   * textContent only; the photo URL must be http(s) or a same-site path. */
+  var SAFE_URL = /^(https?:)?\/\/|^\//i, PSTATE = { on: 1, away: 1, off: 1 };
+  function photoEl(p, size) {
+    var w = el('span', 'pimg'), c = el('span', 'pin');
+    w.style.width = w.style.height = size + 'px'; w.style.fontSize = Math.round(size * .34) + 'px';
+    // drawn portrait from the shared sprite (resorts/partials/wai-avatar.blade.php) sits under the photo; gender is only used when the reply sends it
+    var k = typeof wavKind === 'function' ? wavKind(p.gender) : 'n', ns = 'http://www.w3.org/2000/svg', sv = document.createElementNS(ns, 'svg'), us = document.createElementNS(ns, 'use');
+    us.setAttribute('href', '#wav-' + k); sv.appendChild(us); sv.setAttribute('aria-hidden', 'true'); c.appendChild(sv);
+    c.style.background = k === 'n' || typeof wavTint !== 'function' ? '#E6F0F1' : wavTint(p.emp_id || p.id);
+    if (typeof p.photo === 'string' && SAFE_URL.test(p.photo)) {
+      var im = document.createElement('img');
+      im.alt = ''; im.loading = 'lazy'; im.decoding = 'async'; im.referrerPolicy = 'no-referrer';
+      im.onload = function () { im.classList.add('on'); }; im.onerror = function () { im.remove(); w.removeAttribute('data-zoom'); w.title = p.name; };
+      im.src = p.photo; c.appendChild(im); w.setAttribute('data-zoom', p.photo); w.setAttribute('data-name', p.name);
+    }
+    if (!w.hasAttribute('data-zoom')) w.title = p.name; // no photo → plain tooltip; with a photo the hover zoom names them
+    w.appendChild(c);
+    if (p.status && PSTATE[p.status.state]) w.appendChild(el('i', 'st-dot ' + p.status.state));
+    return w;
+  }
+  function roleLine(p) { return [p.role, p.dept].filter(Boolean).join(' · '); }
+  function personCard(p) {
+    var c = el('div', 'pcard'), top = el('div', 'ptop'), d = el('div'), nm = el('div', 'pnm', p.name), rl = roleLine(p), R = cfg().routes.profile;
+    if (p.emp_id) nm.appendChild(el('span', '', p.emp_id));
+    d.appendChild(nm);
+    if (rl) d.appendChild(el('div', 'prl', rl));
+    if (p.status && PSTATE[p.status.state] && p.status.text) { var s = el('span', 'ppill ' + p.status.state); s.appendChild(el('i')); s.appendChild(document.createTextNode(p.status.text)); d.appendChild(s); }
+    top.appendChild(photoEl(p, 104)); top.appendChild(d); c.appendChild(top);
+    if (Array.isArray(p.facts) && p.facts.length) {
+      var f = el('div', 'pfacts');
+      p.facts.slice(0, 4).forEach(function (x) { var cell = el('div'); cell.appendChild(el('span', '', x[0])); cell.appendChild(el('b', x[2] ? 'w' : '', x[1])); f.appendChild(cell); });
+      c.appendChild(f);
+    }
+    if (R && R.url && /^\d+$/.test(String(p.id))) { // same whitelisted profile link as the [[open: profile]] button
+      var a = el('a', 'pact', R.btn || 'Open profile'), acts = el('div', 'pacts');
+      a.href = R.url.replace('__id__', encodeURIComponent(btoa(String(p.id)))); acts.appendChild(a); c.appendChild(acts);
+    }
+    return c;
+  }
+  function peopleStrip(list) {
+    var w = el('div', 'pstrip'), st = el('span', 'pstack');
+    list.slice(0, 5).forEach(function (p) { st.appendChild(photoEl(p, 36)); });
+    w.appendChild(st); w.appendChild(el('span', '', list.length + ' people'));
+    return w;
+  }
+  function peoplePick(list, onPick) {
+    var w = el('div', 'ppick');
+    list.forEach(function (p) {
+      var b = el('button', 'pk'), rl = roleLine(p);
+      b.type = 'button'; b.appendChild(photoEl(p, 76)); b.appendChild(el('b', '', p.name));
+      if (rl) b.appendChild(el('small', '', rl));
+      if (p.emp_id) b.appendChild(el('span', 'pid', p.emp_id));
+      b.addEventListener('click', function () {
+        if (w.getAttribute('data-done')) return;
+        w.setAttribute('data-done', '1');
+        Array.prototype.forEach.call(w.children, function (x) { x.classList.add(x === b ? 'chosen' : 'dim'); });
+        onPick(p);
+      });
+      w.appendChild(b);
+    });
+    return w;
+  }
+  // Hover on any person photo shows a big floating copy with the name, so a face is easy to recognise.
+  var zoomEl;
+  function zoomOff() { if (zoomEl) zoomEl.classList.remove('on'); }
+  document.addEventListener('mouseover', function (e) {
+    var t = e.target.closest && e.target.closest('.a-md .pimg[data-zoom]'), r, S = 220, x, y;
+    if (!t) return zoomOff();
+    if (!zoomEl) {
+      zoomEl = el('div', 'wai-pzoom'); zoomEl.appendChild(document.createElement('img')); zoomEl.appendChild(el('span'));
+      zoomEl.firstChild.referrerPolicy = 'no-referrer'; document.body.appendChild(zoomEl);
+    }
+    zoomEl.firstChild.src = t.getAttribute('data-zoom'); zoomEl.lastChild.textContent = t.getAttribute('data-name');
+    r = t.getBoundingClientRect();
+    x = Math.max(8, Math.min(innerWidth - S - 8, r.left + r.width / 2 - S / 2));
+    y = r.top - S - 44 > 8 ? r.top - S - 44 : r.bottom + 8; // above the photo, below if no room
+    zoomEl.style.left = x + 'px'; zoomEl.style.top = y + 'px'; zoomEl.classList.add('on');
+  });
+  document.addEventListener('scroll', zoomOff, true);
+  // Appends the people block inside an answer's .a-md (before its "open" button, if any). onPick(person) re-asks the question.
+  function addPeople(box, people, pick, onPick) {
+    var list = (Array.isArray(people) ? people : []).filter(function (p) { return p && typeof p.name === 'string' && p.name; }).slice(0, 12), n;
+    if (!list.length) return;
+    n = list.length === 1 ? personCard(list[0]) : (pick && onPick) ? peoplePick(list, onPick) : peopleStrip(list);
+    if (list.length === 1) { var dup = box.querySelector(':scope > .subj'); if (dup) dup.remove(); } // the card already names them
+    box.insertBefore(n, box.querySelector(':scope > .go'));
+    tideIn(n);
+  }
+  return { render: render, tideIn: tideIn, roll: roll, modulePicker: modulePicker, addPeople: addPeople };
 })();

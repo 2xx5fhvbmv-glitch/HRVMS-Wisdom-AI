@@ -295,7 +295,7 @@
 #tpx .rtip .rt-r{font-size:11.5px;color:rgba(255,255,255,.82);margin-top:3px;line-height:1.5}
 #tpx .rtip .rt-d{font-size:10.5px;color:rgba(255,255,255,.55);margin-top:5px}
 #tpx .tpx-av{flex:none;border-radius:50%;background:#E1EBEC;color:var(--teal);font-weight:600;display:grid;place-items:center;overflow:hidden;border:2px solid #fff;box-shadow:0 0 0 1.5px var(--teal-3)}
-#tpx .tpx-av img{width:100%;height:100%;object-fit:cover}
+#tpx .tpx-av .wav{width:100%;height:100%}
 #tpx .metric .ml{font-size:9.5px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
 #tpx .metric .mv{font-size:16px;font-weight:600;color:var(--teal);font-variant-numeric:tabular-nums;line-height:1.1}
 #tpx .metric .mv small{font-size:10px;font-weight:500;color:var(--faint)}
@@ -652,7 +652,6 @@
     // ---- Talent Pool list (DataTables, server-side — same endpoint, filters, sort and paging as before) ----
     const TPX_ASSET = @json(rtrim(URL::asset(''), '/'));
     const tpxAsset = p => !p ? '' : (/^(https?:)?\/\//.test(p) ? p : TPX_ASSET + '/' + String(p).replace(/^\//, ''));
-    const tpxInitials = n => (String(n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')) || '?';
     const TPX_AVAIL = { available: ['Available', 'ok'], pending: ['Pending Response', 'warn'], unavailable: ['Unavailable', 'muted'], consent_rejected: ['Consent Rejected', 'err'] };
     const tpxPct = v => (v === null || v === '' || isNaN(v)) ? null : Math.max(0, Math.min(100, +v));
     const tpxNum = v => +(+v).toFixed(1);
@@ -711,7 +710,7 @@
                         { data: null, orderable: false, searchable: false, className: 'tpx-chevcell', defaultContent: '<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>' },
                         { data: 'first_name', name: 'first_name', render: function (data, type, row) {
                             const sub = [row.countryName, tpxYears(row.total_work_exp)].filter(Boolean).join(' · ');
-                            const img = row.profileImg ? `<img src="${escHtml(row.profileImg)}" alt="${escHtml(row.name)}" data-i="${tpxInitials(row.name)}" onerror="this.parentNode.textContent=this.dataset.i">` : tpxInitials(row.name);
+                            const img = wavHTML({ photo: row.profileImg, name: row.name, id: row.applicant_id || row.name });
                             return `<div class="appcell"><span class="tpx-av">${img}</span><div><div class="nm userApplicants-btn" data-id="${escHtml(row.applicant_id)}">${escHtml(row.name)}</div><div class="sub">${escHtml(sub) || '—'}</div></div></div>`;
                         }},
                         { data: 'Position', name: 'Position', render: function (data, type, row) {

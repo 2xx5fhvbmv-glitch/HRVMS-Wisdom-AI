@@ -104,16 +104,7 @@
         justify-content: center;
         width: 150px;
     }
-    .ta-todo-card-v2 .ta-todo-initials {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #fff;
-        font-weight: 600;
-        font-size: 13px;
-    }
+    .ta-todo-card-v2 .img-circle .wav { width: 100%; height: 100%; }
 </style>
         <div class="row g-3 g-xxl-4 card-heigth">
              <!-- Total Employees -->
@@ -252,41 +243,10 @@
                     </div>
 
                     <div class="todoList-main ta-todo-list-v2">
-                        @php
-                            $todoDefaultPhoto = url(config('settings.default_picture'));
-                            $todoPalette = ['var(--teal)', '#0E8A9E', 'var(--aqua)', '#4A5F8A', 'var(--muted)'];
-                            $todoInitials = function ($name) {
-                                $parts = preg_split('/\s+/', trim((string) $name));
-                                $initials = '';
-                                foreach (array_slice($parts, 0, 2) as $part) {
-                                    $initials .= mb_strtoupper(mb_substr($part, 0, 1));
-                                }
-                                return $initials !== '' ? $initials : '?';
-                            };
-                            $todoAvatarColor = function ($name) use ($todoPalette) {
-                                $hash = 0;
-                                foreach (str_split((string) $name) as $ch) {
-                                    // Bounded modulo every step — without this, a long
-                                    // enough name overflows PHP's int range into a
-                                    // float, and abs()/% on that float can produce a
-                                    // negative or out-of-range result (crashed with
-                                    // "Undefined array key -4" on a real employee name).
-                                    $hash = (ord($ch) + (($hash << 5) - $hash)) % 1000000007;
-                                }
-                                return $todoPalette[abs($hash) % count($todoPalette)];
-                            };
-                        @endphp
                         @forelse ($attendanceDataTodoList as $todo)
-                            @php
-                                $todoHasPhoto = !empty($todo->profileImg) && $todo->profileImg !== $todoDefaultPhoto;
-                            @endphp
                             <div class="todoList-block">
                                 <div class="img-circle">
-                                    @if($todoHasPhoto)
-                                        <img src="{{ $todo->profileImg }}" alt="image">
-                                    @else
-                                        <span class="ta-todo-initials" style="background:{{ $todoAvatarColor($todo->EmployeeName) }};">{{ $todoInitials($todo->EmployeeName) }}</span>
-                                    @endif
+                                    <x-wai-avatar :photo="$todo->profileImg ?? null" :name="$todo->EmployeeName" :gender="$todo->gender ?? null" :id="$todo->Emp_id ?? $todo->EmployeeName" />
                                 </div>
                                 <div class="flex-grow-1">
                                     <p class="mb-1">

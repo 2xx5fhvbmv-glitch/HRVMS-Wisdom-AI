@@ -66,7 +66,7 @@
     .vm-emp{ display:flex; align-items:center; gap:10px; min-width:0; }
     .vm-av{ width:28px; height:28px; border-radius:50%; flex:none; display:grid; place-items:center; font-size:11px;
         font-weight:600; color:var(--teal); background:var(--teal-3); overflow:hidden; }
-    .vm-av img{ width:100%; height:100%; object-fit:cover; }
+    .vm-av .wav{ width:100%; height:100%; }
     .vm-ename{ font-size:14px; font-weight:400; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .vm-oob{ display:inline-block; font-size:10px; font-weight:500; letter-spacing:.2px; color:var(--critical);
         background:var(--critical-bg); border-radius:6px; padding:2px 7px; margin-left:6px; vertical-align:middle; }

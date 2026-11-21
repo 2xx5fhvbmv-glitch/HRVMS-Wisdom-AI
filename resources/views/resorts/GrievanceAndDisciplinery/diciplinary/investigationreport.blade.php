@@ -47,12 +47,6 @@
             $dviPriority = $Disciplinary_parent->Priority ?? 'Low';
             $dviPriorityColor = $dviPriority == 'High' ? 'var(--error)' : ($dviPriority == 'Medium' ? 'var(--warning)' : 'var(--positive)');
 
-            // Initials fallback for the employee avatar — the real photo
-            // already comes with a built-in default-picture fallback via
-            // Common::getResortUserPicture(), this is just an extra safety
-            // net if that URL itself ever fails to load.
-            $dviInitials = strtoupper(substr($Disciplinary_parent->first_name ?? '', 0, 1) . substr($Disciplinary_parent->last_name ?? '', 0, 1)) ?: '?';
-
             // Attachments — build a clean, non-mutating file list (the old
             // code mutated $Path itself inside the loop, corrupting every
             // file link rendered afterwards on this page, including the
@@ -128,8 +122,7 @@
                 <div class="dvi-card dvi-rail">
                     <div class="rh">Employee</div>
                     <div class="who">
-                        <img class="dvi-av" src="{{ Common::getResortUserPicture($Disciplinary_parent->GetEmployee->resortAdmin->id) }}" alt=""
-                            onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'dvi-av',textContent:'{{ $dviInitials }}'}))">
+                        <x-wai-avatar :photo="Common::getResortUserPicture($Disciplinary_parent->GetEmployee->resortAdmin->id)" :name="trim($Disciplinary_parent->first_name . ' ' . $Disciplinary_parent->last_name)" :gender="$Disciplinary_parent->GetEmployee->resortAdmin->gender ?? null" :id="$Disciplinary_parent->employee_code ?? $Disciplinary_parent->Parentid" :size="46" />
                         <div class="nm">{{ $Disciplinary_parent->first_name }} {{ $Disciplinary_parent->last_name }}</div>
                     </div>
                     <div class="klist">

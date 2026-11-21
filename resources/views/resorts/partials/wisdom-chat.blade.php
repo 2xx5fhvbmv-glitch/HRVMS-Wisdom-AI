@@ -521,7 +521,7 @@
 #uc-panel .uc-search-box input { border: none; background: none; outline: none; font-family: inherit; font-size: 13.5px; color: var(--ink); width: 100%; padding: 0; }
 #uc-panel .uc-search-box input::placeholder { color: var(--faint); }
 
-/* Photo-first avatars with initials fallback (list rows via .crow .av,
+/* Photo-first avatars with the shared drawn-portrait fallback (list rows via .crow .av,
    picker, thread header, member rows, and message-bubble sender avatars
    all funnel through the same ucAvatarInner() JS helper into this markup). */
 #uc-panel .uc-conv-avatar, #uc-panel .uc-picker-avatar, #uc-panel #uc-thread-avatar, #uc-panel .wai-mini-avatar.uc-msg-avatar {
@@ -540,10 +540,8 @@
     width: 42px; height: 42px; border-radius: 50%; flex: 0 0 42px; overflow: hidden; position: relative;
     background: var(--neutral-bg); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15px;
 }
-.uc-av-fallback {
-    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    color: #fff; font-weight: 600; font-size: inherit; z-index: 0;
-}
+/* the shared .wav portrait fills whichever avatar box it sits in */
+#uc-panel .wav, .crow .av .wav { width: 100%; height: 100%; }
 
 #uc-messages { background: #fff; }
 .uc-daysep { align-self: center; font-size: 10.5px; color: var(--wai-g4); padding: 2px 0 6px; margin: 4px 0; }
@@ -728,6 +726,7 @@
             if (res.body && res.body.usage) applyUsage(res.body.usage);
             if (res.ok && res.body.success) {
                 addMessage('assistant', res.body.reply, true);
+                if (res.body.people) showPeople(res.body.people, res.body.people_pick, text);
                 if (res.body.modules && res.body.modules.length) showModulePicker(res.body.modules, text);
             } else {
                 addMessage('assistant', '⚠️ ' + (res.body.message || 'Something went wrong. Please try again.'));
@@ -735,6 +734,18 @@
         })
         .catch(function () { hideTyping(); addMessage('assistant', '⚠️ Network error. Please try again.'); })
         .finally(function () { busy = false; sendBtn.disabled = usageOut || !input.value.trim(); if (!usageOut) input.focus(); });
+    }
+
+    // Photo card / stack / "which one?" cards for answers about particular employees; picking one re-asks the question for them.
+    function showPeople(people, pick, question) {
+        var bubbles = msgs.querySelectorAll('.wai-bot .a-md');
+        if (!bubbles.length) return;
+        WaiMd.addPeople(bubbles[bubbles.length - 1], people, pick, function (p) {
+            if (busy || usageOut) return;
+            input.value = question + ' (I mean ' + p.name + (p.emp_id ? ', ' + p.emp_id : '') + ')';
+            sendMessage();
+        });
+        scrollDown();
     }
 
     // Module chips go inside the last answer bubble; picking one re-asks the question scoped to it.
@@ -844,28 +855,10 @@
     }
     function isImageAttachment(url) { return /\.(jpe?g|png|gif|webp)(\?|$)/i.test(url); }
 
-    // Photo-first avatar with an initials fallback — Common::getResortUserPicture()
-    // (server side) already guarantees a non-empty URL, but that URL can still
-    // 404 (a missing/never-uploaded file), so this covers that case rather than
-    // trusting the URL always resolves.
-    var UC_AV_PALETTE = ['#0E8A9E', '#6B4FA0', '#1F9D6B', '#D98A00', '#4A5F8A', '#A0527A'];
-    function ucAvatarColor(name) {
-        var hash = 0, s = String(name || '');
-        for (var i = 0; i < s.length; i++) { hash = (s.charCodeAt(i) + ((hash << 5) - hash)) % 1000000007; }
-        return UC_AV_PALETTE[Math.abs(hash) % UC_AV_PALETTE.length];
-    }
-    function ucInitials(name) {
-        var parts = String(name || '').trim().split(/\s+/).slice(0, 2);
-        var s = parts.map(function (p) { return p.charAt(0).toUpperCase(); }).join('');
-        return s || '?';
-    }
+    // Shared portrait avatar (wavHTML): real photo first (a 404 removes the <img>), else the drawn portrait.
+    // Chat payloads carry no gender, so people without a photo show the neutral figure.
     function ucAvatarInner(profile, name) {
-        // Fallback must be painted BEFORE the photo: both are position:absolute
-        // inset:0 with no z-index, so whichever is later in the DOM paints on
-        // top. With the photo last, a successful load naturally covers the
-        // fallback; onerror removes the <img>, revealing the fallback beneath.
-        return '<span class="uc-av-fallback" style="background:' + ucAvatarColor(name) + '">' + escapeHtml(ucInitials(name)) + '</span>' +
-            (profile ? '<img src="' + profile + '" alt="" onerror="this.remove()">' : '');
+        return wavHTML({ photo: profile, name: name, id: name });
     }
     function ucDayLabel(dateStr) {
         if (!dateStr) return '';

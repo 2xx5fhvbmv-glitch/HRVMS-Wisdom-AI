@@ -9,25 +9,6 @@
 
 @section('content')
     @php
-        // Presentational-only helpers for this view. No query/data changes —
-        // same pattern already used in resorts/incident/incident/investigation.blade.php,
-        // reused here so the two screens read identically per the redesign brief.
-        $idtInitials = function ($name) {
-            $parts = preg_split('/\s+/', trim((string) $name));
-            $initials = '';
-            foreach (array_slice($parts, 0, 2) as $part) {
-                $initials .= mb_strtoupper(mb_substr($part, 0, 1));
-            }
-            return $initials !== '' ? $initials : '?';
-        };
-        $idtPalette = ['#0E8A9E', '#6B4FA0', 'var(--positive)', 'var(--warning)', '#4A5F8A', '#A0527A'];
-        $idtAvatarColor = function ($name) use ($idtPalette) {
-            $hash = 0;
-            foreach (str_split((string) $name) as $ch) {
-                $hash = (ord($ch) + (($hash << 5) - $hash)) % 1000000007;
-            }
-            return $idtPalette[abs($hash) % count($idtPalette)];
-        };
         $idtPillClass = function ($value) {
             $map = [
                 'Low' => 'neu', 'Medium' => 'warn', 'High' => 'error',
@@ -65,6 +46,7 @@
                     'empid'     => $emp->Emp_id ?? '-',
                     'dept'      => $emp->department->name ?? 'N/A',
                     'photo_id'  => $emp->Admin_Parent_id ?? null,
+                    'gender'    => $emp->resortAdmin->gender ?? null,
                     'has_photo' => !empty($emp->resortAdmin->profile_picture ?? null),
                 ];
             }
@@ -144,12 +126,7 @@
                     <div class="idt-rail">
                         <div class="rh">Reported by</div>
                         <div class="idt-who">
-                            <span class="idt-av idt-bigav" style="background:{{ $idtAvatarColor($incident->reporter->resortAdmin->full_name ?? '') }};color:#fff">
-                                @if(!empty($incident->reporter->resortAdmin->profile_picture ?? null))
-                                    <img src="{{ Common::getResortUserPicture($incident->reporter->Admin_Parent_id) }}" alt="" onerror="this.remove()">
-                                @endif
-                                {{ $idtInitials($incident->reporter->resortAdmin->full_name ?? '') }}
-                            </span>
+                            <span class="idt-av idt-bigav"><x-wai-avatar :photo="!empty($incident->reporter->resortAdmin->profile_picture ?? null) ? Common::getResortUserPicture($incident->reporter->Admin_Parent_id) : null" :name="$incident->reporter->resortAdmin->full_name ?? ''" :gender="$incident->reporter->resortAdmin->gender ?? null" :id="$incident->reporter->Emp_id ?? null" /></span>
                             <div class="nm">{{ $incident->reporter->resortAdmin->full_name ?? '-' }}</div>
                         </div>
                         <div class="idt-klist">
@@ -183,12 +160,7 @@
                                 @elseif($n === 1)
                                     @php $p = $ppl[0]; @endphp
                                     <div class="idt-rline">
-                                        <span class="idt-av" style="background:{{ $idtAvatarColor($p['name']) }};color:#fff">
-                                            @if($p['has_photo'])
-                                                <img src="{{ Common::getResortUserPicture($p['photo_id']) }}" alt="" onerror="this.remove()">
-                                            @endif
-                                            {{ $idtInitials($p['name']) }}
-                                        </span>
+                                        <span class="idt-av"><x-wai-avatar :photo="$p['has_photo'] ? Common::getResortUserPicture($p['photo_id']) : null" :name="$p['name']" :gender="$p['gender'] ?? null" :id="$p['empid']" /></span>
                                         <div class="idt-pmeta">
                                             <div class="idt-nm">{{ $p['name'] }} <span class="idt-id">#{{ $p['empid'] }}</span></div>
                                             <div class="idt-sum">{{ $p['dept'] }}</div>
@@ -198,12 +170,7 @@
                                     <div class="idt-rline">
                                         <div class="idt-avstack">
                                             @foreach(array_slice($ppl, 0, 5) as $p)
-                                                <span class="idt-av" style="background:{{ $idtAvatarColor($p['name']) }};color:#fff">
-                                                    @if($p['has_photo'])
-                                                        <img src="{{ Common::getResortUserPicture($p['photo_id']) }}" alt="" onerror="this.remove()">
-                                                    @endif
-                                                    {{ $idtInitials($p['name']) }}
-                                                </span>
+                                                <span class="idt-av"><x-wai-avatar :photo="$p['has_photo'] ? Common::getResortUserPicture($p['photo_id']) : null" :name="$p['name']" :gender="$p['gender'] ?? null" :id="$p['empid']" /></span>
                                             @endforeach
                                             @if($n > 5)
                                                 <span class="idt-av idt-more">+{{ $n - 5 }}</span>
@@ -218,12 +185,7 @@
                                     <div class="idt-roster" id="{{ $role['rosterId'] }}" hidden>
                                         @foreach($ppl as $p)
                                             <div class="idt-rrow">
-                                                <span class="idt-av" style="background:{{ $idtAvatarColor($p['name']) }};color:#fff">
-                                                    @if($p['has_photo'])
-                                                        <img src="{{ Common::getResortUserPicture($p['photo_id']) }}" alt="" onerror="this.remove()">
-                                                    @endif
-                                                    {{ $idtInitials($p['name']) }}
-                                                </span>
+                                                <span class="idt-av"><x-wai-avatar :photo="$p['has_photo'] ? Common::getResortUserPicture($p['photo_id']) : null" :name="$p['name']" :gender="$p['gender'] ?? null" :id="$p['empid']" /></span>
                                                 <span class="idt-rn">{{ $p['name'] }}</span>
                                                 <span class="idt-rid">#{{ $p['empid'] }}</span>
                                                 <span class="idt-rr">{{ $p['dept'] }}</span>
@@ -375,7 +337,7 @@
 
 /* ===== avatars (shared by rail + people-involved) ===== */
 .idt-av{width:40px;height:40px;border-radius:50%;flex:none;object-fit:cover;display:grid;place-items:center;font-size:13px;font-weight:600;letter-spacing:.3px;position:relative;overflow:hidden;border:2px solid #fff}
-.idt-av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.idt-av .wav{width:100%;height:100%}
 .idt-bigav{width:52px;height:52px;font-size:15px;border:none}
 
 /* ===== people involved (scalable) ===== */

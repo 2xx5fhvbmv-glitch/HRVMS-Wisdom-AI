@@ -317,20 +317,11 @@
                                         @foreach($employeeMinWageList as $row)
                                             @php
                                                 $firstName = \Illuminate\Support\Str::before($row['name'], ' ');
-                                                $isDefaultPic = $row['picture'] === url(config('settings.default_picture'));
-                                                $initials = collect(explode(' ', trim($row['name'])))
-                                                    ->filter()
-                                                    ->map(fn($part) => mb_strtoupper(mb_substr($part, 0, 1)))
-                                                    ->take(2)
-                                                    ->implode('');
                                             @endphp
                                             <div class="wct-avatar-item"
                                                  title="{{ $row['name'] }} &mdash; {{ $row['code'] }} &mdash; {{ $row['salary'] }} {{ $row['currency'] }}">
-                                                @if($isDefaultPic || !$row['picture'])
-                                                    <span class="wct-avatar-photo wct-avatar-initials">{{ $initials ?: '?' }}</span>
-                                                @else
-                                                    <img class="wct-avatar-photo" src="{{ $row['picture'] }}" alt="{{ $row['name'] }}">
-                                                @endif
+                                                {{-- Portrait avatar (the row carries no gender, so no photo shows the neutral figure). --}}
+                                                <span class="wct-avatar-photo"><x-wai-avatar :photo="$row['picture'] ?? null" :name="$row['name']" :gender="$row['gender'] ?? null" :id="$row['code']" /></span>
                                                 <small class="wct-avatar-name">{{ $firstName }}</small>
                                                 <small class="wct-avatar-code">{{ $row['code'] }}</small>
                                             </div>
@@ -677,27 +668,11 @@
                         <tbody>
                             @foreach($employeeMinWageList as $row)
                                 @php
-                                    $isDefaultPic = $row['picture'] === url(config('settings.default_picture'));
-                                    $hasRealPhoto = !$isDefaultPic && $row['picture'];
-                                    $initials = collect(explode(' ', trim($row['name'])))
-                                        ->filter()
-                                        ->map(fn($part) => mb_strtoupper(mb_substr($part, 0, 1)))
-                                        ->take(2)
-                                        ->implode('');
                                 @endphp
                                 <tr>
                                     <td>
                                         <div class="emp">
-                                            <div class="av">
-                                                {{ $initials ?: '?' }}
-                                                @if($hasRealPhoto)
-                                                    {{-- photo-first, initials underneath as the fallback: if the
-                                                         photo URL 404s/fails, onerror removes just the <img> and
-                                                         the initials already sitting behind it show through —
-                                                         never a broken-image icon. --}}
-                                                    <img src="{{ $row['picture'] }}" alt="" onerror="this.remove()">
-                                                @endif
-                                            </div>
+                                            <x-wai-avatar :photo="$row['picture'] ?? null" :name="$row['name']" :gender="$row['gender'] ?? null" :id="$row['code']" :size="30" />
                                             <div class="who">
                                                 <div class="nm">{{ $row['name'] }}</div>
                                                 <div class="id">{{ $row['code'] }}</div>
@@ -1109,21 +1084,14 @@
         max-width: 60px;
     }
     .wct-avatar-photo {
+        display: block;
         width: 42px;
         height: 42px;
         border-radius: 50%;
-        object-fit: cover;
+        overflow: hidden;
         border: 2px solid var(--error);
     }
-    .wct-avatar-initials {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: var(--teal-3);
-        color: var(--teal);
-        font-size: 13px;
-        font-weight: 700;
-    }
+    .wct-avatar-photo .wav { width: 100%; height: 100%; }
     .wct-avatar-name {
         display: block;
         width: 100%;

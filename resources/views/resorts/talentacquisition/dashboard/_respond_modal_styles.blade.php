@@ -82,7 +82,7 @@ body.rsp-modal-open .modal-backdrop { background: rgba(6, 24, 28, .5); backdrop-
 /* request summary — solid, no glass-on-glass */
 .rsp-req { position: relative; display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid var(--line, #EEF2F2); border-radius: 14px; padding: 15px 16px; margin: 18px 0; }
 .rsp-av { position: relative; width: 48px; height: 48px; flex: none; border-radius: 50%; background: var(--teal-soft, #F5F8F8); color: var(--teal, #014653); font-size: 15px; font-weight: 600; display: grid; place-items: center; overflow: hidden; }
-.rsp-av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.rsp-av .wav { width: 100%; height: 100%; }
 .rsp-rbody { flex: 1; min-width: 0; }
 .rsp-rtop { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .rsp-rname { font-size: 14.5px; font-weight: 600; color: var(--ink, #14232A); }

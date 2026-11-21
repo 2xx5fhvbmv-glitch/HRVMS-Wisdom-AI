@@ -70,24 +70,15 @@
                                                         @php
                                                             $ddAdminId = $emp->employee->resortAdmin->id ?? null;
                                                             $ddFullName = $emp->employee->resortAdmin->full_name ?? '';
-                                                            $ddParts = preg_split('/\s+/', trim($ddFullName));
-                                                            $ddInitials = strtoupper(($ddParts[0][0] ?? '') . (isset($ddParts[1]) ? $ddParts[1][0] : '')) ?: '?';
-                                                            // getResortUserPicturesBatch() always resolves to at least
-                                                            // the app's generic silhouette default — only render <img>
-                                                            // for a REAL uploaded photo, never the generic placeholder,
-                                                            // so the initials fallback shows instead per the photo-first
-                                                            // convention.
-                                                            $ddDefaultPicture = url(config('settings.default_picture'));
+                                                            // Portrait avatar: x-wai-avatar treats the app's generic default picture as "no photo".
                                                             $ddPhoto = $ddAdminId ? ($employeePictures[$ddAdminId] ?? null) : null;
-                                                            if ($ddPhoto === $ddDefaultPicture) { $ddPhoto = null; }
                                                             $ddPosition = $emp->employee->position->position_title ?? null;
                                                             $ddDepartment = $emp->employee->department->name ?? null;
                                                             $ddSub = trim(collect([$emp->employee->Emp_id, collect([$ddPosition, $ddDepartment])->filter()->implode(' – ')])->filter()->implode(' · '));
                                                         @endphp
                                                         <div class="dd-item{{ !empty($preselectedEmployeeId) && (int) $preselectedEmployeeId === (int) $emp->employee->id ? ' active' : '' }}" role="option" data-value="{{ $emp->employee->id }}">
                                                             <span class="ffs-dd-av">
-                                                                <span class="ffs-dd-av-fallback">{{ $ddInitials }}</span>
-                                                                @if($ddPhoto)<img src="{{ $ddPhoto }}" alt="" onerror="this.remove()">@endif
+                                                                <x-wai-avatar :photo="$ddPhoto" :name="$ddFullName" :gender="$emp->employee->resortAdmin->gender ?? null" :id="$emp->employee->Emp_id" :size="34" />
                                                             </span>
                                                             <span class="ffs-dd-text">
                                                                 <span class="dd-nm">{{ $emp->employee->Emp_id }} - {{ $ddFullName }}</span>
@@ -528,7 +519,7 @@
 .ffs-wrap.selected .ffs-pc-body { display: block; }
 .ffs-pc-head { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line, #EEF2F2); }
 .ffs-pa { width: 52px; height: 52px; flex: none; border-radius: 50%; background: var(--teal-soft, #f1f7f7); color: var(--teal); font-size: 16px; font-weight: 600; display: grid; place-items: center; overflow: hidden; }
-.ffs-pa img { width: 100%; height: 100%; object-fit: cover; }
+.ffs-pa .wav { width: 100%; height: 100%; }
 .ffs-pn { font-size: 17px; font-weight: 600; color: var(--ink); }
 .ffs-prow { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 13px 0; border-bottom: 1px solid #F3F6F6; font-size: 14px; }
 .ffs-prow:last-child { border-bottom: none; }
@@ -593,14 +584,12 @@
 .ffs-cfoot { display: flex; justify-content: flex-end; margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--line, #EEF2F2); }
 .ffs-submit:disabled { opacity: .55; cursor: default; transform: none !important; box-shadow: none !important; }
 
-/* employee dropdown — each row: photo-first avatar (initials fallback)
+/* employee dropdown — each row: portrait avatar
    + a stacked name/position-department text block, vertically centered
    against the avatar (matches the Incident "Reported by" avatar-row
    pattern used elsewhere, rather than top-aligning against wrapped text). */
 .ffs-emp-dd .dd-item { align-items: center; gap: 11px; }
 .ffs-dd-av { position: relative; width: 34px; height: 34px; flex: none; border-radius: 50%; background: var(--teal-soft, #f1f7f7); overflow: hidden; }
-.ffs-dd-av-fallback { position: absolute; inset: 0; display: grid; place-items: center; color: var(--teal); font-size: 12px; font-weight: 600; }
-.ffs-dd-av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ffs-dd-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .ffs-emp-dd .dd-nm { flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ffs-dd-sub { font-size: 12px; color: #99A1A5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1252,17 +1241,9 @@
                     document.getElementById('ffsWrap').classList.add('selected');
                     $('#submit').prop('disabled', false);
 
-                    // Photo-first avatar with an initials fallback — the
-                    // photo URL from Common::getResortUserPicture() is
-                    // already guaranteed non-empty, but the file itself can
-                    // still 404 (never-uploaded/removed), so onerror swaps
-                    // in the initials chip rather than showing a broken image.
+                    // Shared portrait avatar: photo first, else the drawn portrait by recorded gender (neutral if the response has none).
                     var fullName = response.data.full_name || '';
-                    var nameParts = fullName.trim().split(/\s+/);
-                    var initials = ((nameParts[0] || '').charAt(0) + (nameParts[1] ? nameParts[1].charAt(0) : '')).toUpperCase() || '?';
-                    $("#img-circle").html(
-                        '<img src="' + (response.data.profile_picture || '') + '" alt="' + fullName + '" onerror="this.parentNode.textContent=\'' + initials + '\'">'
-                    );
+                    $("#img-circle").html(wavHTML({ photo: response.data.profile_picture, name: fullName, gender: response.data.gender, id: response.data.emp_id }));
 
                     // Employee details panel — Employee ID / Department /
                     // Position are separate rows (Status is static "Resigned"

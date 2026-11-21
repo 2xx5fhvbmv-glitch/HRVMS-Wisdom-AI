@@ -364,7 +364,7 @@
 #spx .tbl tbody tr.main:hover td{background:#fafcfc}
 #spx .appcell{display:flex;align-items:center;gap:11px;min-width:0}
 #spx .spx-av{flex:none;width:36px;height:36px;border-radius:50%;background:#E1EBEC;color:var(--teal);font-size:11px;font-weight:600;display:grid;place-items:center;overflow:hidden;border:2px solid #fff;box-shadow:0 0 0 1.5px var(--teal-3)}
-#spx .spx-av img{width:100%;height:100%;object-fit:cover}
+#spx .spx-av .wav{width:100%;height:100%}
 #spx .appcell .nm{font-size:13.5px;font-weight:500;color:var(--ink)}
 #spx .appcell .sub{font-size:11px;color:var(--muted);margin-top:1px}
 #spx .iv .ivd{font-size:13px;font-weight:500;color:var(--g1)}
@@ -451,7 +451,6 @@ $(document).ready(function() {
         const src = c === 'MV' ? SPX_MV_FLAG : 'https://flagcdn.com/w40/' + c.toLowerCase() + '.png';
         return `<img class="flagimg" src="${src}" alt="${c}" loading="lazy" data-c="${c}" onerror="this.outerHTML='<span class=&quot;ccode&quot;>'+this.dataset.c+'</span>'">`;
     };
-    const spxIni = n => (String(n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')) || '?';
     const spxB64 = v => btoa(String(v));
     const SPX_STATUS = {
         'Slot Booked': ['Slot booked', 'teal'], 'Slot Not Booked': ['Slot not booked', 'warn'], 'Pending Review': ['Pending review', 'warn'],
@@ -494,7 +493,7 @@ $(document).ready(function() {
             { data: 'first_name', name: 'first_name', render: function (d, t, row) {
                 const name = ((row.first_name || '') + ' ' + (row.last_name || '')).replace(/^./, c => c.toUpperCase()).trim();
                 const pm = /<img[^>]*src="([^"]+)"/.exec(row.Applicants || ''), photo = pm ? pm[1] : '';
-                const img = photo ? `<img src="${escHtml(photo)}" alt="${escHtml(name)}" data-i="${spxIni(name)}" onerror="this.parentNode.textContent=this.dataset.i">` : spxIni(name);
+                const img = wavHTML({ photo: photo, name: name, id: row.ApplicantStatus_id || name });
                 return `<div class="appcell"><span class="spx-av">${img}</span><div><div class="nm userApplicants-btn" data-id="${spxB64(row.ApplicantStatus_id)}" style="cursor:pointer">${escHtml(name)}</div><div class="sub">${escHtml(row.Position)}</div></div></div>`;
             }},
             { data: 'Stage', name: 'Stage', render: function (d, t, row) {

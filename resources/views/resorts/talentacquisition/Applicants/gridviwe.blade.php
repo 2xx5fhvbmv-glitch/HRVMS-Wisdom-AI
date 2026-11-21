@@ -17,7 +17,6 @@
             $apxName   = trim(ucfirst($a->first_name) . ' ' . ucfirst($a->last_name));
             $apxRole   = ucfirst((string) $a->position_title);
             $apxAid    = base64_encode($a->id);
-            $apxIni    = strtoupper(mb_substr((string) $a->first_name, 0, 1) . mb_substr((string) $a->last_name, 0, 1)) ?: '?';
             $apxExp    = $a->total_work_exp;
             $apxExpTxt = is_numeric($apxExp) ? $apxExp . ' ' . ((float) $apxExp == 1.0 ? 'yr' : 'yrs') : ($apxExp ?: '—');
             $apxEmployed = $a->employment_status !== 'Available';
@@ -32,7 +31,7 @@
             <div class="apx-top">
                 <div class="apx-ring {{ $apxRingCls }}" data-progress="{{ $apxProg['percent'] }}" title="Hiring progress: {{ $apxProg['percent'] }}%">
                     <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="trk" cx="60" cy="60" r="54"/><circle class="val" cx="60" cy="60" r="54"/></svg>
-                    <span class="apx-av apx-av-lg">{{ $apxIni }}@if($a->profileImg)<img src="{{ $a->profileImg }}" alt="" onerror="this.remove()">@endif</span>
+                    <span class="apx-av apx-av-lg"><x-wai-avatar :photo="$a->profileImg" :name="$apxName" :id="$a->id" /></span>
                 </div>
                 <div class="nm">{{ $apxName }}</div>
                 <div class="ro">{{ $apxRole }}</div>

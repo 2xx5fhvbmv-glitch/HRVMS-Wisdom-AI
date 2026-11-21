@@ -123,7 +123,7 @@
                                 'rank' => \App\Helpers\Common::rankLabel($employee),
                                 'nation' => $employee->nationality,
                                 // No photo column is selected by this query — every
-                                // seat renders via the initials fallback below, per
+                                // seat renders the neutral portrait, per
                                 // the "never fabricate a photo" rule. Wiring a real
                                 // photo would mean adding a column to the
                                 // employeesByPosition select in ViewManning(), a
@@ -298,21 +298,13 @@
     var VM_SECTIONS = @json($vmSections);
 
     function vmEsc(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
-    function vmInitials(n) {
-        return String(n).split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w[0]; }).join('').toUpperCase();
-    }
     var vmRevIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6M20.5 9A9 9 0 006 5.3L1 10M23 14l-5 4.7A9 9 0 013.5 15"/></svg>';
     var vmChevIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
 
-    // Employee avatar: photo-first, initials fallback. s.photo is always
-    // null today (see the @php block above) — every seat renders via
-    // initials, matching "never fabricate a photo" — but the img/onerror
-    // path is real and takes over the moment a real photo field exists.
+    // Employee avatar: shared portrait (wavHTML). No photo/gender column is selected by this query, so seats show the
+    // neutral figure; photo and gender are picked up automatically once the row carries them.
     function vmAvatar(s) {
-        if (s.photo) {
-            return '<span class="vm-av"><img src="' + vmEsc(s.photo) + '" alt="' + vmEsc(s.name) + '" onerror="this.parentNode.textContent=\'' + vmInitials(s.name) + '\'"></span>';
-        }
-        return '<span class="vm-av">' + vmEsc(vmInitials(s.name)) + '</span>';
+        return '<span class="vm-av">' + wavHTML({ photo: s.photo, name: s.name, gender: s.gender, id: s.name }) + '</span>';
     }
     function vmSeatCell(s) {
         if (s.vacant) return '<div class="vm-emp"><span class="vm-vacant"><span class="vm-vd"></span>Vacant</span></div>';

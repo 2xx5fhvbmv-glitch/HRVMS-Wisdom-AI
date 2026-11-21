@@ -67,10 +67,6 @@
                 ? \App\Helpers\Common::resolveGrievanceAttachments($Grivance_Parent->Attachements, $path."/".$Grivance_Parent->Grivance_id, $Grivance_Parent->resort_id)
                 : [];
 
-            // Initials fallback for the employee avatar, matching the pattern
-            // already established on the Disciplinary Investigation page.
-            $gviInitials = strtoupper(substr($Grivance_Parent->first_name ?? '', 0, 1) . substr($Grivance_Parent->last_name ?? '', 0, 1)) ?: '?';
-
             // Follow-up action / investigation stage — humanise the raw
             // camel-case enum values for display only; unmapped values fall
             // back to the raw string rather than guessing.
@@ -164,8 +160,7 @@
                     <div class="gvi-card gvi-rail">
                         <div class="rh">Employee</div>
                         <div class="who">
-                            <img class="gvi-av" src="{{ Common::getResortUserPicture($Grivance_Parent->Parentid) }}" alt=""
-                                onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'gvi-av',textContent:'{{ $gviInitials }}'}))">
+                            <x-wai-avatar :photo="Common::getResortUserPicture($Grivance_Parent->Parentid)" :name="trim($Grivance_Parent->first_name . ' ' . $Grivance_Parent->last_name)" :gender="$Grivance_Parent->gender ?? null" :id="$Grivance_Parent->Parentid" :size="46" />
                             <div class="nm">{{ $Grivance_Parent->first_name }} {{ $Grivance_Parent->last_name }}</div>
                         </div>
                         <div class="klist">
@@ -194,14 +189,13 @@
                         @php
                             $gviStageInfo = $gviStageLabels[$value->investigation_stage] ?? [$value->investigation_stage, 'stage-init'];
                             $gviActionLabel = $gviActionLabels[$value->follow_up_action] ?? $value->follow_up_action;
-                            $gviInitialsHist = strtoupper(substr($value->first_name ?? '', 0, 1) . substr($value->last_name ?? '', 0, 1)) ?: '?';
                             $gviExplanationLen = strlen(strip_tags($value->inves_find_recommendations ?? ''));
                         @endphp
                         <div class="gvi-hentry @if($key === 0) latest @endif">
                             <span class="gvi-hdot"></span>
                             <div class="gvi-hcard">
                                 <div class="gvi-hhead">
-                                    <div class="gvi-hav">{{ $gviInitialsHist }}</div>
+                                    <x-wai-avatar :name="trim($value->first_name . ' ' . $value->last_name)" :gender="$value->gender ?? null" :id="$value->first_name . $value->last_name" :size="34" />
                                     <div class="gvi-hwho"><div class="hn">{{ $value->first_name }} {{ $value->last_name }}</div><div class="hr">Committee member</div></div>
                                     @if(!empty($value->investigation_stage))
                                         <span class="gvi-hpill {{ $gviStageInfo[1] }}">{{ $gviStageInfo[0] }}</span>

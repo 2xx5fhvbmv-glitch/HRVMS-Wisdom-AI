@@ -140,7 +140,7 @@
     .pay-pop .er { display: grid; grid-template-columns: 26px 1fr 88px; align-items: center; gap: 10px; padding: 8px 15px 8px 22px; border-bottom: 1px solid rgba(1,70,83,.07); }
     .pay-pop .er:last-of-type { border-bottom: none; }
     .pay-pop .av { width: 26px; height: 26px; border-radius: 50%; background: var(--teal-3); color: var(--teal); font-size: 9.5px; font-weight: 600; display: grid; place-items: center; letter-spacing: .2px; overflow: hidden; flex: none; }
-    .pay-pop .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pay-pop .av .wav { width: 100%; height: 100%; }
     .pay-pop .who { min-width: 0; display: flex; flex-direction: column; gap: 1px; line-height: 1.3; }
     .pay-pop .who .n { display: block; font-size: 12px; color: var(--ink); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .pay-pop .who .dp { display: block; font-size: 10.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

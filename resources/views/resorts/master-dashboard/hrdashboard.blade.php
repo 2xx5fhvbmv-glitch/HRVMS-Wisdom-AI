@@ -10,7 +10,6 @@
 @section('content')
 @php
     // Presentation helpers only — every figure below comes from variables MasterDashboardController::hr_dashboard() already passes.
-    $initials = fn ($name) => collect(explode(' ', trim((string) $name)))->filter()->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->take(2)->implode('') ?: '?';
     $plural   = fn ($n, $one, $many = null) => $n . ' ' . ($n == 1 ? $one : ($many ?? $one . 's'));
     $pctOf    = fn ($n) => $total_employees > 0 ? round($n / $total_employees * 100, 1) : 0;
     $defaultPic = url(config('settings.default_picture'));
@@ -194,7 +193,7 @@
             @endphp
             @if (!$isApplicant || in_array($t->ApplicationStatus ?? '', ['Sortlisted', 'Complete']))
             <div class="td-item">
-              <span class="td-ico">@if($photo)<img src="{{ $photo }}" alt="{{ $person }}" data-i="{{ $initials($person) }}" onerror="this.parentNode.textContent=this.dataset.i">@else{{ $initials($person) }}@endif</span>
+              <span class="td-ico"><x-wai-avatar :photo="$photo" :name="$person" :id="$person" :size="32" /></span>
               <span class="td-bd"><span class="td-tt">{{ $title }}<small>{{ $sub }}</small></span></span>
               <a class="td-btn" href="{{ $href }}">{{ $btn }}</a>
             </div>
@@ -908,14 +907,11 @@
   var $ = function (id) { return document.getElementById(id); };
   var AJAX = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
   function getJson(url) { return fetch(url, { headers: AJAX, credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
-  function initials(n) { return (String(n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(function (p) { return p[0].toUpperCase(); }).join('')) || '?'; }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-  function fillAvatar(box, photo, name) {
-    var ini = initials(name);
-    if (!photo) { box.textContent = ini; return; }
-    var img = new Image(); img.alt = name || ''; img.src = photo;
-    img.onerror = function () { box.textContent = ini; };
-    box.appendChild(img);
+  // Shared portrait avatar (wavHTML) fills the box; gender/id are optional and the neutral figure shows without them.
+  function fillAvatar(box, photo, name, gender, id) {
+    box.innerHTML = wavHTML({ photo: photo, name: name, gender: gender, id: id || name });
+    var w = box.firstChild; w.style.width = w.style.height = '100%';
   }
   function plural(n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); }
 
@@ -1077,7 +1073,7 @@
       body.scrollTop = body.scrollHeight;
       fetch(URLS.wai, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', body: JSON.stringify({ message: q }) })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
-        .then(function (j) { if (j && j.usage) applyUsage(j.usage); var md = el('div', 'a-md'); WaiMd.render(md, j.success ? j.reply : (j.message || 'Something went wrong. Please try again.'), { thread: body, reveal: true }); a.replaceChild(md, p); if (j.success && j.modules && j.modules.length) md.appendChild(WaiMd.modulePicker(j.modules, function (m) { ask('In the ' + m + ' module: ' + q); })); body.scrollTop = body.scrollHeight; })
+        .then(function (j) { if (j && j.usage) applyUsage(j.usage); var md = el('div', 'a-md'); WaiMd.render(md, j.success ? j.reply : (j.message || 'Something went wrong. Please try again.'), { thread: body, reveal: true }); a.replaceChild(md, p); if (j.success && j.people) WaiMd.addPeople(md, j.people, j.people_pick, function (x) { ask(q + ' (I mean ' + x.name + (x.emp_id ? ', ' + x.emp_id : '') + ')'); }); if (j.success && j.modules && j.modules.length) md.appendChild(WaiMd.modulePicker(j.modules, function (m) { ask('In the ' + m + ' module: ' + q); })); body.scrollTop = body.scrollHeight; })
         .catch(function () { if (p.parentNode) a.replaceChild(el('p', '', 'Something went wrong. Please try again.'), p); });
     }
     function submitAsk() { var v = askInput.value.trim(); if (!v) return; body.textContent = ''; body._waiSubj = null; ask(v); open(); }
@@ -1229,7 +1225,7 @@
       cfBody.textContent = '';
       var a = el('div', 'a'), list = el('div', 'a-list'), r = el('div', 'a-row'), av = el('div', 'av'), ab = el('div', 'ab');
       a.appendChild(el('div', 'a-tag', 'Compliance' + (it.module ? ' · ' + it.module : '')));
-      fillAvatar(av, it.photo, it.name); av.style.background = 'var(--teal)';
+      fillAvatar(av, it.photo, it.name, it.gender, it.code); av.style.background = 'var(--teal)';
       ab.appendChild(el('div', 'at', it.name || 'Employee')); ab.appendChild(el('div', 'ac', [it.role, it.rule].filter(Boolean).join(' · ')));
       r.appendChild(av); r.appendChild(ab); r.appendChild(el('span', 'atag', { crit: 'Critical', high: 'High', med: 'Medium' }[it.sev])); list.appendChild(r);
       a.appendChild(list);
@@ -1267,7 +1263,7 @@
         if (!list.length) { bodyEl.appendChild(el('div', 'empty', 'No ' + (k === 'crit' ? 'critical' : k === 'high' ? 'high' : 'medium') + ' breaches.')); return; }
         list.slice(0, 5).forEach(function (it) {
           var item = el('div', 'cmp-item'), a = el('span', 'cmp-av'), main = el('div', 'cmp-main');
-          fillAvatar(a, it.photo, it.name);
+          fillAvatar(a, it.photo, it.name, it.gender, it.code);
           main.appendChild(el('div', 'cmp-rule', it.rule)); main.appendChild(el('div', 'cmp-sub', it.sub));
           var fix = el('button', 'cmp-fix', 'Suggestion'); fix.type = 'button'; fix.onclick = function () { openFix(it); };
           item.appendChild(a); item.appendChild(main); item.appendChild(el('span', 'cmp-rep', it.date)); item.appendChild(fix);

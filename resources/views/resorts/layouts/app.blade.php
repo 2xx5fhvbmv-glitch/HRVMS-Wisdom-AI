@@ -14,6 +14,7 @@
 
 </head>
 <body id="body-content " class="Dashboard-page">
+    @include('resorts.partials.wai-avatar')
     @php
     $resort_id =Auth::guard('resort-admin')->user()->resort_id;
     $user_id =  isset(Auth::guard('resort-admin')->user()->GetEmployee) ? Auth::guard('resort-admin')->user()->GetEmployee->id : '' ;

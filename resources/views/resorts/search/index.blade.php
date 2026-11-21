@@ -15,27 +15,6 @@
         return preg_replace('/(' . $needle . ')/i', '<mark class="sr-highlight">$1</mark>', $escaped);
     };
 
-    // Deterministic initials + color for a "no photo" avatar fallback.
-    $srPalette = ['#6B4FA0', '#0E8A9E', 'var(--positive)', 'var(--warning)', '#4A5F8A', '#A0527A'];
-    $srInitials = function ($name) {
-        $parts = preg_split('/\s+/', trim((string) $name));
-        $initials = '';
-        foreach (array_slice($parts, 0, 2) as $part) {
-            $initials .= mb_strtoupper(mb_substr($part, 0, 1));
-        }
-        return $initials !== '' ? $initials : '?';
-    };
-    $srAvatarColor = function ($name) use ($srPalette) {
-        $hash = 0;
-        foreach (str_split((string) $name) as $ch) {
-            // Bounded modulo every step — without this, a long enough name
-            // overflows PHP's int range into a float, and abs()/% on that
-            // float can produce a negative or out-of-range array index.
-            $hash = (ord($ch) + (($hash << 5) - $hash)) % 1000000007;
-        }
-        return $srPalette[abs($hash) % count($srPalette)];
-    };
-
     $peopleCount = $getEmployee->count() + $getApplicants->count() + $getEmployeeLeave->count();
     $workforceCount = $getVacancy->count() + $getPositions->count() + $getDepartments->count();
     $totalResults = $peopleCount + $getAnnouncements->count() + $getDocuments->count() + $workforceCount
@@ -76,11 +55,7 @@
 							@endphp
 							<li>
 								<a target="_blank" href="{{ route('people.employees.details', base64_encode($employee->id)) }}" class="sr-item">
-									@if($hasPhoto)
-										<img class="sr-avatar" src="{{ $employee->profile_picture_url }}" alt="">
-									@else
-										<span class="sr-avatar sr-avatar-initials" style="background:{{ $srAvatarColor($empName) }};">{{ $srInitials($empName) }}</span>
-									@endif
+									<x-wai-avatar :photo="$hasPhoto ? $employee->profile_picture_url : null" :name="$empName" :gender="$employee->resortAdmin->gender ?? null" :id="$employee->Emp_id" :size="32" />
 									<span class="sr-body">
 										<span class="sr-row-top">
 											<strong>{!! $srHighlight($empName) !!}</strong>
@@ -96,7 +71,7 @@
 							@php $applicantName = trim($applicant->first_name . ' ' . $applicant->last_name); @endphp
 							<li>
 								<a target="_blank" href="{{ route('resort.applicantForm', base64_encode($applicant->id)) }}" class="sr-item">
-									<span class="sr-avatar sr-avatar-initials" style="background:{{ $srAvatarColor($applicantName) }};">{{ $srInitials($applicantName) }}</span>
+									<x-wai-avatar :name="$applicantName" :id="$applicant->id" :size="32" />
 									<span class="sr-body">
 										<span class="sr-row-top">
 											<strong>{!! $srHighlight($applicantName) !!}</strong>
@@ -112,7 +87,7 @@
 							@php $leaveName = $employeeLeave->employee->full_name ?? ''; @endphp
 							<li>
 								<a target="_blank" href="{{ route('leave.details', base64_encode($employeeLeave->id)) }}" class="sr-item">
-									<span class="sr-avatar sr-avatar-initials" style="background:{{ $srAvatarColor($leaveName) }};">{{ $srInitials($leaveName) }}</span>
+									<x-wai-avatar :name="$leaveName" :gender="$employeeLeave->employee->gender ?? null" :id="$employeeLeave->employee->Emp_id ?? null" :size="32" />
 									<span class="sr-body">
 										<span class="sr-row-top">
 											<strong>{!! $srHighlight($leaveName) !!}</strong>

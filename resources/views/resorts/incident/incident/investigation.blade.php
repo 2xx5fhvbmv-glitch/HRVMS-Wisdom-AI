@@ -9,26 +9,7 @@
 
 @section('content')
     @php
-        // Presentational-only helpers for this view. No query/data changes —
-        // these only decide how the already-fetched models are displayed.
-        // Same pattern already used in resorts/search/index.blade.php.
-        $ivInitials = function ($name) {
-            $parts = preg_split('/\s+/', trim((string) $name));
-            $initials = '';
-            foreach (array_slice($parts, 0, 2) as $part) {
-                $initials .= mb_strtoupper(mb_substr($part, 0, 1));
-            }
-            return $initials !== '' ? $initials : '?';
-        };
-        // Deterministic avatar tint so initials-only avatars aren't all one flat color.
-        $ivPalette = ['#0E8A9E', '#6B4FA0', 'var(--positive)', 'var(--warning)', '#4A5F8A', '#A0527A'];
-        $ivAvatarColor = function ($name) use ($ivPalette) {
-            $hash = 0;
-            foreach (str_split((string) $name) as $ch) {
-                $hash = (ord($ch) + (($hash << 5) - $hash)) % 1000000007;
-            }
-            return $ivPalette[abs($hash) % count($ivPalette)];
-        };
+        // Presentational-only helpers for this view. No query/data changes.
         // Facts-strip / classification pills — cosmetic color mapping only,
         // falls back to neutral for any value not in the map (e.g. a
         // resort-configured status/severity/priority not listed here).
@@ -134,12 +115,7 @@
                         <div class="iv-ehead">Reported by</div>
                         <div class="iv-ebody">
                             <div class="iv-top">
-                                <span class="bigav" style="background:{{ $ivAvatarColor($incident->reporter->resortAdmin->full_name ?? '') }};color:#fff">
-                                    @if(!empty($incident->reporter->resortAdmin->profile_picture ?? null))
-                                        <img src="{{ Common::getResortUserPicture($incident->reporter->Admin_Parent_id) }}" alt="" onerror="this.remove()">
-                                    @endif
-                                    {{ $ivInitials($incident->reporter->resortAdmin->full_name ?? '') }}
-                                </span>
+                                <span class="bigav"><x-wai-avatar :photo="!empty($incident->reporter->resortAdmin->profile_picture ?? null) ? Common::getResortUserPicture($incident->reporter->Admin_Parent_id) : null" :name="$incident->reporter->resortAdmin->full_name ?? ''" :gender="$incident->reporter->resortAdmin->gender ?? null" :id="$incident->reporter->Emp_id ?? null" /></span>
                                 <div class="nm">{{ $incident->reporter->resortAdmin->full_name ?? '-' }}</div>
                             </div>
                             <div class="iv-rows">
@@ -329,12 +305,7 @@
                                         [$repStatusClass, $repStatusLabel] = $ivReportStatus($investigation);
                                     @endphp
                                     <button type="button" class="iv-tab {{ $i === 0 ? 'on' : '' }}" data-i="{{ $i }}">
-                                        <span class="av" style="background:{{ $ivAvatarColor($repName) }};color:#fff">
-                                            @if($repHasPhoto)
-                                                <img src="{{ Common::getResortUserPicture($investigation->addedBy->employee->Admin_Parent_id) }}" alt="" onerror="this.remove()">
-                                            @endif
-                                            {{ $ivInitials($repName) }}
-                                        </span>
+                                        <span class="av"><x-wai-avatar :photo="$repHasPhoto ? Common::getResortUserPicture($investigation->addedBy->employee->Admin_Parent_id) : null" :name="$repName" :gender="$investigation->addedBy->employee->resortAdmin->gender ?? null" :id="$investigation->addedBy->employee->Emp_id ?? null" /></span>
                                         {{ $repName }}
                                         <span class="tstat {{ $repStatusClass }}"></span>
                                     </button>
@@ -349,12 +320,7 @@
                                 <div class="iv-tpanel" data-p="{{ $i }}" @if($i !== 0) hidden @endif>
                                     <div class="iv-prow">
                                         <div class="who">
-                                            <span class="av" style="background:{{ $ivAvatarColor($repName) }};color:#fff">
-                                                @if($repHasPhoto)
-                                                    <img src="{{ Common::getResortUserPicture($investigation->addedBy->employee->Admin_Parent_id) }}" alt="" onerror="this.remove()">
-                                                @endif
-                                                {{ $ivInitials($repName) }}
-                                            </span>
+                                            <span class="av"><x-wai-avatar :photo="$repHasPhoto ? Common::getResortUserPicture($investigation->addedBy->employee->Admin_Parent_id) : null" :name="$repName" :gender="$investigation->addedBy->employee->resortAdmin->gender ?? null" :id="$investigation->addedBy->employee->Emp_id ?? null" /></span>
                                             <div><div class="n">{{ $repName }}</div></div>
                                         </div>
                                         <div class="iv-dpair">
@@ -456,12 +422,7 @@
                                 @endphp
                                 <div class="iv-srow {{ $stSubmitted ? '' : 'no-expand' }}">
                                     <div class="iv-shead {{ $stSubmitted ? 'click' : '' }}">
-                                        <span class="av" style="background:{{ $ivAvatarColor($stName) }};color:#fff">
-                                            @if($stHasPhoto)
-                                                <img src="{{ Common::getResortUserPicture($statement->employee->Admin_Parent_id) }}" alt="" onerror="this.remove()">
-                                            @endif
-                                            {{ $ivInitials($stName) }}
-                                        </span>
+                                        <span class="av"><x-wai-avatar :photo="$stHasPhoto ? Common::getResortUserPicture($statement->employee->Admin_Parent_id) : null" :name="$stName" :gender="$statement->employee->resortAdmin->gender ?? null" :id="$statement->employee->Emp_id ?? null" /></span>
                                         <div class="who">
                                             <div class="n">{{ $stName }}</div>
                                             <div class="dt">{{ \Carbon\Carbon::flexible($statement->created_at)->format('d M Y') }} &middot; {{ \Carbon\Carbon::flexible($statement->created_at)->format('h:i A') }}</div>
@@ -536,12 +497,7 @@
                                 @endphp
                                 <div class="iv-srow {{ $wSubmitted ? '' : 'no-expand' }}">
                                     <div class="iv-shead {{ $wSubmitted ? 'click' : '' }}">
-                                        <span class="av" style="background:{{ $ivAvatarColor($wName) }};color:#fff">
-                                            @if($wHasPhoto)
-                                                <img src="{{ Common::getResortUserPicture($witness->employee->Admin_Parent_id) }}" alt="" onerror="this.remove()">
-                                            @endif
-                                            {{ $ivInitials($wName) }}
-                                        </span>
+                                        <span class="av"><x-wai-avatar :photo="$wHasPhoto ? Common::getResortUserPicture($witness->employee->Admin_Parent_id) : null" :name="$wName" :gender="$witness->employee->resortAdmin->gender ?? null" :id="$witness->employee->Emp_id ?? null" /></span>
                                         <div class="who">
                                             <div class="n">{{ $wName }}</div>
                                             <div class="dt">{{ \Carbon\Carbon::flexible($witness->created_at)->format('d M Y') }} &middot; {{ \Carbon\Carbon::flexible($witness->created_at)->format('h:i A') }}</div>
@@ -788,7 +744,7 @@
 .iv-ebody{padding:18px 20px}
 .iv-top{display:flex;align-items:center;gap:13px}
 .bigav{width:52px;height:52px;font-size:15px;border-radius:50%;display:grid;place-items:center;font-weight:600;position:relative;overflow:hidden;flex:none}
-.bigav img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.bigav .wav,.iv-wrap .av .wav{width:100%;height:100%}
 .iv-top .nm{font-size:16px;font-weight:600;line-height:1.2;color:var(--ink)}
 .iv-rows{margin-top:16px}
 .iv-rows .r{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line-2)}

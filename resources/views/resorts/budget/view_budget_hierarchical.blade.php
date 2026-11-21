@@ -256,8 +256,9 @@
         width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
         object-fit: cover; background: var(--teal); color: #fff;
         display: flex; align-items: center; justify-content: center;
-        font-size: 13px; font-weight: 700;
+        font-size: 13px; font-weight: 700; overflow: hidden;
     }
+    .wb-leaf-avatar .wav { width: 100%; height: 100%; }
     .wb-leaf-avatar-vacant {
         border: 2px dashed var(--wb-vacant);
         background: var(--wb-vacant-bg);
@@ -3381,19 +3382,11 @@ $(document).ready(function() {
         $('#wbDetailHeader').addClass('d-none').empty();
     }
 
-    // Round photo, falling back to round initials — same pattern already
-    // used on the Workforce Planning dashboard's Compliance Tracking card
-    // this session (compare against the resort's configured default
-    // placeholder picture to detect "no real photo").
+    // Round photo, falling back to the shared drawn portrait (wavHTML). Gender isn't in the row payload, so no
+    // photo shows the neutral figure; the resort's default placeholder picture counts as "no real photo".
     window.wbAvatarHtml = function (name, pictureUrl) {
-        name = (name || '').trim();
-        var isDefault = !pictureUrl || pictureUrl === window.wbDefaultPictureUrl;
-        if (isDefault) {
-            var parts = name.split(' ').filter(Boolean);
-            var initials = parts.slice(0, 2).map(function (p) { return p.charAt(0).toUpperCase(); }).join('');
-            return '<span class="wb-leaf-avatar">' + (initials || '?') + '</span>';
-        }
-        return '<img class="wb-leaf-avatar" src="' + wbEsc(pictureUrl) + '" alt="">';
+        var photo = (!pictureUrl || pictureUrl === window.wbDefaultPictureUrl) ? '' : pictureUrl;
+        return '<span class="wb-leaf-avatar">' + wavHTML({ photo: photo, name: (name || '').trim(), id: name }) + '</span>';
     };
     function wbAvatarHtml(name, pictureUrl) { return window.wbAvatarHtml(name, pictureUrl); }
 

@@ -731,7 +731,7 @@
 .apx-pill.warn{background:#FBF0DC;color:#B7791F}.apx-pill.err{background:#FDEEEB;color:#E5573F}
 .apx-pill.muted{background:#EEF4F4;color:#6B7378}
 .apx-av{flex:none;border-radius:50%;background:#E1EBEC;color:#014653;font-weight:600;display:grid;place-items:center;overflow:hidden;border:2px solid #fff;box-shadow:0 0 0 1.5px #E6F0F1;position:relative}
-.apx-av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.apx-av .wav{width:100%;height:100%}
 .apx-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;font-weight:600;border-radius:10px;padding:9px 12px;border:1px solid transparent;white-space:nowrap;cursor:pointer;text-decoration:none;transition:background .15s,border-color .15s,transform .15s cubic-bezier(.34,1.56,.64,1)}
 .apx-btn:active{transform:scale(.97)}
 .apx-btn svg{width:14px;height:14px}
@@ -2099,7 +2099,6 @@ body.apx-glass-on .modal-backdrop.show{opacity:1}
             x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>',
             doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>'
         };
-        const apxIni = n => (String(n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')) || '?';
         const apxExp = e => { const n = parseFloat(e); return isNaN(n) ? (e || '—') : (n + (n === 1 ? ' yr' : ' yrs')); };
         const apxPill = (cls, text) => '<span class="apx-pill ' + cls + '">' + escHtml(text) + '</span>';
 
@@ -2228,8 +2227,7 @@ body.apx-glass-on .modal-backdrop.show{opacity:1}
                             if (type !== 'display') return data;
                             const code = TA_COUNTRY_CODES[row.countryName] || '';
                             const sub = [taFlag(code) + escHtml(row.countryName || '—'), escHtml(apxExp(row.total_work_exp)), escHtml(row.position_title || '')].filter(Boolean).join(' · ');
-                            return '<div class="apx-appcell"><span class="apx-av">' + escHtml(apxIni(row.name))
-                                + (row.profileImg ? '<img src="' + apxAttr(row.profileImg) + '" alt="" onerror="this.remove()">' : '')
+                            return '<div class="apx-appcell"><span class="apx-av">' + wavHTML({ photo: row.profileImg, name: row.name, id: row.name })
                                 + '</span><div><div class="nm">' + escHtml(row.name) + '</div><div class="sub">' + sub + '</div></div></div>';
                         }},
                         { data: 'passport_no', name: 'passport_no', render: function (d, t) { return t === 'display' ? escHtml(d || '—') : d; } },

@@ -2,7 +2,6 @@
     // Presentation helpers only — every value below comes from the rows getTalentPoolGridApplicant() already returns.
     $canReject = \App\Helpers\Common::checkRouteWisePermission('resort.ta.TalentPool', config('settings.resort_permissions.edit'));
     $canDelete = \App\Helpers\Common::checkRouteWisePermission('resort.ta.TalentPool', config('settings.resort_permissions.delete'));
-    $initials = fn ($n) => collect(explode(' ', trim((string) $n)))->filter()->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->take(2)->implode('') ?: '?';
     $availMap = [
         'available'        => ['Available', 'ok'],
         'pending'          => ['Pending Response', 'warn'],
@@ -39,7 +38,7 @@
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
             </button>
             <div class="tp-top">
-                <span class="tpx-av">@if($a->profileImg)<img src="{{ $a->profileImg }}" alt="{{ $name }}" data-i="{{ $initials($name) }}" onerror="this.parentNode.textContent=this.dataset.i">@else{{ $initials($name) }}@endif</span>
+                <span class="tpx-av"><x-wai-avatar :photo="$a->profileImg" :name="$name" :id="$a->applicant_id ?? $name" /></span>
                 <div class="nm userApplicants-btn" data-id="{{ $a->applicant_id }}" style="cursor:pointer">{{ $name }}</div>
                 <div class="ro">{{ ucfirst($a->position_title) }}</div>
                 <div class="tp-status statuscell">

@@ -61,23 +61,12 @@
                                         // summed to the total.
                                         $employeeCostBreakdown = $employee->cost_breakdown ?? [];
                                         $employeeFullName = trim(ucwords(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')));
-                                        $employeeInitials = strtoupper(collect(explode(' ', $employeeFullName))->filter()->map(fn($p) => mb_substr($p, 0, 1))->take(2)->implode(''));
-                                        // Same isDefault check as View Budget's wbAvatarHtml() —
-                                        // getResortUserPicture() always returns a URL (a generic
-                                        // placeholder image when there's no real photo), so a plain
-                                        // truthiness check would never show initials. Comparing
-                                        // against the actual default-picture URL is what View Budget
-                                        // does to decide when to fall back to initials instead.
-                                        $employeeHasRealPicture = !empty($employee->picture) && $employee->picture !== url(config('settings.default_picture'));
                                     @endphp
                                     <tr data-row-id="employee-{{ $employee->emp_id }}">
                                         <td class="sticky-col sticky-col-1">
                                             <div class="cb-name-cell">
-                                                @if($employeeHasRealPicture)
-                                                    <img class="cb-avatar" src="{{ $employee->picture }}" alt="">
-                                                @else
-                                                    <span class="cb-avatar cb-avatar-fallback">{{ $employeeInitials ?: '?' }}</span>
-                                                @endif
+                                                {{-- Portrait avatar (gender isn't in this query's select, so no-photo rows show the neutral figure). --}}
+                                                <x-wai-avatar :photo="$employee->picture ?? null" :name="$employeeFullName" :gender="$employee->gender ?? null" :id="$employee->emp_id" :size="28" />
                                                 <span>{{ $employeeFullName ?: '—' }}</span>
                                             </div>
                                         </td>
@@ -362,17 +351,7 @@
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    object-fit: cover;
     flex-shrink: 0;
-}
-.cb-avatar-fallback {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--teal);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 700;
 }
 .cb-avatar-vacant {
     display: flex;

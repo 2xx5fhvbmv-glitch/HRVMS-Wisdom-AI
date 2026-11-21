@@ -1118,11 +1118,6 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
             });
         }
-        function rspInitials(name) {
-            var parts = String(name || '').trim().split(/\s+/).slice(0, 2);
-            var out = parts.map(function (p) { return p.charAt(0).toUpperCase(); }).join('');
-            return out || '?';
-        }
         $(document).on("click", ".respondOfFreshmodal", function() {
 
             // FreshRespond-modal
@@ -1145,15 +1140,9 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             $("#holdResponseModel").attr("data-Child_ta_id",Child_ta_id);
             $("#RejectResponseModel").attr("data-Child_ta_id",Child_ta_id);
 
-            // Photo-first avatar, initials fallback: skip the <img> entirely
-            // when it's just the app's default silhouette (not a real
-            // photo), and still guard with onerror in case a real photo
-            // URL is broken.
-            var hasPhoto = image && image !== rspDefaultPhoto;
-            var initials = rspInitials(createdBy);
-            var avatarInner = hasPhoto
-                ? '<img src="' + rspEsc(image) + '" alt="' + rspEsc(createdBy) + '" onerror="this.parentNode.textContent=\'' + rspEsc(initials) + '\'">'
-                : rspEsc(initials);
+            // Photo-first avatar (shared wavHTML): the app's default silhouette counts as no photo and
+            // shows the drawn portrait; the requester's gender isn't on the row, so it is the neutral figure.
+            var avatarInner = wavHTML({ photo: image, name: createdBy, id: createdBy });
 
             let hm =`<div class="rsp-req">
                                 <span class="rsp-av">${avatarInner}</span>

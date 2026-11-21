@@ -9,25 +9,6 @@
 
 @section('content')
     @php
-        // Presentational-only helpers for this view. No query/data changes —
-        // same pattern already used in resorts/search/index.blade.php and
-        // the Incident Investigation redesign.
-        $mtgInitials = function ($name) {
-            $parts = preg_split('/\s+/', trim((string) $name));
-            $initials = '';
-            foreach (array_slice($parts, 0, 2) as $part) {
-                $initials .= mb_strtoupper(mb_substr($part, 0, 1));
-            }
-            return $initials !== '' ? $initials : '?';
-        };
-        $mtgPalette = ['#0E8A9E', '#6B4FA0', 'var(--positive)', 'var(--warning)', '#4A5F8A', '#A0527A'];
-        $mtgAvatarColor = function ($name) use ($mtgPalette) {
-            $hash = 0;
-            foreach (str_split((string) $name) as $ch) {
-                $hash = (ord($ch) + (($hash << 5) - $hash)) % 1000000007;
-            }
-            return $mtgPalette[abs($hash) % count($mtgPalette)];
-        };
         // Location is free text in this app (room names like "HR Office" are
         // just as common as real URLs, even on Online-type meetings — real
         // data checked), so only render it as a link when it actually looks
@@ -91,12 +72,7 @@
                                                     $pRole = $participant->participant_role ?? null;
                                                 @endphp
                                                 <div class="mtg-person">
-                                                    <span class="av" style="background:{{ $mtgAvatarColor($pName) }};color:#fff">
-                                                        @if($pHasPhoto)
-                                                            <img src="{{ Common::getResortUserPicture($participant->employee->Admin_Parent_id) }}" alt="" onerror="this.remove()">
-                                                        @endif
-                                                        {{ $mtgInitials($pName) }}
-                                                    </span>
+                                                    <span class="av"><x-wai-avatar :photo="$pHasPhoto ? Common::getResortUserPicture($participant->employee->Admin_Parent_id) : null" :name="$pName" :gender="$participant->employee->resortAdmin->gender ?? null" :id="$participant->employee->Emp_id ?? null" /></span>
                                                     <div>
                                                         <div class="n">{{ $pName }}</div>
                                                         @if($pRole)
@@ -117,7 +93,7 @@
                                             @foreach($meeting->externalParticipant as $ext)
                                                 @if(!empty($ext->participant_name))
                                                     <div class="mtg-person">
-                                                        <span class="av" style="background:{{ $mtgAvatarColor($ext->participant_name) }};color:#fff">{{ $mtgInitials($ext->participant_name) }}</span>
+                                                        <span class="av"><x-wai-avatar :name="$ext->participant_name" :id="$ext->participant_name" /></span>
                                                         <div><div class="n">{{ $ext->participant_name }}</div></div>
                                                     </div>
                                                 @endif
@@ -222,6 +198,7 @@
 .mtg-mlabel{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);display:block}
 
 .mtg-wrap .av{border-radius:50%;display:grid;place-items:center;font-weight:600;flex:none;position:relative;overflow:hidden;font-size:12px}
+.mtg-wrap .av .wav{width:100%;height:100%}
 .mtg-wrap .av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 
 .mtg-people{display:flex;flex-wrap:wrap;gap:12px}

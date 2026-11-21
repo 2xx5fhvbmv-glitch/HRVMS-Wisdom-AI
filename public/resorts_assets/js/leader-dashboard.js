@@ -12,17 +12,12 @@
   var JSON_HEAD = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
 
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-  function initials(n) { return (String(n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(function (p) { return p[0].toUpperCase(); }).join('')) || '?'; }
-  var AVC = [['#014653', '#fff'], ['#2E7B86', '#fff'], ['#7FBEC6', '#013a46'], ['#E6F0F1', '#014653'], ['#D99A2B', '#fff']];
-  // Photo first; initials chip when there is no photo or the image fails to load.
-  function fillAvatar(box, name, photo) {
-    var ini = initials(name), h = 0, c;
-    for (var i = 0; i < String(name || '').length; i++) h = (h * 31 + String(name).charCodeAt(i)) >>> 0;
-    c = AVC[h % AVC.length]; box.style.background = c[0]; box.style.color = c[1];
-    if (!photo) { box.textContent = ini; return box; }
-    var img = new Image(); img.alt = name || ''; img.src = photo;
-    img.onerror = function () { box.textContent = ini; };
-    box.textContent = ''; box.appendChild(img);
+  // Shared portrait avatar (wavHTML, from partials/wai-avatar): real photo first, else the drawn portrait.
+  // Gender/id are optional; without them the neutral figure shows.
+  function fillAvatar(box, name, photo, gender, id) {
+    box.style.background = ''; box.style.color = '';
+    box.innerHTML = wavHTML({ photo: photo, name: name, gender: gender, id: id || name });
+    var w = box.firstChild; w.style.width = w.style.height = '100%';
     return box;
   }
   function getJson(url) { return fetch(url, { headers: JSON_HEAD, credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
@@ -161,6 +156,7 @@
       var md = el('div', 'a-md');
       if (window.WaiMd) window.WaiMd.render(md, text, { thread: body, reveal: true }); else md.textContent = text;
       a.appendChild(md);
+      if (j.success && j.people && window.WaiMd) window.WaiMd.addPeople(md, j.people, j.people_pick, function (x) { if (!busy && !usageOut) exchange(q + ' (I mean ' + x.name + (x.emp_id ? ', ' + x.emp_id : '') + ')'); });
       if (j.success && j.modules && j.modules.length && window.WaiMd) md.appendChild(window.WaiMd.modulePicker(j.modules, function (m) { if (!busy && !usageOut) exchange('In the ' + m + ' module: ' + q); }));
       if (j.success && j.source) { var s = el('div', 'a-src', 'Source · '); s.appendChild(el('b', '', j.source)); a.appendChild(s); }
     }

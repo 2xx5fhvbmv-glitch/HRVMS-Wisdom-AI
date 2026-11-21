@@ -30,7 +30,7 @@
 #tal .tal-tbl tbody tr.main{cursor:pointer}
 #tal .tal-appcell{display:flex;align-items:center;gap:11px;min-width:0}
 #tal .tal-av{flex:none;width:36px;height:36px;border-radius:50%;background:#E1EBEC;color:var(--teal);font-size:11px;font-weight:600;display:grid;place-items:center;overflow:hidden;border:2px solid #fff;box-shadow:0 0 0 1.5px var(--teal-3);position:relative}
-#tal .tal-av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#tal .tal-av .wav{width:100%;height:100%}
 #tal .tal-appcell .nm{font-size:13.5px;font-weight:500;color:var(--ink)}
 #tal .tal-appcell .sub{font-size:11px;color:var(--muted);margin-top:1px}
 #tal .tal-stack .a{font-size:12.5px;color:var(--g1)}

@@ -5,10 +5,9 @@
 @include('resorts.talentacquisition._flag_js')
 const talEsc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const talDec = s => { const t = document.createElement('textarea'); t.innerHTML = s == null ? '' : s; return t.value; };
-const talIni = n => (String(n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')) || '?';
 const talPill = (cls, text) => '<span class="tal-pill ' + cls + '">' + talEsc(text) + '</span>';
-// Photo-first avatar; if the image is missing or broken the initials underneath show.
-const talAvatar = (name, img) => '<span class="tal-av">' + talEsc(talIni(name)) + (img ? '<img src="' + talEsc(img) + '" alt="" onerror="this.remove()">' : '') + '</span>';
+// Photo-first avatar (shared wavHTML); applicants carry no recorded gender here, so no photo shows the neutral figure.
+const talAvatar = (name, img) => '<span class="tal-av">' + wavHTML({ photo: img, name: name, id: name }) + '</span>';
 const talApplicant = (name, img, subHtml) => '<div class="tal-appcell">' + talAvatar(name, img) + '<div><div class="nm">' + talEsc(name) + '</div><div class="sub">' + subHtml + '</div></div></div>';
 // Pipeline stage (status + approver rank) -> pill. Unknown values stay visible as a muted pill.
 function talStage(status, rank) {

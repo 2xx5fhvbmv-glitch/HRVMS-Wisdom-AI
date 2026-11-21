@@ -48,14 +48,8 @@
 .nhr-role { font-size: 14.5px; font-weight: 600; color: var(--ink, #14232A); }
 .nhr-who { display: flex; align-items: center; gap: 7px; margin-top: 6px; min-width: 0; }
 
-/* mini avatar — photo-first with initials fallback painted first (see
-   note on _new_hire_request_row.blade.php): a loaded photo covers the
-   initials, and onerror="this.remove()" on a broken image reveals them
-   underneath again. Flat teal-soft/teal per the finalized design (no
-   per-name hashed palette on this card). */
-.nhr-mini { position: relative; width: 20px; height: 20px; flex: none; border-radius: 50%; background: var(--teal-soft, #F5F8F8); overflow: hidden; }
-.nhr-mini-fallback { position: absolute; inset: 0; display: grid; place-items: center; color: var(--teal, #014653); font-size: 9px; font-weight: 600; }
-.nhr-mini img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* mini avatar — shared portrait avatar (x-wai-avatar); real photo first, drawn portrait underneath. */
+.nhr-mini { position: relative; width: 20px; height: 20px; flex: none; border-radius: 50%; overflow: hidden; }
 .nhr-wn { font-size: 12px; color: #6B7378; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .nhr-wn b { color: #3A4145; font-weight: 600; }
 

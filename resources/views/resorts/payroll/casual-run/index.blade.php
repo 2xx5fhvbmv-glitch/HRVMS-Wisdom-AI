@@ -207,7 +207,7 @@
 #cpx .etbl .empcell .nm{font-size:13px;font-weight:500;color:var(--ink)}
 #cpx .etbl .empcell .po{font-size:11px;color:var(--muted);margin-top:1px}
 #cpx .cpx-av{flex:none;width:32px;height:32px;border-radius:50%;background:#E1EBEC;color:var(--teal);font-size:10.5px;font-weight:600;display:grid;place-items:center;overflow:hidden;border:2px solid #fff;box-shadow:0 0 0 1.5px var(--teal-3)}
-#cpx .cpx-av img{width:100%;height:100%;object-fit:cover}
+#cpx .cpx-av .wav{width:100%;height:100%}
 #cpx .cpx-num{font-variant-numeric:tabular-nums}
 #cpx .z{color:var(--faint)}
 #cpx .comm{color:var(--faint)}
@@ -259,9 +259,8 @@
     let cpMax = 1; // highest step unlocked by a real action
     const cpMoney = n => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const cpEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    const cpInitials = n => (String(n || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')) || '?';
-    // Photo isn't part of the casual-run payloads, so avatars are initials (the photo-first slot is ready when a URL is supplied).
-    const cpEmpCell = (name, sub) => `<td class="emp"><div class="empcell"><span class="cpx-av">${cpEsc(cpInitials(name))}</span><div><div class="nm">${cpEsc(name)}</div>${sub ? `<div class="po">${cpEsc(sub)}</div>` : ''}</div></div></td>`;
+    // Photo and gender aren't part of the casual-run payloads, so avatars show the neutral portrait figure (wavHTML takes photo/gender when supplied).
+    const cpEmpCell = (name, sub) => `<td class="emp"><div class="empcell"><span class="cpx-av">${wavHTML({ name: name, id: name })}</span><div><div class="nm">${cpEsc(name)}</div>${sub ? `<div class="po">${cpEsc(sub)}</div>` : ''}</div></div></td>`;
     const cpSum = (rows, f) => rows.reduce((t, r) => t + (Number(f(r)) || 0), 0);
     const cpShortDate = s => { const d = new Date(s + 'T00:00:00'); return isNaN(d) ? s : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
 
