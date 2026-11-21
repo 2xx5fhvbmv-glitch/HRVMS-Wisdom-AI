@@ -184,7 +184,7 @@ class MasterSearchController extends Controller
                     })
                     ->get();
 
-                $getEmployeeLeave = EmployeeLeave::with(['LeaveCategory'])->where('resort_id', $resort_id)
+                $getEmployeeLeave = EmployeeLeave::with(['LeaveCategory', 'employee.resortAdmin'])->where('resort_id', $resort_id)
                     ->where(function($query) use ($searchValues) {
                         foreach($searchValues as $search_key) {
                             $query->whereHas('LeaveCategory',function($q) use ($search_key) {

@@ -226,6 +226,11 @@ class ResortAllNotificationController extends Controller
 
     public function ReminderRequestManning(Request $request)
     {
+        // Same rule as ManningNotification(): a reminder broadcasts free text to every pending HOD/EXCOM.
+        $caller = Auth::guard('resort-admin')->user();
+        if (!Common::isHR() && (int) optional(optional($caller)->GetEmployee)->rank !== 8) {
+            return response()->json(['success' => false, 'msg' => 'Only HR or the GM can send manning reminders.'], 403);
+        }
         $validator = Validator::make($request->all(), ['ManningReminderRequest' => 'required'],
         ['ManningReminderRequest.required' => 'Please Enter Your Manning Request Massage.',]);
         if ($validator->fails()) {

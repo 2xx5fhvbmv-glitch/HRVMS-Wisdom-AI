@@ -30,6 +30,7 @@ class Compliance extends Model
         'reported_on',
         'status',
         'Dismissal_status',
+        'dismissal_reason',
         'assigned_to',
         // AI-generated context fields populated by ComplianceController
         // after each rule fires. Nullable everywhere — view falls back

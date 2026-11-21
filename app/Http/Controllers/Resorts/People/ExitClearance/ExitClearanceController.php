@@ -886,6 +886,22 @@ class ExitClearanceController extends Controller
         ));
     }
 
+    /**
+     * Who may submit answers for a clearance assignment — the same rule departmentForm() uses to open it: EDIT permission
+     * on people.exit-clearance or HR, otherwise the person it's assigned to (or, for a department form, anyone in that
+     * department). The store endpoints used to accept any assignment id from any portal user, so a sign-off could be forged.
+     */
+    private function canAnswerAssignment(ExitClearanceFormAssignment $a): bool
+    {
+        if (Common::canManageEmployeeRecords() || Common::checkRouteWisePermission('people.exit-clearance', config('settings.resort_permissions.edit'))) {
+            return true;
+        }
+        $user = $this->resort->GetEmployee;
+        if (!$user) return false;
+        if ((int) $a->assigned_to_id === (int) $user->id) return true;
+        return $a->assigned_to_type === 'department' && !empty($user->Dept_id) && (int) $a->department_id === (int) $user->Dept_id;
+    }
+
     public function departmentFormResponseStore(Request $request)
     {
         $resort_id = $this->resort->resort_id;
@@ -894,6 +910,9 @@ class ExitClearanceController extends Controller
             ->where('resort_id', $resort_id)
             ->where('assigned_to_type', 'department')
             ->firstOrFail();
+        if (!$this->canAnswerAssignment($exitClearanceFormAssignment)) {
+            return response()->json(['success' => false, 'message' => 'This clearance form is not assigned to you.'], 403);
+        }
 
         $exitClearanceForm = ExitClearanceForm::where('id', $exitClearanceFormAssignment->form_id)
             ->where('resort_id', $resort_id)
@@ -1061,6 +1080,9 @@ class ExitClearanceController extends Controller
             ->where('resort_id', $resort_id)
             ->where('assigned_to_type', 'employee')
             ->firstOrFail();
+        if (!$this->canAnswerAssignment($exitClearanceFormAssignment)) {
+            return response()->json(['success' => false, 'message' => 'This clearance form is not assigned to you.'], 403);
+        }
 
         $exitClearanceForm = ExitClearanceForm::where('id', $exitClearanceFormAssignment->form_id)
             ->where('resort_id', $resort_id)

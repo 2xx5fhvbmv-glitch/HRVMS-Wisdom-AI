@@ -2805,6 +2805,7 @@ class Common
                     DB::raw("CONCAT(creator.first_name, ' ', creator.last_name) as created_by_name"),
                     'creator_emp.rank as creator_rank',
                     'creator.id as creator_admin_id',
+                    'creator.gender as creator_gender',
 
                 ])
                 ->unique('V_id')
@@ -3175,6 +3176,7 @@ class Common
 								't4.id as Deprt_id',
                                 'vacancies.Resort_id',
                                 't6.id as user_id',
+                                't6.gender',
                                 't6.first_name',
                                 't6.last_name',
 

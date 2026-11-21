@@ -201,7 +201,7 @@ class WisdomTools
                     'to'   => ['type' => 'string', 'description' => 'Range end YYYY-MM-DD (use with from).'],
                 ], ['name']),
             self::fn('get_attendance_register',
-                'Who was present / absent on a date (defaults today) across the whole resort. Returns the present list, the absent list, who was on approved leave, and any "unverified" staff (have a record but no punch-in/out logged). Use for "who was present/absent on <date>", "today\'s attendance", "who did not come in".',
+                'Who was present / absent on a date (defaults today) across the whole resort. Returns counts plus one entry per person (emp_id, name, position, department) for present, absent, on_leave, day_off (rostered day off — not absent), unverified (record but no punch-in), and no_punch_recorded when almost nobody has punched in yet. Use for "who was present/absent on <date>", "today\'s attendance", "who did not come in".',
                 [
                     'date' => ['type' => 'string', 'description' => 'Date YYYY-MM-DD. Defaults to today.'],
                 ]),
@@ -3413,43 +3413,67 @@ class WisdomTools
             ->whereDate('joining_date', '<=', $date)->pluck('id')->all();
         $rows   = DB::table('parent_attendaces')->where('resort_id', $rid)->whereDate('date', $date)
             ->get(['Emp_id', 'CheckingTime', 'CheckingOutTime']);
-        $names  = self::resolveEmpNames($rid, array_merge($active, $rows->pluck('Emp_id')->all()));
-
-        $present = $unverified = [];
-        $seen = [];
-        foreach ($rows as $r) {
-            $seen[$r->Emp_id] = true;
-            $nm = $names[$r->Emp_id] ?? ('Employee #' . $r->Emp_id);
-            if (!empty($r->CheckingTime)) {
-                $present[] = $nm;
-            } else {
-                $unverified[] = $nm; // has a row but no punch-in/out logged
-            }
-        }
+        // A rostered day off is not an absence (duty_roster_entries is the plan for the day).
+        $dayOff = DB::table('duty_roster_entries')->where('resort_id', $rid)->whereDate('date', $date)
+            ->where('Status', 'DayOff')->pluck('Emp_id')->map(fn ($v) => (int) $v)->all();
         // On approved leave that day — so they're not counted as unexplained absent.
         $onLeave = DB::table('employees_leaves')->where('resort_id', $rid)
             ->whereRaw("LOWER(status) IN ('approved','recommended')")
             ->whereDate('from_date', '<=', $date)->whereDate('to_date', '>=', $date)
-            ->pluck('emp_id')->all();
-        $leaveNames = [];
-        $absent = [];
+            ->pluck('emp_id')->map(fn ($v) => (int) $v)->all();
+
+        // One row per person — Emp ID / position / department tell same-name employees apart.
+        $people = Employee::where('resort_id', $rid)
+            ->whereIn('id', array_unique(array_merge($active, $rows->pluck('Emp_id')->all())))
+            ->with(['resortAdmin:id,first_name,last_name', 'position:id,position_title', 'department:id,name'])
+            ->get(['id', 'Emp_id', 'Admin_Parent_id', 'Position_id', 'Dept_id'])
+            ->mapWithKeys(fn ($e) => [$e->id => [
+                'emp_id'     => $e->Emp_id,
+                'name'       => self::empName($e),
+                'position'   => optional($e->position)->position_title,
+                'department' => optional($e->department)->name,
+            ]])->all();
+        $person = fn ($id) => $people[$id] ?? ['emp_id' => null, 'name' => 'Employee #' . $id, 'position' => null, 'department' => null];
+
+        $lists = ['present' => [], 'absent' => [], 'on_leave' => [], 'day_off' => [], 'unverified' => []];
+        $seen = [];
+        foreach ($rows as $r) {
+            $seen[$r->Emp_id] = true;
+            // has a row but no punch-in logged = unverified
+            $lists[!empty($r->CheckingTime) ? 'present' : 'unverified'][] = $person($r->Emp_id);
+        }
         foreach ($active as $id) {
             if (isset($seen[$id])) continue;
-            if (in_array($id, $onLeave)) { $leaveNames[] = $names[$id] ?? ('Employee #' . $id); }
-            else { $absent[] = $names[$id] ?? ('Employee #' . $id); }
+            $key = in_array((int) $id, $onLeave, true) ? 'on_leave' : (in_array((int) $id, $dayOff, true) ? 'day_off' : 'absent');
+            $lists[$key][] = $person($id);
         }
-        sort($present); sort($absent); sort($unverified); sort($leaveNames);
+        foreach ($lists as &$list) {
+            usort($list, fn ($x, $y) => strcasecmp($x['name'], $y['name']));
+        }
+        unset($list);
 
-        return [
-            'date'             => self::fmtDate($date),
-            'present_count'    => count($present),
-            'present'          => $present,
-            'absent_count'     => count($absent),
-            'absent'           => $absent,
-            'on_leave'         => $leaveNames,
-            'unverified'       => $unverified,
-            'note'             => $unverified ? 'Employees under "unverified" have an attendance record but no punch-in/out logged, so presence cannot be confirmed.' : null,
-        ];
+        // Almost nobody punched in: that is missing punch data, not a mass absence.
+        $expected   = count($lists['present']) + count($lists['absent']);
+        $noPunches  = $expected >= 5 && count($lists['present']) <= max(1, (int) floor($expected * 0.05));
+        if ($noPunches) {
+            $lists['no_punch_recorded'] = $lists['absent'];
+            $lists['absent'] = [];
+        }
+
+        $out = ['date' => self::fmtDate($date)];
+        foreach ($lists as $key => $list) {
+            $out[$key . '_count'] = count($list);
+            $out[$key] = $list;
+        }
+        $notes = [];
+        if ($noPunches) {
+            $notes[] = 'Almost no punches are recorded for this date, so presence cannot be judged. Say "no punches recorded yet" — do NOT call these employees absent.';
+        }
+        if ($lists['unverified']) {
+            $notes[] = 'Employees under "unverified" have an attendance record but no punch-in logged, so presence cannot be confirmed.';
+        }
+        $out['note'] = $notes ? implode(' ', $notes) : null;
+        return $out;
     }
 
     /** Employees who punched in later than their shift start time on a date. */

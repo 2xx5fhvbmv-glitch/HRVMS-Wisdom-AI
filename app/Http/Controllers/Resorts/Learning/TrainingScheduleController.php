@@ -99,7 +99,10 @@ class TrainingScheduleController extends Controller
                 // both ORDERed by employees.id so the two lists index-align.
                 // '|' separator: safe against commas/pipes in names.
                 DB::raw("GROUP_CONCAT(CONCAT(resort_admins.first_name, ' ', resort_admins.last_name) ORDER BY employees.id SEPARATOR '|') as employee_names"),
-                DB::raw("GROUP_CONCAT(employees.Admin_Parent_id ORDER BY employees.id SEPARATOR '|') as employee_ids")
+                DB::raw("GROUP_CONCAT(employees.Admin_Parent_id ORDER BY employees.id SEPARATOR '|') as employee_ids"),
+                // Same order; COALESCE keeps the lists aligned (GROUP_CONCAT skips NULLs).
+                DB::raw("GROUP_CONCAT(COALESCE(resort_admins.gender, '') ORDER BY employees.id SEPARATOR '|') as employee_genders"),
+                DB::raw("GROUP_CONCAT(COALESCE(employees.Emp_id, '') ORDER BY employees.id SEPARATOR '|') as employee_codes")
             )
             ->leftJoin('learning_programs', 'training_schedules.training_id', '=', 'learning_programs.id')
             ->leftJoin('employees as trainer', 'learning_programs.trainer', '=', 'trainer.id') // Join trainer from employees table
@@ -261,6 +264,23 @@ class TrainingScheduleController extends Controller
                 }
 
                 return '<div class="user-ovImg">' . $attendeeImages . '</div>';
+            })
+            // Plain per-attendee data for the drawn avatar (same order as above).
+            ->addColumn('attendee_list', function ($row) {
+                $names   = !empty($row->employee_names) ? explode('|', $row->employee_names) : [];
+                $ids     = explode('|', (string) $row->employee_ids);
+                $genders = explode('|', (string) $row->employee_genders);
+                $codes   = explode('|', (string) $row->employee_codes);
+                $list = [];
+                foreach ($names as $i => $name) {
+                    $list[] = [
+                        'name'   => $name,
+                        'photo'  => Common::getResortUserPicture($ids[$i] ?? null),
+                        'gender' => ($genders[$i] ?? '') ?: null,
+                        'code'   => ($codes[$i] ?? '') ?: null,
+                    ];
+                }
+                return $list;
             })
             ->addColumn('action', function ($row) use ($edit_class) {
                 $editUrl = 'javascript:void(0)';

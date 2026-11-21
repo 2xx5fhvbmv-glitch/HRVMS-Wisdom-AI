@@ -480,6 +480,8 @@ class DashboardController extends Controller
                 'employee_id'       => $empId,
                 'name'              => $name,
                 'initials'          => $initials ?: '?',
+                'gender'            => $employee->resortAdmin->gender ?? null,
+                'admin_id'          => $employee->Admin_Parent_id,
                 'department'        => optional($employee->department)->name,
                 'earned_salary'     => $earnedSalary,
                 'absent_deduction'  => $absentDeduction,
@@ -525,13 +527,14 @@ class DashboardController extends Controller
         // context: what to show under an employee's name in the expanded
         // detail. Pension shows the % basis (matches how the real payroll
         // run explains it); OT shows hours; everything else shows department.
-        $group = function (string $label, string $field) use ($lines) {
+        $photos = Common::getResortUserPicturesBatch($lines->pluck('admin_id')->all());
+        $group = function (string $label, string $field) use ($lines, $photos) {
             $matching = $lines->filter(fn($l) => $l[$field] > 0);
             return [
                 'label'          => $label,
                 'amount'         => round($matching->sum($field), 2),
                 'employee_count' => $matching->count(),
-                'employees'      => $matching->sortByDesc($field)->take(10)->map(function ($l) use ($field) {
+                'employees'      => $matching->sortByDesc($field)->take(10)->map(function ($l) use ($field, $photos) {
                     $context = $l['department'];
                     if ($field === 'ot_pay') {
                         $context = $l['ot_hours'] . ' hrs';
@@ -544,6 +547,9 @@ class DashboardController extends Controller
                     return [
                         'name'     => $l['name'],
                         'initials' => $l['initials'],
+                        'employee_id' => $l['employee_id'],
+                        'gender'   => $l['gender'],
+                        'photo'    => $photos[$l['admin_id']] ?? null,
                         'context'  => $context,
                         'amount'   => $l[$field],
                     ];
@@ -615,6 +621,7 @@ class DashboardController extends Controller
 
         $empIds = $todayRecords->pluck('Emp_id')->unique();
         $employees = Employee::with(['department', 'resortAdmin'])->whereIn('id', $empIds)->get()->keyBy('id');
+        $photos = Common::getResortUserPicturesBatch($employees->pluck('Admin_Parent_id')->all());
 
         $rows = collect();
         foreach ($todayRecords as $rec) {
@@ -629,7 +636,7 @@ class DashboardController extends Controller
             $perDay = $basicUSD / $totalDaysInPeriod;
 
             $time = $rec->updated_at ? Carbon::parse($rec->updated_at)->format('h:i A') : null;
-            $base = ['employee_id' => $rec->Emp_id, 'name' => $name, 'initials' => $initials ?: '?', 'department' => optional($employee->department)->name, 'time' => $time];
+            $base = ['employee_id' => $rec->Emp_id, 'name' => $name, 'initials' => $initials ?: '?', 'gender' => $employee->resortAdmin->gender ?? null, 'photo' => $photos[$employee->Admin_Parent_id] ?? null, 'department' => optional($employee->department)->name, 'time' => $time];
 
             if ($rec->Status === 'HalfDayLeave') {
                 $rows->push($base + ['status' => 'Half Day', 'note' => "half a day's salary", 'amount' => round($perDay / 2, 2), 'type' => 'earn']);

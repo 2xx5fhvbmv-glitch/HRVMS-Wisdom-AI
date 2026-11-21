@@ -48,6 +48,7 @@ class ConversationController extends Controller
                 'id' => $resortAdmin->id,
                 'name' => $resortAdmin->first_name . ' ' . $resortAdmin->last_name,
                 'profile' => Common::getResortUserPicture($resortAdmin->id),
+                'gender' => $resortAdmin->gender,
             ];
         } elseif ($type == 'group') {
             $group = GroupChat::where('id', $receiver_id)->where('resort_id', $resort->resort_id)->first();
@@ -69,6 +70,7 @@ class ConversationController extends Controller
                     'id' => $member->user_id,
                     'name' => $admin ? $admin->first_name . ' ' . $admin->last_name : 'Unknown',
                     'profile' => Common::getResortUserPicture($member->user_id),
+                    'gender' => $admin->gender ?? null,
                     'role' => $member->role,
                 ];
             })->values();

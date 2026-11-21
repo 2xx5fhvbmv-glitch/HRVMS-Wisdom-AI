@@ -262,6 +262,7 @@ class BudgetController extends Controller
                 'e.id as Empid',
                 'ra.first_name',
                 'ra.last_name',
+                'ra.gender',
                 'e.Admin_Parent_id',
                 'e.rank',
                 'e.Dept_id',
@@ -269,6 +270,14 @@ class BudgetController extends Controller
                 'e.basic_salary',
                 'e.joining_date',
             ])->groupBy('position_id');
+
+        // Seat avatars on the manning page: one batched photo lookup.
+        $manningPhotos = Common::getResortUserPicturesBatch(
+            $employeesByPosition->flatten()->pluck('Admin_Parent_id')->all()
+        );
+        foreach ($employeesByPosition->flatten() as $e) {
+            $e->photo = $manningPhotos[$e->Admin_Parent_id] ?? null;
+        }
 
         // 2) BudgetStatus rows keyed by Budget_id.
         $budgetIds = $allPositionsRaw->pluck('Budget_id')->filter()->unique()->all();
@@ -455,7 +464,7 @@ class BudgetController extends Controller
                             'e.resort_id',
                             'e.id as Empid',
                             'ra.first_name',
-                            'ra.last_name',
+                            'ra.last_name', 'ra.gender',
                             'e.Admin_Parent_id',
                             'e.rank',
                             'e.Dept_id',
@@ -1229,7 +1238,7 @@ class BudgetController extends Controller
                             'e.resort_id',
                             'e.id as Empid',
                             'ra.first_name',
-                            'ra.last_name',
+                            'ra.last_name', 'ra.gender',
                             'e.Position_id',
                             'e.Admin_Parent_id',
                             'e.rank',
@@ -2318,7 +2327,7 @@ class BudgetController extends Controller
                             'e.id',
                             'e.Admin_Parent_id',
                             'ra.first_name',
-                            'ra.last_name',
+                            'ra.last_name', 'ra.gender',
                             'e.rank',
                             'e.employment_type',
                             'e.nationality',
@@ -4029,7 +4038,7 @@ class BudgetController extends Controller
                     'e.resort_id',
                     'e.id as Empid',
                     'ra.first_name',
-                    'ra.last_name',
+                    'ra.last_name', 'ra.gender',
                     'e.Position_id',
                     'e.Admin_Parent_id',
                     'e.rank',

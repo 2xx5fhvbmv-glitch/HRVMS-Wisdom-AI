@@ -11,6 +11,7 @@ use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\SendsPasswordResetEmails;
 use App\Models\ResortAdmin;
+use App\Models\Settings;
 class ResortforgotPasswordController extends Controller
 {
     use SendsPasswordResetEmails;
@@ -21,7 +22,7 @@ class ResortforgotPasswordController extends Controller
 
     public function requestPassword()
     {
-      return view('resorts.auth.request-password');
+      return view('resorts.auth.request-password', ['settings' => Settings::first()]);   // tagline in the shared left panel, as on login
     }
 
     public function requestPasswordSubmit(Request $request)
@@ -64,7 +65,7 @@ class ResortforgotPasswordController extends Controller
               return redirect(route('resort.password.request'))->withErrors(['error' => __('messages.invalidRequest')]);
             }
 
-            return view('resorts.auth.reset-password', ['token' => $token, 'email' => $request->email]);
+            return view('resorts.auth.reset-password', ['token' => $token, 'email' => $request->email, 'settings' => Settings::first()]);
           } catch( \Exception $e ) {
             \Log::emergency( "File: ".$e->getFile() );
             \Log::emergency( "Line: ".$e->getLine() );

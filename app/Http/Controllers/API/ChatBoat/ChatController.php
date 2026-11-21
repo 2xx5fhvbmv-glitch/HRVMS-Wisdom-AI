@@ -90,6 +90,7 @@ class ChatController extends Controller
                                    'name' => $ResortAdmin->first_name . ' ' . $ResortAdmin->last_name,
                                    'last_seen' => $ResortAdmin->updated_at,
                                    'profile' => $pictures[$ResortAdmin->id] ?? Common::getResortUserPicture($ResortAdmin->id),
+                                   'gender' => $ResortAdmin->gender,
                                    'last_msg' => $lastMessage->message ?? null,
                                    'last_message_time' => optional($lastMessage)->created_at,
                                    'unread_count' => $unreadCount,
@@ -195,6 +196,7 @@ class ChatController extends Controller
                          'id' => $employee->resortAdmin->id,
                          'name' => $employee->resortAdmin->full_name,
                          'profile' => $pictures[$employee->resortAdmin->id] ?? Common::getResortUserPicture($employee->resortAdmin->id),
+                         'gender' => $employee->resortAdmin->gender,
                          'type' => 'individual',
                     ];
                }
@@ -335,6 +337,7 @@ class ChatController extends Controller
                                    'id' => $employee->resortAdmin->id,
                                    'name' => $employee->resortAdmin->full_name,
                                    'profile' => $pictures[$employee->resortAdmin->id] ?? Common::getResortUserPicture($employee->resortAdmin->id),
+                                   'gender' => $employee->resortAdmin->gender,
                               ];
                          }
                     }
@@ -534,6 +537,7 @@ class ChatController extends Controller
                          'id' => $employee->resortAdmin->id,
                          'name' => $employee->resortAdmin->full_name,
                          'profile' => $pictures[$employee->resortAdmin->id] ?? Common::getResortUserPicture($employee->resortAdmin->id),
+                         'gender' => $employee->resortAdmin->gender,
                     ];
                }
           }

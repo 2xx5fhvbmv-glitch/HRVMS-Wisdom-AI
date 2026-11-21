@@ -154,14 +154,14 @@ class LeaderDashboard
             ->whereExists(fn ($q) => $q->from('employees_leaves_status as s')->whereColumn('s.leave_request_id', 'l.id')
                 ->where('s.status', 'Pending')->whereIn('s.approver_id', $acting))
             ->orderBy('l.created_at')->limit(50)
-            ->get(['l.id', 'l.from_date', 'l.to_date', 'l.total_days', 'l.created_at', 'a.id as admin_id', 'a.first_name', 'a.last_name', 'c.leave_type']);
+            ->get(['l.id', 'l.from_date', 'l.to_date', 'l.total_days', 'l.created_at', 'a.id as admin_id', 'a.first_name', 'a.last_name', 'a.gender', 'e.Emp_id as emp_code', 'c.leave_type']);
 
         $overtime = DB::table('employee_overtimes as o')
             ->join('employees as e', 'e.id', '=', 'o.Emp_id')->join('resort_admins as a', 'a.id', '=', 'e.Admin_Parent_id')
             ->where('o.resort_id', $this->resortId)->where('o.status', 'pending')
             ->when($this->deptIds !== null, fn ($q) => $q->whereIn('e.Dept_id', $this->deptIds))
             ->orderBy('o.date')->limit(50)
-            ->get(['o.id', 'o.Emp_id', 'o.date', 'o.total_time', 'o.created_at', 'a.id as admin_id', 'a.first_name', 'a.last_name']);
+            ->get(['o.id', 'o.Emp_id', 'o.date', 'o.total_time', 'o.created_at', 'a.id as admin_id', 'a.first_name', 'a.last_name', 'a.gender', 'e.Emp_id as emp_code']);
         // One picture lookup for every row instead of one per row.
         $pics = Common::getResortUserPicturesBatch($leaves->pluck('admin_id')->merge($overtime->pluck('admin_id'))->all());
         foreach ($leaves as $l) {
@@ -187,6 +187,8 @@ class LeaderDashboard
             'type' => $type,
             'n' => trim($row->first_name . ' ' . $row->last_name),
             'photo' => $photo,
+            'gender' => $row->gender,
+            'code' => $row->emp_code,
             'r' => 'Request #' . $id,
             'd' => $detail,
             'm' => 'Submitted ' . Carbon::parse($row->created_at)->format('d M Y'),
@@ -215,8 +217,8 @@ class LeaderDashboard
                 $people = DB::table('training_participants as tp')->join('employees as e', 'e.id', '=', 'tp.employee_id')
                     ->join('resort_admins as a', 'a.id', '=', 'e.Admin_Parent_id')
                     ->where('tp.training_schedule_id', $t->id)->whereIn('tp.employee_id', $ids)->limit(8)
-                    ->get(['a.id', 'a.first_name', 'a.last_name'])
-                    ->map(fn ($p) => ['n' => trim($p->first_name . ' ' . $p->last_name), 'p' => Common::getResortUserPicture($p->id)])->all();
+                    ->get(['a.id', 'a.first_name', 'a.last_name', 'a.gender', 'e.Emp_id'])
+                    ->map(fn ($p) => ['n' => trim($p->first_name . ' ' . $p->last_name), 'p' => Common::getResortUserPicture($p->id), 'gender' => $p->gender, 'code' => $p->Emp_id])->all();
                 return [
                     'date' => Carbon::parse($t->start_date)->toDateString(),
                     'title' => $t->name ?: 'Training',
@@ -309,7 +311,7 @@ class LeaderDashboard
             ->leftJoin('shift_settings as s', 's.id', '=', 'd.Shift_id')
             ->where('d.resort_id', $this->resortId)->whereDate('d.date', $day)->whereIn('d.Emp_id', $this->employeeIds())
             ->where(fn ($q) => $q->whereNull('d.Status')->orWhere('d.Status', '!=', 'DayOff'))
-            ->get(['d.Emp_id', 'd.Status', 'a.id as admin_id', 'a.first_name', 'a.last_name', 'p.position_title', 's.ShiftName', 's.StartTime', 's.EndTime']);
+            ->get(['d.Emp_id', 'd.Status', 'a.id as admin_id', 'a.first_name', 'a.last_name', 'a.gender', 'e.Emp_id as emp_code', 'p.position_title', 's.ShiftName', 's.StartTime', 's.EndTime']);
 
         $punches = DB::table('parent_attendaces')->where('resort_id', $this->resortId)->whereDate('date', $day)
             ->whereIn('Emp_id', $entries->pluck('Emp_id'))->whereNotNull('CheckingTime')->pluck('CheckingTime', 'Emp_id');
@@ -343,6 +345,8 @@ class LeaderDashboard
                 'name' => trim($e->first_name . ' ' . $e->last_name),
                 'position' => $e->position_title ?? '',
                 'photo' => Common::getResortUserPicture($e->admin_id),
+                'gender' => $e->gender,
+                'code' => $e->emp_code,
                 'shift' => $e->ShiftName ?: 'Shift',
                 'start' => round($start, 2),
                 'end' => round($end, 2),

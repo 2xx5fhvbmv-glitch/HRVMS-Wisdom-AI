@@ -32,6 +32,7 @@ use App\Models\PayrollDeduction;
 use App\Events\ResortNotificationEvent;
 use App\Models\ResortNotification;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use App\Models\EmployeeOnboardingAcknowledgements;
 use App\Models\EmployeePromotion;
 use App\Models\JobDescription;
@@ -558,6 +559,26 @@ class ComplianceController extends Controller
           // Dismissal_status=Pending, employee belongs to this resort).
           // Presentation-only: no change to how breaches are detected or
           // generated, just grouped counts for the header cards/chips.
+          [$complianceSummary, $complianceChips] = $this->complianceCounts($resortId);
+
+          // Last compliance check: the manual run stamps the cache; rows
+          // also come from scheduled commands, so fall back to the newest row.
+          $lastCheckAt = Cache::get("compliance:last_run:{$resortId}")
+               ?? Compliance::where('resort_id', $resortId)->max('reported_on');
+
+            return view('resorts.people.compliance.list', compact('positions', 'departments', 'page_title', 'complianceSummary', 'complianceChips', 'lastCheckAt'));
+
+     }
+
+     /** KPI counts as JSON, for refreshing the header after dismiss/run. */
+     public function counts()
+     {
+          [$summary, $chips] = $this->complianceCounts($this->resort->resort_id);
+          return response()->json(['success' => true, 'open_count' => $chips['all'], 'summary' => $summary, 'chips' => $chips]);
+     }
+
+     private function complianceCounts($resortId): array
+     {
           $base = $this->complianceBaseQuery($resortId);
           $moduleCounts = (clone $base)->select('module_name', DB::raw('count(*) as cnt'))
                ->groupBy('module_name')->pluck('cnt', 'module_name');
@@ -579,9 +600,7 @@ class ComplianceController extends Controller
                'rules'    => $ruleCounts,
                'modules'  => $moduleCounts,
           ];
-
-            return view('resorts.people.compliance.list', compact('positions', 'departments', 'page_title', 'complianceSummary', 'complianceChips'));
-
+          return [$complianceSummary, $complianceChips];
      }
 
      /**
@@ -632,12 +651,12 @@ class ComplianceController extends Controller
                $query->where('status', $request->status);
           }
 
-          if ($request->module_name != null) {
-               $query->where('module_name', $request->module_name);
+          if ($request->filled('module_name')) {
+               $query->whereIn('module_name', (array) $request->module_name);
           }
 
-          if ($request->compliance_breached_name != null) {
-               $query->where('compliance_breached_name', $request->compliance_breached_name);
+          if ($request->filled('compliance_breached_name')) {
+               $query->whereIn('compliance_breached_name', (array) $request->compliance_breached_name);
           }
 
           // Filter chip: "Critical" — same severity_ai field the
@@ -670,6 +689,12 @@ class ComplianceController extends Controller
 
           if ($request->ajax()) 
           {
+               $defaultPhoto = url(config('settings.default_picture'));
+               $photos = Common::getResortUserPicturesBatch($compliances->pluck('employee.Admin_Parent_id')->all());
+               $photoOf = function ($compliance) use ($photos, $defaultPhoto) {
+                    $p = $photos[$compliance->employee?->Admin_Parent_id] ?? '';
+                    return $p === $defaultPhoto ? '' : $p;
+               };
                $edit_class = '';
                if (Common::checkRouteWisePermission('people.compliances.edit', config('settings.resort_permissions.edit')) == false) 
                {
@@ -692,7 +717,14 @@ class ComplianceController extends Controller
                     ->addColumn('employee_id', function ($compliance) {
                          return $compliance->employee ? $compliance->employee->Emp_id : '-';
                     })
-                    ->addColumn('employee_name', function ($compliance) {
+                    // Flat fields for the redesigned page (no HTML parsing).
+                    ->addColumn('rule_name', fn ($c) => $c->compliance_breached_name)
+                    ->addColumn('employee_db_id', fn ($c) => $c->employee?->id)
+                    ->addColumn('employee_full_name', fn ($c) => $c->employee?->resortAdmin?->full_name ?? '')
+                    ->addColumn('position_title', fn ($c) => $c->employee?->position?->position_title ?? '')
+                    ->addColumn('gender', fn ($c) => $c->employee?->resortAdmin?->gender ?? '')
+                    ->addColumn('photo', $photoOf)
+                    ->addColumn('employee_name', function ($compliance) use ($photoOf) {
                          if (!$compliance->employee) {
                               return '<span class="text-danger">-</span>';
                          }
@@ -701,8 +733,8 @@ class ComplianceController extends Controller
                          // Real profile photo when the employee has one;
                          // initials avatar as the fallback rather than a
                          // generic placeholder image.
-                         $photo = Common::getResortUserPicture($compliance->employee->Admin_Parent_id);
-                         $hasRealPhoto = $photo !== url(config('settings.default_picture'));
+                         $photo = $photoOf($compliance);
+                         $hasRealPhoto = $photo !== '';
 
                          if ($hasRealPhoto) {
                               $avatarHtml = '<img src="' . e($photo) . '" alt="' . e($name) . '">';
@@ -841,6 +873,19 @@ class ComplianceController extends Controller
                             return '';
                         }
                     })
+                    // Whitelist the JSON. Without this yajra serialises the
+                    // loaded employee + resort_admin models whole (password
+                    // hash, email, phone, ...) into every row.
+                    ->only([
+                         'DT_RowIndex', 'id', 'compliance_breached_name', 'rule_name', 'severity_ai', 'module_name',
+                         'description', 'remediation_ai', 'reported_on', 'status', 'action', 'created_at',
+                         'employee_id', 'employee_name', 'employee_db_id', 'employee_full_name', 'position_title',
+                         'gender', 'photo',
+                         // Minimal nested shape kept for the redesigned page, which reads these paths.
+                         'employee.id', 'employee.Emp_id',
+                         'employee.resort_admin.first_name', 'employee.resort_admin.last_name', 'employee.resort_admin.gender',
+                         'employee.position.position_title',
+                    ])
                     ->make(true);
           }    
           
@@ -2025,6 +2070,15 @@ class ComplianceController extends Controller
           // Auto-close breaches that were NOT re-detected this run (now fixed).
           $this->resolveStaleBreaches($resort->resort_id);
 
+          Cache::forever("compliance:last_run:{$resort->resort_id}", now()->toDateTimeString());
+
+          if ($request->expectsJson()) {
+               return response()->json([
+                    'success'    => true,
+                    'open_count' => $this->complianceBaseQuery($resort->resort_id)->count(),
+               ]);
+          }
+
           return redirect()->route('people.compliance.index')->with('success', 'Compliance checks completed successfully.');
      }
 
@@ -2264,20 +2318,25 @@ class ComplianceController extends Controller
                $query->where('status', $request->status);
           }
           
-          if ($request->module_name != null) {
-               $query->where('module_name', $request->module_name);
+          if ($request->filled('module_name')) {
+               $query->whereIn('module_name', (array) $request->module_name);
           }
           
-          if ($request->compliance_breached_name != null) {
-               $query->where('compliance_breached_name', $request->compliance_breached_name);
+          if ($request->filled('compliance_breached_name')) {
+               $query->whereIn('compliance_breached_name', (array) $request->compliance_breached_name);
           }
           
+          if ($request->severity != null) {
+               $query->where('severity_ai', $request->severity);
+          }
+
           // Filter out rows whose employee isn't in this resort (cross-resort
           // data corruption guard — see list() for the rationale).
           $compliances = $query
                ->whereHas('employee', function ($q) use ($resortId) {
                     $q->where('resort_id', $resortId)->whereHas('resortAdmin');
                })
+               ->where('Dismissal_status', 'Pending')
                ->get();
           
           // Transform data similar to how the DataTable displays it
@@ -2329,35 +2388,47 @@ class ComplianceController extends Controller
           return view('resorts.people.compliance.calendar', compact('compliances', 'page_title'));
      }
 
-     public function DismissCompliance($id)
+     public function DismissCompliance(Request $request, $id)
      {
-          // Scope by resort_id. Without it any logged-in user could
-          // dismiss a compliance row belonging to ANOTHER resort just by
-          // knowing the base64-encoded id (which is enumerable). The list
-          // page only shows the current resort's rows, but the dismiss
-          // endpoint is callable directly.
-          $decoded = base64_decode($id);
-          $compliance = Compliance::where('id', $decoded)
+          // Same permission the list uses to show the Dismiss button.
+          if (Common::checkRouteWisePermission('people.compliances.edit', config('settings.resort_permissions.edit')) == false) {
+               return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+          }
+          $request->validate(['reason' => 'nullable|string|max:255']);
+
+          // Scoped by resort_id: the base64 id is enumerable.
+          $compliance = Compliance::where('id', base64_decode($id))
               ->where('resort_id', $this->resort->resort_id)
+              ->where('Dismissal_status', 'Pending')
               ->first();
-          if ($compliance) {
-              $compliance->Dismissal_status = 'Rejected';
-              $compliance->save();
-
-               return response()->json([
-                   'success' => true,
-                   'message' => 'Compliance dismissed successfully.'
-               ],200);
+          if (!$compliance) {
+               return response()->json(['success' => false, 'message' => 'Compliance not found.'], 404);
           }
-          else
-          {
-               return response()->json([
-                   'success' => false,
-                   'errors' => $validator->errors()
-               ], 422);
-          }
+          $compliance->Dismissal_status = 'Rejected';
+          $compliance->dismissal_reason = $request->input('reason');
+          $compliance->save();
 
-         
+          return response()->json(['success' => true, 'message' => 'Compliance dismissed successfully.'], 200);
+     }
+
+     /** Undo a manual dismiss. Auto-resolved rows ('Resolved') are not touched. */
+     public function RestoreCompliance($id)
+     {
+          if (Common::checkRouteWisePermission('people.compliances.edit', config('settings.resort_permissions.edit')) == false) {
+               return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+          }
+          $compliance = Compliance::where('id', base64_decode($id))
+              ->where('resort_id', $this->resort->resort_id)
+              ->where('Dismissal_status', 'Rejected')
+              ->first();
+          if (!$compliance) {
+               return response()->json(['success' => false, 'message' => 'Compliance not found.'], 404);
+          }
+          $compliance->Dismissal_status = 'Pending';
+          $compliance->dismissal_reason = null;
+          $compliance->save();
+
+          return response()->json(['success' => true, 'message' => 'Compliance restored.'], 200);
      }
 
     /** "HH:MM" or "HH:MM:SS" → minutes after midnight; null when empty or malformed (e.g. "48:00"). */

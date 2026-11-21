@@ -281,6 +281,7 @@ class WorkforcePlanningDashboardController extends Controller
                     'code'     => $e->Emp_id ?? '—',
                     'name'     => $name,
                     'picture'  => $picture,
+                    'gender'   => optional($e->resortAdmin)->gender,
                     'salary'   => $salary,
                     'currency' => $currency,
                 ];
@@ -629,6 +630,7 @@ class WorkforcePlanningDashboardController extends Controller
                     'code'     => $e->Emp_id ?? '—',
                     'name'     => $name,
                     'picture'  => $picture,
+                    'gender'   => optional($e->resortAdmin)->gender,
                     'salary'   => $salary,
                     'currency' => $currency,
                 ];

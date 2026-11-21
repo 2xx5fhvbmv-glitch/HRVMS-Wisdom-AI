@@ -47,15 +47,15 @@ Route::prefix(config('settings.route_prefix.admin'))->namespace('Admin')->group(
         Route::post('/admins/store', 'AdminController@store')->middleware('admin.reauth')->name('admin.store');
         Route::get('/admins/list', 'AdminController@list')->name('admin.list');
         Route::get('/admins/edit/{id}', 'AdminController@edit')->name('admin.edit');
-        Route::post('/admins/update/{id}', 'AdminController@update')->middleware('admin.reauth')->name('admin.update');
-        Route::delete('/admins/destroy/{id}', 'AdminController@destroy')->middleware('admin.reauth')->name('admin.destroy');
-        Route::get('/admins/inactive/{id}', 'AdminController@block')->middleware('admin.reauth')->name('admin.inactive');
-        Route::get('/admins/active/{id}', 'AdminController@active')->middleware('admin.reauth')->name('admin.active');
+        Route::post('/admins/update/{id}', 'AdminController@update')->middleware('admin.reauth')->whereNumber('id')->name('admin.update');
+        Route::delete('/admins/destroy/{id}', 'AdminController@destroy')->middleware('admin.reauth')->whereNumber('id')->name('admin.destroy');
+        Route::get('/admins/inactive/{id}', 'AdminController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.inactive');
+        Route::get('/admins/active/{id}', 'AdminController@active')->middleware('admin.reauth')->whereNumber('id')->name('admin.active');
         Route::get('/admins/massremove', 'AdminController@massremove')->middleware('admin.reauth')->name('admin.massremove');
 
         Route::post('/admins/check-email-exists', 'AdminController@checkEmailExists')->name('admin.checkEmailExists');
-        Route::get('/admins/block/{id}', 'AdminController@block')->middleware('admin.reauth')->name('admin.block');
-        Route::get('/admins/active/{id}', 'AdminController@active')->middleware('admin.reauth')->name('admin.active');
+        Route::get('/admins/block/{id}', 'AdminController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.block');
+        Route::get('/admins/active/{id}', 'AdminController@active')->middleware('admin.reauth')->whereNumber('id')->name('admin.active');
 
         /*** Settings ***/
         Route::get('/settings/update', 'SettingsController@updateSettings')->name('settings.update');

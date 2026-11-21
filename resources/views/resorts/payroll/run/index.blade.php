@@ -901,7 +901,7 @@
         $.post('{{ route("payroll.entries.list") }}', { payroll_id: localStorage.getItem("payroll_id"), kind: kind, _token: '{{ csrf_token() }}' }, function (res) {
             var list = (res.entries || []).map(function (e) {
                 return '<li class="d-flex justify-content-between gap-2 py-1 border-bottom"><span><b>' + $('<i>').text(e.employee + ' · ' + (e.label || '')).html()
-                    + '</b> ' + e.currency + ' ' + fmtNum(e.amount) + '<br><span class="text-muted">' + $('<i>').text(e.reason + ' — ' + e.by + ', ' + e.at).html()
+                    + '</b> ' + $('<i>').text(e.currency || '').html() + ' ' + fmtNum(e.amount) + '<br><span class="text-muted">' + $('<i>').text(e.reason + ' — ' + e.by + ', ' + e.at).html()
                     + '</span></span><a href="#" class="text-danger remove-payroll-entry" data-id="' + e.id + '" data-kind="' + kind + '">Remove</a></li>';
             }).join('');
             $(target).html(list ? '<div class="mt-2"><b>Already added</b><ul class="list-unstyled mb-0">' + list + '</ul></div>' : '');

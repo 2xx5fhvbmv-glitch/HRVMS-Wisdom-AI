@@ -2263,7 +2263,9 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
     Route::post('/people/compliance/regenerate-ai','People\Compliances\ComplianceController@regenerateAi')->name('people.compliance.regenerateAi');
     // Run the AI-only anomaly scan (Layer 2) — separate from the rules engine.
     Route::post('/people/compliance/anomaly-scan','People\Compliances\ComplianceController@runAnomalyScan')->name('people.compliance.anomalyScan');
-    Route::get('/people/compliance/dismiss/{id?}','People\Compliances\ComplianceController@DismissCompliance')->name('people.compliances.dismiss');
+    Route::match(['get', 'post'], '/people/compliance/dismiss/{id?}','People\Compliances\ComplianceController@DismissCompliance')->name('people.compliances.dismiss');
+    Route::post('/people/compliance/restore/{id}','People\Compliances\ComplianceController@RestoreCompliance')->name('people.compliances.restore');
+    Route::get('/people/compliance/counts','People\Compliances\ComplianceController@counts')->name('people.compliance.counts');
     Route::get('/people/compliance/download','People\Compliances\ComplianceController@download')->name('people.compliance.download');
 
     Route::get('/people/Calendar', 'People\Compliances\ComplianceController@Calendar')->name('people.compliance.Calendar');

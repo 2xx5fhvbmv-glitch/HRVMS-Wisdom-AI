@@ -114,6 +114,8 @@ class PayslipController extends Controller
                 'first_name' => $employee->resortAdmin->first_name ?? 'N/A',
                 'last_name' => $employee->resortAdmin->last_name ?? 'N/A',
                 'profile_picture' => Common::getResortUserPicture($employee->Admin_Parent_id),
+                'gender' => $employee->resortAdmin->gender ?? null,
+                'emp_id' => $employee->Emp_id,
             ];
         })
         ->addColumn('position', function ($employee) {
@@ -506,6 +508,7 @@ class PayslipController extends Controller
             "emp_id"             => $employee->Emp_id,
             "full_name"          => $employee->resortAdmin->full_name,
             "profile_picture"    => Common::getResortUserPicture($employee->resortAdmin->id),
+            "gender"             => $employee->resortAdmin->gender,
             "position"           => $employee->position->position_title ?? "N/A",
             "department"         => $employee->department->name ?? "N/A",
             "resignation_date"   => $employee->resignation->resignation_date ?? "N/A",
@@ -1386,6 +1389,7 @@ class PayslipController extends Controller
                     'name' => $settlement->employee->resortAdmin->full_name ?? 'N/A',
                     'emp_id' => $settlement->employee->Emp_id ?? 'N/A',
                     'profile_picture' => Common::getResortUserPicture($settlement->employee->Admin_Parent_id),
+                    'gender' => $settlement->employee->resortAdmin->gender ?? null,
                 ];
             })
             ->addColumn('position', function ($settlement) {

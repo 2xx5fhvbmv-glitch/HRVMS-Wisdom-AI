@@ -149,7 +149,7 @@ class ResortModulePagesSeeder extends Seeder
            [
               "page_name"       => "Compare Budget",
               "Module_Id"       => "1",
-              "internal_route"  => "resort.budget.comparebudget,{id]",
+              "internal_route"  => "resort.budget.comparebudget",
               "TypeOfPage"      => "InsideOfPage",
               "type"            => "normal",
               "place_order"     => "0"

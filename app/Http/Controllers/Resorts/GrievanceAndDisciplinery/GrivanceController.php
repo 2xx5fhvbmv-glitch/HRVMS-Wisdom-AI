@@ -431,14 +431,14 @@ class GrivanceController extends Controller
                         ->leftjoin('action_stores as t5',"t5.id","=","grivance_submission_models.action_taken")
                         ->where("t1.resort_id",$this->resort->resort_id)
                         ->where("grivance_submission_models.id",$id)
-                        ->first(['t7.Category_Name as CatName','t6.Sub_Category_Name as SubCatName','t5.ActionName','t2.personal_phone','t2.id as Parentid','t2.first_name','t2.last_name','t2.profile_picture','grivance_submission_models.*','t3.name as DepartmentName','t4.position_title as PositiontName']);
+                        ->first(['t7.Category_Name as CatName','t6.Sub_Category_Name as SubCatName','t5.ActionName','t2.personal_phone','t2.id as Parentid','t2.first_name','t2.last_name','t2.profile_picture','t2.gender','grivance_submission_models.*','t3.name as DepartmentName','t4.position_title as PositiontName']);
             $flag="CommitteeMode";
             $GrivanceSubmissionHistory =[];
             $GrivanceSubmissionHistory =  GrivanceInvestigationModel::join('grivance_investigation_child_models as t1',"t1.investigation_p_id","=","grivance_investigation_models.id")
                                                                 ->join('employees as t2',"t2.id","=","t1.Committee_member_id")   
                                                                 ->join('resort_admins as t3',"t3.id","=","t2.Admin_Parent_id")   
                                                                 ->where('grivance_investigation_models.Grievance_s_id',$id)
-                                                                ->get(['t3.first_name','t3.last_name','grivance_investigation_models.*','t1.*']);
+                                                                ->get(['t3.first_name','t3.last_name','grivance_investigation_models.*','t1.*','t3.gender']);
         $GrivanceInvestigationModel = GrivanceInvestigationModel::where('Grievance_s_id',$id)->first();
         $FilePath = config('settings.GrievanceSubmission').'/'.$this->resort->resort->resort_id;
 
@@ -843,7 +843,7 @@ class GrivanceController extends Controller
                                                         ->leftjoin('action_stores as t5',"t5.id","=","grivance_submission_models.action_taken")
                                                         ->where("t1.resort_id",$this->resort->resort_id)
                                                         ->where("grivance_submission_models.id",$id)
-                                                        ->first(['t7.Category_Name as CatName','t6.Sub_Category_Name as SubCatName','t5.ActionName','t2.personal_phone','t2.id as Parentid','t2.first_name','t2.last_name','t2.profile_picture','grivance_submission_models.*','t3.name as DepartmentName','t4.position_title as PositiontName']);
+                                                        ->first(['t7.Category_Name as CatName','t6.Sub_Category_Name as SubCatName','t5.ActionName','t2.personal_phone','t2.id as Parentid','t2.first_name','t2.last_name','t2.profile_picture','t2.gender','grivance_submission_models.*','t3.name as DepartmentName','t4.position_title as PositiontName']);
 
             // The joins above are all INNER joins (employee, admin, dept,
             // position, sub-category, category) — a grievance whose id
@@ -862,7 +862,7 @@ class GrivanceController extends Controller
                                                                 ->join('employees as t2',"t2.id","=","t1.Committee_member_id")
                                                                 ->join('resort_admins as t3',"t3.id","=","t2.Admin_Parent_id")
                                                                 ->where('grivance_investigation_models.Grievance_s_id',$id)
-                                                                ->get(['t3.first_name','t3.last_name','grivance_investigation_models.*','t1.*']);
+                                                                ->get(['t3.first_name','t3.last_name','grivance_investigation_models.*','t1.*','t3.gender']);
       
                                                                   $GrivanceInvestigationModel = GrivanceInvestigationModel::where('Grievance_s_id',$id)->first();
         // $offence_models = OffensesModel::where("id",$Grivance_Parent->Grivance_offence_id)->first();

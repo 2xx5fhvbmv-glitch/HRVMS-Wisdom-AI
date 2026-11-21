@@ -135,6 +135,7 @@ class AttendanceController extends Controller
                     $data[] = [
                         'id' => $employee->id,
                         'Emp_ID' => $employee->Emp_id,
+                        'gender' => $employee->resortAdmin->gender ?? null,
                         'checkbox' => '<input type="checkbox" class="attendance-checkbox" data-employee-id="'.$employee->id.'" data-training-id="'.$session->id.'">',
                         'employee_name' => '<div class="tableUser-block">
                             <div class="img-circle"><img src="'.Common::getResortUserPicture($employee->Admin_Parent_id).'" alt="user"></div>

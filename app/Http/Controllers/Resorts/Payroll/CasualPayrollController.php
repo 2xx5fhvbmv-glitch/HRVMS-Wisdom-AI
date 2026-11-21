@@ -135,6 +135,8 @@ class CasualPayrollController extends Controller
             ->addColumn('name', fn($e) => trim(($e->resortAdmin->first_name ?? '') . ' ' . ($e->resortAdmin->last_name ?? '')))
             ->addColumn('position', fn($e) => $e->position->position_title ?? '')
             ->addColumn('department', fn($e) => $e->department->name ?? '')
+            ->addColumn('photo', fn($e) => Common::getResortUserPicture($e->Admin_Parent_id))
+            ->addColumn('gender', fn($e) => $e->resortAdmin->gender ?? null)
             ->make(true);
     }
 
@@ -235,6 +237,7 @@ class CasualPayrollController extends Controller
         $result = [];
         $unconfigured = [];
 
+        $photos = Common::getResortUserPicturesBatch($employees->pluck('Admin_Parent_id')->all());
         foreach ($employees as $empId => $employee) {
             $payConfig = $payConfigByPosition->get($employee->Position_id);
             if (!$payConfig) {
@@ -330,6 +333,8 @@ class CasualPayrollController extends Controller
                 'employee_id' => $employee->id,
                 'name' => trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? '')),
                 'position' => $employee->position->position_title ?? '',
+                'photo' => $photos[$employee->Admin_Parent_id] ?? null,
+                'gender' => $employee->resortAdmin->gender ?? null,
                 'present' => $presentCount,
                 'day_offs' => $dayOffCount,
                 'unpaid_days' => $unpaidCount,
