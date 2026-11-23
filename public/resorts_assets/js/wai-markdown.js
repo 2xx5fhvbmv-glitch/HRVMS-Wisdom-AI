@@ -45,7 +45,7 @@ window.WaiMd = (function () {
     return CFG;
   }
   // Name chips/subjects carry only a name (no gender recorded in the answer), so they show the shared neutral figure from the wai-avatar sprite.
-  function figEl(cls) {
+  function avEl(cls) {
     var w = el('span', cls), ns = 'http://www.w3.org/2000/svg', sv = document.createElementNS(ns, 'svg'), us = document.createElementNS(ns, 'use');
     us.setAttribute('href', '#wav-n'); sv.appendChild(us); sv.setAttribute('aria-hidden', 'true'); w.appendChild(sv); return w;
   }
@@ -88,7 +88,7 @@ window.WaiMd = (function () {
       function draw() {
         var hit = g.names.filter(function (n) { return !q || n.toLowerCase().indexOf(q) >= 0; }), cut = open || q || hit.length <= 12 ? hit : hit.slice(0, 12);
         list.textContent = '';
-        cut.forEach(function (n) { var c = el('div', 'rs-n'); c.appendChild(figEl('av sm')); c.appendChild(el('span', '', n)); list.appendChild(c); });
+        cut.forEach(function (n) { var c = el('div', 'rs-n'); c.appendChild(avEl('av sm')); c.appendChild(el('span', '', n)); list.appendChild(c); });
         if (!hit.length) list.appendChild(el('div', 'rs-empty', 'No name matches'));
         more.textContent = 'Show all ' + hit.length; more.hidden = cut.length === hit.length;
       }
@@ -132,7 +132,7 @@ window.WaiMd = (function () {
         var td = el('td'), txt = plain(c), col = i > 0 && cfg().leaveLc[txt.toLowerCase()];
         if (c && c.pill) td.appendChild(el('span', 'a-pill ' + c.pill, c.text));
         else if (col && /^#[0-9a-f]{3,8}$/i.test(col)) { var lt = el('span', 'lt', txt); lt.style.setProperty('--c', col); td.appendChild(lt); }
-        else if (i === 0 && whoCol) { var who = el('div', 'who'); who.appendChild(figEl('av sm')); var nm = el('span'); mdInline(nm, c == null ? '—' : c); who.appendChild(nm); td.appendChild(who); }
+        else if (i === 0 && whoCol) { var who = el('div', 'who'); who.appendChild(avEl('av sm')); var nm = el('span'); mdInline(nm, c == null ? '—' : c); who.appendChild(nm); td.appendChild(who); }
         else mdInline(td, c == null ? '—' : c);
         tr.appendChild(td);
       });
@@ -299,7 +299,7 @@ window.WaiMd = (function () {
     var d = el('div', 'fig'); d.appendChild(el('div', 'k', f.k)); d.appendChild(el('div', 'v', f.v)); if (f.sub) d.appendChild(el('div', 'sub', f.sub)); return d;
   }
   function subjEl(s) {
-    var w = el('div', 'subj'), d = el('div'); w.appendChild(figEl('av'));
+    var w = el('div', 'subj'), d = el('div'); w.appendChild(avEl('av'));
     d.appendChild(el('div', 'nm', s.name)); if (s.sub) d.appendChild(el('div', 'ps', s.sub)); w.appendChild(d); return w;
   }
   function goEl(o, who) {
