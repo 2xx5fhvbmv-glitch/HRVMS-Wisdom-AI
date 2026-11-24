@@ -100,7 +100,7 @@ Route::prefix(config('settings.route_prefix.admin'))->namespace('Admin')->group(
         Route::post('/resorts/update/{id}', 'ResortsController@update')->middleware('admin.reauth')->whereNumber('id')->name('admin.resorts.update');
         Route::delete('/resorts/destroy/{id}', 'ResortsController@destroy')->middleware('admin.reauth')->name('admin.resorts.destroy');
         Route::post('/resorts/restore/{id}', 'ResortsController@restore')->middleware('admin.reauth')->name('admin.resorts.restore');
-        Route::get('/resorts/inactive/{id}', 'ResortsController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.resorts.block');
+        Route::get('/resorts/inactive/{id}', 'ResortsController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.resorts.inactive');   // own name: a duplicate name broke route:cache
         Route::get('/resorts/active/{id}', 'ResortsController@active')->middleware('admin.reauth')->whereNumber('id')->name('admin.resorts.active');
         Route::get('/resorts/mass-remove', 'ResortsController@massremove')->middleware('admin.reauth')->name('admin.resorts.massremove');
         Route::get('/resorts/block/{id}', 'ResortsController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.resorts.block');
@@ -273,7 +273,7 @@ Route::prefix(config('settings.route_prefix.admin'))->namespace('Admin')->group(
       Route::post('/supports/{id}/assign', 'SupportController@assignTicket')->name('admin.supports.assign');
       Route::get('/supports/chat/{support_id}', 'SupportChatController@index')->name('admin.support.chat');
       Route::post('/supports/chat/send-message', 'SupportChatController@sendMessage')->name('admin.chat.sendMessage');
-      Route::get('supports/chat/messages/{support_id}', 'SupportChatController@fetchMessages')->name('support.chat.fetchMessage');
+      Route::get('supports/chat/messages/{support_id}', 'SupportChatController@fetchMessages')->name('admin.support.chat.fetchMessage');   // was the portal's name too: broke route:cache
 
       Route::post('supports/support-email-reply', 'SupportController@replyStore')->name('support.email.reply');
       // JSON list of email replies for a ticket — drives the live polling

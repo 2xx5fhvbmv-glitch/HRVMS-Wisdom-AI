@@ -120,7 +120,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
          Route::get('payroll/dashboard/estimate-breakdown', 'Payroll\DashboardController@estimateBreakdownJson')->name('payroll.dashboard.estimate-breakdown');
          Route::get('payroll/dashboard/estimate-activity', 'Payroll\DashboardController@estimateActivityJson')->name('payroll.dashboard.estimate-activity');
          //Performance Module
-         Route::get('performance/hr-dashboard', 'Performance\PerformanceDashboardController@HR_Dashobard')->name('Performance.Hrdashboard');
+         Route::get('performance/hr-dashboard', 'Performance\PerformanceDashboardController@HR_Dashobard')->name('Performance.HrdashboardAlt');   // own name: a duplicate name broke route:cache
          Route::get('performance/hod-dashboard', 'Performance\PerformanceDashboardController@Hod_dashboard')->name('Performance.HODdashboard');
          Route::get('performance/admin-dashboard', 'Performance\PerformanceDashboardController@Admin_dashboard')->name('Performance.admindashboard');
 
@@ -1234,7 +1234,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('grievance-and-disciplinary/get-employee-details', 'GrievanceAndDisciplinery\GrivanceController@GetEmployeeDetails')->name('GrievanceAndDisciplinery.grivance.GetEmployeeDetails');
     Route::get('grievance-and-disciplinary/investigation/{id}', 'GrievanceAndDisciplinery\GrivanceController@InvestigationReport')->name('GrievanceAndDisciplinery.config.Investigation');
     Route::post('grievance-and-disciplinary/investigation-report-store', 'GrievanceAndDisciplinery\GrivanceController@InvestigationReportStore')->name('GrievanceAndDisciplinery.grivance.InvestigationReportStore');
-    Route::delete('grievance-and-disciplinary/grievance-destroy/{id}', 'GrievanceAndDisciplinery\GrivanceController@GrivnanceDestory')->name('GrievanceAndDisciplinery.grivance.DeleteGrivance');
+    Route::delete('grievance-and-disciplinary/grievance-destroy/{id}', 'GrievanceAndDisciplinery\GrivanceController@GrivnanceDestory')->name('GrievanceAndDisciplinery.grivance.DestroyGrivance');   // own name: a duplicate name broke route:cache
 
     Route::post('grievance-and-disciplinary/request-identity', 'GrievanceAndDisciplinery\GrivanceController@RequestIdentity')->name('GrievanceAndDisciplinery.grivance.RequestIdentity');
     Route::get('grievance-and-disciplinary/investigation-info/{id}', 'GrievanceAndDisciplinery\GrivanceController@Investigationinfo')->name('GrievanceAndDisciplinery.config.Investigationinfo');

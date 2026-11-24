@@ -46,6 +46,10 @@ return [
     // generator could not place — they stay unmapped (UNMAPPED_ROUTE) until given an owner page.
     'map' => array_merge(require __DIR__ . '/route_permissions_generated.php', [
 
+        // Second routes renamed so route:cache works (each follows the page its old shared name did).
+        'Performance.HrdashboardAlt'                          => ['Performance.Hrdashboard', 'view'],
+        'GrievanceAndDisciplinery.grivance.DestroyGrivance'   => ['GrievanceAndDisciplinery.grivance.GrivanceIndex', 'delete'],
+
         // Resort Permissions screen — follows the Settings page (UpdateInternalPermissions already requires its edit tick).
         'resort.Page.Permission'              => ['resort.sitesettings', 'view'],
         'resorts.searchPermissions'           => ['resort.sitesettings', 'view'],
