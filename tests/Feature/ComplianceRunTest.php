@@ -174,7 +174,7 @@ class ComplianceRunTest extends TestCase
         $this->assertStringNotContainsString('(9000.00)', $flagged);
         $this->assertStringNotContainsString('(0.00)', $flagged, 'unbudgeted vacancy is not a breach');
 
-        $this->assertSame('Breached', $this->breach($noOvertime, 'Over Time Not Eligibile')?->status);
+        $this->assertSame('Breached', $this->breach($noOvertime, 'Over Time Not Eligible')?->status);
     }
 
     public function test_a_resort_without_workforce_planning_config_still_runs_the_other_rules()

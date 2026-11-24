@@ -3,9 +3,10 @@
     // Same rules as wavKind() / wavTint() in resorts/partials/wai-avatar.blade.php.
     $g = strtolower(trim((string) $gender));
     $kind = in_array($g, ['m', 'male']) ? 'm' : (in_array($g, ['f', 'female']) ? 'f' : 'n');
+    // Hash UTF-16 code units exactly like wavTint() in JS, so an accented name gets the same tint on both sides.
     $h = 0;
-    foreach (str_split((string) $id) as $c) {
-        $h = ($h * 31 + ord($c)) & 0xFFFFFFFF;
+    foreach (unpack('v*', mb_convert_encoding((string) $id, 'UTF-16LE', 'UTF-8')) ?: [] as $c) {
+        $h = ($h * 31 + $c) & 0xFFFFFFFF;
         if ($h >= 0x80000000) { $h -= 0x100000000; }
     }
     $tint = $kind === 'n' ? '#E6F0F1' : ['#E3EEF7', '#EEF4E2', '#E6F0F1', '#F3EBDA', '#F6E7EE'][abs($h) % 5];

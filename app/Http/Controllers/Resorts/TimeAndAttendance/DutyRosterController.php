@@ -720,7 +720,7 @@ class DutyRosterController extends Controller
                                     'resort_id' => $this->resort->resort_id,
                                     'employee_id' => $CheckEmployees->id,
                                     'module_name' => 'Time and Attendance',
-                                    'compliance_breached_name' => 'Over Time Not Eligibile',
+                                    'compliance_breached_name' => 'Over Time Not Eligible',
                                 ], [
                                     'description' => "{$empName} ({$CheckEmployees->Emp_id} - {$positionName}) is not eligible for overtime.",
                                     'reported_on' => Carbon::now(),

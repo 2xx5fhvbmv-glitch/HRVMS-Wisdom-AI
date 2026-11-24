@@ -32,7 +32,7 @@ class RosterOvertimeComplianceTest extends TestCase
             ])->assertJson(['success' => true]);
         }
 
-        $rows = DB::table('compliances')->where('employee_id', $hod->id)->where('compliance_breached_name', 'Over Time Not Eligibile')->get();
+        $rows = DB::table('compliances')->where('employee_id', $hod->id)->where('compliance_breached_name', 'Over Time Not Eligible')->get();
         $this->assertCount(1, $rows, 'one breach per employee, not one per save');
         $this->assertSame($hod->resortAdmin->full_name . " ({$hod->Emp_id} - Executive Housekeeper) is not eligible for overtime.", $rows[0]->description);
     }

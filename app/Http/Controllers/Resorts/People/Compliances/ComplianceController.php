@@ -1938,14 +1938,14 @@ class ComplianceController extends Controller
                               'resort_id' => $this->resort->resort_id,
                               'employee_id' => $employee->id,
                               'module_name' => 'Time and Attendance',
-                              'compliance_breached_name' => 'Over Time Not Eligibile',
+                              'compliance_breached_name' => 'Over Time Not Eligible',
                          ]);
                          Compliance::firstOrCreate(
                               [
                                    'resort_id' => $this->resort->resort_id,
                                    'employee_id' => $employee->id,
                                    'module_name' => 'Time and Attendance',
-                                   'compliance_breached_name' => 'Over Time Not Eligibile',
+                                   'compliance_breached_name' => 'Over Time Not Eligible',
                               ],
                               [
                                    'description' => "{$employee->Emp_name} ({$employee->Emp_id} - {$employee->Position_name}) is not eligible for overtime.",
@@ -2089,7 +2089,7 @@ class ComplianceController extends Controller
           'TIN Requirement',
           'Minimum Wage',
           'Extended Probation Period',
-          'Over Time Not Eligibile',
+          'Over Time Not Eligible',
           'Overtime Agreement Lacked',
           'Job Description Not Received',
           'Job Description Not Signed',

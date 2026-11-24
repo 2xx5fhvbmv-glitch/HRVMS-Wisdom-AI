@@ -388,6 +388,8 @@
     var CC_PAGES = @json($ccPages);
     var CC_PROFILE = @json(route('people.employees.details', '__id__'));
     var CC_DISMISS = @json(route('people.compliances.dismiss', '__id__'));
+    var CC_RESTORE = @json(route('people.compliances.restore', '__id__'));
+    var CC_COUNTS = @json(route('people.compliance.counts'));
     var CC_RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     var CC_SEV = { critical: ['Critical', 'var(--cc-crit)'], high: ['High', 'var(--cc-high)'], medium: ['Medium', 'var(--cc-med)'] };
     var CC_NR = ['Unrated', 'var(--cc-nr)'];
@@ -525,16 +527,16 @@
         k.forEach(function (el, i) { el.style.setProperty('--d', (i * 60) + 'ms'); el.classList.add('cc-rv'); });
         requestAnimationFrame(function () { requestAnimationFrame(function () { k.forEach(function (el) { el.classList.add('in'); }); }); });
     }
-    // The counts are computed by index(); re-read them from the page instead of recomputing them here.
+    // The 4 KPI numbers from the lightweight counts endpoint (same numbers index() renders), in the cards' order.
     function ccKpis() {
-        return fetch(location.pathname, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(function (r) { return r.ok ? r.text() : ''; })
-            .then(function (t) {
-                if (!t) { return; }
-                var fresh = new DOMParser().parseFromString(t, 'text/html').querySelectorAll('#cc-kpis .cc-kn');
+        return fetch(CC_COUNTS, { credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (j) {
+                if (!j || !j.summary) { return; }
+                var vals = [j.summary.critical, j.summary.employees, j.summary.rules, j.summary.modules];
                 document.querySelectorAll('#cc-kpis .cc-kn').forEach(function (el, i) {
-                    var v = fresh[i] && fresh[i].textContent.trim();
-                    if (v != null && v !== '' && v !== el.textContent.trim()) { el.textContent = v; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+                    var v = vals[i] == null ? null : String(vals[i]);
+                    if (v != null && v !== el.textContent.trim()) { el.textContent = v; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
                 });
             }).catch(function () {});
     }
@@ -711,7 +713,7 @@
                     setTimeout(function () {
                         viewForm.ajax.reload(function () {
                             if (nx !== undefined && ccRow(nx)) { ccOpen(nx); } else { ccClose(); }
-                            wisdomToast('ok', 'Dismissed', d.name + '’s issue was dismissed.');
+                            wisdomToast('ok', 'Dismissed', d.name + '’s issue was dismissed.', { undo: function () { ccRestore(id, d.name); } });
                         }, false);
                         ccKpis();
                     }, CC_RM ? 0 : 320);
@@ -720,6 +722,20 @@
             });
         });
     });
+
+    // Undo a dismissal (from the "Dismissed" toast): back to Pending, then refresh the list and the KPIs.
+    function ccRestore(id, name) {
+        $.ajax({
+            url: CC_RESTORE.replace('__id__', btoa(String(id))), type: 'POST',
+            data: { _token: '{{ csrf_token() }}' },
+            success: function () {
+                viewForm.ajax.reload(function () { if (ccRow(id)) { ccOpen(id); } }, false);
+                ccKpis();
+                wisdomToast('ok', 'Restored', name + '’s issue is open again.');
+            },
+            error: function () { wisdomAlert({ type: 'error', title: 'Error!', text: 'Could not undo the dismissal. Please try again.' }); }
+        });
+    }
 
     // IDs of compliance rows freshly AI-regenerated in the most recent batch. Set in the AJAX success handlers below,
     // consumed by the table draw to flag the rows for ~12 s after the reload. Cleared afterwards so a refresh doesn't re-flag stale rows.

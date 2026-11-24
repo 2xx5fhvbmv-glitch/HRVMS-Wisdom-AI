@@ -477,7 +477,7 @@ class DemoPeopleSeeder
         $add($line('Housekeeping'), 'Time & Attendance', 'Without Mandatory Break',
             fn ($p) => "Employee {$this->name($p)} ({$title($p)}) worked 9 hours without a break. Review schedule to ensure adherence to labor laws.", 5,
             ['Medium', 'A shift over 6 hours had no recorded break.', 'Ask the supervisor to confirm the break and correct the punch, or schedule a fixed break slot.']);
-        $add($pick(fn ($p) => (int) $p->rank === 4), 'Time and Attendance', 'Over Time Not Eligibile',
+        $add($pick(fn ($p) => (int) $p->rank === 4), 'Time and Attendance', 'Over Time Not Eligible',
             fn ($p) => "{$this->name($p)} ({$p->Emp_id} - {$title($p)}) is not eligible for overtime.", 12);
         $rate = (float) DB::table('resort_site_settings')->where('resort_id', $this->resortId)->value('DollertoMVR') ?: 15.42;
         foreach ($this->people()->where('rank', '2')->filter(fn ($p) => $p->nationality !== 'Maldivian')->take(2) as $p) {
