@@ -23,7 +23,7 @@ class SupportChatController extends Controller
     public function index($support_id)
     {
         $decodedId = base64_decode($support_id);
-        $support = Support::with(['support_category','createdBy.GetEmployee','assignedAdmin'])->where('id',$decodedId)->first();
+        $support = Support::with(['support_category','createdBy.GetEmployee','assignedAdmin'])->where('id',$decodedId)->visibleToAdmin(Auth::guard('admin')->user())->firstOrFail();
 
         // Mark all admin-bound messages on this ticket as read for the
         // current admin so the unread badge on the support list clears.
@@ -42,7 +42,7 @@ class SupportChatController extends Controller
 
     public function fetchMessages($support_id)
     {
-        $support = Support::with(['support_category','createdBy.GetEmployee','assignedAdmin'])->where('id',base64_decode($support_id))->first();
+        $support = Support::with(['support_category','createdBy.GetEmployee','assignedAdmin'])->where('id',base64_decode($support_id))->visibleToAdmin(Auth::guard('admin')->user())->firstOrFail();
 
         $messages = SupportChatMessage::where('support_id', base64_decode($support_id))->orderBy('created_at', 'asc')->get();
         
@@ -51,7 +51,7 @@ class SupportChatController extends Controller
 
     public function sendMessage(Request $request)
     {
-        $support = Support::with(['support_category','createdBy.GetEmployee','assignedAdmin'])->where('id',$request->support_id)->first();
+        $support = Support::with(['support_category','createdBy.GetEmployee','assignedAdmin'])->where('id',$request->support_id)->visibleToAdmin(Auth::guard('admin')->user())->firstOrFail();
 
          $employee = $support->createdBy->getEmployee;
         

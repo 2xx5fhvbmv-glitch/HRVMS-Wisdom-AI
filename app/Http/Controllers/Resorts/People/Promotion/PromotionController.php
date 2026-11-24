@@ -1275,6 +1275,10 @@ class PromotionController extends Controller
      */
     public function downloadPromotionLetter($id)
     {
+        // Audit run-4 N7: salary / letter data is HR's (send-letter sibling is already gated).
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            abort(403, 'Unauthorized action.');
+        }
         $promotion = EmployeePromotion::with([
             'employee.position',
             'employee.department',

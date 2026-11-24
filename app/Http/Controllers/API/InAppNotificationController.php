@@ -26,6 +26,22 @@ class InAppNotificationController extends Controller
         }
     }
 
+  /**
+   * The caller's own notification rows. resort_notifications.user_id holds an
+   * employees.id for staff but a shopkeepers.id for 'Staff Shop' rows (see
+   * Shopkeeper\DashboardController) — without the module filter an employee
+   * whose id equals a shopkeeper's id read/marked that shop's notifications
+   * (audit run-4). NULL module rows are the employee's own, so keep them.
+   */
+  private function ownNotifications()
+  {
+    return ResortNotification::where('user_id', $this->user->GetEmployee->id)
+      ->where('resort_id', $this->resort_id)
+      ->where(function ($q) {
+        $q->whereNull('module')->orWhere('module', '<>', 'Staff Shop');
+      });
+  }
+
   public function employeeInAppNotification()
   {
     return $this->buildNotificationList(['unread', 'read']);
@@ -60,8 +76,7 @@ class InAppNotificationController extends Controller
     }
 
     try {
-        $notifications                                  = ResortNotification::where('user_id', $this->user->GetEmployee->id)
-                                                            ->where('resort_id', $this->resort_id)
+        $notifications                                  = $this->ownNotifications()
                                                             ->whereIn('status', $statuses)
                                                             ->orderBy('created_at', 'desc')
                                                             ->get()->map(function ($notification) {
@@ -167,9 +182,7 @@ class InAppNotificationController extends Controller
       return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
     }
 
-    $notification = ResortNotification::where('id', $request->notification_id)
-      ->where('resort_id', $this->resort_id)
-      ->where('user_id', $this->user->GetEmployee->id)
+    $notification = $this->ownNotifications()->where('id', $request->notification_id)
       ->first();
 
     if (!$notification) {
@@ -213,9 +226,7 @@ class InAppNotificationController extends Controller
 
         if ($request->has('notification_id') && $request->has('status') && $request->module == 'other') {
             // Same IDOR pattern — scope to the caller's own resort + user.
-            $notification                               =   ResortNotification::where('id', $request->notification_id)
-                                                                ->where('resort_id', $this->resort_id)
-                                                                ->where('user_id', $this->user->GetEmployee->id)
+            $notification                               =   $this->ownNotifications()->where('id', $request->notification_id)
                                                                 ->first();
             if ($notification) {
                 $notification->status                   =   $request->status;
@@ -255,8 +266,7 @@ class InAppNotificationController extends Controller
         // Clear all notifications for the user
         if ($request->module == 'delete_all') {
 
-          ResortNotification::where('user_id', $this->user->GetEmployee->id)
-            ->where('resort_id', $this->resort_id)
+          $this->ownNotifications()
             ->update(['status' => 'deleted']);
 
               return response()->json([

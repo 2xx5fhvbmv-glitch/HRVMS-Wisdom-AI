@@ -1044,12 +1044,10 @@ class Common
 
 	public static function generateUniquePassword($length)
 	{
-		$timestamp = now()->format('YmdHis');
-		$randomString = Str::random(4);
-		$dataToHash = $timestamp . $randomString;
-		$hashedData = hash('sha256', $dataToHash);
-		$uniqueCode = substr($hashedData, 0, $length);
-		return $uniqueCode;
+		// Audit run-4: CSPRNG (Str::password uses random_int), at least 16 characters,
+		// letters + digits only (it goes into emails and is typed by hand). Was a
+		// truncated sha256 of a timestamp + 4 random chars.
+		return Str::password(max((int) $length, 16), true, true, false);
 	}
 
 	public static function getAuthorizedSignature()
@@ -3467,14 +3465,21 @@ class Common
 
 	/**
      * Send email using a template */
-	public static function sendTemplateEmail($Module =null,$templateId, $recipientEmail, $dynamicData)
+	public static function sendTemplateEmail($Module =null,$templateId, $recipientEmail, $dynamicData, $resortId = null)
 	{
 
 		try {
+			// The template must belong to the caller's resort: its resort picks the
+			// SMTP account, so an id from another resort must never be accepted.
+			// Callers are resort-portal actions, so the logged-in resort is the default.
+			$resortId = $resortId ?: optional(Auth::guard('resort-admin')->user())->resort_id;
+			if (!$resortId) {
+				throw new \Illuminate\Database\Eloquent\ModelNotFoundException('No resort for template ' . $templateId);
+			}
 			// Fetch the template
             if($Module == "Disciplinary")
             {
-                $template =  DisciplinaryEmailmodel::findOrFail($templateId);
+                $template =  DisciplinaryEmailmodel::where('resort_id', $resortId)->findOrFail($templateId);
             // Replace placeholders in the email body and subject
                 $body = self::replacePlaceholders($template->content, $dynamicData);
 
@@ -3483,7 +3488,7 @@ class Common
             }
             if($Module=="TalentAcquisition")
             {
-                $template = TaEmailTemplate::findOrFail($templateId);
+                $template = TaEmailTemplate::where('Resort_id', $resortId)->findOrFail($templateId);
                 // Replace placeholders in the email body and subject
                 $body = self::replacePlaceholders($template->MailTemplete, $dynamicData);
 
@@ -5462,12 +5467,12 @@ class Common
      * resort_admins row (shared 'resort-admins' provider), so lockout state
      * lives here once and both call sites share this trio of helpers.
      */
-    public static function isAccountLocked(ResortAdmin|Admin $admin): bool
+    public static function isAccountLocked(ResortAdmin|Admin|\App\Models\TemporaryClinicDoctor $admin): bool
     {
         return $admin->locked_until && Carbon::parse($admin->locked_until)->isFuture();
     }
 
-    public static function registerFailedLogin(ResortAdmin|Admin $admin): void
+    public static function registerFailedLogin(ResortAdmin|Admin|\App\Models\TemporaryClinicDoctor $admin): void
     {
         $admin->failed_login_attempts = ($admin->failed_login_attempts ?? 0) + 1;
 
@@ -5482,7 +5487,7 @@ class Common
         $admin->save();
     }
 
-    public static function registerSuccessfulLogin(ResortAdmin|Admin $admin): void
+    public static function registerSuccessfulLogin(ResortAdmin|Admin|\App\Models\TemporaryClinicDoctor $admin): void
     {
         if ($admin->failed_login_attempts || $admin->locked_until) {
             $admin->failed_login_attempts = 0;
@@ -5491,7 +5496,7 @@ class Common
         }
     }
 
-    private static function notifyAccountLocked(ResortAdmin|Admin $admin): void
+    private static function notifyAccountLocked(ResortAdmin|Admin|\App\Models\TemporaryClinicDoctor $admin): void
     {
         // Super-admin console: cross-tenant reach, so alert every owner too.
         if ($admin instanceof Admin) {
@@ -5499,6 +5504,8 @@ class Common
             return;
         }
         try {
+            // Temporary clinic doctors have one `name` column (first/last_name accessors split it).
+            if (empty($admin->email)) return;
             $name = trim($admin->first_name . ' ' . $admin->last_name) ?: $admin->email;
             self::applyResortSmtpConfig($admin->resort_id);
             Mail::to($admin->email)->send(new \App\Mail\IncidentNotificationMail(
@@ -5511,7 +5518,7 @@ class Common
                 $admin->resort_id,
                 false   // account alert, not an incident
             ));
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             \Log::warning('Account-lock notification failed for ' . $admin->email . ': ' . $e->getMessage());
         }
     }
@@ -9496,7 +9503,9 @@ class Common
         ->join('resort_admins as t2',"t2.id","=","t1.Admin_Parent_id")
         ->where("resort_notifications.resort_id", $resort_id)
         ->where('resort_notifications.status', 'unread')
-        ->where("resort_notifications.user_id", $user_id);
+        ->where("resort_notifications.user_id", $user_id)
+        // Shopkeeper notifications share user_id but hold a shopkeeper id — never an employee's.
+        ->where(fn ($q) => $q->whereNull('resort_notifications.module')->orWhere('resort_notifications.module', '!=', 'Staff Shop'));
 
         // Sticky admin notices pinned to the top of the bell.
         $r = $query
@@ -12782,7 +12791,8 @@ class Common
         // for the rationale. Broadcasts must be created as per-recipient rows.
         $query = ResortNotification::where('resort_id', $resort_id)
                 ->where('status', 'unread')
-                ->where('user_id', $user_id);
+                ->where('user_id', $user_id)
+                ->where(fn ($q) => $q->whereNull('module')->orWhere('module', '!=', 'Staff Shop'));   // shopkeeper rows share user_id
 
         $resortNotificationCount = $query->count();
 
@@ -14486,9 +14496,9 @@ class Common
 
         return [
             'configured'     => true,
-            'headerImage'    => $setting->imageAbsolutePath('header_image'),
-            'footerImage'    => $setting->imageAbsolutePath('footer_image'),
-            'signatureImage' => $setting->imageAbsolutePath('signature_image'),
+            'headerImage'    => $setting->imageDataUri('header_image'),
+            'footerImage'    => $setting->imageDataUri('footer_image'),
+            'signatureImage' => $setting->imageDataUri('signature_image'),
             'signatoryName'  => $setting->signatory_name,
             'signatoryTitle' => $setting->signatory_title,
             'addressLine1'   => $setting->address_line1,

@@ -130,6 +130,7 @@ class LoginController extends Controller
     Auth::guard('admin')->login($admin, false);
     $request->session()->regenerate();
     $request->session()->put('admin_last_activity', time());
+    $request->session()->put('admin_mfa_stamp', \App\Http\Middleware\AdminSecurity::mfaStamp($admin));
 
     // Decision E2: alert when this account signs in from an IP it has never
     // successfully used before. Checked before logging this attempt.
@@ -162,7 +163,7 @@ class LoginController extends Controller
   {
     if (session()->has('impersonated_by')) {
       Auth::guard('resort-admin')->logout();
-      session()->forget(['impersonated_by', 'impersonation_last_activity']);
+      session()->forget(['impersonated_by', 'impersonation_last_activity', 'impersonation_started_at']);
     }
     return redirect()->route('admin.resorts.index');
   }
@@ -194,7 +195,7 @@ class LoginController extends Controller
           if (Auth::guard('resort-admin')->check())
           {
             // Store original admin ID as the impersonator
-            session(['impersonated_by' => Auth::guard('admin')->id(), 'impersonation_last_activity' => now()->getTimestamp()]);
+            session(['impersonated_by' => Auth::guard('admin')->id(), 'impersonation_last_activity' => now()->getTimestamp(), 'impersonation_started_at' => now()->getTimestamp()]);
             // Determine redirect URL based on the impersonated user's role
             $role = $resortAdmin->GetEmployee->rank ?? null;
             $rankConfig = config('settings.Position_Rank');

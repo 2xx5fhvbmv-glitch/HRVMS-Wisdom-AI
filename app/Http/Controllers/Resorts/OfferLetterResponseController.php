@@ -27,6 +27,10 @@ class OfferLetterResponseController extends Controller
             ]);
         }
 
+        if ($offer->isTokenExpired()) {
+            return $this->expiredPage();
+        }
+
         $applicant = Applicant_form_data::find($offer->applicant_id);
         $resort = Resort::find($offer->resort_id);
 
@@ -57,6 +61,10 @@ class OfferLetterResponseController extends Controller
                 ->with('error', 'Invalid offer letter link.');
         }
 
+        if ($offer->isTokenExpired()) {
+            return $this->expiredPage();
+        }
+
         if ($offer->status === 'Accepted') {
             return redirect()->route('resort.offer.letter.show', $token)
                 ->with('info', 'You have already accepted this offer letter.');
@@ -67,13 +75,17 @@ class OfferLetterResponseController extends Controller
                 ->with('error', 'This offer letter has already been rejected.');
         }
 
+        if ($stale = $this->staleResponse($offer, $token)) {
+            return $stale;
+        }
+
         $offer->update([
             'status' => 'Accepted',
             'responded_at' => Carbon::now(),
         ]);
 
         // Update applicant status
-        ApplicantWiseStatus::where('id', $offer->applicant_status_id)
+        ApplicantWiseStatus::where('id', $offer->applicant_status_id)->where('status', 'Offer Letter Sent')
             ->update(['status' => 'Offer Letter Accepted']);
 
         // Send offer letter email with download link
@@ -94,6 +106,10 @@ class OfferLetterResponseController extends Controller
                 ->with('error', 'Invalid offer letter link.');
         }
 
+        if ($offer->isTokenExpired()) {
+            return $this->expiredPage();
+        }
+
         if ($offer->status === 'Rejected') {
             return redirect()->route('resort.offer.letter.show', $token)
                 ->with('info', 'You have already rejected this offer letter.');
@@ -102,6 +118,10 @@ class OfferLetterResponseController extends Controller
         if ($offer->status === 'Accepted') {
             return redirect()->route('resort.offer.letter.show', $token)
                 ->with('error', 'This offer letter has already been accepted.');
+        }
+
+        if ($stale = $this->staleResponse($offer, $token)) {
+            return $stale;
         }
 
         $request->validate([
@@ -114,11 +134,40 @@ class OfferLetterResponseController extends Controller
             'responded_at' => Carbon::now(),
         ]);
 
-        ApplicantWiseStatus::where('id', $offer->applicant_status_id)
+        ApplicantWiseStatus::where('id', $offer->applicant_status_id)->where('status', 'Offer Letter Sent')
             ->update(['status' => 'Offer Letter Rejected']);
 
         return redirect()->route('resort.offer.letter.show', $token)
             ->with('success', 'Offer letter has been declined.');
+    }
+
+    /**
+     * Audit run-4: an old offer link must not move the applicant back — once a newer
+     * offer or a contract was issued for this applicant, this link is closed.
+     */
+    private function staleResponse($offer, $token)
+    {
+        $superseded = ApplicantOfferContract::where('applicant_id', $offer->applicant_id)
+            ->where('resort_id', $offer->resort_id)->where('id', '>', $offer->id)->exists();
+        return $superseded
+            ? redirect()->route('resort.offer.letter.show', $token)->with('error', 'This offer letter link is no longer valid. Please use the most recent email from HR.')
+            : null;
+    }
+
+    /** N18: the candidate's copy, keyed by the link token (the file itself is private). */
+    public function download($token)
+    {
+        $offer = ApplicantOfferContract::where('token', $token)->where('type', 'offer_letter')->first();
+        abort_if(!$offer || !$offer->file_path, 404);
+        if ($offer->isTokenExpired()) {
+            return $this->expiredPage();
+        }
+        return $offer->downloadResponse();
+    }
+
+    private function expiredPage()
+    {
+        return response()->view('resorts.offer_letter.show', ['error' => ApplicantOfferContract::EXPIRED_MESSAGE, 'offer' => null], 410);
     }
 
     private function sendOfferLetterEmail($offer)
@@ -130,7 +179,7 @@ class OfferLetterResponseController extends Controller
             $resort = Resort::find($offer->resort_id);
             $candidateName = ucfirst($applicant->first_name) . ' ' . ucfirst($applicant->last_name);
             $resortName = $resort->resort_name ?? '';
-            $downloadLink = asset('storage/' . $offer->file_path);
+            $downloadLink = route('resort.offer.letter.download', $offer->token);
 
             $vacancy = Vacancies::join('resort_positions as t1', 't1.id', '=', 'vacancies.position')
                 ->where('vacancies.id', $applicant->Parent_v_id ?? 0)

@@ -723,7 +723,7 @@ use Illuminate\Support\Facades\Route;
 	// separate Passport guard from the ResortAdmin-backed 'api' guard above
 	// (config/auth.php: 'temp-clinic-doctor' / 'temporary-clinic-doctors').
 	// Login can't require auth, so it stays outside the auth:api group.
-	Route::post('clinic-doctor/login', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'login']);
+	Route::post('clinic-doctor/login', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'login'])->middleware('throttle:mobile-login');
 	Route::post('clinic-doctor/logout', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'logout'])->middleware('auth:temp-clinic-doctor');
 	Route::get('clinic-doctor/profile', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'profile'])->middleware('auth:temp-clinic-doctor');
 
@@ -733,7 +733,7 @@ use Illuminate\Support\Facades\Route;
 	// request 401'd, and the app surfaced that as a forced logout even
 	// though the login itself succeeded. Same "must live outside the
 	// outer group" reasoning as the 3 routes above.
-	Route::post('add-device-token', [App\Http\Controllers\API\LoginController::class, 'addDeviceToken'])->middleware('auth:api,temp-clinic-doctor');
+	Route::post('add-device-token', [App\Http\Controllers\API\LoginController::class, 'addDeviceToken'])->middleware(['auth:api,temp-clinic-doctor', 'account.active']);
 
 	// Deliberately unrestricted by rank — any employee needs to view
 	// categories to self-book an appointment, or their own appointment/

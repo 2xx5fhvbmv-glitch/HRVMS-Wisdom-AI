@@ -14,7 +14,7 @@ class ApplicantInterViewDetails extends Model
     protected $fillable = [
         'resort_id','Applicant_id','ApplicantStatus_id','InterViewDate',
         'ApplicantInterviewtime','ResortInterviewtime','Approved_By','Status','MeetingLink','EmailTemplateId',
-        'invitation_token','interviewer_id','rejection_reason'
+        'invitation_token','token_expires_at','interviewer_id','rejection_reason'
     ];
 
     public function interviewer()

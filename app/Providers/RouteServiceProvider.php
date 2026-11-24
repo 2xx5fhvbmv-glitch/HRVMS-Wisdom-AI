@@ -83,7 +83,8 @@ class RouteServiceProvider extends ServiceProvider
         }
 
         RateLimiter::for('mobile-login', function ($request) {
-            $identifier = self::safeIdentifier($request->input('emp_id'));
+            // emp_id for employees; the clinic-doctor login posts email instead.
+            $identifier = self::safeIdentifier($request->input('emp_id') ?: $request->input('email'));
             return [
                 Limit::perMinute(5)->by($identifier . '|' . $request->ip()),
                 Limit::perMinute(30)->by($request->ip()),

@@ -161,6 +161,7 @@ class GrievanceReportController extends Controller
             ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
             ->leftJoin('grievance_committee_member_parents as gcm', 'gcm.id', '=', 'g.Committee_id')
             ->where('g.resort_id', $rid)
+            ->whereNull('g.deleted_at')   // audit run-4: soft-deleted cases stay out of reports
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($f['department'] ?? null, fn($q) => $q->where('e.Dept_id', $f['department']))
             ->when($f['employee'] ?? null, fn($q) => $q->where('g.Employee_id', $f['employee']))

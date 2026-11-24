@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Resorts;
 
 use App\Http\Controllers\Controller;
+use App\Models\ApplicantOfferContract;
 use App\Models\Applicant_form_data;
 use App\Models\Resort;
 use App\Models\Employee;
@@ -23,6 +24,10 @@ class ConsentResponseController extends Controller
             ]);
         }
 
+        if (ApplicantOfferContract::expired($applicant->consent_token_expires_at)) {
+            return $this->expiredPage();
+        }
+
         $resort = Resort::find($applicant->resort_id);
 
         return view('resorts.consent.show', [
@@ -40,6 +45,10 @@ class ConsentResponseController extends Controller
         if (!$applicant) {
             return redirect()->route('resort.consent.show', $token)
                 ->with('error', 'Invalid consent link.');
+        }
+
+        if (ApplicantOfferContract::expired($applicant->consent_token_expires_at)) {
+            return $this->expiredPage();
         }
 
         if ($applicant->consent_status === 'approved') {
@@ -74,6 +83,10 @@ class ConsentResponseController extends Controller
         if (!$applicant) {
             return redirect()->route('resort.consent.show', $token)
                 ->with('error', 'Invalid consent link.');
+        }
+
+        if (ApplicantOfferContract::expired($applicant->consent_token_expires_at)) {
+            return $this->expiredPage();
         }
 
         if ($applicant->consent_status === 'rejected') {
@@ -135,5 +148,10 @@ class ConsentResponseController extends Controller
             false,
             'talent-acquisition-consent-response'
         );
+    }
+
+    private function expiredPage()
+    {
+        return response()->view('resorts.consent.show', ['error' => ApplicantOfferContract::EXPIRED_MESSAGE, 'applicant' => null], 410);
     }
 }

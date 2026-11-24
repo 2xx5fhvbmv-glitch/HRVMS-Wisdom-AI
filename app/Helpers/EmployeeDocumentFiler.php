@@ -6,7 +6,6 @@ use App\Models\ApplicantOfferContract;
 use App\Models\FilemangementSystem;
 use App\Models\ChildFileManagement;
 use App\Models\Resort;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Files an applicant's accepted offer letter and contract into the new
@@ -51,7 +50,7 @@ class EmployeeDocumentFiler
     }
 
     /**
-     * Encrypt a stored document (on the 'public' disk) and attach it to the
+     * Encrypt a stored document (private StorageHelper file or legacy 'public' disk) and attach it to the
      * employee's categorized File Management folder. Never throws.
      */
     public static function fileDocToEmployeeFolder($employee, string $sourceRelativePath, string $displayName): void
@@ -78,12 +77,13 @@ class EmployeeDocumentFiler
                 return;
             }
 
-            if (!Storage::disk('public')->exists($sourceRelativePath)) {
+            // N18: private encrypted files via StorageHelper; older rows still on the public disk.
+            $binary = ApplicantOfferContract::readFile($sourceRelativePath);
+            if ($binary === null) {
                 \Log::warning("Onboarding doc: source file missing ({$sourceRelativePath}) for employee {$employee->Emp_id}");
                 return;
             }
-            $binary = Storage::disk('public')->get($sourceRelativePath);
-            $ext    = strtolower(pathinfo($sourceRelativePath, PATHINFO_EXTENSION) ?: 'pdf');
+            $ext    = ApplicantOfferContract::fileExtension($sourceRelativePath);
 
             $resortFolder = optional(Resort::find($employee->resort_id))->resort_id;
 

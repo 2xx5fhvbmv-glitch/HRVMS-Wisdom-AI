@@ -1458,6 +1458,7 @@ class ApplicantsController extends Controller
                     'MeetingLink' => (str_starts_with((string) $request->MeetingLink, 'https://')) ? $request->MeetingLink : '',
                     'interviewer_id' => $interviewerId,
                     'invitation_token' => Str::uuid(),
+                    'token_expires_at' => ApplicantOfferContract::tokenExpiry(),
                 ]
             );
 
@@ -1648,7 +1649,8 @@ class ApplicantsController extends Controller
         }
 
         // Update status to 'Invitation Sent' after email is confirmed
-        $interview->update(['Status' => 'Invitation Sent']);
+        // The link's life starts when it is actually emailed.
+        $interview->update(['Status' => 'Invitation Sent', 'token_expires_at' => ApplicantOfferContract::tokenExpiry()]);
 
         return response()->json([
             'success' => true,
@@ -1754,6 +1756,7 @@ class ApplicantsController extends Controller
             'MeetingLink' => str_starts_with((string) $request->MeetingLink, 'https://') ? $request->MeetingLink : '',
             'Status' => 'Pending Review',
             'invitation_token' => Str::uuid(),
+            'token_expires_at' => ApplicantOfferContract::tokenExpiry(),
             'rejection_reason' => null,
         ]);
 
@@ -1847,8 +1850,29 @@ class ApplicantsController extends Controller
             return response()->json(['success' => false, 'message' => 'Applicant status not found.'], 404);
         }
 
-        // Get dynamic final round rank for this applicant's position
+        // N3 (run-4): the applicant id is written into the status row and
+        // used to pick the email recipient — it must be this resort's
+        // applicant and the same one the status row belongs to.
         $applicant = Applicant_form_data::where('resort_id', $Resort_id)->find($ApplicantID);
+        if (!$applicant || (int) $ApplicantWiseStatus->Applicant_id !== (int) $applicant->id) {
+            return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
+        }
+        // Only HR, or an interviewer assigned to this applicant
+        // (applicant_inter_view_details.interviewer_id = resort_admins.id).
+        $isAssignedInterviewer = ApplicantInterViewDetails::where('resort_id', $Resort_id)
+            ->where('Applicant_id', $applicant->id)
+            ->where('interviewer_id', $this->resort->id)
+            ->exists();
+        if (!Common::canManageEmployeeRecords() && !$isAssignedInterviewer) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to change this applicant\'s status.'], 403);
+        }
+        // The status email template must be one of this resort's templates.
+        if ($request->filled('emailTemplateID')
+            && !TaEmailTemplate::where('id', $request->emailTemplateID)->where('Resort_id', $Resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Email template not found.'], 404);
+        }
+
+        // Get dynamic final round rank for this applicant's position
         $vacancyRank = null;
         if ($applicant && $applicant->Parent_v_id) {
             $vacancy = \App\Models\Vacancies::find($applicant->Parent_v_id);
@@ -3242,6 +3266,10 @@ class ApplicantsController extends Controller
         if ($guard = $this->requireHrAccess()) return $guard;
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
+            // N17 (run-4): the manual upload is
+            // linked to the candidate — PDF only (content-sniffed; store()
+            // then names it by that type, not the client extension).
+            'offer_letter' => 'nullable|file|mimes:pdf|max:10240',
         ]);
 
         if ($validator->fails()) {
@@ -3256,11 +3284,16 @@ class ApplicantsController extends Controller
         if (!$applicant) {
             return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
         }
+        // The status row written below must be this applicant's (it was any id, any resort).
+        if (!ApplicantWiseStatus::where('id', $applicant_status_id)->where('Applicant_id', $applicant->id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Applicant status not found.'], 404);
+        }
 
         DB::beginTransaction();
         try {
             $filePath = null;
-            $pdfPath = null;
+            $fileBytes = null;
+            $fileExt = null;
             $templateId = null;
 
             // Get template: use selected template_id if provided, otherwise fall back to default
@@ -3274,24 +3307,25 @@ class ApplicantsController extends Controller
 
             if ($template && $template->file_path && !$request->hasFile('offer_letter')) {
                 // DOCX template mode: replace placeholders and send filled DOCX directly
-                $docxFullPath = storage_path('app/public/' . $template->file_path);
-                if (!file_exists($docxFullPath)) {
+                // Template is private/encrypted (legacy rows: public disk) — decrypt to a temp file.
+                $docxFullPath = $template->toTempFile();
+                if ($docxFullPath === null) {
+                    DB::rollBack();
                     return response()->json(['success' => false, 'message' => 'Template file not found. Please re-upload in Configuration.'], 404);
                 }
 
                 $placeholders = Common::resolveTemplatePlaceholders($applicant_id, $resort_id);
-                $tempDocxPath = $this->generateFilledDocxFromTemplate($docxFullPath, $placeholders);
-
-                $fileName = 'offer_letter_' . time() . '_' . $applicant_id . '.docx';
-                $storagePath = 'offer_letters/' . $resort_id;
-                $fullStorageDir = storage_path('app/public/' . $storagePath);
-                if (!file_exists($fullStorageDir)) {
-                    mkdir($fullStorageDir, 0755, true);
+                try {
+                    $tempDocxPath = $this->generateFilledDocxFromTemplate($docxFullPath, $placeholders);
+                } finally {
+                    @unlink($docxFullPath);
                 }
-                $filePath = $storagePath . '/' . $fileName;
-                copy($tempDocxPath, storage_path('app/public/' . $filePath));
+
+                // N18: private, encrypted, via StorageHelper (was the public disk).
+                $fileExt = 'docx';
+                $fileBytes = file_get_contents($tempDocxPath);
                 @unlink($tempDocxPath);
-                $pdfPath = storage_path('app/public/' . $filePath);
+                $filePath = ApplicantOfferContract::storeFile($resort_id, 'offer_letter', (int) $applicant_id, $fileBytes, $fileExt);
                 $templateId = $template->id;
 
                 // Also resolve email subject placeholders
@@ -3301,8 +3335,9 @@ class ApplicantsController extends Controller
             } elseif ($request->hasFile('offer_letter')) {
                 // Manual PDF upload fallback
                 $file = $request->file('offer_letter');
-                $filePath = $file->store('offer_letters/' . $resort_id, 'public');
-                $pdfPath = storage_path('app/public/' . $filePath);
+                $fileExt = 'pdf';
+                $fileBytes = $file->get();
+                $filePath = ApplicantOfferContract::storeFile($resort_id, 'offer_letter', (int) $applicant_id, $fileBytes, $fileExt);
             } else {
                 return response()->json(['success' => false, 'message' => 'No template configured and no file uploaded. Please configure a template in TA Configuration or upload a PDF.'], 422);
             }
@@ -3317,6 +3352,7 @@ class ApplicantsController extends Controller
                 'file_path' => $filePath,
                 'status' => 'Sent',
                 'token' => $token,
+                'token_expires_at' => ApplicantOfferContract::tokenExpiry(),
                 'sent_by' => $this->resort->id,
                 'ta_document_template_id' => $templateId,
             ]);
@@ -3343,18 +3379,11 @@ class ApplicantsController extends Controller
 
             $subject = $emailSubject ?? $request->email_subject ?? "Offer Letter – {$positionTitle} at {$resortName}";
 
-            \Illuminate\Support\Facades\Mail::send('emails.offerLetter', compact('candidateName', 'positionTitle', 'department', 'resortName', 'offerLetterLink'), function ($message) use ($applicant, $subject, $pdfPath) {
+            \Illuminate\Support\Facades\Mail::send('emails.offerLetter', compact('candidateName', 'positionTitle', 'department', 'resortName', 'offerLetterLink'), function ($message) use ($applicant, $subject, $fileBytes, $fileExt) {
                 $message->to($applicant->email)
                     ->subject($subject);
-                if ($pdfPath && file_exists($pdfPath)) {
-                    $mime = str_ends_with($pdfPath, '.docx')
-                        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                        : 'application/pdf';
-                    $attachName = str_ends_with($pdfPath, '.docx') ? 'Offer_Letter.docx' : 'Offer_Letter.pdf';
-                    $message->attach($pdfPath, [
-                        'as' => $attachName,
-                        'mime' => $mime,
-                    ]);
+                if ($fileBytes !== null) {
+                    $message->attachData($fileBytes, 'Offer_Letter.' . $fileExt, ['mime' => ApplicantOfferContract::mimeFor($fileExt)]);
                 }
             });
 
@@ -3386,6 +3415,10 @@ class ApplicantsController extends Controller
         if ($guard = $this->requireHrAccess()) return $guard;
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
+            // N17 (run-4): the manual upload is
+            // linked to the candidate — PDF only (content-sniffed; store()
+            // then names it by that type, not the client extension).
+            'contract_file' => 'nullable|file|mimes:pdf|max:10240',
         ]);
 
         if ($validator->fails()) {
@@ -3400,11 +3433,16 @@ class ApplicantsController extends Controller
         if (!$applicant) {
             return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
         }
+        // The status row written below must be this applicant's (it was any id, any resort).
+        if (!ApplicantWiseStatus::where('id', $applicant_status_id)->where('Applicant_id', $applicant->id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Applicant status not found.'], 404);
+        }
 
         DB::beginTransaction();
         try {
             $filePath = null;
-            $pdfPath = null;
+            $fileBytes = null;
+            $fileExt = null;
             $templateId = null;
 
             // Get template: use selected template_id if provided, otherwise fall back to default
@@ -3418,24 +3456,25 @@ class ApplicantsController extends Controller
 
             if ($template && $template->file_path && !$request->hasFile('contract_file')) {
                 // DOCX template mode: replace placeholders and send filled DOCX directly
-                $docxFullPath = storage_path('app/public/' . $template->file_path);
-                if (!file_exists($docxFullPath)) {
+                // Template is private/encrypted (legacy rows: public disk) — decrypt to a temp file.
+                $docxFullPath = $template->toTempFile();
+                if ($docxFullPath === null) {
+                    DB::rollBack();
                     return response()->json(['success' => false, 'message' => 'Template file not found. Please re-upload in Configuration.'], 404);
                 }
 
                 $placeholders = Common::resolveTemplatePlaceholders($applicant_id, $resort_id);
-                $tempDocxPath = $this->generateFilledDocxFromTemplate($docxFullPath, $placeholders);
-
-                $fileName = 'contract_' . time() . '_' . $applicant_id . '.docx';
-                $storagePath = 'contracts/' . $resort_id;
-                $fullStorageDir = storage_path('app/public/' . $storagePath);
-                if (!file_exists($fullStorageDir)) {
-                    mkdir($fullStorageDir, 0755, true);
+                try {
+                    $tempDocxPath = $this->generateFilledDocxFromTemplate($docxFullPath, $placeholders);
+                } finally {
+                    @unlink($docxFullPath);
                 }
-                $filePath = $storagePath . '/' . $fileName;
-                copy($tempDocxPath, storage_path('app/public/' . $filePath));
+
+                // N18: private, encrypted, via StorageHelper (was the public disk).
+                $fileExt = 'docx';
+                $fileBytes = file_get_contents($tempDocxPath);
                 @unlink($tempDocxPath);
-                $pdfPath = storage_path('app/public/' . $filePath);
+                $filePath = ApplicantOfferContract::storeFile($resort_id, 'contract', (int) $applicant_id, $fileBytes, $fileExt);
                 $templateId = $template->id;
 
                 if ($template->subject) {
@@ -3444,8 +3483,9 @@ class ApplicantsController extends Controller
             } elseif ($request->hasFile('contract_file')) {
                 // Manual PDF upload fallback
                 $file = $request->file('contract_file');
-                $filePath = $file->store('contracts/' . $resort_id, 'public');
-                $pdfPath = storage_path('app/public/' . $filePath);
+                $fileExt = 'pdf';
+                $fileBytes = $file->get();
+                $filePath = ApplicantOfferContract::storeFile($resort_id, 'contract', (int) $applicant_id, $fileBytes, $fileExt);
             } else {
                 return response()->json(['success' => false, 'message' => 'No template configured and no file uploaded. Please configure a template in TA Configuration or upload a PDF.'], 422);
             }
@@ -3459,6 +3499,7 @@ class ApplicantsController extends Controller
                 'file_path' => $filePath,
                 'status' => 'Sent',
                 'token' => $token,
+                'token_expires_at' => ApplicantOfferContract::tokenExpiry(),
                 'sent_by' => $this->resort->id,
                 'ta_document_template_id' => $templateId,
             ]);
@@ -3484,18 +3525,11 @@ class ApplicantsController extends Controller
 
             $subject = $emailSubject ?? $request->email_subject ?? "Employment Contract – {$positionTitle} at {$resortName}";
 
-            \Illuminate\Support\Facades\Mail::send('emails.contract', compact('candidateName', 'positionTitle', 'department', 'resortName', 'contractLink'), function ($message) use ($applicant, $subject, $pdfPath) {
+            \Illuminate\Support\Facades\Mail::send('emails.contract', compact('candidateName', 'positionTitle', 'department', 'resortName', 'contractLink'), function ($message) use ($applicant, $subject, $fileBytes, $fileExt) {
                 $message->to($applicant->email)
                     ->subject($subject);
-                if ($pdfPath && file_exists($pdfPath)) {
-                    $mime = str_ends_with($pdfPath, '.docx')
-                        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                        : 'application/pdf';
-                    $attachName = str_ends_with($pdfPath, '.docx') ? 'Employment_Contract.docx' : 'Employment_Contract.pdf';
-                    $message->attach($pdfPath, [
-                        'as' => $attachName,
-                        'mime' => $mime,
-                    ]);
+                if ($fileBytes !== null) {
+                    $message->attachData($fileBytes, 'Employment_Contract.' . $fileExt, ['mime' => ApplicantOfferContract::mimeFor($fileExt)]);
                 }
             });
 
@@ -3522,6 +3556,14 @@ class ApplicantsController extends Controller
         }
     }
 
+    /** N18: HR's copy of a sent offer letter / contract — this resort's rows only, HR/GM only. */
+    public function downloadOfferContract($id)
+    {
+        if ($guard = $this->requireHrAccess()) return $guard;
+        $record = ApplicantOfferContract::where('resort_id', $this->resort->resort_id)->findOrFail((int) $id);
+        return $record->downloadResponse();
+    }
+
     public function sendConsentRequest(Request $request)
     {
         if ($guard = $this->requireHrAccess()) return $guard;
@@ -3545,6 +3587,7 @@ class ApplicantsController extends Controller
             'consent_status' => 'pending',
             'consent_expiry_date' => $request->consent_expiry_date,
             'consent_token' => $token,
+            'consent_token_expires_at' => ApplicantOfferContract::tokenExpiry(),
         ]);
 
         // Send consent email
@@ -3592,6 +3635,7 @@ class ApplicantsController extends Controller
         $applicant->update([
             'availability_status' => 'pending',
             'availability_token' => $token,
+            'availability_token_expires_at' => ApplicantOfferContract::tokenExpiry(),
             'availability_responded_at' => null,
         ]);
 

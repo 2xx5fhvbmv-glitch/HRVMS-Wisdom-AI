@@ -414,6 +414,10 @@ class SalaryIncrementController extends Controller
      */
     public function viewDetail($id)
     {
+        // Audit run-4 N7: salary / letter data is HR's (send-letter sibling is already gated).
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         // Was ->find($id) with no resort filter — unscoped read leaked
         // another resort's full approval trail (salary + reasons).
         $peopleSalaryIncrement = PeopleSalaryIncrement::with([
@@ -724,6 +728,10 @@ class SalaryIncrementController extends Controller
     // This  two summary function are used to show dat to hr
     public function summaryStore(Request $request)
     {
+        // Audit run-4 N7: salary / letter data is HR's (send-letter sibling is already gated).
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
 
         $request->validate([
             'increments.*.emp_id' => 'required',
@@ -792,6 +800,10 @@ class SalaryIncrementController extends Controller
 
     public function summaryView()
     {
+        // Audit run-4 N7: salary / letter data is HR's (send-letter sibling is already gated).
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            abort(403, 'Unauthorized action.');
+        }
         $page_title = 'Salary Increment Summary';
         $employees_data = session('increments_summary', []); 
         $currentBasicSalary = 0;
@@ -1996,6 +2008,10 @@ class SalaryIncrementController extends Controller
      */
     public function downloadSalaryIncrementLetter($id)
     {
+        // Audit run-4 N7: salary / letter data is HR's (send-letter sibling is already gated).
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            abort(403, 'Unauthorized action.');
+        }
         $increment = PeopleSalaryIncrement::with(['employee.resortAdmin', 'employee.position', 'employee.department'])
             ->where('id', $id)
             ->where('resort_id', $this->resort->resort_id)

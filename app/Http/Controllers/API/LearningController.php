@@ -841,7 +841,7 @@ class LearningController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'training_schedule_id'      => 'required',
+            'training_schedule_id'      => 'required|integer|min:1',
            
         ]);
 
@@ -856,9 +856,8 @@ class LearningController extends Controller
                 $trainingFeedbackResponse               =   TrainingFeedbackResponse::join('employees as e','e.id','training_feedback_responses.participant_id')
                                                                 ->join('resort_admins as t1', "t1.id", "=", "e.Admin_Parent_id")
                                                                 ->join('resort_positions as t2', "t2.id", "=", "e.Position_id")
-                                                                ->when($trainingScheduleId, function ($query, $trainingScheduleId) {
-                                                                    return $query->where('training_feedback_responses.training_id', $trainingScheduleId);
-                                                                })
+                                                                ->where('training_feedback_responses.training_id', $trainingScheduleId)
+                                                                ->where('e.resort_id', $this->resort_id)
                                                                 ->select(
                                                                    'training_feedback_responses.*',
                                                                     't1.id as Parentid',
@@ -1022,7 +1021,7 @@ class LearningController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'training_schedule_id'      => 'required',
+            'training_schedule_id'      => 'required|integer|min:1',
         ]);
 
         if ($validator->fails()) {
@@ -1035,9 +1034,8 @@ class LearningController extends Controller
                 $evaluationResponse                     =   EvaluationFormResponse::join('employees as e','e.id','evaluation_form_responses.participant_id')
                                                                 ->join('resort_admins as t1', "t1.id", "=", "e.Admin_Parent_id")
                                                                 ->join('resort_positions as t2', "t2.id", "=", "e.Position_id")
-                                                                ->when($trainingScheduleId, function ($query, $trainingScheduleId) {
-                                                                    return $query->where('evaluation_form_responses.training_id', $trainingScheduleId);
-                                                                })
+                                                                ->where('evaluation_form_responses.training_id', $trainingScheduleId)
+                                                                ->where('e.resort_id', $this->resort_id)
                                                                 ->select(
                                                                    'evaluation_form_responses.*',
                                                                     't1.id as Parentid',

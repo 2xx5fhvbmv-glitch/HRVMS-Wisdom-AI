@@ -459,7 +459,7 @@ class ExitClearanceController extends Controller
 
             if (!$employee) {
                 $employee = Employee::where('resort_id', $resort_id)->where('Dept_id',$department_id)
-                ->where('rank',3)->orWhere('rank',4)
+                ->whereIn('rank', [3, 4])   // audit run-4: was ->orWhere('rank',4), which escaped the resort/dept filter
                 ->first();
             }
 

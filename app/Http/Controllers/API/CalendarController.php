@@ -119,7 +119,7 @@ class CalendarController extends Controller
             'events_for'                                        =>  'required|in:organization,department,employee',
             'category'                                          =>  'nullable|string|max:100',
             'employees'                                         =>  'required|array',
-            'employees.*'                                       =>  'exists:employees,id',
+            'employees.*'                                       =>  [\Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
         ]);
 
         if ($validator->fails()) {

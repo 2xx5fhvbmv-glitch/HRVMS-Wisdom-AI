@@ -21,7 +21,7 @@
             'People'             => ['people.info-update.index', 'People › Employee Info Update'],
             'People Management'  => ['people.info-update.index', 'People › Employee Info Update'],
         ])->filter(fn ($v) => \Illuminate\Support\Facades\Route::has($v[0]))->map(fn ($v) => ['url' => route($v[0]), 'label' => $v[1]]);
-        $ccCanDismiss = App\Helpers\Common::checkRouteWisePermission('people.compliances.edit', config('settings.resort_permissions.edit')) != false;
+        $ccCanDismiss = App\Helpers\Common::canManageEmployeeRecords();
     @endphp
     <style>
         /* Same requested push as the other module dashboards/pages — extra breathing room between the hero and the
@@ -703,7 +703,8 @@
         }).then(function (result) {
             if (!result.isConfirmed) { sel.value = ''; return; }
             $.ajax({
-                url: CC_DISMISS.replace('__id__', btoa(String(id))), type: 'GET',
+                url: CC_DISMISS.replace('__id__', btoa(String(id))), type: 'POST',
+                data: { _token: '{{ csrf_token() }}' },
                 success: function () {
                     var o = ccOrder(), k = o.indexOf(id), nx = o[k + 1] !== undefined ? o[k + 1] : o[k - 1];
                     $('#table-exitclearance-form tbody tr[data-id="' + id + '"]').addClass('leave');

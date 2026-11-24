@@ -832,7 +832,8 @@ return [
             'fields' => [
                 'case_id'      => ['col' => 'gs.Grivance_id', 'type' => 'string'],
                 'raised_by'    => ['expr' => "(CASE WHEN gs.Request_Identity_Disclosure = 'No' THEN NULL ELSE TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) END)", 'type' => 'string', 'join' => 'person', 'sensitivity' => 'personal', 'label' => 'Complainant (empty when confidential)'],
-                'department'   => ['col' => 'd.name', 'type' => 'string', 'join' => 'dept', 'label' => 'Complainant\'s department'],
+                // Audit run-4: like raised_by, withheld on a confidential grievance — a small department would name the complainant.
+                'department'   => ['expr' => "(CASE WHEN gs.Request_Identity_Disclosure = 'No' THEN NULL ELSE d.name END)", 'type' => 'string', 'join' => 'dept', 'label' => 'Complainant\'s department (empty when confidential)'],
                 'confidential' => ['expr' => "(CASE WHEN gs.Request_Identity_Disclosure = 'No' THEN 'yes' ELSE 'no' END)", 'type' => 'string', 'values' => ['yes', 'no']],
                 'category'     => ['col' => 'gc.Category_Name', 'type' => 'string', 'join' => 'category'],
                 'status'       => ['col' => 'gs.status', 'type' => 'string', 'values' => ['pending', 'in_review', 'resolved', 'closed']],

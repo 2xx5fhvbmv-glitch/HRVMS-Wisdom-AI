@@ -20,6 +20,8 @@ use App\Helpers\Common;
  */
 class EnsureAccountActive
 {
+    public const IMPERSONATION_MAX_SECONDS = 3600;   // "log in as resort" ends 60 minutes after it started
+
     public function handle(Request $request, Closure $next)
     {
         $isApi = $request->is('api/*');
@@ -61,10 +63,13 @@ class EnsureAccountActive
         $session = $request->session();
         $admin = Auth::guard('admin')->user();
         $last = $session->get('impersonation_last_activity', now()->getTimestamp());
+        // Audit run-4: absolute lifetime too, however active the session stays.
+        $started = $session->get('impersonation_started_at', $last);
         if (!$admin || (int) $admin->id !== (int) $session->get('impersonated_by') || $admin->status !== 'active'
-            || now()->getTimestamp() - $last > \App\Http\Middleware\AdminSecurity::IDLE_SECONDS) {
+            || now()->getTimestamp() - $last > \App\Http\Middleware\AdminSecurity::IDLE_SECONDS
+            || now()->getTimestamp() - $started > self::IMPERSONATION_MAX_SECONDS) {
             Auth::guard('resort-admin')->logout();
-            $session->forget(['impersonated_by', 'impersonation_last_activity']);
+            $session->forget(['impersonated_by', 'impersonation_last_activity', 'impersonation_started_at']);
             return $request->expectsJson()
                 ? response()->json(['success' => false, 'message' => 'The admin session for this resort has ended.'], 401)
                 : redirect()->route('admin.loginindex');

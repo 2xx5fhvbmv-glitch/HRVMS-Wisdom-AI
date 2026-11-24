@@ -33,6 +33,10 @@ class ContractResponseController extends Controller
             ]);
         }
 
+        if ($contract->isTokenExpired()) {
+            return $this->expiredPage();
+        }
+
         $applicant = Applicant_form_data::find($contract->applicant_id);
         $resort = Resort::find($contract->resort_id);
 
@@ -61,6 +65,10 @@ class ContractResponseController extends Controller
         if (!$contract) {
             return redirect()->route('resort.contract.show', $token)
                 ->with('error', 'Invalid contract link.');
+        }
+
+        if ($contract->isTokenExpired()) {
+            return $this->expiredPage();
         }
 
         if ($contract->status === 'Accepted') {
@@ -118,6 +126,10 @@ class ContractResponseController extends Controller
         if (!$contract) {
             return redirect()->route('resort.contract.show', $token)
                 ->with('error', 'Invalid contract link.');
+        }
+
+        if ($contract->isTokenExpired()) {
+            return $this->expiredPage();
         }
 
         if ($contract->status === 'Rejected') {
@@ -221,6 +233,13 @@ class ContractResponseController extends Controller
             \Log::warning('Contract accept: applicant email belongs to another resort', ['contract_id' => $contract->id, 'resort_admin_id' => $existingAdmin->id]);
             return null;
         }
+        if ($existingAdmin && !$existingAdmin->trashed()) {
+            // A live login of this resort (HR, a manager, another staff member) already owns
+            // this email: never re-password it or attach a new employee to it from a public
+            // contract link (audit run-4). HR sorts it out by hand.
+            \Log::warning('Contract accept: applicant email belongs to a live account of this resort', ['contract_id' => $contract->id, 'resort_admin_id' => $existingAdmin->id]);
+            return null;
+        }
         if ($existingAdmin) {
             $existingEmployee = Employee::withTrashed()->where('Admin_Parent_id', $existingAdmin->id)->first();
             if ($existingEmployee && !$existingEmployee->trashed()) {
@@ -244,6 +263,8 @@ class ContractResponseController extends Controller
                 $resortAdmin->restore();
             }
             $resortAdmin->update(['password' => Hash::make($plainPassword), 'status' => 'Active', 'is_employee' => 1]);
+            $resortAdmin->must_change_password = true;   // emailed in clear
+            $resortAdmin->save();
         } else {
             $resortAdmin = ResortAdmin::create([
                 'resort_id' => $contract->resort_id,
@@ -263,6 +284,8 @@ class ContractResponseController extends Controller
                 'is_master_admin' => 0,
                 'status' => 'Active',
             ]);
+            $resortAdmin->must_change_password = true;   // emailed in clear
+            $resortAdmin->save();
         }
 
         // Create Employee record (stores job info: department, position, dates)
@@ -437,6 +460,22 @@ class ContractResponseController extends Controller
         return $employee;
     }
 
+    /** N18: the candidate's copy, keyed by the link token (the file itself is private). */
+    public function download($token)
+    {
+        $contract = ApplicantOfferContract::where('token', $token)->where('type', 'contract')->first();
+        abort_if(!$contract || !$contract->file_path, 404);
+        if ($contract->isTokenExpired()) {
+            return $this->expiredPage();
+        }
+        return $contract->downloadResponse();
+    }
+
+    private function expiredPage()
+    {
+        return response()->view('resorts.contract.show', ['error' => ApplicantOfferContract::EXPIRED_MESSAGE, 'contract' => null], 410);
+    }
+
     private function sendContractEmail($contract)
     {
         try {
@@ -446,7 +485,7 @@ class ContractResponseController extends Controller
             $resort = Resort::find($contract->resort_id);
             $candidateName = ucfirst($applicant->first_name) . ' ' . ucfirst($applicant->last_name);
             $resortName = $resort->resort_name ?? '';
-            $downloadLink = asset('storage/' . $contract->file_path);
+            $downloadLink = route('resort.contract.download', $contract->token);
 
             $vacancy = Vacancies::join('resort_positions as t1', 't1.id', '=', 'vacancies.position')
                 ->where('vacancies.id', $applicant->Parent_v_id ?? 0)

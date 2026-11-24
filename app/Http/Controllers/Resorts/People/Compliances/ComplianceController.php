@@ -696,7 +696,7 @@ class ComplianceController extends Controller
                     return $p === $defaultPhoto ? '' : $p;
                };
                $edit_class = '';
-               if (Common::checkRouteWisePermission('people.compliances.edit', config('settings.resort_permissions.edit')) == false) 
+               if (!Common::canManageEmployeeRecords())
                {
                     $edit_class = 'd-none';
                }
@@ -2379,8 +2379,10 @@ class ComplianceController extends Controller
 
      public function DismissCompliance(Request $request, $id)
      {
-          // Same permission the list uses to show the Dismiss button.
-          if (Common::checkRouteWisePermission('people.compliances.edit', config('settings.resort_permissions.edit')) == false) {
+          // Same gate the list uses to show the Dismiss button.
+          // N8 (run-4): 'people.compliances.edit' is not a module_pages row, so
+          // checkRouteWisePermission() never refused anyone — HR only.
+          if (!Common::canManageEmployeeRecords()) {
                return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
           }
           $request->validate(['reason' => 'nullable|string|max:255']);
@@ -2403,7 +2405,9 @@ class ComplianceController extends Controller
      /** Undo a manual dismiss. Auto-resolved rows ('Resolved') are not touched. */
      public function RestoreCompliance($id)
      {
-          if (Common::checkRouteWisePermission('people.compliances.edit', config('settings.resort_permissions.edit')) == false) {
+          // N8 (run-4): 'people.compliances.edit' is not a module_pages row, so
+          // checkRouteWisePermission() never refused anyone — HR only.
+          if (!Common::canManageEmployeeRecords()) {
                return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
           }
           $compliance = Compliance::where('id', base64_decode($id))

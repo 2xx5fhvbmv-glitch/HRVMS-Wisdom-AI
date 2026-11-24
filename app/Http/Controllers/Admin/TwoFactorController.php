@@ -100,6 +100,7 @@ class TwoFactorController extends Controller
 
         $request->session()->forget('admin_2fa_setup_secret');
         $request->session()->put('admin_reauth_at', time());
+        $request->session()->put('admin_mfa_stamp', \App\Http\Middleware\AdminSecurity::mfaStamp($admin));
         Common::alertSuperAdmins($admin, 'Super-admin MFA enrolled', $admin->email . ' enrolled an authenticator app from IP ' . $request->ip() . '.');
 
         return view('admin.auth.two_factor', ['mode' => 'codes', 'codes' => $codes]);

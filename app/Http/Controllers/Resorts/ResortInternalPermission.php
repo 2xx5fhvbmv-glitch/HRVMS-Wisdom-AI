@@ -28,6 +28,8 @@ class ResortInternalPermission extends Controller
     }
     public function Permissionpage()
     {
+        // Who can see every position's permission grid: the same Settings tick UpdateInternalPermissions needs to save it.
+        abort_unless(\App\Helpers\Common::checkRouteWisePermission('resort.sitesettings', config('settings.resort_permissions.view')), 403);
         try {
             $page_title = 'resorts Permission';
             $resort_id =$this->resortdata->resort_id;

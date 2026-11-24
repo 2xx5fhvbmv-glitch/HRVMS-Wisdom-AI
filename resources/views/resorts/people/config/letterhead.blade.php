@@ -39,10 +39,10 @@
                             <div class="col-md-6">
                                 <label class="form-label">LETTERHEAD HEADER IMAGE</label>
                                 <input type="file" class="form-control" name="header_image" accept="image/*,.heic,.heif">
-                                <small class="text-muted">Branded banner shown at the top of the letter. JPEG/PNG/GIF/SVG/WEBP/HEIC, max 5 MB.</small>
-                                @if($letterhead && $letterhead->imageUrl('header_image'))
+                                <small class="text-muted">Branded banner shown at the top of the letter. JPEG/PNG/GIF/WEBP/HEIC, max 5 MB.</small>
+                                @if($letterhead && ($preview = $letterhead->imageDataUri('header_image')))
                                     <div class="mt-2">
-                                        <img src="{{ $letterhead->imageUrl('header_image') }}" alt="Current header" style="max-height:70px; border:1px solid #ddd; padding:4px;">
+                                        <img src="{{ $preview }}" alt="Current header" style="max-height:70px; border:1px solid #ddd; padding:4px;">
                                     </div>
                                 @endif
                             </div>
@@ -52,9 +52,9 @@
                                 <label class="form-label">LETTERHEAD FOOTER IMAGE (OPTIONAL)</label>
                                 <input type="file" class="form-control" name="footer_image" accept="image/*,.heic,.heif">
                                 <small class="text-muted">Optional branded footer shown at the bottom of the letter.</small>
-                                @if($letterhead && $letterhead->imageUrl('footer_image'))
+                                @if($letterhead && ($preview = $letterhead->imageDataUri('footer_image')))
                                     <div class="mt-2">
-                                        <img src="{{ $letterhead->imageUrl('footer_image') }}" alt="Current footer" style="max-height:70px; border:1px solid #ddd; padding:4px;">
+                                        <img src="{{ $preview }}" alt="Current footer" style="max-height:70px; border:1px solid #ddd; padding:4px;">
                                     </div>
                                 @endif
                             </div>
@@ -64,9 +64,9 @@
                                 <label class="form-label">E-SIGNATURE IMAGE</label>
                                 <input type="file" class="form-control" name="signature_image" accept="image/*,.heic,.heif">
                                 <small class="text-muted">Scanned / digital signature placed above the signatory name.</small>
-                                @if($letterhead && $letterhead->imageUrl('signature_image'))
+                                @if($letterhead && ($preview = $letterhead->imageDataUri('signature_image')))
                                     <div class="mt-2">
-                                        <img src="{{ $letterhead->imageUrl('signature_image') }}" alt="Current signature" style="max-height:60px; border:1px solid #ddd; padding:4px;">
+                                        <img src="{{ $preview }}" alt="Current signature" style="max-height:60px; border:1px solid #ddd; padding:4px;">
                                     </div>
                                 @endif
                             </div>

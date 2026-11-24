@@ -2077,6 +2077,10 @@ class TransferController extends Controller
 
     public function downloadTransferLetter($id)
     {
+        // Audit run-4 N7: salary / letter data is HR's (send-letter sibling is already gated).
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            abort(403, 'Unauthorized action.');
+        }
         $transfer = EmployeeTransfer::with([
             'employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition', 'approvals'
         ])->where('resort_id', $this->resort->resort_id)->findOrFail($id);
@@ -2105,6 +2109,10 @@ class TransferController extends Controller
      */
     public function previewTransferLetter($id)
     {
+        // Audit run-4 N7: salary / letter data is HR's (send-letter sibling is already gated).
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            abort(403, 'Unauthorized action.');
+        }
         $transfer = EmployeeTransfer::with([
             'employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition', 'approvals'
         ])->where('resort_id', $this->resort->resort_id)->findOrFail($id);
@@ -2134,6 +2142,10 @@ class TransferController extends Controller
      */
     public function sendTransferLetter($id)
     {
+        // Audit run-4 N7: salary / letter data is HR's (send-letter sibling is already gated).
+        if (!(\App\Helpers\Common::canManageEmployeeRecords())) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         $transfer = EmployeeTransfer::with([
             'employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition', 'approvals'
         ])->where('resort_id', $this->resort->resort_id)->findOrFail($id);

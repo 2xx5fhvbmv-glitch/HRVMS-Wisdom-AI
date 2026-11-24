@@ -321,6 +321,12 @@ class AttandanceRegisterController extends Controller
         if (!Employee::where('id', $empId)->where('resort_id', $resort_id)->exists()) {
             return response()->json(['success' => false, 'message' => 'Employee not found in this resort.'], 404);
         }
+        // N2 (run-4): same gate as nonPermanentAllocateRoster — HR, or HOD/EXCOM
+        // of the employee's department; never yourself. Permanent staff stay
+        // markable here (the page has a Permanent tab; they need a roster).
+        if (!Common::canManageAttendanceFor($empId, $this->resort->GetEmployee ?? null)) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to mark attendance for this employee.'], 403);
+        }
 
         try {
             DB::beginTransaction();

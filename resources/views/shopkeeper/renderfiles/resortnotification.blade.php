@@ -6,7 +6,7 @@
             </div>
             <div class="flex-grow-1 ms-3">
                 <h5>{{ $name }}</h5>
-                <p>{!! $content  !!}</p>
+                <p>{!! \Mews\Purifier\Facades\Purifier::clean((string) $content, 'richtext') !!}</p>
             </div>
         </a>
         <a href="#" class="btn-lg-icon btn-light-grey">

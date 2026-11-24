@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Resorts;
 
 use App\Http\Controllers\Controller;
+use App\Models\ApplicantOfferContract;
 use App\Models\ApplicantInterViewDetails;
 use App\Models\Applicant_form_data;
 use App\Models\ResortAdmin;
@@ -23,6 +24,10 @@ class InterviewInvitationController extends Controller
                 'error' => 'Invalid invitation link.',
                 'interview' => null,
             ]);
+        }
+
+        if (ApplicantOfferContract::expired($interview->token_expires_at)) {
+            return $this->expiredPage();
         }
 
         // Get applicant, vacancy and resort details
@@ -52,6 +57,10 @@ class InterviewInvitationController extends Controller
         if (!$interview) {
             return redirect()->route('resort.interview.invitation.show', $token)
                 ->with('error', 'Invalid invitation link.');
+        }
+
+        if (ApplicantOfferContract::expired($interview->token_expires_at)) {
+            return $this->expiredPage();
         }
 
         if ($interview->Status === 'Slot Booked') {
@@ -105,6 +114,10 @@ class InterviewInvitationController extends Controller
         if (!$interview) {
             return redirect()->route('resort.interview.invitation.show', $token)
                 ->with('error', 'Invalid invitation link.');
+        }
+
+        if (ApplicantOfferContract::expired($interview->token_expires_at)) {
+            return $this->expiredPage();
         }
 
         if ($interview->Status === 'Invitation Rejected') {
@@ -238,5 +251,10 @@ class InterviewInvitationController extends Controller
         } catch (\Exception $e) {
             \Log::warning("Failed to send meeting link to candidate: " . $e->getMessage());
         }
+    }
+
+    private function expiredPage()
+    {
+        return response()->view('resorts.interview_invitation.show', ['error' => ApplicantOfferContract::EXPIRED_MESSAGE, 'interview' => null], 410);
     }
 }

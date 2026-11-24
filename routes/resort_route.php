@@ -32,30 +32,35 @@ Route::prefix('resort')->namespace('Resort')->group(function () {
   Route::post('/applicant_temp/video-remove', ['App\Http\Controllers\Resorts\ApplicantController','applicant_tempVideoremove'])->middleware('throttle:applicant-form-step')->name('resort.applicant_tempVideoremove');
 
   Route::post('/applicant_temp/video-store', ['App\Http\Controllers\Resorts\ApplicantController','applicant_tempVideoStore'])->middleware('throttle:applicant-form-heavy')->name('resort.applicant_tempVideoStore');
-  // Interview Invitation - Public (no auth)
-  Route::get('/interview-invitation/{token}', ['App\Http\Controllers\Resorts\InterviewInvitationController','show'])->name('resort.interview.invitation.show');
-  Route::post('/interview-invitation/{token}/accept', ['App\Http\Controllers\Resorts\InterviewInvitationController','accept'])->name('resort.interview.invitation.accept');
-  Route::post('/interview-invitation/{token}/reject', ['App\Http\Controllers\Resorts\InterviewInvitationController','reject'])->name('resort.interview.invitation.reject');
+  // Public token links (interview, offer, contract, consent, availability): rate-limited per IP (audit run-4).
+  Route::middleware('throttle:30,1')->group(function () {
+    // Interview Invitation - Public (no auth)
+    Route::get('/interview-invitation/{token}', ['App\Http\Controllers\Resorts\InterviewInvitationController','show'])->name('resort.interview.invitation.show');
+    Route::post('/interview-invitation/{token}/accept', ['App\Http\Controllers\Resorts\InterviewInvitationController','accept'])->name('resort.interview.invitation.accept');
+    Route::post('/interview-invitation/{token}/reject', ['App\Http\Controllers\Resorts\InterviewInvitationController','reject'])->name('resort.interview.invitation.reject');
 
-  // Offer Letter - Public (no auth)
-  Route::get('/offer-letter/{token}', ['App\Http\Controllers\Resorts\OfferLetterResponseController','show'])->name('resort.offer.letter.show');
-  Route::post('/offer-letter/{token}/accept', ['App\Http\Controllers\Resorts\OfferLetterResponseController','accept'])->name('resort.offer.letter.accept');
-  Route::post('/offer-letter/{token}/reject', ['App\Http\Controllers\Resorts\OfferLetterResponseController','reject'])->name('resort.offer.letter.reject');
+    // Offer Letter - Public (no auth)
+    Route::get('/offer-letter/{token}', ['App\Http\Controllers\Resorts\OfferLetterResponseController','show'])->name('resort.offer.letter.show');
+    Route::post('/offer-letter/{token}/accept', ['App\Http\Controllers\Resorts\OfferLetterResponseController','accept'])->name('resort.offer.letter.accept');
+    Route::post('/offer-letter/{token}/reject', ['App\Http\Controllers\Resorts\OfferLetterResponseController','reject'])->name('resort.offer.letter.reject');
+    Route::get('/offer-letter/{token}/download', ['App\Http\Controllers\Resorts\OfferLetterResponseController','download'])->name('resort.offer.letter.download');
 
-  // Contract - Public (no auth)
-  Route::get('/contract/{token}', ['App\Http\Controllers\Resorts\ContractResponseController','show'])->name('resort.contract.show');
-  Route::post('/contract/{token}/accept', ['App\Http\Controllers\Resorts\ContractResponseController','accept'])->name('resort.contract.accept');
-  Route::post('/contract/{token}/reject', ['App\Http\Controllers\Resorts\ContractResponseController','reject'])->name('resort.contract.reject');
+    // Contract - Public (no auth)
+    Route::get('/contract/{token}', ['App\Http\Controllers\Resorts\ContractResponseController','show'])->name('resort.contract.show');
+    Route::post('/contract/{token}/accept', ['App\Http\Controllers\Resorts\ContractResponseController','accept'])->name('resort.contract.accept');
+    Route::post('/contract/{token}/reject', ['App\Http\Controllers\Resorts\ContractResponseController','reject'])->name('resort.contract.reject');
+    Route::get('/contract/{token}/download', ['App\Http\Controllers\Resorts\ContractResponseController','download'])->name('resort.contract.download');
 
-  // Consent - Public (no auth)
-  Route::get('/consent/{token}', ['App\Http\Controllers\Resorts\ConsentResponseController','show'])->name('resort.consent.show');
-  Route::post('/consent/{token}/approve', ['App\Http\Controllers\Resorts\ConsentResponseController','approve'])->name('resort.consent.approve');
-  Route::post('/consent/{token}/reject', ['App\Http\Controllers\Resorts\ConsentResponseController','reject'])->name('resort.consent.reject');
+    // Consent - Public (no auth)
+    Route::get('/consent/{token}', ['App\Http\Controllers\Resorts\ConsentResponseController','show'])->name('resort.consent.show');
+    Route::post('/consent/{token}/approve', ['App\Http\Controllers\Resorts\ConsentResponseController','approve'])->name('resort.consent.approve');
+    Route::post('/consent/{token}/reject', ['App\Http\Controllers\Resorts\ConsentResponseController','reject'])->name('resort.consent.reject');
 
-  // Availability - Public (no auth)
-  Route::get('/availability/{token}', ['App\Http\Controllers\Resorts\AvailabilityResponseController','show'])->name('resort.availability.show');
-  Route::post('/availability/{token}/available', ['App\Http\Controllers\Resorts\AvailabilityResponseController','available'])->name('resort.availability.available');
-  Route::post('/availability/{token}/unavailable', ['App\Http\Controllers\Resorts\AvailabilityResponseController','unavailable'])->name('resort.availability.unavailable');
+    // Availability - Public (no auth)
+    Route::get('/availability/{token}', ['App\Http\Controllers\Resorts\AvailabilityResponseController','show'])->name('resort.availability.show');
+    Route::post('/availability/{token}/available', ['App\Http\Controllers\Resorts\AvailabilityResponseController','available'])->name('resort.availability.available');
+    Route::post('/availability/{token}/unavailable', ['App\Http\Controllers\Resorts\AvailabilityResponseController','unavailable'])->name('resort.availability.unavailable');
+  });
 });
 
 /*** Admin Authenticated Routes ***/
@@ -536,6 +541,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     // Offer Letter & Contract
     Route::post('/talent-acquisition/send-offer-letter', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','sendOfferLetter'])->name('resort.ta.sendOfferLetter');
     Route::post('/talent-acquisition/send-contract', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','sendContract'])->name('resort.ta.sendContract');
+    Route::get('/talent-acquisition/offer-contract/{id}/download', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','downloadOfferContract'])->whereNumber('id')->name('resort.ta.offerContract.download');
 
     // Document Templates (Offer Letter & Contract) — CRUD pages
     Route::get('/talent-acquisition/offer-letter-templates', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','index'])->name('resort.ta.offerLetterTemplates.index')->defaults('type', 'offer_letter');
@@ -545,6 +551,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','account.active','force
     Route::post('/talent-acquisition/document-template/store', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','store'])->name('resort.ta.documentTemplate.store');
     Route::put('/talent-acquisition/document-template/set-default/{id?}', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','setDefault'])->name('resort.ta.documentTemplate.setDefault');
     Route::delete('/talent-acquisition/document-template/destroy/{id?}', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','destroy'])->name('resort.ta.documentTemplate.destroy');
+    Route::get('/talent-acquisition/document-template/{id}/download', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','download'])->whereNumber('id')->name('resort.ta.documentTemplate.download');
 
     // Rejected Applications & Review Reminders
     Route::get('/talent-acquisition/rejected-applicants', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','RejectedApplicants'])->name('resort.ta.RejectedApplicants');
@@ -2263,7 +2270,7 @@ Route::get('people/advance-salary/{id}/download-approval-pdf','People\Employee\A
     Route::post('/people/compliance/regenerate-ai','People\Compliances\ComplianceController@regenerateAi')->name('people.compliance.regenerateAi');
     // Run the AI-only anomaly scan (Layer 2) — separate from the rules engine.
     Route::post('/people/compliance/anomaly-scan','People\Compliances\ComplianceController@runAnomalyScan')->name('people.compliance.anomalyScan');
-    Route::match(['get', 'post'], '/people/compliance/dismiss/{id?}','People\Compliances\ComplianceController@DismissCompliance')->name('people.compliances.dismiss');
+    Route::post('/people/compliance/dismiss/{id}','People\Compliances\ComplianceController@DismissCompliance')->name('people.compliances.dismiss');
     Route::post('/people/compliance/restore/{id}','People\Compliances\ComplianceController@RestoreCompliance')->name('people.compliances.restore');
     Route::get('/people/compliance/counts','People\Compliances\ComplianceController@counts')->name('people.compliance.counts');
     Route::get('/people/compliance/download','People\Compliances\ComplianceController@download')->name('people.compliance.download');

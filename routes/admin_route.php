@@ -135,106 +135,106 @@ Route::prefix(config('settings.route_prefix.admin'))->namespace('Admin')->group(
         Route::get('/divisions', 'DivisionController@index')->name('admin.divisions.index');
         Route::get('/divisions/list', 'DivisionController@list')->name('admin.divisions.list');
         Route::get('/divisions/create', 'DivisionController@create')->name('admin.divisions.create');
-        Route::post('/divisions/store', 'DivisionController@store')->name('admin.divisions.store');
+        Route::post('/divisions/store', 'DivisionController@store')->middleware('admin.reauth')->name('admin.divisions.store');
         Route::get('/divisions/edit/{id}', 'DivisionController@edit')->name('admin.divisions.edit');
-        Route::delete('/divisions/destroy/{id}', 'DivisionController@destroy')->name('admin.divisions.destroy');
-        Route::post('/divisions/update/{id}', 'DivisionController@update')->name('admin.divisions.update');
-        Route::get('/divisions/massremove', 'DivisionController@massremove')->name('admin.divisions.massremove');
-        Route::get('/divisions/inactive/{id}', 'DivisionController@block')->name('admin.divisions.block');
-        Route::get('/divisions/active/{id}', 'DivisionController@active')->name('admin.divisions.active');
+        Route::delete('/divisions/destroy/{id}', 'DivisionController@destroy')->middleware('admin.reauth')->whereNumber('id')->name('admin.divisions.destroy');
+        Route::post('/divisions/update/{id}', 'DivisionController@update')->middleware('admin.reauth')->whereNumber('id')->name('admin.divisions.update');
+        Route::get('/divisions/massremove', 'DivisionController@massremove')->middleware('admin.reauth')->name('admin.divisions.massremove');
+        Route::get('/divisions/inactive/{id}', 'DivisionController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.divisions.block');
+        Route::get('/divisions/active/{id}', 'DivisionController@active')->middleware('admin.reauth')->whereNumber('id')->name('admin.divisions.active');
         Route::get('/divisions/sample-sheet', 'DivisionController@downloadSample')->name('admin.divisions.sample');
-        Route::post('/divisions/import', 'DivisionController@import')->name('admin.divisions.import');
+        Route::post('/divisions/import', 'DivisionController@import')->middleware('admin.reauth')->name('admin.divisions.import');
 
         /**Departments Module **/
         Route::get('/department', 'DepartmentController@index')->name('admin.department.index');
         Route::get('/department/list', 'DepartmentController@list')->name('admin.department.list');
         Route::get('/department/create', 'DepartmentController@create')->name('admin.department.create');
-        Route::post('/department/store', 'DepartmentController@store')->name('admin.department.store');
+        Route::post('/department/store', 'DepartmentController@store')->middleware('admin.reauth')->name('admin.department.store');
         Route::get('/department/edit/{id}', 'DepartmentController@edit')->name('admin.department.edit');
-        Route::delete('/department/destroy/{id}', 'DepartmentController@destroy')->name('admin.department.destroy');
-        Route::post('/department/update/{id}', 'DepartmentController@update')->name('admin.department.update');
-        Route::get('/department/massremove', 'DepartmentController@massremove')->name('admin.department.massremove');
-        Route::get('/department/inactive/{id}', 'DepartmentController@block')->name('admin.department.block');
-        Route::get('/department/active/{id}', 'DepartmentController@active')->name('admin.department.active');
+        Route::delete('/department/destroy/{id}', 'DepartmentController@destroy')->middleware('admin.reauth')->whereNumber('id')->name('admin.department.destroy');
+        Route::post('/department/update/{id}', 'DepartmentController@update')->middleware('admin.reauth')->whereNumber('id')->name('admin.department.update');
+        Route::get('/department/massremove', 'DepartmentController@massremove')->middleware('admin.reauth')->name('admin.department.massremove');
+        Route::get('/department/inactive/{id}', 'DepartmentController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.department.block');
+        Route::get('/department/active/{id}', 'DepartmentController@active')->middleware('admin.reauth')->whereNumber('id')->name('admin.department.active');
         Route::get('/department/sample-sheet', 'DepartmentController@downloadSample')->name('admin.department.sample');
-        Route::post('/department/import', 'DepartmentController@import')->name('admin.department.import');
+        Route::post('/department/import', 'DepartmentController@import')->middleware('admin.reauth')->name('admin.department.import');
 
         /**Sections Module **/
         Route::get('/sections', 'SectionController@index')->name('admin.sections.index');
         Route::get('/sections/list', 'SectionController@list')->name('admin.sections.list');
         Route::get('/sections/create', 'SectionController@create')->name('admin.sections.create');
-        Route::post('/sections/store', 'SectionController@store')->name('admin.sections.store');
+        Route::post('/sections/store', 'SectionController@store')->middleware('admin.reauth')->name('admin.sections.store');
         Route::get('/sections/edit/{id}', 'SectionController@edit')->name('admin.sections.edit');
-        Route::delete('/sections/destroy/{id}', 'SectionController@destroy')->name('admin.sections.destroy');
-        Route::post('/sections/update/{id}', 'SectionController@update')->name('admin.sections.update');
-        Route::get('/sections/massremove', 'SectionController@massremove')->name('admin.sections.massremove');
-        Route::get('/sections/inactive/{id}', 'SectionController@block')->name('admin.sections.block');
-        Route::get('/sections/active/{id}', 'SectionController@active')->name('admin.sections.active');
+        Route::delete('/sections/destroy/{id}', 'SectionController@destroy')->middleware('admin.reauth')->whereNumber('id')->name('admin.sections.destroy');
+        Route::post('/sections/update/{id}', 'SectionController@update')->middleware('admin.reauth')->whereNumber('id')->name('admin.sections.update');
+        Route::get('/sections/massremove', 'SectionController@massremove')->middleware('admin.reauth')->name('admin.sections.massremove');
+        Route::get('/sections/inactive/{id}', 'SectionController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.sections.block');
+        Route::get('/sections/active/{id}', 'SectionController@active')->middleware('admin.reauth')->whereNumber('id')->name('admin.sections.active');
         Route::get('/sections/sample-sheet', 'SectionController@downloadSample')->name('admin.sections.sample');
-        Route::post('/sections/import', 'SectionController@import')->name('admin.sections.import');
+        Route::post('/sections/import', 'SectionController@import')->middleware('admin.reauth')->name('admin.sections.import');
 
         /**Positions Module **/
         Route::get('/positions', 'PositionController@index')->name('admin.positions.index');
         Route::get('/positions/list', 'PositionController@list')->name('admin.positions.list');
         Route::get('/positions/create', 'PositionController@create')->name('admin.positions.create');
-        Route::post('/positions/store', 'PositionController@store')->name('admin.positions.store');
+        Route::post('/positions/store', 'PositionController@store')->middleware('admin.reauth')->name('admin.positions.store');
         Route::get('/positions/edit/{id}', 'PositionController@edit')->name('admin.positions.edit');
-        Route::delete('/positions/destroy/{id}', 'PositionController@destroy')->name('admin.positions.destroy');
-        Route::post('/positions/update/{id}', 'PositionController@update')->name('admin.positions.update');
-        Route::get('/positions/massremove', 'PositionController@massremove')->name('admin.positions.massremove');
+        Route::delete('/positions/destroy/{id}', 'PositionController@destroy')->middleware('admin.reauth')->whereNumber('id')->name('admin.positions.destroy');
+        Route::post('/positions/update/{id}', 'PositionController@update')->middleware('admin.reauth')->whereNumber('id')->name('admin.positions.update');
+        Route::get('/positions/massremove', 'PositionController@massremove')->middleware('admin.reauth')->name('admin.positions.massremove');
         Route::get('/positions/edit-permissions/{id}', 'PositionController@editPermissions')->name('admin.positions.edit_permissions');
-        Route::post('/positions/update-permissions/{id}', 'PositionController@updatePermissions')->name('admin.positions.update_permissions');
-        Route::get('/positions/inactive/{id}', 'PositionController@block')->name('admin.positions.block');
-        Route::get('/positions/active/{id}', 'PositionController@active')->name('admin.positions.active');
+        Route::post('/positions/update-permissions/{id}', 'PositionController@updatePermissions')->middleware('admin.reauth')->whereNumber('id')->name('admin.positions.update_permissions');
+        Route::get('/positions/inactive/{id}', 'PositionController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.positions.block');
+        Route::get('/positions/active/{id}', 'PositionController@active')->middleware('admin.reauth')->whereNumber('id')->name('admin.positions.active');
         Route::get('/positions/sample-sheet', 'PositionController@downloadSample')->name('admin.positions.sample');
-        Route::post('/positions/import', 'PositionController@import')->name('admin.positions.import');
+        Route::post('/positions/import', 'PositionController@import')->middleware('admin.reauth')->name('admin.positions.import');
 
         /** Notification Module */
         Route::get('/notifications', 'NotificationController@index')->name('admin.notifications.index');
         Route::get('/notifications/list', 'NotificationController@list')->name('admin.notifications.list');
         Route::get('/notifications/create', 'NotificationController@create')->name('admin.notifications.create');
-        Route::post('/notifications/store', 'NotificationController@store')->name('admin.notifications.store');
+        Route::post('/notifications/store', 'NotificationController@store')->middleware('admin.reauth')->name('admin.notifications.store');
         Route::get('/notifications/edit/{id}', 'NotificationController@edit')->name('admin.notifications.edit');
-        Route::delete('/notifications/destroy/{id}', 'NotificationController@destroy')->name('admin.notifications.destroy');
-        Route::post('/notifications/update/{id}', 'NotificationController@update')->name('admin.notifications.update');
-        Route::get('/notifications/massremove', 'NotificationController@massremove')->name('admin.notifications.massremove');
-        Route::get('/notifications/block/{id}', 'NotificationController@block')->name('admin.notifications.block');
-        Route::get('/notifications/active/{id}', 'NotificationController@active')->name('admin.notifications.active');
+        Route::delete('/notifications/destroy/{id}', 'NotificationController@destroy')->middleware('admin.reauth')->whereNumber('id')->name('admin.notifications.destroy');
+        Route::post('/notifications/update/{id}', 'NotificationController@update')->middleware('admin.reauth')->whereNumber('id')->name('admin.notifications.update');
+        Route::get('/notifications/massremove', 'NotificationController@massremove')->middleware('admin.reauth')->name('admin.notifications.massremove');
+        Route::get('/notifications/block/{id}', 'NotificationController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.notifications.block');
+        Route::get('/notifications/active/{id}', 'NotificationController@active')->middleware('admin.reauth')->whereNumber('id')->name('admin.notifications.active');
 
         /**Public Holidays Module **/
         Route::get('/public_holidays', 'PublicHolidayController@index')->name('admin.public_holidays.index');
         Route::get('/public_holidays/list', 'PublicHolidayController@list')->name('admin.public_holidays.list');
         Route::get('/public_holidays/create', 'PublicHolidayController@create')->name('admin.public_holidays.create');
-        Route::post('/public_holidays/store', 'PublicHolidayController@store')->name('admin.public_holidays.store');
+        Route::post('/public_holidays/store', 'PublicHolidayController@store')->middleware('admin.reauth')->name('admin.public_holidays.store');
         Route::get('/public_holidays/edit/{id}', 'PublicHolidayController@edit')->name('admin.public_holidays.edit');
-        Route::delete('/public_holidays/destroy/{id}', 'PublicHolidayController@destroy')->name('admin.public_holidays.destroy');
-        Route::post('/public_holidays/update/{id}', 'PublicHolidayController@update')->name('admin.public_holidays.update');
-        Route::get('/public_holidays/massremove', 'PublicHolidayController@massremove')->name('admin.public_holidays.massremove');
-        Route::get('/public_holidays/inactive/{id}', 'PublicHolidayController@block')->name('admin.public_holidays.block');
-        Route::get('/public_holidays/active/{id}', 'PublicHolidayController@active')->name('admin.public_holidays.active');
+        Route::delete('/public_holidays/destroy/{id}', 'PublicHolidayController@destroy')->middleware('admin.reauth')->whereNumber('id')->name('admin.public_holidays.destroy');
+        Route::post('/public_holidays/update/{id}', 'PublicHolidayController@update')->middleware('admin.reauth')->whereNumber('id')->name('admin.public_holidays.update');
+        Route::get('/public_holidays/massremove', 'PublicHolidayController@massremove')->middleware('admin.reauth')->name('admin.public_holidays.massremove');
+        Route::get('/public_holidays/inactive/{id}', 'PublicHolidayController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.public_holidays.block');
+        Route::get('/public_holidays/active/{id}', 'PublicHolidayController@active')->middleware('admin.reauth')->whereNumber('id')->name('admin.public_holidays.active');
 
         //Permission module
 
 
         Route::get('/modules/list', ['App\Http\Controllers\Admin\ModuleController','index'])->name('admin.Modules.index');
         Route::get('/modules/create', ['App\Http\Controllers\Admin\ModuleController','create'])->name('admin.Modules.create');
-        Route::post('/modules/store', ['App\Http\Controllers\Admin\ModuleController','store'])->name('admin.Modules.store');
+        Route::post('/modules/store', ['App\Http\Controllers\Admin\ModuleController','store'])->middleware('admin.reauth')->name('admin.Modules.store');
         Route::get('/modules/edit/{id}', ['App\Http\Controllers\Admin\ModuleController','edit'])->name('admin.Modules.edit');
-        Route::delete('/modules/destroy/{id}', ['App\Http\Controllers\Admin\ModuleController','destroy'])->name('admin.Modules.destroy');
-        Route::post('/modules/update/{id}', ['App\Http\Controllers\Admin\ModuleController','update'])->name('admin.Modules.update');
-        Route::get('/modules/block/{id}', ['App\Http\Controllers\Admin\ModuleController','block'])->name('admin.Modules.block');
-        Route::get('/modules/active/{id}', ['App\Http\Controllers\Admin\ModuleController','active'])->name('admin.Modules.active');
-        Route::get('/admins/modules/massremove', ['App\Http\Controllers\Admin\ModuleController','massremove'])->name( 'admin.Modules.massremove');
+        Route::delete('/modules/destroy/{id}', ['App\Http\Controllers\Admin\ModuleController','destroy'])->middleware('admin.reauth')->whereNumber('id')->name('admin.Modules.destroy');
+        Route::post('/modules/update/{id}', ['App\Http\Controllers\Admin\ModuleController','update'])->middleware('admin.reauth')->whereNumber('id')->name('admin.Modules.update');
+        Route::get('/modules/block/{id}', ['App\Http\Controllers\Admin\ModuleController','block'])->middleware('admin.reauth')->whereNumber('id')->name('admin.Modules.block');
+        Route::get('/modules/active/{id}', ['App\Http\Controllers\Admin\ModuleController','active'])->middleware('admin.reauth')->whereNumber('id')->name('admin.Modules.active');
+        Route::get('/admins/modules/massremove', ['App\Http\Controllers\Admin\ModuleController','massremove'])->middleware('admin.reauth')->name( 'admin.Modules.massremove');
 
         Route::get('/module-pages/list', ['App\Http\Controllers\Admin\ModulesPagesController','index'])->name('admin.ModulePages.index');
         Route::get('/module-pages/create', ['App\Http\Controllers\Admin\ModulesPagesController','create'])->name('admin.ModulePages.create');
-        Route::post('/module-pages/store', ['App\Http\Controllers\Admin\ModulesPagesController','store'])->name('admin.ModulePages.store');
+        Route::post('/module-pages/store', ['App\Http\Controllers\Admin\ModulesPagesController','store'])->middleware('admin.reauth')->name('admin.ModulePages.store');
         Route::get('/module-pages/edit/{id}', ['App\Http\Controllers\Admin\ModulesPagesController','edit'])->name('admin.ModulePages.edit');
-        Route::delete('/module-pages/destroy/{id}', ['App\Http\Controllers\Admin\ModulesPagesController','destroy'])->name('admin.ModulePages.destroy');
-        Route::post('/module-pages/update/{id}', ['App\Http\Controllers\Admin\ModulesPagesController','update'])->name('admin.ModulePages.update');
-        Route::get('/module-pages/block/{id}', ['App\Http\Controllers\Admin\ModulesPagesController','block'])->name('admin.ModulePages.block');
-        Route::get('/module-pages/active/{id}', ['App\Http\Controllers\Admin\ModulesPagesController','active'])->name('admin.ModulePages.active');
-        Route::get('/admins/module-pages/massremove', ['App\Http\Controllers\Admin\ModulesPagesController','ModulesPagesmassremove'])->name( 'admin.ModulePages.massremove');
+        Route::delete('/module-pages/destroy/{id}', ['App\Http\Controllers\Admin\ModulesPagesController','destroy'])->middleware('admin.reauth')->whereNumber('id')->name('admin.ModulePages.destroy');
+        Route::post('/module-pages/update/{id}', ['App\Http\Controllers\Admin\ModulesPagesController','update'])->middleware('admin.reauth')->whereNumber('id')->name('admin.ModulePages.update');
+        Route::get('/module-pages/block/{id}', ['App\Http\Controllers\Admin\ModulesPagesController','block'])->middleware('admin.reauth')->whereNumber('id')->name('admin.ModulePages.block');
+        Route::get('/module-pages/active/{id}', ['App\Http\Controllers\Admin\ModulesPagesController','active'])->middleware('admin.reauth')->whereNumber('id')->name('admin.ModulePages.active');
+        Route::get('/admins/module-pages/massremove', ['App\Http\Controllers\Admin\ModulesPagesController','ModulesPagesmassremove'])->middleware('admin.reauth')->name( 'admin.ModulePages.massremove');
 
 
         //End Permission module
@@ -244,24 +244,24 @@ Route::prefix(config('settings.route_prefix.admin'))->namespace('Admin')->group(
       Route::get('/ewt_brackets', 'EwtTaxBracketController@index')->name('admin.ewt_brackets.index');
       Route::get('/ewt_brackets/list', 'EwtTaxBracketController@list')->name('admin.ewt_brackets.list');
       Route::get('/ewt_brackets/create', 'EwtTaxBracketController@create')->name('admin.ewt_brackets.create');
-      Route::post('/ewt_brackets/store', 'EwtTaxBracketController@store')->name('admin.ewt_brackets.store');
+      Route::post('/ewt_brackets/store', 'EwtTaxBracketController@store')->middleware('admin.reauth')->name('admin.ewt_brackets.store');
       Route::get('/ewt_brackets/edit/{id}', 'EwtTaxBracketController@edit')->name('admin.ewt_brackets.edit');
-      Route::delete('/ewt_brackets/destroy/{id}', 'EwtTaxBracketController@destroy')->name('admin.ewt_brackets.destroy');
-      Route::post('/ewt_brackets/update/{id}', 'EwtTaxBracketController@update')->name('admin.ewt_brackets.update');
-      Route::get('/ewt_brackets/massremove', 'EwtTaxBracketController@massremove')->name('admin.ewt_brackets.massremove');
+      Route::delete('/ewt_brackets/destroy/{id}', 'EwtTaxBracketController@destroy')->middleware('admin.reauth')->whereNumber('id')->name('admin.ewt_brackets.destroy');
+      Route::post('/ewt_brackets/update/{id}', 'EwtTaxBracketController@update')->middleware('admin.reauth')->whereNumber('id')->name('admin.ewt_brackets.update');
+      Route::get('/ewt_brackets/massremove', 'EwtTaxBracketController@massremove')->middleware('admin.reauth')->name('admin.ewt_brackets.massremove');
         
       //Support Categories module
 
       Route::get('/support-categories', 'SupportCategoryController@index')->name('admin.support_categories.index');
       Route::get('/support-categories/list', 'SupportCategoryController@list')->name('admin.support_categories.list');
       Route::get('/support-categories/create', 'SupportCategoryController@create')->name('admin.support_categories.create');
-      Route::post('/support-categories/store', 'SupportCategoryController@store')->name('admin.support_categories.store');
+      Route::post('/support-categories/store', 'SupportCategoryController@store')->middleware('admin.reauth')->name('admin.support_categories.store');
       Route::get('/support-categories/edit/{id}', 'SupportCategoryController@edit')->name('admin.support_categories.edit');
-      Route::delete('/support-categories/destroy/{id}', 'SupportCategoryController@destroy')->name('admin.support_categories.destroy');
-      Route::post('/support-categories/update/{id}', 'SupportCategoryController@update')->name('admin.support_categories.update');
-      Route::get('/support-categories/massremove', 'SupportCategoryController@massremove')->name('admin.support_categories.massremove');
-      Route::get('/support-categories/block/{id}','SupportCategoryController@block')->name('admin.support_categories.block');
-      Route::get('/support-categories/active/{id}', 'SupportCategoryController@active')->name('admin.support_categories.active');
+      Route::delete('/support-categories/destroy/{id}', 'SupportCategoryController@destroy')->middleware('admin.reauth')->whereNumber('id')->name('admin.support_categories.destroy');
+      Route::post('/support-categories/update/{id}', 'SupportCategoryController@update')->middleware('admin.reauth')->whereNumber('id')->name('admin.support_categories.update');
+      Route::get('/support-categories/massremove', 'SupportCategoryController@massremove')->middleware('admin.reauth')->name('admin.support_categories.massremove');
+      Route::get('/support-categories/block/{id}','SupportCategoryController@block')->middleware('admin.reauth')->whereNumber('id')->name('admin.support_categories.block');
+      Route::get('/support-categories/active/{id}', 'SupportCategoryController@active')->middleware('admin.reauth')->whereNumber('id')->name('admin.support_categories.active');
       
       //Support module
 

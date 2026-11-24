@@ -363,7 +363,7 @@ class MonthlyCheckInController extends Controller
         DB::beginTransaction();
         try
         {
-            $meeting                                        =   MonthlyCheckingModel::where('id', $request->meeting_id)->where('status', 'Confirm')->first();
+            $meeting                                        =   MonthlyCheckingModel::where('resort_id', $this->resort_id)->where('id', $request->meeting_id)->where('status', 'Confirm')->first();
 
             if (!$meeting) {
                 DB::rollBack();
@@ -372,8 +372,22 @@ class MonthlyCheckInController extends Controller
                     'message'                               =>  'Meeting not found or status is not Confirm.'
                 ], 200);
             }
+
+            // Same people who may schedule it (see monthlyCheckInStore):
+            // whoever created it, HR/GM, the employee's reporting manager or
+            // their department's HOD/EXCOM (audit run-4 N12).
+            $actor          = $this->user->getEmployee;
+            $target         = Employee::where('resort_id', $this->resort_id)->find($meeting->emp_id);
+            $mayReschedule  = (int) $meeting->created_by === (int) $this->user->id
+                || ($actor && Common::hasFullDataAccess($actor))
+                || ($actor && $target && (int) $target->reporting_to === (int) $actor->id)
+                || ($actor && $target && (int) $target->Dept_id === (int) $actor->Dept_id && in_array((int) $actor->rank, [1, 2], true));
+            if (!$mayReschedule) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+            }
            
-            $update                                         =   MonthlyCheckingModel::where('id',$request->meeting_id)->where('status','Confirm')->update([
+            $update                                         =   MonthlyCheckingModel::where('resort_id', $this->resort_id)->where('id',$request->meeting_id)->where('status','Confirm')->update([
                 "date_discussion"                           =>  $request->date_discussion, 
                 "start_time"                                =>  $request->start_time,
                 "end_time"                                  =>  $request->end_time,

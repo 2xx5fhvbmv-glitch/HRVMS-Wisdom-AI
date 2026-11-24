@@ -47,7 +47,9 @@ class ResortDataSetupController extends Controller
 
     public function show(Request $request, Resort $resort)
     {
-        $this->authorizeResorts('view');
+        // Audit run-4 N15: the page lists before/after salary, bank and passport
+        // values from the import report and record history — Resorts Edit only.
+        $this->authorizeResorts('edit');
         return $this->render($resort, [], trim((string) $request->query('lookup')));
     }
 

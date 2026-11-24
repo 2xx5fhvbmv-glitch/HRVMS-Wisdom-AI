@@ -720,7 +720,11 @@
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
             body: JSON.stringify({ message: text })
         })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+        .then(function (r) {
+            // 401/419 = the login session ended: every later question would fail the same way, so go sign in.
+            if (r.status === 401 || r.status === 419) { setTimeout(function () { location.reload(); }, 1500); return { ok: false, body: { message: 'Your session has ended. Taking you to sign in…' } }; }
+            return r.json().then(function (j) { return { ok: r.ok, body: j }; });
+        })
         .then(function (res) {
             hideTyping();
             if (res.body && res.body.usage) applyUsage(res.body.usage);

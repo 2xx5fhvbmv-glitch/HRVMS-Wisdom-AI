@@ -7,7 +7,7 @@
             <div class="ntf-av ntf-av-wisdom"><span class="ntf-mk"></span></div>
             <div class="flex-grow-1">
                 <h5>{{ $notification->name }}</h5>
-                <p>{!!$notification->content  !!}</p>
+                <p>{!! \Mews\Purifier\Facades\Purifier::clean((string) $notification->content, 'richtext') !!}</p>
                 <span>Start Time: {{ $notification->start_date }}, End Time: {{ $notification->end_date }}  </span>
             </div>
         </a>

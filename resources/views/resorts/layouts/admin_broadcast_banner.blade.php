@@ -3,6 +3,13 @@
      the current user's resort that they haven't already dismissed. Each
      banner has a × that POSTs to /resort/admin-notifications/{id}/dismiss
      and writes a per-user row to admin_notification_dismissals. --}}
+@if(session()->has('impersonated_by'))
+    {{-- A super-admin "log in as resort" session: always show the way out. --}}
+    <div class="admin-broadcast-bar" style="background:#f8d7da;color:#842029;display:flex;justify-content:space-between;align-items:center;padding:8px 16px;font-size:13px;">
+        <span>You are signed in to this resort from the super-admin console.</span>
+        <a href="{{ route('endImpersonation') }}" style="color:#842029;font-weight:600;">End session</a>
+    </div>
+@endif
 @php
     $__adminBroadcasts = \App\Helpers\Common::getActiveAdminNotifications();
 @endphp
@@ -16,7 +23,7 @@
                     color:{{ $b->font_color ?: '#664d03' }};">
             <div class="admin-broadcast-content">
                 <strong>{{ $b->name }}</strong>
-                <span class="ms-2">{!! $b->content !!}</span>
+                <span class="ms-2">{!! \Mews\Purifier\Facades\Purifier::clean((string) $b->content, 'richtext') !!}</span>
             </div>
             <button type="button"
                     class="admin-broadcast-close"

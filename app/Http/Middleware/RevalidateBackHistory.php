@@ -14,9 +14,7 @@ class RevalidateBackHistory
       ->header('Pragma','no-cache')
       ->header('Expires','Fri, 01 Jan 1990 00:00:00 GMT');
     }
-    else
-    {
-      return $next($request);
-    }
+    // Downloads/streams have no header(); was `return $next($request)`, which ran the whole request a second time.
+    return $response;
   }
 }

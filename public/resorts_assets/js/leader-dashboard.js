@@ -23,7 +23,11 @@
   function getJson(url) { return fetch(url, { headers: JSON_HEAD, credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
   function postJson(url, body) {
     return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', body: JSON.stringify(body || {}) })
-      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { j.__ok = r.ok; return j; }); });
+      .then(function (r) {
+        // 401/419 = the login session ended: every later request would fail the same way, so go sign in.
+        if (r.status === 401 || r.status === 419) { setTimeout(function () { location.reload(); }, 1500); return { __ok: false, message: 'Your session has ended. Taking you to sign in…' }; }
+        return r.json().catch(function () { return {}; }).then(function (j) { j.__ok = r.ok; return j; });
+      });
   }
 
   /* ---------- Leave — on leave today / upcoming (type colours = leave configuration) ---------- */

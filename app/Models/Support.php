@@ -74,6 +74,30 @@ class Support extends Model {
         return $this->belongsTo(ResortAdmin::class, 'created_by', 'id');
     }
 
+    /**
+     * Tickets a resort-portal user may open (audit run-4): their own resort, and
+     * only the ones they raised unless they're HR — same rule as the ticket list
+     * (SupportController::getSupportData).
+     */
+    public function scopeVisibleTo($query, $user)
+    {
+        $query->where('resort_id', $user->resort_id);
+        $rank = config('settings.Position_Rank')[optional($user->GetEmployee)->rank ?? ''] ?? '';
+        if ($rank !== 'HR') {
+            $query->where('created_by', $user->id);
+        }
+        return $query;
+    }
+
+    /** Console side: a non-super admin works only the tickets assigned to them (same rule as the console list). */
+    public function scopeVisibleToAdmin($query, $admin)
+    {
+        if (($admin->type ?? null) !== 'super') {
+            $query->where('assigned_to', $admin->id);
+        }
+        return $query;
+    }
+
     public function assignedAdmin()
     {
         return $this->belongsTo(Admin::class, 'assigned_to');

@@ -59,7 +59,7 @@ class TaDocumentTemplateController extends Controller
         return datatables()->of($data)
             ->addColumn('file_name', function ($row) {
                 if ($row->file_path) {
-                    return '<i class="fa-solid fa-file-word text-primary me-1"></i>' . e(basename($row->file_path));
+                    return '<i class="fa-solid fa-file-word text-primary me-1"></i>' . e(basename(preg_replace('/\.enc$/', '', $row->file_path)));
                 }
                 return '<span class="text-muted">No file</span>';
             })
@@ -76,27 +76,8 @@ class TaDocumentTemplateController extends Controller
                 $deleteBtn = '<a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-id="' . $row->id . '"><img src="' . asset('resorts_assets/images/trash-red.svg') . '" alt="Delete" class="img-fluid" /></a>';
                 $downloadBtn = '';
                 if ($row->file_path) {
-                    $downloadUrl = null;
-                    $disk = StorageHelper::disk();
-                    try {
-                        if (StorageHelper::existsCached($row->file_path)) {
-                            $downloadUrl = StorageHelper::isCloud()
-                                ? $disk->temporaryUrl($row->file_path, now()->addMinutes(30))
-                                : $disk->url($row->file_path);
-                        }
-                    } catch (\Exception $e) {}
-                    if (!$downloadUrl && Storage::disk('public')->exists($row->file_path)) {
-                        $downloadUrl = asset('storage/' . $row->file_path);
-                    }
-                    if (!$downloadUrl && file_exists(public_path($row->file_path))) {
-                        $downloadUrl = asset($row->file_path);
-                    }
-                    if (!$downloadUrl && Storage::disk('local')->exists('public/' . $row->file_path)) {
-                        $downloadUrl = url('storage/' . $row->file_path);
-                    }
-                    if ($downloadUrl) {
-                        $downloadBtn = '<a href="' . $downloadUrl . '" download class="btn-lg-icon icon-bg-green me-1"><i class="fa-solid fa-download"></i></a>';
-                    }
+                    // Private file: streamed through an HR-only, resort-scoped route.
+                    $downloadBtn = '<a href="' . route('resort.ta.documentTemplate.download', $row->id) . '" class="btn-lg-icon icon-bg-green me-1"><i class="fa-solid fa-download"></i></a>';
                 }
                 return '<div class="d-flex align-items-center">' . $downloadBtn . $deleteBtn . '</div>';
             })
@@ -121,12 +102,16 @@ class TaDocumentTemplateController extends Controller
             return response()->json(['success' => false, 'message' => 'Please upload a .docx file.'], 422);
         }
 
+        // A .docx is a ZIP container; refuse anything renamed to .docx.
+        $bytes = $request->file('template_file')->get();
+        if (!is_string($bytes) || !str_starts_with($bytes, "PK\x03\x04")) {
+            return response()->json(['success' => false, 'message' => 'Please upload a .docx file.'], 422);
+        }
+
         try {
             $resort_id = $this->resort->resort_id;
-            $file = $request->file('template_file');
-            $storagePath = 'ta_templates/' . $resort_id;
-            $fileName = $request->type . '_' . time() . '_' . uniqid() . '.docx';
-            $filePath = $file->storeAs($storagePath, $fileName, 'public');
+            // Private + encrypted via StorageHelper (was the public disk).
+            $filePath = TaDocumentTemplate::storeFile((int) $resort_id, $request->type, $bytes);
 
             // Check if any default exists for this type
             $hasDefault = TaDocumentTemplate::where('resort_id', $resort_id)
@@ -152,6 +137,16 @@ class TaDocumentTemplateController extends Controller
             \Log::emergency("TaDocumentTemplateController@store error: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Failed to upload template.'], 500);
         }
+    }
+
+    /**
+     * HR download of a template file (private storage, legacy public rows too).
+     */
+    public function download($id)
+    {
+        return TaDocumentTemplate::where('resort_id', $this->resort->resort_id)
+            ->findOrFail((int) $id)
+            ->downloadResponse();
     }
 
     /**

@@ -36,45 +36,20 @@ class EmployeeController extends Controller
             $resortId       = $user->resort_id;
             $employee       = $user->GetEmployee;
 
-            // Fetch rank and determine role
-            $employeeRankPosition = Common::getEmployeeRankPosition($employee);
-            // An HOD whose own department IS HR must get org-wide visibility
-            // (same rule used elsewhere: HR HOD/EXCOM → unrestricted), not
-            // restricted to their own subordinates — without this check, an
-            // HR-department HOD creating an "Entire Organization" calendar
-            // event only saw their own direct reports instead of every
-            // employee in the resort.
-            $isHOD           = ($employeeRankPosition['rank'] === "HOD") && !Common::isHRDepartment($employee->Dept_id ?? null);
-            $isHR            = ($employeeRankPosition['rank'] === "HR");
+            // Audit run-4: the list doubles as the calendar-event invitee
+            // picker (createEvent has no rank gate), so every employee keeps
+            // the resort-wide name list — but leave balances and personal
+            // fields (religion, gender, grade, joining date) are only filled
+            // in for the employees the caller may see per invariant #5:
+            // HR/GM all, HOD/EXCOM own department, MGR/SUP their reports,
+            // everyone else only themselves.
+            $visibleIds = $this->leaveVisibleIds($employee, $resortId);
 
-            // Fetch employees based on role
-            $employees = collect(); // Initialize as empty collection
-
-            if ($isHOD) {
-                $subordinateIds     = Common::getSubordinates($employee->id);
-
-                $employeesAndLeaveData = DB::table('employees as e')
-                    ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-                    ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
-                    ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
-                    ->where('e.resort_id', $resortId)
-                    ->whereIn('e.id', $subordinateIds);
-
-            } elseif ($isHR) {
-
-                $employeesAndLeaveData = DB::table('employees as e')
-                    ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-                    ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
-                    ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
-                    ->where('e.resort_id', $resortId);
-
-            }  else {
-                $employeesAndLeaveData      = DB::table('employees as e')
-                                            ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-                                            ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
-                                            ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
-                                            ->where('e.resort_id', $resortId);
-            }
+            $employeesAndLeaveData      = DB::table('employees as e')
+                                        ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                                        ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
+                                        ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
+                                        ->where('e.resort_id', $resortId);
                 $employeesAndLeaveData = $employeesAndLeaveData->where('e.deleted_at', null)
                 ->select(
                     'ra.id',
@@ -120,6 +95,19 @@ class EmployeeController extends Controller
                 foreach ($employeesAndLeaveData as $key => $value) {
 
                     $value->employee_profile_picture = Common::getResortUserPicture($value->id);
+
+                    if ($visibleIds !== null && !in_array((int) $value->emp_id, $visibleIds, true)) {
+                        foreach (['rank', 'religion', 'benefit_grid_level', 'joining_date', 'gender'] as $field) {
+                            $value->$field = null;
+                        }
+                        $value->rank_type = null;
+                        $leaveData[] = [
+                            'total_allocated_days' => null,
+                            'total_available_days' => null,
+                            'employee'             => $value,
+                        ];
+                        continue;
+                    }
 
                     // Use fields already fetched in the join above — the previous
                     // re-query by Admin_Parent_id could return null for an
@@ -229,6 +217,12 @@ class EmployeeController extends Controller
             if (!$profile) {
                 return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
             }
+            // Audit run-4: same visibility as getEmployees() — any employee
+            // of the resort could read anyone's leave breakdown.
+            $visibleIds = $this->leaveVisibleIds($user->GetEmployee, $resortId);
+            if ($visibleIds !== null && !in_array((int) $profile->id, $visibleIds, true)) {
+                return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+            }
             $gender         = $profile->gender;
             $religion       = $profile->religion;
 
@@ -298,6 +292,30 @@ class EmployeeController extends Controller
             \Log::error($e->getMessage());
             return response()->json(['success' => false, 'message' => 'An unexpected error occurred. Please try again.'], 500);
         }
+    }
+
+    /**
+     * Employees whose leave data the caller may see: null = whole resort
+     * (HR/GM, and HR-department rank 1-4 per W1-28 option A), else an id list.
+     */
+    private function leaveVisibleIds($employee, $resortId): ?array
+    {
+        if (!$employee) {
+            return [];
+        }
+        $rank = (int) $employee->rank;
+        if (Common::hasFullDataAccess($employee)
+            || (in_array($rank, [1, 2, 3, 4], true) && Common::isHRDepartment($employee->Dept_id ?? null))) {
+            return null;
+        }
+        $ids = [(int) $employee->id];
+        if (in_array($rank, [1, 2], true)) {
+            $deptIds = Common::getScopedDepartmentIds($employee) ?? [];
+            $ids = array_merge($ids, Employee::where('resort_id', $resortId)->whereIn('Dept_id', $deptIds)->pluck('id')->all());
+        } elseif (in_array($rank, [4, 5], true)) {
+            $ids = array_merge($ids, Common::getSubordinates($employee->id));
+        }
+        return array_values(array_unique(array_map('intval', $ids)));
     }
 
     public function getLeaveCount($emp_id, $leave_cat_id)

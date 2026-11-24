@@ -569,9 +569,11 @@ class WisdomTools
         if (in_array($name, self::PAYROLL_TOOLS, true) && empty($ctx['can_payroll'])) {
             return ['error' => 'Access denied: payroll and compensation data is restricted for your role.'];
         }
-        // The ad-hoc SQL + schema-discovery tools are full-access (HR) only.
-        if (in_array($name, ['run_read_query', 'list_tables', 'describe_table'], true) && empty($ctx['can_payroll'])) {
-            return ['error' => 'Access denied: custom queries are restricted for your role.'];
+        // The legacy ad-hoc SQL + schema-discovery tools are retired: the data
+        // catalog (list_datasets / query_data) is the only supported data path.
+        // Refused for every tier even if a model still names them.
+        if (in_array($name, ['run_read_query', 'list_tables', 'describe_table'], true)) {
+            return ['error' => 'This tool is disabled. Use list_datasets / query_data instead.'];
         }
         if ($name === 'search_policy_documents') {
             return self::searchPolicyDocuments((int) $ctx['resort_id'], $args);
@@ -2449,11 +2451,22 @@ class WisdomTools
 
         $dept = trim($args['department'] ?? '');
         if ($dept !== '') {
-            $q->whereHas('GetEmployee.department', fn ($d) => $d->where('name', 'like', "%{$dept}%"));
+            $q->whereHas('GetEmployee.department', fn ($d) => $d->where('name', 'like', "%{$dept}%"))
+                // a confidential grievance is never matched by its complainant's department (audit run-4)
+                ->where(fn ($w) => $w->whereNull('Request_Identity_Disclosure')->orWhere('Request_Identity_Disclosure', '!=', 'No'));
         }
 
         $rows = $q->orderByDesc('id')->limit(100)->get();
-        $list = $rows->map(fn ($c) => [
+        // Confidential grievance: neither the complainant's name nor department is returned (audit run-4).
+        $list = $rows->map(fn ($c) => $c->Request_Identity_Disclosure === 'No' ? [
+            'employee'     => 'Confidential',
+            'department'   => null,
+            'category'     => optional($c->category)->Category_Name,
+            'priority'     => $c->Priority,
+            'status'       => $c->status,
+            'confidential' => true,
+            'date'         => $c->getRawOriginal('Grivance_date_time') ? Carbon::parse($c->getRawOriginal('Grivance_date_time'))->format('Y-m-d') : null,
+        ] : [
             'employee'     => $c->GetEmployee ? self::empName($c->GetEmployee) : 'Confidential/Unknown',
             'department'   => optional(optional($c->GetEmployee)->department)->name,
             'category'     => optional($c->category)->Category_Name,

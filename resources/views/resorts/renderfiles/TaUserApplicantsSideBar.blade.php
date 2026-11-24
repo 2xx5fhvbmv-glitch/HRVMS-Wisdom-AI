@@ -507,6 +507,9 @@
                                                         <span class="badge {{ $oc->status == 'Rejected' ? 'bg-danger' : ($oc->status == 'Accepted' ? 'bg-success' : 'bg-primary') }}">{{ $oc->status }}</span>
                                                     </div>
                                                     <small class="text-muted">Sent: {{ $oc->created_at }}</small>
+                                                    @if($isHrDepartment && $oc->file_path)
+                                                        · <a href="{{ route('resort.ta.offerContract.download', $oc->id) }}" class="small">Download</a>
+                                                    @endif
                                                     @if($oc->responded_at)
                                                         <br><small class="text-muted">Responded: {{ $oc->responded_at->format('d M Y H:i') }}</small>
                                                     @endif

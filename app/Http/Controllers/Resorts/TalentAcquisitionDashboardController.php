@@ -102,6 +102,7 @@ class TalentAcquisitionDashboardController extends Controller
                                 $v->ApplicationId= $v->application_id;
                             }
             $talentPool  = Applicant_form_data::join('applicant_wise_statuses as t1', 't1.Applicant_id', '=', 'applicant_form_data.id')
+                            ->where('applicant_form_data.resort_id', $resort_id)
                             ->whereIn("t1.status", ["Rejected","Rejected By Wisdom AI"])
                             ->latest('t1.created_at')
                             ->take('10')
@@ -263,6 +264,7 @@ class TalentAcquisitionDashboardController extends Controller
             // keeps those rows visible without breaking the department scope.
             $talentPoolQuery = Applicant_form_data::join('applicant_wise_statuses as t1', 't1.Applicant_id', '=', 'applicant_form_data.id')
                             ->leftJoin('vacancies as v', 'v.id', '=', 'applicant_form_data.Parent_v_id')
+                            ->where('applicant_form_data.resort_id', $resort_id)
                             ->whereIn("t1.status", ["Rejected","Rejected By Wisdom AI"]);
             if (!$canSeeAllDepts && $userDeptId) {
                 $talentPoolQuery->where(function ($q) use ($userDeptId) {

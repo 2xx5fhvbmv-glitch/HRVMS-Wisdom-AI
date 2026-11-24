@@ -60,7 +60,7 @@ class OccupancyController extends Controller
                 'occupancytotalRooms' => $request->occupancytotalRooms,
                 'occupancyOccupiedRooms' => $request->occupancyOccupiedRooms
             ]);
-            $occupancies = Occuplany::find($Occuplany->id)->first(['id','occupancyinPer','occupancydate','occupancytotalRooms','occupancyOccupiedRooms']);
+            $occupancies = Occuplany::where('resort_id', $this->Authdata->resort_id)->where('id', $Occuplany->id)->first(['id','occupancyinPer','occupancydate','occupancytotalRooms','occupancyOccupiedRooms']); // audit run-4: find()->first() returned the table's first row (any resort)
             $RoomsAvailable = $occupancies->occupancytotalRooms - $occupancies->occupancyOccupiedRooms;
             $OccuplanyPercentage = $occupancies->occupancyinPer;
             

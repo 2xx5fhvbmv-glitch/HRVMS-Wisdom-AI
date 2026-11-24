@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Auth;
+use App\Helpers\StorageHelper;
 
 /**
  * Per-resort Letterhead & E-signature configuration.
@@ -38,24 +39,56 @@ class LetterheadSetting extends Model
         return $this->belongsTo(Resort::class, 'resort_id', 'id');
     }
 
-    /**
-     * Absolute filesystem path of an image column, for DomPDF embedding.
-     * Returns null when the column is empty or the file is missing.
-     */
-    public function imageAbsolutePath(string $column): ?string
+    /** Folder (on the StorageHelper disk, private) holding a resort's letterhead images. */
+    public static function storageDir($resortId): string
     {
-        $relative = $this->{$column} ?? null;
-        if (empty($relative)) {
-            return null;
-        }
-        $abs = public_path($relative);
-        return is_file($abs) ? $abs : null;
+        return 'letterheads/' . $resortId;
     }
 
-    /** Public URL of an image column (used in the config screen preview). */
-    public function imageUrl(string $column): ?string
+    /** Paths saved before the move to private storage pointed at public/uploads/letterheads/... */
+    public static function isLegacyPublicPath(?string $path): bool
     {
-        $relative = $this->{$column} ?? null;
-        return empty($relative) ? null : asset($relative);
+        return !empty($path) && str_starts_with($path, 'uploads/letterheads/');
+    }
+
+    /**
+     * Raw bytes of an image column: the private StorageHelper file, or the
+     * old public/ file for a path not yet moved (letterhead:move-to-private).
+     * Null when the column is empty or the file is missing.
+     */
+    public function imageBytes(string $column): ?string
+    {
+        $path = $this->{$column} ?? null;
+        if (empty($path)) {
+            return null;
+        }
+        try {
+            if (self::isLegacyPublicPath($path)) {
+                $abs = public_path($path);
+                return is_file($abs) ? file_get_contents($abs) : null;
+            }
+            return StorageHelper::exists($path) ? StorageHelper::get($path) : null;
+        } catch (\Throwable $e) {
+            \Log::warning('Letterhead image read failed for ' . $path . ': ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * base64 data: URI of an image column, for DomPDF (<img src>) and the
+     * settings-page preview, so the file never needs a public URL.
+     */
+    public function imageDataUri(string $column): ?string
+    {
+        $bytes = $this->imageBytes($column);
+        if ($bytes === null || $bytes === '') {
+            return null;
+        }
+        $info = @getimagesizefromstring($bytes);
+        $mime = is_array($info) ? ($info['mime'] ?? null) : null;
+        if (!$mime) {
+            $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes) ?: 'application/octet-stream';
+        }
+        return 'data:' . $mime . ';base64,' . base64_encode($bytes);
     }
 }

@@ -306,7 +306,9 @@ class GrievanceAppealController extends Controller
 
     public function withdraw($id)
     {
-        $appeal = $this->loadAppealForWrite($id);
+        // Audit run-4: the submitter may withdraw their own appeal — the
+        // HR gate is skipped here; the submitter-or-HR check below applies.
+        $appeal = $this->loadAppealForWrite($id, false);
         if (in_array($appeal->status, ['Resolved', 'Rejected', 'Withdrawn'], true)) {
             return response()->json(['success' => false, 'message' => 'Appeal is already closed.'], 422);
         }
@@ -327,14 +329,14 @@ class GrievanceAppealController extends Controller
      * Helper: load an appeal by base64 id, scoped to the viewer + write
      * permission. Aborts with the right HTTP code on failure.
      */
-    private function loadAppealForWrite($id): GrievanceAppeal
+    private function loadAppealForWrite($id, bool $hrOnly = true): GrievanceAppeal
     {
         if (Common::checkRouteWisePermission('GrievanceAndDisciplinery.Appeals.Index', config('settings.resort_permissions.edit')) == false) {
             abort(403, 'Unauthorized to modify appeals.');
         }
         // Audit run-3 M2: the page check above names a module_pages row that doesn't exist, so it allowed everyone.
         // Deciding an appeal or setting its hearing is HR's (or the GM's / master admin's) — isHrEquivalent().
-        abort_unless($this->isHrEquivalent(), 403, 'Only HR can decide appeals or set hearings.');
+        abort_unless(!$hrOnly || $this->isHrEquivalent(), 403, 'Only HR can decide appeals or set hearings.');
         $decoded = base64_decode($id, true);
         if ($decoded === false || !is_numeric($decoded)) abort(404);
         $appeal = GrievanceAppeal::where('resort_id', $this->resort->resort_id)

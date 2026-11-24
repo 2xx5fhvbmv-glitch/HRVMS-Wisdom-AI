@@ -239,9 +239,14 @@ class SitesettignsController extends Controller
 
     public function UpdateCurrency (Request $request)
     {
+            // N9 (run-4): resort-wide setting — same gate as UpdateSiteSettings,
+            // and only the two values the header toggle / settings page send.
+            if (!Common::checkRouteWisePermission('resort.sitesettings', config('settings.resort_permissions.edit'))) {
+                return response()->json(['success' => false, 'msg' => 'You are not authorized to change the resort currency.'], 403);
+            }
             $validator = Validator::make($request->all(), [
 
-                'currency' => 'required',
+                'currency' => 'required|in:MVR,Dollar',
             ], [
                 'currency.required' => 'Please choose a currency.',
             ]);
@@ -294,7 +299,10 @@ class SitesettignsController extends Controller
         try
         {
             // was any resort's notification by id
-            $r = ResortNotification::where('resort_id', Auth::guard('resort-admin')->user()->resort_id)->findOrFail($request->id);
+            $r = ResortNotification::where('resort_id', Auth::guard('resort-admin')->user()->resort_id)
+                ->where('user_id', Auth::guard('resort-admin')->user()->GetEmployee->id ?? 0)
+                ->where(fn ($q) => $q->whereNull('module')->orWhere('module', '!=', 'Staff Shop'))   // shopkeeper rows share user_id
+                ->findOrFail($request->id);
             $r->status = 'read';
             $r->save();
             $response['success'] = true;
@@ -332,7 +340,8 @@ class SitesettignsController extends Controller
                 ])
                 ->where('resort_id', $resortId)
                 ->where('status', '!=', 'deleted')
-                ->where('user_id', $userEmpId);
+                ->where('user_id', $userEmpId)
+                ->where(fn ($q) => $q->whereNull('module')->orWhere('module', '!=', 'Staff Shop'));   // shopkeeper rows share user_id
 
             return datatables()->of($query)
                 ->order(function ($query) use ($request) {
@@ -374,7 +383,16 @@ class SitesettignsController extends Controller
         $id = base64_decode($id);
         try
         {
-            ResortNotification::where("id",$id)->delete();
+            // N10 (run-4): only the caller's own notification in their resort
+            // (user_id = employees.id, as NotificationList filters).
+            $deleted = ResortNotification::where("id", $id)
+                ->where('resort_id', Auth::guard('resort-admin')->user()->resort_id)
+                ->where('user_id', Auth::guard('resort-admin')->user()->GetEmployee->id ?? 0)
+                ->where(fn ($q) => $q->whereNull('module')->orWhere('module', '!=', 'Staff Shop'))   // shopkeeper rows share user_id
+                ->delete();
+            if (!$deleted) {
+                return response()->json(['success' => false, 'message' => 'Notification not found.'], 404);
+            }
             return response()->json([
                 'success' => true,
                 'message' => 'Notification Delete Successfully',
@@ -394,6 +412,9 @@ class SitesettignsController extends Controller
 
             $resort = Auth::guard('resort-admin')->user();
 
+            if (!in_array($request->menuType, ['horizontal', 'vertical'], true)) {   // the column is enum(horizontal, vertical)
+                return response()->json(['success' => false, 'message' => 'Unknown menu type.'], 422);
+            }
             if($resort){
                 $resort->update([
                     'menu_type' => $request->menuType

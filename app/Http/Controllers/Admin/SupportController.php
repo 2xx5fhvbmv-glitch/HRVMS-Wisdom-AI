@@ -239,7 +239,7 @@ class SupportController extends Controller
             'assigned_to' => 'required|exists:admins,id'
         ]);
 
-        $support = Support::findOrFail(base64_decode($id));
+        $support = Support::visibleToAdmin(Auth::guard('admin')->user())->findOrFail(base64_decode($id));
         $support->assigned_to = $request->assigned_to;
         $support->status = 'In Progress';
         $support->save();
@@ -256,7 +256,7 @@ class SupportController extends Controller
         ]);
 
         
-        $ticket = Support::findOrFail($request->ticket_id);
+        $ticket = Support::visibleToAdmin(Auth::guard('admin')->user())->findOrFail($request->ticket_id);
 
         $ticket->status = $request->status;
         $ticket->save();
@@ -274,6 +274,7 @@ class SupportController extends Controller
     {
         $ticketId = (int) base64_decode($id, true);
         if (!$ticketId) return response()->json(['success' => false], 400);
+        abort_unless(Support::visibleToAdmin(Auth::guard('admin')->user())->whereKey($ticketId)->exists(), 404);
 
         $rows = SupportMessages::where('ticket_id', $ticketId)
             ->orderBy('id')
@@ -358,7 +359,7 @@ class SupportController extends Controller
     public function view($id)
     {
         $ticketId = base64_decode($id);
-        $support = Support::with(['support_category', 'createdBy','assignedAdmin'])->findOrFail($ticketId);
+        $support = Support::with(['support_category', 'createdBy','assignedAdmin'])->visibleToAdmin(Auth::guard('admin')->user())->findOrFail($ticketId);
         // Admin opened the ticket → mark every employee-sent reply as read
         // so the unread badge on the action button (and sidebar nav) clears.
         SupportMessages::where('ticket_id', $ticketId)
@@ -379,7 +380,7 @@ class SupportController extends Controller
             'attachment.*' => 'nullable|file|mimes:jpg,jpeg,png,heic,heif,pdf,doc,docx|max:32768', // Allow multiple files
         ]);
 
-        $ticket = Support::with(['createdBy.GetEmployee','assignedAdmin','support_category'])->findOrFail($request->ticket_id);
+        $ticket = Support::with(['createdBy.GetEmployee','assignedAdmin','support_category'])->visibleToAdmin(Auth::guard('admin')->user())->findOrFail($request->ticket_id);
         // dd($ticket);
 
         $resort = Resort::findorFail($ticket->resort_id);

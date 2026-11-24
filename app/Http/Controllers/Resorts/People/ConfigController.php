@@ -247,9 +247,10 @@ class ConfigController extends Controller
         if (!\App\Helpers\Common::canManageEmployeeRecords()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
         }
-        // No `image` rule — it rejects SVG/HEIC; mimes covers the allowed set
+        // No `image` rule — it rejects HEIC; mimes covers the allowed set
         // and matches the site-wide HEIC-friendly upload convention.
-        $imageRule = 'nullable|file|mimes:jpeg,jpg,png,gif,svg,webp,heic,heif|max:5120';
+        // N17 (run-4): no svg — an SVG served from the app's origin runs script.
+        $imageRule = 'nullable|file|mimes:jpeg,jpg,png,gif,webp,heic,heif|max:5120';
 
         $validator = Validator::make($request->all(), [
             'header_image'    => $imageRule,
@@ -263,9 +264,9 @@ class ConfigController extends Controller
             'contact_email'   => 'nullable|email|max:150',
             'website'         => 'nullable|string|max:150',
         ], [
-            'header_image.mimes'    => 'The header image must be of type: jpeg, jpg, png, gif, svg, webp, heic, heif.',
-            'footer_image.mimes'    => 'The footer image must be of type: jpeg, jpg, png, gif, svg, webp, heic, heif.',
-            'signature_image.mimes' => 'The signature image must be of type: jpeg, jpg, png, gif, svg, webp, heic, heif.',
+            'header_image.mimes'    => 'The header image must be of type: jpeg, jpg, png, gif, webp, heic, heif.',
+            'footer_image.mimes'    => 'The footer image must be of type: jpeg, jpg, png, gif, webp, heic, heif.',
+            'signature_image.mimes' => 'The signature image must be of type: jpeg, jpg, png, gif, webp, heic, heif.',
         ]);
 
         if ($validator->fails()) {
@@ -281,25 +282,28 @@ class ConfigController extends Controller
         try {
             $setting = LetterheadSetting::firstOrNew(['resort_id' => $resortId]);
 
-            // Relative-to-public directory, one per resort.
-            $relativeDir = 'uploads/letterheads/' . $resortId;
-            $absoluteDir = public_path($relativeDir);
+            // Private storage (StorageHelper disk), one folder per resort —
+            // never public/: PDFs and the settings preview embed the bytes
+            // as data: URIs (LetterheadSetting::imageDataUri()).
+            $dir = LetterheadSetting::storageDir($resortId);
+            $replaced = [];
 
             foreach (['header_image', 'footer_image', 'signature_image'] as $field) {
                 if ($request->hasFile($field)) {
                     $file = $request->file($field);
-                    $fileName = $field . '_' . substr(md5(uniqid('', true)), 0, 10)
-                        . '.' . strtolower($file->getClientOriginalExtension());
+                    // Extension from the content-sniffed type the mimes rule
+                    // just validated, never the client's file name.
+                    $path = $dir . '/' . $field . '_' . substr(md5(uniqid('', true)), 0, 10)
+                        . '.' . $file->guessExtension();
 
-                    Common::uploadFile($file, $fileName, $absoluteDir);
-
-                    // Remove the previous image so old files don't pile up.
-                    $old = $setting->{$field};
-                    if (!empty($old) && is_file(public_path($old))) {
-                        @unlink(public_path($old));
+                    if (!\App\Helpers\StorageHelper::put($path, file_get_contents($file->getRealPath()))) {
+                        throw new \RuntimeException('Letterhead image upload failed for ' . $path);
                     }
 
-                    $setting->{$field} = $relativeDir . '/' . $fileName;
+                    if (!empty($setting->{$field})) {
+                        $replaced[] = $setting->{$field};
+                    }
+                    $setting->{$field} = $path;
                 }
             }
 
@@ -313,6 +317,21 @@ class ConfigController extends Controller
             $setting->save();
 
             DB::commit();
+
+            // Remove the previous images only once the new paths are saved.
+            foreach ($replaced as $old) {
+                try {
+                    if (LetterheadSetting::isLegacyPublicPath($old)) {
+                        if (is_file(public_path($old))) {
+                            @unlink(public_path($old));
+                        }
+                    } else {
+                        \App\Helpers\StorageHelper::delete($old);
+                    }
+                } catch (\Throwable $e) {
+                    \Log::warning('Old letterhead image not removed: ' . $old . ' — ' . $e->getMessage());
+                }
+            }
 
             return response()->json([
                 'status'  => 'success',

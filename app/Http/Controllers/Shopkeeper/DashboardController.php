@@ -159,7 +159,15 @@ class DashboardController extends Controller
 
     public function UpdateProfile(Request $request)
     {
-        // dd($request);
+        // Same password policy as the other portals (audit run-4).
+        if ($request->filled('password')) {
+            $check = \Illuminate\Support\Facades\Validator::make($request->only('password'), [
+                'password' => ['string', \Illuminate\Validation\Rules\Password::min(12)->mixedCase()->numbers()->uncompromised()],
+            ]);
+            if ($check->fails()) {
+                return response()->json(['success' => false, 'msg' => $check->errors()->first('password'), 'errors' => $check->errors()], 422);
+            }
+        }
         $path_profile_image = config('settings.ShopkeeperProfile_folder');
         DB::beginTransaction();
         try
@@ -175,7 +183,7 @@ class DashboardController extends Controller
             // this line used to null the email out on every save regardless.
             $shopkeeper->contact_no = $request->contact_no;
 
-            if(isset($request->password))
+            if($request->filled('password'))
             {
                 $shopkeeper->password = Hash::make($request->password);
                 $shopkeeper->must_change_password = false;

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\TemporaryClinicDoctor;
+use App\Helpers\Common;
 use Validator;
 
 /**
@@ -30,7 +31,18 @@ class TemporaryClinicDoctorAuthController extends Controller
         try {
             $doctor = TemporaryClinicDoctor::where('email', $request->email)->first();
 
-            if (!$doctor || !Hash::check($request->password, $doctor->password)) {
+            // Per-account lockout, same shared helpers as the employee login (checked before the password).
+            if ($doctor && Common::isAccountLocked($doctor)) {
+                Common::logLoginAttempt('clinic-doctor', $request->email, false, $request);
+                return response()->json(['success' => false, 'message' => 'Too many failed login attempts. Please try again in a few minutes.'], 200);
+            }
+
+            if (!$doctor || !Hash::check((string) $request->password, $doctor->password)) {
+                // Audit run-4: failures land in login_attempts like the employee login.
+                Common::logLoginAttempt('clinic-doctor', $request->email, false, $request);
+                if ($doctor) {
+                    Common::registerFailedLogin($doctor);
+                }
                 return response()->json(['success' => false, 'message' => 'Invalid email or password.'], 200);
             }
 
@@ -39,6 +51,8 @@ class TemporaryClinicDoctorAuthController extends Controller
             }
 
             $token = $doctor->createToken('TemporaryClinicDoctorToken')->accessToken;
+            Common::logLoginAttempt('clinic-doctor', $request->email, true, $request);
+            Common::registerSuccessfulLogin($doctor);
 
             return response()->json([
                 'success' => true,

@@ -1072,7 +1072,8 @@
       var a = el('div', 'a'); a.appendChild(el('div', 'a-tag', 'WAI')); var p = thinking(); a.appendChild(p); body.appendChild(a); WaiMd.tideIn(a, 120);
       body.scrollTop = body.scrollHeight;
       fetch(URLS.wai, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', body: JSON.stringify({ message: q }) })
-        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        // 401/419 = the login session ended (30 min idle): every later question would fail the same way, so go sign in.
+        .then(function (r) { if (r.status === 401 || r.status === 419) { setTimeout(function () { location.reload(); }, 1500); return { message: 'Your session has ended. Taking you to sign in…' }; } return r.json().catch(function () { return {}; }); })
         .then(function (j) { if (j && j.usage) applyUsage(j.usage); var md = el('div', 'a-md'); WaiMd.render(md, j.success ? j.reply : (j.message || 'Something went wrong. Please try again.'), { thread: body, reveal: true }); a.replaceChild(md, p); if (j.success && j.people) WaiMd.addPeople(md, j.people, j.people_pick, function (x) { ask(q + ' (I mean ' + x.name + (x.emp_id ? ', ' + x.emp_id : '') + ')'); }); if (j.success && j.modules && j.modules.length) md.appendChild(WaiMd.modulePicker(j.modules, function (m) { ask('In the ' + m + ' module: ' + q); })); body.scrollTop = body.scrollHeight; })
         .catch(function () { if (p.parentNode) a.replaceChild(el('p', '', 'Something went wrong. Please try again.'), p); });
     }

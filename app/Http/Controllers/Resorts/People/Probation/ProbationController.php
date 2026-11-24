@@ -752,6 +752,10 @@ class ProbationController extends Controller
 
     public function letterTamplate(Request $request)
     {
+        // Audit run-4 N1: letter templates drive HR's official letters — HR only.
+        if (!Common::canManageEmployeeRecords()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
         // dd($request->all());
         $MailTemplete  = $request->content;
         $MailSubject  = $request->subject;
@@ -924,6 +928,14 @@ class ProbationController extends Controller
 
     public function sendProbationLetter(Request $request)
     {
+        // Audit run-4 N1: sending the letter confirms/fails probation and
+        // changes employment status — HR only, like extendProbation().
+        if (!Common::canManageEmployeeRecords()) {
+            return response()->json(['error' => 'Unauthorized action.'], 403);
+        }
+        if (!in_array($request->type, ['success', 'failed'], true)) {
+            return response()->json(['error' => 'Invalid letter type.'], 422);
+        }
         // Was Employee::findOrFail($request->employee_id) with no resort
         // filter — a client-supplied employee_id from another resort would
         // send a real letter email + mutate that foreign employee's
@@ -934,6 +946,11 @@ class ProbationController extends Controller
             ->first();
         if (!$employee) {
             return response()->json(['error' => 'Employee not found.'], 404);
+        }
+        // A terminated / inactive / offboarding employee must not be
+        // "confirmed" back to Active (or failed again) by a probation letter.
+        if (in_array($employee->status, ['Terminated', 'Inactive', 'Offboarding'], true)) {
+            return response()->json(['error' => 'Probation letters cannot be sent to a ' . $employee->status . ' employee.'], 422);
         }
         $type = $request->type;
         $resort = Resort::findOrFail($employee->resort_id);

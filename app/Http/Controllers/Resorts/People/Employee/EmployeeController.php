@@ -1427,6 +1427,7 @@ class EmployeeController extends Controller
      */
     public function sendEmploymentVerificationLetter(Request $request, $id)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-4 N6
         $resort_id = $this->resort->resort_id;
         $employee = Employee::with(['resortAdmin','position','department'])
             ->where('resort_id', $resort_id)
@@ -1621,14 +1622,14 @@ class EmployeeController extends Controller
     public function assignToTeam(Request $request)
     {
         if ($guard = $this->requireHrAccess()) return $guard;   // audit run-3 M5: HR's employee page only
-        // dd($request->all());
+        // Audit run-4: every id written must belong to the caller's resort.
+        $resortId = Auth::guard('resort-admin')->user()->resort_id;
         $request->validate([
-            'emp_id' => 'required|exists:employees,id',
-            'team_id' => 'required|exists:sos_teams,id',
-            'role_id' => 'required|exists:sos_role_management,id'
+            'emp_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $resortId)],
+            'team_id' => ['required', Rule::exists('sos_teams', 'id')->where('resort_id', $resortId)],
+            'role_id' => ['required', Rule::exists('sos_role_management', 'id')->where('resort_id', $resortId)],
         ]);
 
-        $resortId = Auth::guard('resort-admin')->user()->resort_id;
         $employee = Employee::with('resortAdmin')
                             ->where('id', $request->emp_id)
                             ->where('resort_id', $resortId)
@@ -2309,6 +2310,7 @@ class EmployeeController extends Controller
      */
     public function employmentLogs(Request $request)
     {
+        if ($guard = $this->requireHrAccess()) return $guard;   // audit run-4 N6
         $employeeId = (int) $request->employee_id;
         if (!$employeeId) {
             return response()->json(['success' => false, 'html' => '']);

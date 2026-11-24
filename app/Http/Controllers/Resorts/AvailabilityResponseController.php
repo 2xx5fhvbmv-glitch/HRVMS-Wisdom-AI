@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Resorts;
 
 use App\Http\Controllers\Controller;
+use App\Models\ApplicantOfferContract;
 use App\Models\Applicant_form_data;
 use App\Models\Resort;
 use Carbon\Carbon;
@@ -18,6 +19,10 @@ class AvailabilityResponseController extends Controller
                 'error' => 'Invalid availability link.',
                 'applicant' => null,
             ]);
+        }
+
+        if (ApplicantOfferContract::expired($applicant->availability_token_expires_at)) {
+            return $this->expiredPage();
         }
 
         $resort = Resort::find($applicant->resort_id);
@@ -37,6 +42,10 @@ class AvailabilityResponseController extends Controller
         if (!$applicant) {
             return redirect()->route('resort.availability.show', $token)
                 ->with('error', 'Invalid availability link.');
+        }
+
+        if (ApplicantOfferContract::expired($applicant->availability_token_expires_at)) {
+            return $this->expiredPage();
         }
 
         if ($applicant->availability_status === 'available') {
@@ -62,6 +71,10 @@ class AvailabilityResponseController extends Controller
                 ->with('error', 'Invalid availability link.');
         }
 
+        if (ApplicantOfferContract::expired($applicant->availability_token_expires_at)) {
+            return $this->expiredPage();
+        }
+
         if ($applicant->availability_status === 'unavailable') {
             return redirect()->route('resort.availability.show', $token)
                 ->with('info', 'You have already responded to this request.');
@@ -74,5 +87,10 @@ class AvailabilityResponseController extends Controller
 
         return redirect()->route('resort.availability.show', $token)
             ->with('success', 'Thank you for letting us know. We will keep your profile for future opportunities.');
+    }
+
+    private function expiredPage()
+    {
+        return response()->view('resorts.availability.show', ['error' => ApplicantOfferContract::EXPIRED_MESSAGE, 'applicant' => null], 410);
     }
 }

@@ -26,11 +26,13 @@ Broadcast::channel('chat.{receiver_id}', function ($user, $receiver_id) {
 Broadcast::channel('support-ticket.{supportId}', function ($user, $supportId) {
     if ($user instanceof \App\Models\Admin) {
         // Audit run-3 §4: an admin needs the Support module's View permission (any admin used to be admitted).
-        return $user->type === 'super' || \App\Models\AdminRoleModulePermission::where('role_id', $user->role_id)
+        // Audit run-4: and a non-super admin only on tickets assigned to them.
+        return $user->type === 'super' || (\App\Models\AdminRoleModulePermission::where('role_id', $user->role_id)
             ->whereHas('module_permission', fn ($q) => $q->where('module_id', config('settings.admin_modules.supports'))
-                ->where('permission_id', config('settings.permissions.view')))->exists();
+                ->where('permission_id', config('settings.permissions.view')))->exists()
+            && \App\Models\Support::whereKey($supportId)->visibleToAdmin($user)->exists());
     }
-    return \App\Models\Support::where('id', $supportId)->where('resort_id', $user->resort_id)->exists();
+    return \App\Models\Support::where('id', $supportId)->visibleTo($user)->exists();   // own tickets, or HR (audit run-4)
 }, ['guards' => ['admin', 'resort-admin']]);
 
 Broadcast::channel('group.{group_id}', function ($user, $group_id) {

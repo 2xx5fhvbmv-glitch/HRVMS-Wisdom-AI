@@ -539,6 +539,8 @@
                                                                         class="img-fluid"></span>Settings</a>
                                                         </li>
                                                 
+                                                    {{-- Only users who may change the resort currency (UpdateCurrency checks the same permission). --}}
+                                                    @if (Common::checkRouteWisePermission('resort.sitesettings', config('settings.resort_permissions.edit')))
                                                     <li class="d-flex justify-content-between align-items-center">
 
                                                         <a class="dropdown-item" href="#"><span class="img-box"><img
@@ -556,6 +558,7 @@
                                                         </div>
 
                                                     </li>
+                                                    @endif
 
                                                     <li class="d-flex justify-content-between align-items-center hor-ver-box">
                                                         <a class="dropdown-item" href="#"><span class="img-box"><img

@@ -53,6 +53,9 @@ class HousekeepingRequestController extends Controller
         if (!$employee) {
             return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
         }
+        if (!$this->canActFor($employee)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+        }
 
         $gradeLevelId = Common::resolveEmpGrade($this->resort_id, $employee->rank, $employee->benefit_grid_level, $employee->Position_id);
 
@@ -96,6 +99,9 @@ class HousekeepingRequestController extends Controller
         $employee = Employee::where('id', $request->emp_id)->where('resort_id', $this->resort_id)->first();
         if (!$employee) {
             return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
+        }
+        if (!$this->canActFor($employee)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
         }
 
         // Same convention as StaffAccommodationController::createMaintenanceRequests():
@@ -630,6 +636,21 @@ class HousekeepingRequestController extends Controller
         if ($scoped === null) return true;
         $deptId = $row->employee_id ? Employee::where('id', $row->employee_id)->value('Dept_id') : null;
         return $deptId !== null && in_array((int) $deptId, array_map('intval', $scoped), true);
+    }
+
+    /**
+     * Audit run-4: who may raise a request / see eligible services for $target — the canHandle() rule plus "yourself":
+     * Housekeeping HOD/XCOM and HR/GM anyone, another HOD/EXCOM their own department(s), anyone else only themselves.
+     */
+    private function canActFor(Employee $target): bool
+    {
+        $me = $this->user->GetEmployee;
+        if (!$me) return false;
+        if ((int) $me->id === (int) $target->id || Common::isHousekeepingHodXcom($me)) return true;
+        $scoped = Common::getScopedDepartmentIds($me);
+        if ($scoped === null) return true;
+        return in_array((int) $me->rank, [1, 2], true)
+            && in_array((int) $target->Dept_id, array_map('intval', $scoped), true);
     }
 
     private function ownedAssignedRequest($id)

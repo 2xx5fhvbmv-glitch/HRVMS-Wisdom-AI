@@ -29,7 +29,7 @@ class SupportChatController extends Controller
     {
         $page_title = 'Support Chat';
         $supportId = base64_decode($support_id);
-        $support = Support::with(['support_category','createdBy','assignedAdmin'])->where('id',$supportId)->where('resort_id', $this->resort->resort_id)->first();
+        $support = Support::with(['support_category','createdBy','assignedAdmin'])->where('id',$supportId)->visibleTo($this->resort)->first();
         if (!$support) {
             abort(404, 'Support ticket not found.');
         }
@@ -45,7 +45,7 @@ class SupportChatController extends Controller
         // resolved through support_id -> support.resort_id. Without this
         // check any authenticated resort-admin could poll another
         // resort's live support chat by guessing/incrementing the id.
-        $supportExists = Support::where('id', $supportId)->where('resort_id', $this->resort->resort_id)->exists();
+        $supportExists = Support::where('id', $supportId)->visibleTo($this->resort)->exists();
         if (!$supportExists) {
             return response()->json(['success' => false, 'message' => 'Support ticket not found.'], 404);
         }
@@ -67,7 +67,11 @@ class SupportChatController extends Controller
         // an admin yet have no concrete recipient. We still record the
         // employee's outbound message and notify the support pool generically.
         $validatedData = $request->validate([
-            'support_id'     => ['required', \Illuminate\Validation\Rule::exists('support', 'id')->where('resort_id', $this->resort->resort_id)],
+            'support_id'     => ['required', 'integer', function ($attr, $value, $fail) {
+                if (!Support::where('id', $value)->visibleTo($this->resort)->exists()) {
+                    $fail('Support ticket not found.');
+                }
+            }],
             'receiverId'     => 'nullable',
             'receiverType'   => 'nullable|string',
             'receiver_name'  => 'nullable|string',

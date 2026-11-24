@@ -38,11 +38,16 @@ class AdminSecurity
 
         $now = time();
         $last = $request->session()->get('admin_last_activity');
-        if ($admin->status !== 'active' || ($last && $now - $last > self::IDLE_SECONDS)) {
+        // Audit run-4: an MFA change since this session signed in (admin:2fa-reset, or a
+        // re-enrolment elsewhere) ends it — a session from before a reset must not get to
+        // enrol its own authenticator.
+        $mfaChanged = $request->session()->has('admin_mfa_stamp') && $request->session()->get('admin_mfa_stamp') !== self::mfaStamp($admin);
+        if ($admin->status !== 'active' || ($last && $now - $last > self::IDLE_SECONDS) || $mfaChanged) {
             Auth::guard('admin')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
-            $msg = $admin->status !== 'active' ? 'Your account is deactivated.' : 'Signed out after 15 minutes of inactivity.';
+            $msg = $admin->status !== 'active' ? 'Your account is deactivated.'
+                : ($mfaChanged ? 'Your two-factor settings changed. Please sign in again.' : 'Signed out after 15 minutes of inactivity.');
             return $request->expectsJson()
                 ? response()->json(['success' => false, 'msg' => $msg], 401)
                 : redirect()->route('admin.loginindex')->withErrors([$msg]);
@@ -88,5 +93,11 @@ class AdminSecurity
         }
 
         return $response;
+    }
+
+    /** Fingerprint of the account's MFA enrolment, stored in the session at sign-in / enrolment. */
+    public static function mfaStamp($admin): string
+    {
+        return (string) $admin->two_factor_confirmed_at;
     }
 }
