@@ -38,17 +38,16 @@ class ChatController extends Controller
      
           $resort = $this->resort;
 
-         $chatHaveReciver = Conversation::where('resort_id', $resort->resort_id)
-               ->distinct()
-               ->pluck('type_id')
-               ->toArray();
-
-         $chatHaveSender = Conversation::where('resort_id', $resort->resort_id)
-               ->distinct()
-               ->pluck('sender_id')
-               ->toArray();
-
-          $chatHaveEmpIds = array_merge($chatHaveReciver, $chatHaveSender);
+         // Only the caller's own one-to-one conversations. This used to collect every sender/receiver id in the resort
+         // (group ids too), so the list showed people the caller never talked to — with a last message taken from
+         // their private chats with someone else.
+         $mine = Conversation::where('resort_id', $resort->resort_id)
+               ->where('type', 'individual')
+               ->where(fn ($q) => $q->where('sender_id', $resort->id)->orWhere('type_id', $resort->id));
+          $chatHaveEmpIds = array_merge(
+               (clone $mine)->where('sender_id', $resort->id)->distinct()->pluck('type_id')->all(),
+               (clone $mine)->where('type_id', $resort->id)->distinct()->pluck('sender_id')->all()
+          );
               $chatWithEmp = ResortAdmin::where('resort_id', $resort->resort_id)
                          ->where('id', '!=', $resort->id)
                          ->whereIn('id', $chatHaveEmpIds)
@@ -66,11 +65,12 @@ class ChatController extends Controller
                          ->map(function ($ResortAdmin) use ($resort, $pictures) {
 
                               // Correctly group the conditions for the last message query
+                              // The last message between the caller and this person, either direction — never their chats with others.
                               $lastMessage = Conversation::where('resort_id', $resort->resort_id)
                                    ->where('type', 'individual')
-                                   ->where(function ($q) use ($ResortAdmin) {
-                                        $q->where('type_id', $ResortAdmin->id)
-                                        ->orWhere('sender_id', $ResortAdmin->id);
+                                   ->where(function ($q) use ($ResortAdmin, $resort) {
+                                        $q->where(fn ($x) => $x->where('sender_id', $resort->id)->where('type_id', $ResortAdmin->id))
+                                          ->orWhere(fn ($x) => $x->where('sender_id', $ResortAdmin->id)->where('type_id', $resort->id));
                                    })
                                    ->latest('created_at')
                                    ->first();

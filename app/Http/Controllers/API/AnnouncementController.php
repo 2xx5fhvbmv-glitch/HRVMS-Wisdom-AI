@@ -78,18 +78,24 @@ class AnnouncementController extends Controller
         $employee                                       =   $this->user->GetEmployee;
         DB::beginTransaction();
         try {
-            $announcement                               =   Announcement::find($announcementId);
+            // Was any resort's announcement by id.
+            $announcement                               =   Announcement::where('resort_id', $this->resort_id)->find($announcementId);
 
             if (!$announcement) {
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'Announcement not found.'], 200);
             }
 
-            $AnnouncementNotification                   =   AnnouncementNotification::create([
+            // One congratulation per person per announcement: repeated taps used to add a row (and a push) each time.
+            $AnnouncementNotification                   =   AnnouncementNotification::firstOrCreate([
                 'resort_id'                             =>  $this->resort_id,
                 'announcement_id'                       =>  $announcementId,
                 'employee_id'                           =>  $employee->id
             ]);
+            if (!$AnnouncementNotification->wasRecentlyCreated) {
+                DB::commit();
+                return response()->json(['success' => true, 'message' => 'You have already congratulated them.', 'data' => $AnnouncementNotification], 200);
+            }
 
             Common::sendMobileNotification($this->resort_id,3,null,$announcement->employee_id,'Congratulation','You have a new message.','Announcement',[$announcement->employee_id],$announcement->id,false,'announcement-message');
 

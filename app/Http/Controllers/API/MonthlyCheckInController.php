@@ -834,7 +834,19 @@ class MonthlyCheckInController extends Controller
         }
 
         try {
+            // Was every resort's check-ins (no resort filter). Now: this resort; HR/GM all of it, HOD/EXCOM their
+            // department, everyone else themselves and their reports.
+            $me = $this->user->GetEmployee;
+            $visibleIds = null;
+            if (!Common::hasFullDataAccess($me)) {
+                $rank = strtoupper((string) (config('settings.Position_Rank')[optional($me)->rank ?? ''] ?? ''));
+                $visibleIds = in_array($rank, ['HOD', 'EXCOM'], true) && optional($me)->Dept_id
+                    ? Employee::where('resort_id', $this->resort_id)->where('Dept_id', $me->Dept_id)->pluck('id')->all()
+                    : array_merge([optional($me)->id ?? 0], $me ? (array) Common::getSubordinates($me->id) : []);
+            }
             $employeeMonthlyCheckings                       =   MonthlyCheckingModel::select('id','emp_id','Checkin_id','date_discussion','start_time','end_time','Meeting_Place','Area_of_Discussion','Area_of_Improvement','Time_Line','comment','employee_comment','status')
+                                                                ->where('resort_id', $this->resort_id)
+                                                                ->when($visibleIds !== null, fn ($q) => $q->whereIn('emp_id', $visibleIds ?: [0]))
                                                                 ->with(['employee:id,Admin_Parent_id,Position_id','employee.resortAdmin:id,first_name,last_name,profile_picture','employee.position:id,position_title'])
                                                                 ->orderBy('emp_id')
                                                                 ->whereIn('status',['Conducted','Rescheduled'])
